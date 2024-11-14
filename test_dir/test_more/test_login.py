@@ -1,6 +1,15 @@
 """
 AOM: https://seldomqa.github.io/api-testing/api_object.html
 """
+import sys , os 
+# base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# print(base_dir)
+base_dir = '/tangzk/py/seldom-api-testing'
+
+sys.path.append(base_dir)
+
+print(sys.path)
+
 import seldom
 from api_object.user_api import UserApiObject
 
