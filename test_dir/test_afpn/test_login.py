@@ -28,7 +28,7 @@ class TestRequest(seldom.TestCase):
         print(jsonpath1)
         print(jsonpath2)
         print(jsonpath3)
-        self.assertPath("data.enterpriseInfo.name", "上海艾佩菲宁1")
+        self.assertPath("data.enterpriseInfo.name", "上海艾佩菲宁")
 
     def test_umis_logout(self):
         """
