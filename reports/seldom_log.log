@@ -1,9 +1,9 @@
- 2024-11-14 10:06:32 | INFO     | request.py | -------------- Request -----------------[🚀]
- 2024-11-14 10:06:32 | INFO     | request.py | [method]: DELETE      [url]: https://httpbin.org/delete 
- 2024-11-14 10:06:33 | INFO     | request.py | -------------- Response ----------------[🛬️]
- 2024-11-14 10:06:33 | INFO     | request.py | successful with status 200
- 2024-11-14 10:06:33 | DEBUG    | request.py | [type]: json      [time]: 0.76706
- 2024-11-14 10:06:33 | DEBUG    | request.py | [response]:
+ 2024-11-14 10:36:53 | INFO     | request.py | MainThread | -------------- [📤] Request -----------------
+ 2024-11-14 10:36:53 | INFO     | request.py | MainThread | [method]: DELETE      [url]: https://httpbin.org/delete 
+ 2024-11-14 10:36:54 | INFO     | request.py | MainThread | -------------- [📨] Response ----------------
+ 2024-11-14 10:36:54 | INFO     | request.py | MainThread | successful with status 200
+ 2024-11-14 10:36:54 | DEBUG    | request.py | MainThread | [type]: json      [time]: 0.982152
+ 2024-11-14 10:36:54 | DEBUG    | request.py | MainThread | [response]:
  {
   "args": {},
   "data": "",
@@ -15,24 +15,24 @@
     "Content-Length": "0",
     "Host": "httpbin.org",
     "User-Agent": "python-requests/2.32.3",
-    "X-Amzn-Trace-Id": "Root=1-67355b29-18aa718339977fb31ad1b47e"
+    "X-Amzn-Trace-Id": "Root=1-67356245-16a4bc2c12c326f1119e55a3"
   },
   "json": null,
   "origin": "172.105.209.68",
   "url": "https://httpbin.org/delete"
 }
- 2024-11-14 10:06:33 | INFO     | case.py    | 👀 assertStatusCode -> 200.
- 2024-11-14 10:06:33 | INFO     | request.py | -------------- Request -----------------[🚀]
- 2024-11-14 10:06:33 | INFO     | request.py | [method]: GET      [url]: https://httpbin.org/get 
- 2024-11-14 10:06:33 | DEBUG    | request.py | [params]:
+ 2024-11-14 10:36:54 | INFO     | case.py    | MainThread | 👀 assertStatusCode -> 200.
+ 2024-11-14 10:36:54 | INFO     | request.py | MainThread | -------------- [📤] Request -----------------
+ 2024-11-14 10:36:54 | INFO     | request.py | MainThread | [method]: GET      [url]: https://httpbin.org/get 
+ 2024-11-14 10:36:54 | DEBUG    | request.py | MainThread | [params]:
 {
   "key1": "value1",
   "key2": "value2"
 }
- 2024-11-14 10:06:34 | INFO     | request.py | -------------- Response ----------------[🛬️]
- 2024-11-14 10:06:34 | INFO     | request.py | successful with status 200
- 2024-11-14 10:06:34 | DEBUG    | request.py | [type]: json      [time]: 0.922642
- 2024-11-14 10:06:34 | DEBUG    | request.py | [response]:
+ 2024-11-14 10:36:55 | INFO     | request.py | MainThread | -------------- [📨] Response ----------------
+ 2024-11-14 10:36:55 | INFO     | request.py | MainThread | successful with status 200
+ 2024-11-14 10:36:55 | DEBUG    | request.py | MainThread | [type]: json      [time]: 0.790864
+ 2024-11-14 10:36:55 | DEBUG    | request.py | MainThread | [response]:
  {
   "args": {
     "key1": "value1",
@@ -43,22 +43,22 @@
     "Accept-Encoding": "gzip, deflate",
     "Host": "httpbin.org",
     "User-Agent": "python-requests/2.32.3",
-    "X-Amzn-Trace-Id": "Root=1-67355b29-18d3ed7c5c4efab66bffc2bd"
+    "X-Amzn-Trace-Id": "Root=1-67356246-242a195d694ddb486f6ad63c"
   },
   "origin": "172.105.209.68",
   "url": "https://httpbin.org/get?key1=value1&key2=value2"
 }
- 2024-11-14 10:06:34 | INFO     | case.py    | 👀 assertStatusCode -> 200.
- 2024-11-14 10:06:34 | INFO     | request.py | -------------- Request -----------------[🚀]
- 2024-11-14 10:06:34 | INFO     | request.py | [method]: POST      [url]: https://httpbin.org/post 
- 2024-11-14 10:06:34 | DEBUG    | request.py | [data]:
+ 2024-11-14 10:36:55 | INFO     | case.py    | MainThread | 👀 assertStatusCode -> 200.
+ 2024-11-14 10:36:55 | INFO     | request.py | MainThread | -------------- [📤] Request -----------------
+ 2024-11-14 10:36:55 | INFO     | request.py | MainThread | [method]: POST      [url]: https://httpbin.org/post 
+ 2024-11-14 10:36:55 | DEBUG    | request.py | MainThread | [data]:
 {
   "key": "value"
 }
- 2024-11-14 10:06:35 | INFO     | request.py | -------------- Response ----------------[🛬️]
- 2024-11-14 10:06:35 | INFO     | request.py | successful with status 200
- 2024-11-14 10:06:35 | DEBUG    | request.py | [type]: json      [time]: 0.775462
- 2024-11-14 10:06:35 | DEBUG    | request.py | [response]:
+ 2024-11-14 10:36:56 | INFO     | request.py | MainThread | -------------- [📨] Response ----------------
+ 2024-11-14 10:36:56 | INFO     | request.py | MainThread | successful with status 200
+ 2024-11-14 10:36:56 | DEBUG    | request.py | MainThread | [type]: json      [time]: 0.850716
+ 2024-11-14 10:36:56 | DEBUG    | request.py | MainThread | [response]:
  {
   "args": {},
   "data": "",
@@ -73,23 +73,23 @@
     "Content-Type": "application/x-www-form-urlencoded",
     "Host": "httpbin.org",
     "User-Agent": "python-requests/2.32.3",
-    "X-Amzn-Trace-Id": "Root=1-67355b2a-242d8b370bf6369a0df61020"
+    "X-Amzn-Trace-Id": "Root=1-67356247-7ccaee0f406fc28c0aea84d7"
   },
   "json": null,
   "origin": "172.105.209.68",
   "url": "https://httpbin.org/post"
 }
- 2024-11-14 10:06:35 | INFO     | case.py    | 👀 assertStatusCode -> 200.
- 2024-11-14 10:06:35 | INFO     | request.py | -------------- Request -----------------[🚀]
- 2024-11-14 10:06:35 | INFO     | request.py | [method]: PUT      [url]: https://httpbin.org/put 
- 2024-11-14 10:06:35 | DEBUG    | request.py | [data]:
+ 2024-11-14 10:36:56 | INFO     | case.py    | MainThread | 👀 assertStatusCode -> 200.
+ 2024-11-14 10:36:56 | INFO     | request.py | MainThread | -------------- [📤] Request -----------------
+ 2024-11-14 10:36:56 | INFO     | request.py | MainThread | [method]: PUT      [url]: https://httpbin.org/put 
+ 2024-11-14 10:36:56 | DEBUG    | request.py | MainThread | [data]:
 {
   "key": "value"
 }
- 2024-11-14 10:06:36 | INFO     | request.py | -------------- Response ----------------[🛬️]
- 2024-11-14 10:06:36 | INFO     | request.py | successful with status 200
- 2024-11-14 10:06:36 | DEBUG    | request.py | [type]: json      [time]: 0.837784
- 2024-11-14 10:06:36 | DEBUG    | request.py | [response]:
+ 2024-11-14 10:36:57 | INFO     | request.py | MainThread | -------------- [📨] Response ----------------
+ 2024-11-14 10:36:57 | INFO     | request.py | MainThread | successful with status 200
+ 2024-11-14 10:36:57 | DEBUG    | request.py | MainThread | [type]: json      [time]: 0.77371
+ 2024-11-14 10:36:57 | DEBUG    | request.py | MainThread | [response]:
  {
   "args": {},
   "data": "",
@@ -104,11 +104,11 @@
     "Content-Type": "application/x-www-form-urlencoded",
     "Host": "httpbin.org",
     "User-Agent": "python-requests/2.32.3",
-    "X-Amzn-Trace-Id": "Root=1-67355b2b-6c18659c47a2a4cd4d951ef9"
+    "X-Amzn-Trace-Id": "Root=1-67356248-46f76cc377053a7b68a90ce3"
   },
   "json": null,
   "origin": "172.105.209.68",
   "url": "https://httpbin.org/put"
 }
- 2024-11-14 10:06:36 | INFO     | case.py    | 👀 assertStatusCode -> 200.
- 2024-11-14 10:06:36 | SUCCESS  | runner.py  | A run the test in debug mode without generating HTML report!
+ 2024-11-14 10:36:57 | INFO     | case.py    | MainThread | 👀 assertStatusCode -> 200.
+ 2024-11-14 10:36:57 | SUCCESS  | runner.py  | MainThread | A run the test in debug mode without generating HTML report!
