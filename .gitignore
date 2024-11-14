@@ -1,3 +1,7 @@
 *.pyc
 __pycache__/
 .idea/
+
+# 报告 data
+
+reports/
