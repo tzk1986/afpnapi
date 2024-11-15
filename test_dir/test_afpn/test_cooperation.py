@@ -3,10 +3,11 @@ import seldom
 
 class TestRequest(seldom.TestCase):
     """
-    前厅会员列表页面
+    前厅合作页面
     """
 
     def start(self):
+        print("开始测试")
         self.s = self.Session()
         self.s.post(
             "/api/uims/login",
@@ -21,35 +22,25 @@ class TestRequest(seldom.TestCase):
             },
         )
         self.assertStatusCode(200)
-        print(self.s)
+        print("登录成功")
 
-    def test_query_userInfos(self):
+    def end(self):
+        print("结束测试")
+
+    def test_cooperation_partner(self):
         """
-        会员列表
+        合作商列表
         """
         tt = self.jsonpath("$..token", index=0)
         print(tt)
         self.s.post(
-            "/api/query/userInfos",
-            json={
-                "userBackStatus": "0",
-                "phoneNumber": "",
-                "nickName": "",
-                "memberCard": "",
-                "merchantId": "2021040701",
-                "pageNum": 1,
-                "delFlag": 0,
-                "pageSize": 10,
-                "sysId": "iom",
-            },
+            "/api/mer/cooperative/merchant/queryPage",
+            json={"pageNum": 1, "pageSize": 10, "merchantId": "2021040701"},
             headers={"token": tt},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
-
-        self.assertJSON(0, self.jsonpath("$..errCode", index=0))
         self.assertPath("message", "success")
-
         print(self.jsonpath("$.message", index=0))
 
         if self.jsonpath("$..errCode", index=0) == 0:
@@ -59,48 +50,80 @@ class TestRequest(seldom.TestCase):
             print("查询失败")
             print(f"查询失败的错误码是：{errCode}")
 
-    def test_faceAi_getUserInfos(self):
+    def test_cooperation_department(self):
         """
-        会员列表-人脸列表
+        部门列表
         """
         tt = self.jsonpath("$..token", index=0)
         print(tt)
         self.s.post(
-            "/api/faceAi/getUserInfos",
+            "/api/mer/department/queryPage",
             json={
                 "pageNum": 1,
                 "pageSize": 10,
                 "delFlag": 0,
-                "departmentName": "",
-                "merchantName": "",
                 "merchantId": "2021040701",
-                "cooperativeMerchantId": "",
-                "dimission": "",
-                "phoneNumber": "",
             },
             headers={"token": tt},
         )
-        self.jsonpath("$.message")
-        print(self.jsonpath("$.message"))
+        self.assertStatusCode(200)
+        self.assertPath("errCode", 0)
         self.assertPath("message", "success")
 
-    def test_accountBalance_insertAccountBalanceAdd(self):
+    def test_cooperation_position(self):
         """
-        会员列表-开通账户
+        职务列表
         """
         tt = self.jsonpath("$..token", index=0)
         print(tt)
         self.s.post(
-            "/api/ts/accountBalance/insertAccountBalanceAdd",
+            "/api/mer/position/queryPage",
             json={
-                "accountType": 1,
-                "phoneNumber": "15900506254",
-                "cashBalance": "",
+                "pageNum": 1,
+                "pageSize": 10,
+                "delFlag": 0,
                 "merchantId": "2021040701",
             },
             headers={"token": tt},
         )
-        self.assertPath("message", "会员钱包已存在")
+        self.assertStatusCode(200)
+        self.assertPath("errCode", 0)
+
+    def test_cooperation_employee(self):
+        """
+        员工列表
+        """
+        tt = self.jsonpath("$..token", index=0)
+        print(tt)
+        self.s.post(
+            "/api/us/employee/query/page",
+            json={
+                "pageNum": 1,
+                "pageSize": 10,
+                "delFlag": "",
+                "sysId": "iom",
+                "accountType": 2,
+                "merchantId": "2021040701",
+                "cooperativeMerchantCode": "",
+            },
+            headers={"token": tt},
+        )
+        self.assertStatusCode(200)
+        self.assertPath("errCode", 0)
+
+    def test_cooperation_companyEmployeeGroup(self):
+        """
+        员工分组
+        """
+        tt = self.jsonpath("$..token", index=0)
+        print(tt)
+        self.s.post(
+            "/api/mer/employee/group/queryPage",
+            json={"pageNum": 1, "pageSize": 10, "merchantId": "2021040701"},
+            headers={"token": tt},
+        )
+        self.assertStatusCode(200)
+        self.assertPath("errCode", 0)
 
 
 if __name__ == "__main__":
