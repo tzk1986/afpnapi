@@ -135,7 +135,7 @@ class TestRequest(seldom.TestCase):
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
 
-    def test_system_settings3(self):
+    def test_system_settings5(self):
         """
         设置-菜品新增编辑
         """
