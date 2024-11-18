@@ -3,7 +3,7 @@ import seldom
 
 class TestRequest(seldom.TestCase):
     """
-    前厅运营页面
+    前厅食安页面
     """
 
     def start(self):
