@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,12 +32,10 @@ class TestRequest(seldom.TestCase):
         """
         基础数据-计量单位
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/base/unit/pageQuery",
             json={"pageNum": 1, "pageSize": 10, "unitName": ""},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -45,12 +44,10 @@ class TestRequest(seldom.TestCase):
         """
         基础数据-供应商
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/base/supplier/querySupplierPage",
             json={"pageNum": 1, "pageSize": 10, "supplierCode": "", "supplierName": ""},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -59,8 +56,6 @@ class TestRequest(seldom.TestCase):
         """
         基础数据-商户配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/sys/config/queryConfig",
             json={
@@ -68,7 +63,7 @@ class TestRequest(seldom.TestCase):
                 "configType": 2,
                 "configRelationId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -77,8 +72,6 @@ class TestRequest(seldom.TestCase):
         """
         基础数据-档口配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/sys/config/queryConfig",
             json={
@@ -86,7 +79,7 @@ class TestRequest(seldom.TestCase):
                 "configType": 3,
                 "configRelationId": "3782d4a940e13412e301ef0a8c6ac9dd",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -95,8 +88,6 @@ class TestRequest(seldom.TestCase):
         """
         基础数据-计量单位
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/uims/user/queryPage",
             json={
@@ -105,7 +96,7 @@ class TestRequest(seldom.TestCase):
                 "organizationEntityId": "2021040701",
                 "organizationType": 22,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

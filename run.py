@@ -3,6 +3,9 @@ import seldom
 # 测试环境地址
 test_url ="http://10.50.11.120:9001"
 
+# 测试环境采购地址
+test_purchase_url = "http://10.50.11.120:9005"
+
 
 if __name__ == '__main__':
     seldom.main(

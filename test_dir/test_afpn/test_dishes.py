@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         规格
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/specgroup/queryPage",
             json={
@@ -41,7 +40,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -61,8 +60,6 @@ class TestRequest(seldom.TestCase):
         """
         口味
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/flavorgroup/queryPage",
             json={
@@ -71,7 +68,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -80,8 +77,6 @@ class TestRequest(seldom.TestCase):
         """
         分类
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/category/queryPage",
             json={
@@ -93,7 +88,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -102,8 +97,6 @@ class TestRequest(seldom.TestCase):
         """
         单品菜品
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/dish/queryPage",
             json={
@@ -117,7 +110,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "sysId": "iom",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -126,12 +119,10 @@ class TestRequest(seldom.TestCase):
         """
         单品组合
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/dish/group/queryAll",
             json={"merchantId": "2021040701"},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -140,8 +131,6 @@ class TestRequest(seldom.TestCase):
         """
         套餐菜品
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/combo/queryPage",
             json={
@@ -153,7 +142,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -162,8 +151,6 @@ class TestRequest(seldom.TestCase):
         """
         菜品备注
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/goods/food/remark/queryPage",
             json={
@@ -174,7 +161,7 @@ class TestRequest(seldom.TestCase):
                 "delFlag": 0,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -183,8 +170,6 @@ class TestRequest(seldom.TestCase):
         """
         排餐
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/arrange/meal/queryPage",
             json={
@@ -197,7 +182,7 @@ class TestRequest(seldom.TestCase):
                 "foodName": "",
                 "valuationType": 3,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -206,8 +191,6 @@ class TestRequest(seldom.TestCase):
         """
         食材预估
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/estimation/queryPage",
             json={
@@ -217,7 +200,7 @@ class TestRequest(seldom.TestCase):
                 "queryEndTime": None,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -226,8 +209,6 @@ class TestRequest(seldom.TestCase):
         """
         菜谱分组
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/group/queryPage",
             json={
@@ -239,7 +220,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -248,8 +229,6 @@ class TestRequest(seldom.TestCase):
         """
         菜谱分类
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/type/queryPage",
             json={
@@ -260,7 +239,7 @@ class TestRequest(seldom.TestCase):
                 "delFlag": 0,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -269,12 +248,10 @@ class TestRequest(seldom.TestCase):
         """
         原料管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/ingredients/queryPage",
             json={"pageNum": 1, "pageSize": 10, "delFlag": 0, "name": "", "type": 1},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -283,12 +260,10 @@ class TestRequest(seldom.TestCase):
         """
         调料管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/seasoning/queryPage",
             json={"pageNum": 1, "pageSize": 10, "delFlag": 0, "name": "", "type": 1},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -297,8 +272,6 @@ class TestRequest(seldom.TestCase):
         """
         平台菜谱
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/base/queryRecipeBasePage",
             json={
@@ -310,7 +283,7 @@ class TestRequest(seldom.TestCase):
                 "recipeBaseName": "",
                 "recipeMachineType": 1,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -319,8 +292,6 @@ class TestRequest(seldom.TestCase):
         """
         自研菜谱
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/base/queryRecipeBasePage",
             json={
@@ -333,7 +304,7 @@ class TestRequest(seldom.TestCase):
                 "recipeBaseName": "",
                 "recipeMachineType": 1,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -342,8 +313,6 @@ class TestRequest(seldom.TestCase):
         """
         菜谱授权
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/base/queryRecipeBasePage",
             json={
@@ -360,7 +329,7 @@ class TestRequest(seldom.TestCase):
                 "lastVersionStatus": 2,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -369,8 +338,6 @@ class TestRequest(seldom.TestCase):
         """
         烧录分组
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/burn/group/queryPage",
             json={
@@ -380,7 +347,7 @@ class TestRequest(seldom.TestCase):
                 "groupType": "",
                 "storeId": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -389,8 +356,6 @@ class TestRequest(seldom.TestCase):
         """
         菜谱下发
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/stir/recipe/burnbase/queryPage",
             json={
@@ -406,7 +371,7 @@ class TestRequest(seldom.TestCase):
                 "machineName": "",
                 "machineCode": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

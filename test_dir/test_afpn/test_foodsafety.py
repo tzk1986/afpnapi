@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         健康证
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/healthCert/queryPage",
             json={
@@ -43,7 +42,7 @@ class TestRequest(seldom.TestCase):
                 "healthExpireStartTime": None,
                 "healthExpireEndTime": None,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -52,8 +51,6 @@ class TestRequest(seldom.TestCase):
         """
         岗位管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/healthPost/queryPage",
             json={
@@ -62,7 +59,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

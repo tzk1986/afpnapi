@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         订单列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/orderRecord/queryPage",
             json={
@@ -62,7 +61,7 @@ class TestRequest(seldom.TestCase):
                 "positionName": "",
                 "employeeCode": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -82,8 +81,6 @@ class TestRequest(seldom.TestCase):
         """
         商户对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/businessCheck/page",
             json={
@@ -101,7 +98,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -110,8 +107,6 @@ class TestRequest(seldom.TestCase):
         """
         档口对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/businessCheck/page",
             json={
@@ -132,7 +127,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "businessType": 1,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -141,8 +136,6 @@ class TestRequest(seldom.TestCase):
         """
         合作商消费对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/businessCheck/enterprise/page",
             json={
@@ -169,7 +162,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "businessType": None,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -178,8 +171,6 @@ class TestRequest(seldom.TestCase):
         """
         补贴下发扣除对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/subsidyCheck/queryPage",
             json={
@@ -203,7 +194,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -212,8 +203,6 @@ class TestRequest(seldom.TestCase):
         """
         企业员工对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/cooperate/consume/queryPage",
             json={
@@ -239,7 +228,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "businessType": None,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -248,8 +237,6 @@ class TestRequest(seldom.TestCase):
         """
         减免次数统计
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/employee/derate/summary",
             json={
@@ -268,7 +255,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -277,8 +264,6 @@ class TestRequest(seldom.TestCase):
         """
         商城对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/busines/shop/sum",
             json={
@@ -292,7 +277,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -301,8 +286,6 @@ class TestRequest(seldom.TestCase):
         """
         渠道收款统计
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/query/dwdPayChannelAmountD/sum",
             json={
@@ -316,7 +299,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "sysId": "iom",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         财务管理-供应商对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "merchantId": "2021040701",
             "date": "2024-12",
@@ -42,7 +41,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/report/supplier/querySupplierReport",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -51,8 +50,6 @@ class TestRequest(seldom.TestCase):
         """
         财务管理-验收统计
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -62,7 +59,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/stat/acceptMaterialStat/acceptDayAmount",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -71,13 +68,11 @@ class TestRequest(seldom.TestCase):
         """
         财务管理-档口对账
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"merchantId": "2021040701", "statType": "store", "month": "202412"}
         self.s.post(
             "/api/stat/outboundMaterialStat/queryOutboundMonthCost",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,13 +32,11 @@ class TestRequest(seldom.TestCase):
         """
         导入导出-导入管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10, "sysId": "scm"}
         self.s.post(
             "/api/import/query",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -46,13 +45,11 @@ class TestRequest(seldom.TestCase):
         """
         导入导出-导出管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10, "sysId": "scm"}
         self.s.post(
             "/api/export/query",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

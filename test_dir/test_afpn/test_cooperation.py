@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,12 +32,10 @@ class TestRequest(seldom.TestCase):
         """
         合作商列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/cooperative/merchant/queryPage",
             json={"pageNum": 1, "pageSize": 10, "merchantId": "2021040701"},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -54,8 +53,6 @@ class TestRequest(seldom.TestCase):
         """
         部门列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/department/queryPage",
             json={
@@ -64,7 +61,7 @@ class TestRequest(seldom.TestCase):
                 "delFlag": 0,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -74,8 +71,6 @@ class TestRequest(seldom.TestCase):
         """
         职务列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/position/queryPage",
             json={
@@ -84,7 +79,7 @@ class TestRequest(seldom.TestCase):
                 "delFlag": 0,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -93,8 +88,6 @@ class TestRequest(seldom.TestCase):
         """
         员工列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/us/employee/query/page",
             json={
@@ -106,7 +99,7 @@ class TestRequest(seldom.TestCase):
                 "merchantId": "2021040701",
                 "cooperativeMerchantCode": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -115,16 +108,16 @@ class TestRequest(seldom.TestCase):
         """
         员工分组
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/employee/group/queryPage",
             json={"pageNum": 1, "pageSize": 10, "merchantId": "2021040701"},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
 
 
 if __name__ == "__main__":
-    seldom.main(debug=True, base_url="http://10.50.11.120:9001")
+    seldom.main(
+        # debug=True, 
+        base_url="http://10.50.11.120:9001")

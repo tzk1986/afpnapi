@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         采购管理-物料申请单
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "corpId": "e3b767ab3d542be199748389670ca9be",
             "pageNum": 1,
@@ -42,7 +41,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/pur/materialRequest/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -51,13 +50,11 @@ class TestRequest(seldom.TestCase):
         """
         采购管理-竞价采购
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10}
         self.s.post(
             "/api/pur/bidding/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -66,13 +63,11 @@ class TestRequest(seldom.TestCase):
         """
         采购管理-报价采购
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10}
         self.s.post(
             "/api/pur/spu/bidding/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -81,13 +76,11 @@ class TestRequest(seldom.TestCase):
         """
         采购管理-采购订单
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10}
         self.s.post(
             "/api/pur/purchase/order/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -96,8 +89,6 @@ class TestRequest(seldom.TestCase):
         """
         采购管理-结算主体
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -107,7 +98,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/base/settlement/org/pageQuery",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

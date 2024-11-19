@@ -22,13 +22,12 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print(self.s)
+        self.token = self.jsonpath("$..token", index=0)
 
     def test_query_userInfos(self):
         """
         会员列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/query/userInfos",
             json={
@@ -42,7 +41,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "sysId": "iom",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -63,8 +62,6 @@ class TestRequest(seldom.TestCase):
         """
         会员列表-人脸列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/faceAi/getUserInfos",
             json={
@@ -78,7 +75,7 @@ class TestRequest(seldom.TestCase):
                 "dimission": "",
                 "phoneNumber": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.jsonpath("$.message")
         print(self.jsonpath("$.message"))
@@ -88,8 +85,6 @@ class TestRequest(seldom.TestCase):
         """
         会员列表-开通账户
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/accountBalance/insertAccountBalanceAdd",
             json={
@@ -98,7 +93,7 @@ class TestRequest(seldom.TestCase):
                 "cashBalance": "",
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertPath("message", "会员钱包已存在")
 

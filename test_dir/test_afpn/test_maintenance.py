@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,12 +32,10 @@ class TestRequest(seldom.TestCase):
         """
         账号管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/uims/user/queryPage",
             json={"pageNum": 1, "pageSize": 10, "userName": "", "phoneNumber": ""},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -45,12 +44,10 @@ class TestRequest(seldom.TestCase):
         """
         角色管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/uims/role/queryPage",
             json={"pageNum": 1, "pageSize": 10, "name": ""},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -59,8 +56,6 @@ class TestRequest(seldom.TestCase):
         """
         管理员卡
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/machinemanagementcard/query/example",
             json={
@@ -69,7 +64,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -78,8 +73,6 @@ class TestRequest(seldom.TestCase):
         """
         档口分组
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/tree/group/next/one",
             json={
@@ -91,7 +84,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -100,12 +93,10 @@ class TestRequest(seldom.TestCase):
         """
         档口列表
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/store/queryPageExample/two",
             json={"pageNum": 1, "pageSize": 8, "merchantId": "2021040701"},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -114,8 +105,6 @@ class TestRequest(seldom.TestCase):
         """
         设备管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/machine/queryPageExampleList",
             json={
@@ -127,7 +116,7 @@ class TestRequest(seldom.TestCase):
                 "modelId": None,
                 "status": None,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -136,8 +125,6 @@ class TestRequest(seldom.TestCase):
         """
         托盘管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/repast/queryPageExample",
             json={
@@ -147,7 +134,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -156,8 +143,6 @@ class TestRequest(seldom.TestCase):
         """
         打印机管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/machineprint/queryPage",
             json={
@@ -168,7 +153,7 @@ class TestRequest(seldom.TestCase):
                 "merchantId": "2021040701",
                 "printMachineCode": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -177,8 +162,6 @@ class TestRequest(seldom.TestCase):
         """
         配送员管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/orderDeliverer/queryPage",
             json={
@@ -187,7 +170,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -196,8 +179,6 @@ class TestRequest(seldom.TestCase):
         """
         就餐区域
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/merMerchantArea/queryPage",
             json={
@@ -206,7 +187,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -215,8 +196,6 @@ class TestRequest(seldom.TestCase):
         """
         就餐位置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/merchant/area/location/queryPage",
             json={
@@ -228,7 +207,7 @@ class TestRequest(seldom.TestCase):
                 "merchantId": "2021040701",
                 "downLoadType": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

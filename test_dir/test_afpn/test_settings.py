@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         登录日志
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/oplog/queryPage",
             json={
@@ -41,7 +40,7 @@ class TestRequest(seldom.TestCase):
                 "moduleCode": "",
                 "systemType": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -50,8 +49,6 @@ class TestRequest(seldom.TestCase):
         """
         操作日志
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/oplog/queryPage",
             json={
@@ -60,7 +57,7 @@ class TestRequest(seldom.TestCase):
                 "moduleCode": "",
                 "systemType": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -69,15 +66,13 @@ class TestRequest(seldom.TestCase):
         """
         设置-支付配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "merchantId":"2021040701",
         }
         self.s.get(
             "/api/get/recharge/switch",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.tokentt},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -86,15 +81,13 @@ class TestRequest(seldom.TestCase):
         """
         设置-绑盘配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "merchantId":"2021040701",
         }
         self.s.get(
             "/api/mer/merchantlimitconfig/query",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -103,8 +96,6 @@ class TestRequest(seldom.TestCase):
         """
         设置-视觉餐厅配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/base/org/config/queryConfig",
             json={
@@ -112,7 +103,7 @@ class TestRequest(seldom.TestCase):
                 "organizationId": "2021040701",
                 "organizationType": 22,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -121,8 +112,6 @@ class TestRequest(seldom.TestCase):
         """
         设置-移动端首页展示
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/base/org/config/queryConfig",
             json={
@@ -130,7 +119,7 @@ class TestRequest(seldom.TestCase):
                 "organizationId": "2021040701",
                 "organizationType": 22,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -139,8 +128,6 @@ class TestRequest(seldom.TestCase):
         """
         设置-菜品新增编辑
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/base/org/config/queryConfig",
             json={
@@ -148,7 +135,7 @@ class TestRequest(seldom.TestCase):
                 "organizationId": "2021040701",
                 "organizationType": 22,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

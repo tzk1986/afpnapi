@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,13 +32,11 @@ class TestRequest(seldom.TestCase):
         """
         数据报表-档口领用统计
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"startDate": "20241019", "endDate": "20241118"}
         self.s.post(
             "/api/stat/outboundMaterialStat/queryTakeoutCollectDayResult",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

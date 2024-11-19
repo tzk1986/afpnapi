@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         提现管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/withDrawl/queryPage",
             json={
@@ -47,7 +46,7 @@ class TestRequest(seldom.TestCase):
                 "exportType": "withdraw",
                 "reviewerVerdict": 0,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -56,8 +55,6 @@ class TestRequest(seldom.TestCase):
         """
         补贴下发
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/subsidy/queryPageExample",
             json={
@@ -72,7 +69,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -81,8 +78,6 @@ class TestRequest(seldom.TestCase):
         """
         补贴扣除
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/subsidyDeduct/queryPage",
             json={
@@ -98,7 +93,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "corpId": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -107,8 +102,6 @@ class TestRequest(seldom.TestCase):
         """
         补贴规则
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/subsidy/querySubsidyPage",
             json={
@@ -122,7 +115,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -131,8 +124,6 @@ class TestRequest(seldom.TestCase):
         """
         减免规则
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/quotaconfig/queryPage",
             json={
@@ -145,7 +136,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -154,8 +145,6 @@ class TestRequest(seldom.TestCase):
         """
         绑盘限制
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/bindTrayRule/queryPage",
             json={
@@ -164,7 +153,7 @@ class TestRequest(seldom.TestCase):
                 "merchantId": "2021040701",
                 "ruleName": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -173,12 +162,10 @@ class TestRequest(seldom.TestCase):
         """
         预定管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/store/queryPageExample/two",
             json={"pageNum": 1, "pageSize": 8, "merchantId": "2021040701"},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -187,8 +174,6 @@ class TestRequest(seldom.TestCase):
         """
         充值福利
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/welfare/queryPageExample",
             json={
@@ -201,7 +186,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -210,8 +195,6 @@ class TestRequest(seldom.TestCase):
         """
         消费次数
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/consumption/times/queryPage",
             json={
@@ -223,7 +206,7 @@ class TestRequest(seldom.TestCase):
                 "pageNum": 1,
                 "pageSize": 10,
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -232,8 +215,6 @@ class TestRequest(seldom.TestCase):
         """
         线下餐券
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/mer/mealticket/queryPage",
             json={
@@ -245,7 +226,7 @@ class TestRequest(seldom.TestCase):
                 "pageSize": 10,
                 "merchantId": "2021040701",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -254,8 +235,6 @@ class TestRequest(seldom.TestCase):
         """
         优惠活动
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -267,7 +246,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/activity/performActivityList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -276,8 +255,6 @@ class TestRequest(seldom.TestCase):
         """
         优惠活动统计
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "orderStartDate": "",
             "orderEndDate": "",
@@ -293,7 +270,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/activity/getActivityOrderStat",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         errCode = self.jsonpath("$.errCode", 0)
@@ -306,12 +283,10 @@ class TestRequest(seldom.TestCase):
         """
         报餐管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/mealEnroll/queryPage",
             json={"pageNum": 1, "pageSize": 10, "merchantIds": ["2021040701"]},
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -320,8 +295,6 @@ class TestRequest(seldom.TestCase):
         """
         核销记录
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         self.s.post(
             "/api/ts/mealEnrollUse/queryPage",
             json={
@@ -339,7 +312,7 @@ class TestRequest(seldom.TestCase):
                 "startDate": "",
                 "endDate": "",
             },
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

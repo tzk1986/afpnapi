@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,8 +32,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-验收管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -42,7 +41,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/pur/deliverOrder/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -51,13 +50,11 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-领用管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10, "orderCode": ""}
         self.s.post(
             "/api/takeout/order/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -66,8 +63,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-入库单
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -81,7 +76,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/wms/inboundOrder/queryInBoundOrderList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -90,8 +85,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-出库单
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -104,7 +97,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/wms/outboundOrder/queryOutboundOrderList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -113,8 +106,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-库存查询
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -126,7 +117,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/wms/stockSummary/queryStockSummaryList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -135,8 +126,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-库存流水查询
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -150,7 +139,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/wms/stockFlow/queryStockFlowList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -159,13 +148,11 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-预警配置
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10, "matCode": "", "matName": ""}
         self.s.get(
             "/api/wms/stockWarningConfig/queryStockWarningList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -174,8 +161,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-仓库
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "corpId": "e3b767ab3d542be199748389670ca9be",
             "name": "",
@@ -188,7 +173,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/wms/warehouse/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -197,8 +182,6 @@ class TestRequest(seldom.TestCase):
         """
         库存管理-配送点
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "corpId": "e3b767ab3d542be199748389670ca9be",
             "storeId": "",
@@ -212,7 +195,7 @@ class TestRequest(seldom.TestCase):
         self.s.post(
             "/api/wms/warehouse/deliverAddress/queryPage",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)

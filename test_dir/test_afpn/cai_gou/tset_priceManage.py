@@ -23,6 +23,7 @@ class TestRequest(seldom.TestCase):
         )
         self.assertStatusCode(200)
         print("登录成功")
+        self.token = self.jsonpath("$..token", index=0)
 
     def end(self):
         print("结束测试")
@@ -31,13 +32,11 @@ class TestRequest(seldom.TestCase):
         """
         价格管理-采购价格
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10}
         self.s.get(
             "/api/mat/purchasePrice/queryPurchasePriceList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -46,8 +45,6 @@ class TestRequest(seldom.TestCase):
         """
         价格管理-出库价格
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {
             "pageNum": 1,
             "pageSize": 10,
@@ -61,7 +58,7 @@ class TestRequest(seldom.TestCase):
         self.s.get(
             "/api/mat/outboundPrice/queryOutboundPriceList",
             params=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -70,13 +67,11 @@ class TestRequest(seldom.TestCase):
         """
         价格管理-调价管理
         """
-        tt = self.jsonpath("$..token", index=0)
-        print(tt)
         payload = {"pageNum": 1, "pageSize": 10}
         self.s.post(
             "/api/mat/purchasePriceChangeRequest/queryChangePriceRequestList",
             json=payload,
-            headers={"token": tt},
+            headers={"token": self.token},
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
