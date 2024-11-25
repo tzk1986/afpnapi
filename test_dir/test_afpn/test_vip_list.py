@@ -98,5 +98,9 @@ class TestRequest(seldom.TestCase):
         self.assertPath("message", "会员钱包已存在")
 
 
+# my_object = TestRequest()  # 假设MyClass是一个类，my_object是它的一个实例
+# attributes = dir(my_object)
+# print(attributes)
+
 if __name__ == "__main__":
     seldom.main(debug=True, base_url="http://10.50.11.120:9001")
