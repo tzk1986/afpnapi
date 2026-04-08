@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Seldom Postman API 测试报告</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .header { background-color: #333; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .summary { background-color: white; padding: 15px; border-radius: 5px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .summary-item { display: inline-block; margin-right: 30px; }
+        .summary-item label { font-weight: bold; margin-right: 10px; }
+        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th { background-color: #f0f0f0; padding: 12px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; }
+        tr:hover { background-color: #f9f9f9; }
+        .status-passed { color: green; font-weight: bold; }
+        .status-failed { color: red; font-weight: bold; }
+        .status-error { color: orange; font-weight: bold; }
+        .url { color: #0066cc; font-family: monospace; }
+        .detail { font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Seldom Postman API 测试报告</h1>
+        <p>基于 Seldom 框架的自动化接口测试结果汇总</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-item">
+            <label>总计:</label>
+            <span>2</span>
+        </div>
+        <div class="summary-item">
+            <label style="color: green;">通过:</label>
+            <span style="color: green;">2</span>
+        </div>
+        <div class="summary-item">
+            <label style="color: red;">失败:</label>
+            <span style="color: red;">0</span>
+        </div>
+        <div class="summary-item">
+            <label style="color: orange;">错误:</label>
+            <span style="color: orange;">0</span>
+        </div>
+        <div class="summary-item">
+            <label>成功率:</label>
+            <span>100.00%</span>
+        </div>
+        <div class="summary-item">
+            <label>耗时:</label>
+            <span>0.00s</span>
+        </div>
+        <br>
+        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+            <p>开始时间: 2026-04-08 09:50:29</p>
+            <p>结束时间: 2026-04-08 09:50:29</p>
+        </div>
+    </div>
+
+    <h2>详细结果</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>API名称</th>
+                <th>文件夹</th>
+                <th>方法</th>
+                <th>URL</th>
+                <th>状态</th>
+                <th>状态码</th>
+                <th>详情</th>
+            </tr>
+        </thead>
+        <tbody>
+
+            <tr>
+                <td>获取用户信息</td>
+                <td></td>
+                <td>GET</td>
+                <td><span class="url">https://httpbin.org/get</span></td>
+                <td><span class="status-passed">PASSED</span></td>
+                <td>200</td>
+                <td><span class="detail">响应状态码: 200</span></td>
+            </tr>
+
+            <tr>
+                <td>创建用户</td>
+                <td></td>
+                <td>POST</td>
+                <td><span class="url">https://httpbin.org/post</span></td>
+                <td><span class="status-passed">PASSED</span></td>
+                <td>200</td>
+                <td><span class="detail">响应状态码: 200</span></td>
+            </tr>
+
+        </tbody>
+    </table>
+</body>
+</html>

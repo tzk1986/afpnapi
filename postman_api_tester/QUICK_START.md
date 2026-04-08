@@ -127,7 +127,7 @@ report.print_console_report()
 
 ## 🔧 故障排除
 
-### 问题1：ModuleNotFoundError: No module named 'seldom'
+### 问题1：ModuleNotFoundError: No module named 'requests'
 
 **解决方案：** 安装依赖
 ```bash

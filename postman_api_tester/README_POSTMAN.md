@@ -1,7 +1,7 @@
 # Postman API 自动化测试工具
 
 [![Python](https://img.shields.io/badge/Python-3.7%2B-blue)](https://www.python.org/)
-[![Seldom](https://img.shields.io/badge/Seldom-3.10.0-green)](https://seldom.readthedocs.io/)
+[![Requests](https://img.shields.io/badge/Requests-2.25+-green)](https://requests.readthedocs.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 专业的API接口自动化测试工具 - 读取APIFox/Postman导出的接口定义文件，自动生成并执行测试用例，

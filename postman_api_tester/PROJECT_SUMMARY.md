@@ -2,7 +2,7 @@
 
 ## 📌 项目概述
 
-基于 Seldom 框架，创建了一个完整的 **Postman 接口测试自动化工具**。
+基于 Python requests 库，创建了一个完整的 **Postman 接口测试自动化工具**。
 
 该工具可以：
 - 🔍 读取APIFox/Postman导出的接口文件（JSON格式）

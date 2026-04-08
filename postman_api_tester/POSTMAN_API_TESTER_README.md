@@ -1,6 +1,6 @@
 # Postman API 测试工具
 
-这是一个基于 Seldom 框架的 Postman 接口测试工具，用于读取从 APIFox/Postman 导出的接口文件，动态生成并执行测试用例，最后生成详细的测试报告。
+这是一个基于 Python requests 库的 Postman 接口测试工具，用于读取从 APIFox/Postman 导出的接口文件，动态生成并执行测试用例，最后生成详细的测试报告。
 
 ## 功能特性
 
@@ -43,7 +43,7 @@ base_url = parser.extract_base_url()  # 获取基础URL
 
 ### 2. PostmanTestExecutor（测试执行器）
 
-继承自 Seldom 的 TestCase，负责执行单个 API 的测试。
+继承自 requests.Session，负责执行单个 API 的测试。
 
 **主要功能：**
 - 创建 HTTP 会话
