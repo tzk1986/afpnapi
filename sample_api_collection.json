@@ -1,0 +1,134 @@
+{
+  "info": {
+    "name": "示例 API 集合",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://httpbin.org"
+    }
+  ],
+  "item": [
+    {
+      "name": "获取用户列表",
+      "request": {
+        "method": "GET",
+        "url": "https://httpbin.org/get?page=1&limit=10",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ]
+      }
+    },
+    {
+      "name": "创建用户",
+      "request": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\": \"张三\", \"email\": \"zhangsan@example.com\", \"age\": 28}"
+        }
+      }
+    },
+    {
+      "name": "修改用户信息",
+      "request": {
+        "method": "PUT",
+        "url": "https://httpbin.org/put",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"id\": 1, \"name\": \"李四\", \"email\": \"lisi@example.com\"}"
+        }
+      }
+    },
+    {
+      "name": "请求头测试",
+      "request": {
+        "method": "GET",
+        "url": "https://httpbin.org/headers",
+        "header": [
+          {
+            "key": "X-Custom-Header",
+            "value": "test-value-123"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer token_example"
+          }
+        ]
+      }
+    },
+    {
+      "name": "表单数据测试",
+      "request": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "username",
+              "value": "testuser"
+            },
+            {
+              "key": "password",
+              "value": "password123"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "API 文件夹",
+      "item": [
+        {
+          "name": "查询接口",
+          "request": {
+            "method": "GET",
+            "url": "https://httpbin.org/status/200",
+            "header": []
+          }
+        },
+        {
+          "name": "删除接口",
+          "request": {
+            "method": "DELETE",
+            "url": "https://httpbin.org/delete",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"id\": 1}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
