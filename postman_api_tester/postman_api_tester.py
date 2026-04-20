@@ -591,16 +591,21 @@ class PostmanTestReport:
         
         .results-section {{ background-color: white; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }}
         
-        table {{ width: 100%; border-collapse: collapse; }}
-        th {{ background-color: #f0f0f0; padding: 12px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; }}
-        td {{ padding: 12px; border-bottom: 1px solid #ddd; }}
+        table {{ width: 100%; border-collapse: collapse; table-layout: fixed; }}
+        th {{ background-color: #f0f0f0; padding: 10px 12px; text-align: left; font-weight: bold; border-bottom: 2px solid #ddd; overflow: hidden; }}
+        td {{ padding: 10px 12px; border-bottom: 1px solid #ddd; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }}
+        td.td-wrap {{ white-space: normal; overflow: visible; max-width: none; }}
         tr:hover {{ background-color: #f9f9f9; }}
         .status-passed {{ color: green; font-weight: bold; }}
         .status-failed {{ color: red; font-weight: bold; }}
         .status-error {{ color: orange; font-weight: bold; }}
-        .url {{ color: #0066cc; font-family: monospace; word-break: break-all; }}
+        .url {{ color: #0066cc; font-family: monospace; }}
         .expand-btn {{ cursor: pointer; color: #0066cc; font-weight: bold; padding: 2px 8px; }}
         .expand-btn:hover {{ background-color: #e9e9e9; border-radius: 3px; }}
+        td.msg-td {{ cursor: pointer; }}
+        td.msg-td:hover {{ background-color: #fff8e1; }}
+        td.msg-td.msg-expanded {{ white-space: normal !important; overflow: visible !important; max-width: none !important; word-break: break-word; background-color: #fff8e1; }}
+        td.msg-td.msg-failed-color {{ color: #c0392b; }}
         
         .detail-row {{ display: none; background-color: #f9f9f9; }}
         .detail-row.expanded {{ display: table-row; }}
@@ -809,13 +814,23 @@ class PostmanTestReport:
             
             let html = `
                 <table>
+                    <colgroup>
+                        <col style="width: 60px;">
+                        <col style="width: 12%;">
+                        <col style="width: 10%;">
+                        <col style="width: 60px;">
+                        <col style="width: 22%;">
+                        <col style="width: 70px;">
+                        <col style="width: 60px;">
+                        <col>
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th style="width: 50px;">操作</th>
+                            <th>操作</th>
                             <th>API名称</th>
                             <th>文件夹</th>
                             <th>方法</th>
-                            <th style="min-width: 200px;">URL</th>
+                            <th>URL</th>
                             <th>状态</th>
                             <th>状态码</th>
                             <th>详情</th>
@@ -832,16 +847,16 @@ class PostmanTestReport:
                 html += `
                     <tr data-result-idx="${{globalIdx}}">
                         <td><span class="expand-btn" onclick="toggleDetail('${{detailId}}', ${{globalIdx}})">▶ 展开</span></td>
-                        <td>${{result.name}}</td>
-                        <td>${{result.folder || '-'}}</td>
+                        <td title="${{result.name}}">${{result.name}}</td>
+                        <td title="${{result.folder || '-'}}">${{result.folder || '-'}}</td>
                         <td><strong>${{result.method}}</strong></td>
-                        <td><span class="url">${{result.url}}</span></td>
+                        <td title="${{result.url}}"><span class="url">${{result.url}}</span></td>
                         <td><span class="${{statusClass}}">${{result.status}}</span></td>
                         <td>${{result.status_code || '-'}}</td>
-                        <td><small>${{result.message}}</small></td>
+                        <td class="msg-td ${{result.status === 'FAILED' || result.status === 'ERROR' ? 'msg-failed-color' : ''}}" title="\u70b9\u51fb\u5c55\u5f00/\u6536\u8d77\u5b8c\u6574\u5185\u5bb9" onclick="toggleMsgCell(this)">${{result.message || '-'}}</td>
                     </tr>
                     <tr class="detail-row" id="${{detailId}}">
-                        <td colspan="8">
+                        <td class="td-wrap" colspan="8">
                             <div class="detail-content" id="detail-content-${{globalIdx}}">
                                 <div class="loading">加载详情中...</div>
                             </div>
@@ -900,6 +915,12 @@ class PostmanTestReport:
                 renderTable();
                 window.scrollTo(0, 0);
             }}
+        }}
+        
+        // 切换消息列展开/收起
+        function toggleMsgCell(td) {{
+            td.classList.toggle('msg-expanded');
+            td.title = td.classList.contains('msg-expanded') ? '\u70b9\u51fb\u6536\u8d77' : '\u70b9\u51fb\u5c55\u5f00/\u6536\u8d77\u5b8c\u6574\u5185\u5bb9';
         }}
         
         // 切换详情显示

@@ -431,15 +431,21 @@ REPORT_VIEW_TEMPLATE = """
         .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
         .toolbar button.secondary { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
         .toolbar .hint { color: #64748b; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-        th { color: #475569; font-size: 13px; }
-        tr:hover { background: #f8fafc; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+        th { color: #475569; font-size: 13px; background: #f8fafc; }
+        tr:hover { background: #f0f9ff; }
         .status { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
         .status-passed { background: #dcfce7; color: #166534; }
         .status-failed { background: #fee2e2; color: #991b1b; }
         .status-error { background: #ffedd5; color: #9a3412; }
-        .url { color: #1d4ed8; font-family: Consolas, monospace; word-break: break-all; }
+        .url { color: #1d4ed8; font-family: Consolas, monospace; }
+        .msg-td { cursor: pointer; }
+        .msg-td:hover { background: #fff8e1 !important; }
+        .msg-td.expanded { white-space: normal !important; overflow: visible !important; max-width: none !important; word-break: break-word; background: #fff8e1 !important; }
+        .msg-failed { color: #991b1b; }
+        td.errcode-td { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; word-break: break-all; }
+        td.td-op { white-space: normal; overflow: visible; max-width: none; }
         .empty { padding: 30px 12px; text-align: center; color: #64748b; }
         .pagination { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; margin-top: 16px; }
         .pagination button { padding: 8px 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }
@@ -604,20 +610,31 @@ function renderResults(data) {
 
     const rows = data.items.map((item) => `
         <tr>
-            <td>${escapeHtml(item.name)}</td>
-            <td>${escapeHtml(item.folder || '-')}</td>
+            <td title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+            <td title="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
             <td>${escapeHtml(item.method)}</td>
-            <td><span class="url">${escapeHtml(item.url)}</span></td>
+            <td title="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
             <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></td>
             <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
-            <td>${escapeHtml(item.message || '-')}</td>
-            <td>${escapeHtml(item.err_code || '-')}</td>
-            <td><button onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button></td>
+            <td class="msg-td ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" title="点击展开/收起" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
+            <td class="errcode-td">${escapeHtml(item.err_code || '-')}</td>
+            <td class="td-op"><button onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button></td>
         </tr>
     `).join('');
 
     document.getElementById('resultTableContainer').innerHTML = `
         <table>
+            <colgroup>
+                <col style="width:12%">
+                <col style="width:9%">
+                <col style="width:56px">
+                <col style="width:20%">
+                <col style="width:72px">
+                <col style="width:60px">
+                <col>
+                <col style="width:140px">
+                <col style="width:72px">
+            </colgroup>
             <thead>
                 <tr>
                     <th>接口名称</th>
@@ -637,6 +654,11 @@ function renderResults(data) {
 
     document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条，当前每页 ${data.page_size} 条`;
     renderPagination(data.page, data.total_pages);
+}
+
+function toggleMsg(td) {
+    td.classList.toggle('expanded');
+    td.title = td.classList.contains('expanded') ? '点击收起' : '点击展开/收起完整内容';
 }
 
 function renderPagination(page, totalPages) {
