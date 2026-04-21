@@ -8,8 +8,10 @@ import re
 import socket
 import threading
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, url_for
@@ -35,6 +37,7 @@ def resolve_reports_dir() -> Path:
 
 REPORTS_DIR = resolve_reports_dir()
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()
+EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
 
 RUN_JOBS: Dict[str, Dict[str, Any]] = {}
 RUN_JOBS_LOCK = threading.Lock()
@@ -532,6 +535,11 @@ REPORT_VIEW_TEMPLATE = """
                 </select>
                 <button onclick="reloadResults(1)">查询</button>
                 <button class="secondary" onclick="resetFilters()">重置</button>
+                <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;">
+                    <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;">
+                    导出包含 token/authorization
+                </label>
                 <span class="hint">默认 20 条/页，最高 100 条/页</span>
             </div>
             <div id="resultTableContainer" class="loading">加载报告数据中...</div>
@@ -888,6 +896,7 @@ async function sendRetry() {
                 result_index: resultIndex,
                 name: data.name || url,
                 folder: data.folder || '',
+                item_path: data.item_path || [],
             })
         });
         const result = await resp.json();
@@ -953,6 +962,36 @@ function resetFilters() {
     document.getElementById('statusSelect').value = 'all';
     document.getElementById('pageSizeSelect').value = '20';
     reloadResults(1);
+}
+
+async function exportLatestCollection() {
+    try {
+        const includeAuth = document.getElementById('includeAuthExport').checked;
+        const response = await fetch('/api/export-collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '导出失败');
+        }
+
+        const warningText = (data.warnings && data.warnings.length)
+            ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`
+            : '';
+        alert(
+            `导出完成！\n文件: ${data.file_name}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
+        );
+        if (data.warnings && data.warnings.length) {
+            console.warn('Export warnings:', data.warnings);
+        }
+        if (data.download_url) {
+            window.open(data.download_url, '_blank');
+        }
+    } catch (error) {
+        alert('导出失败: ' + (error.message || error));
+    }
 }
 
 document.getElementById('queryInput').addEventListener('keydown', (event) => {
@@ -1234,6 +1273,7 @@ def run_postman_job(
     output_dir: str,
     token: Optional[str],
     report_name: Optional[str],
+    source_original_file: Optional[str],
     results_per_page: int,
 ) -> None:
     set_run_job(job_id, status="running", message="正在执行接口测试...")
@@ -1273,6 +1313,7 @@ def run_postman_job(
             output_dir=output_dir,
             token=token,
             report_name=report_name,
+            source_original_file=source_original_file,
             results_per_page=results_per_page,
             progress_callback=on_progress,
         )
@@ -1300,6 +1341,247 @@ def load_report_details_map(report: Dict[str, Any]) -> Dict[str, Any]:
         return details if isinstance(details, dict) else {}
     except Exception:
         return {}
+
+
+def _sanitize_export_name(name: str) -> str:
+    normalized = str(name or "").replace("\\", "/").split("/")[-1]
+    normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', normalized).strip(' .')
+    return normalized or "collection"
+
+
+def _apply_token_to_headers(headers: Dict[str, Any], token: str) -> Dict[str, Any]:
+    token = str(token or "").strip()
+    if not token:
+        return dict(headers or {})
+
+    fixed_headers = dict(headers or {})
+    auth_key = None
+    for key in list(fixed_headers.keys()):
+        lower_key = str(key).lower()
+        if lower_key == "authorization":
+            auth_key = key
+        if lower_key == "token":
+            fixed_headers.pop(key)
+    if auth_key:
+        fixed_headers[auth_key] = f"Bearer {token}"
+    else:
+        fixed_headers["token"] = token
+    return fixed_headers
+
+
+def _strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
+    cleaned: Dict[str, Any] = {}
+    for key, value in (headers or {}).items():
+        lower_key = str(key).lower()
+        if lower_key in {"authorization", "token", "access_token", "auth_token"}:
+            continue
+        cleaned[key] = value
+    return cleaned
+
+
+def _to_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
+def _merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
+    raw_url = str(raw_url or "").strip()
+    if not params:
+        return raw_url
+
+    split = urlsplit(raw_url)
+    existing_pairs = parse_qsl(split.query, keep_blank_values=True)
+    merged = {key: value for key, value in existing_pairs}
+    for key, value in (params or {}).items():
+        merged[str(key)] = "" if value is None else str(value)
+
+    new_query = urlencode(merged, doseq=False)
+    return urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
+
+
+def _set_request_url(request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]) -> None:
+    merged_url = _merge_url_with_params(raw_url, params)
+    url_obj = request_obj.get("url")
+    if isinstance(url_obj, dict):
+        request_obj["url"]["raw"] = merged_url
+        request_obj["url"]["query"] = [
+            {"key": str(key), "value": "" if value is None else str(value)}
+            for key, value in (params or {}).items()
+        ]
+    else:
+        request_obj["url"] = merged_url
+
+
+def _set_request_headers(request_obj: Dict[str, Any], headers: Dict[str, Any]) -> None:
+    request_obj["header"] = [
+        {"key": str(key), "value": "" if value is None else str(value)}
+        for key, value in (headers or {}).items()
+    ]
+
+
+def _set_request_body(request_obj: Dict[str, Any], body: Any) -> None:
+    if body is None:
+        request_obj.pop("body", None)
+        return
+
+    if isinstance(body, (dict, list)):
+        request_obj["body"] = {
+            "mode": "raw",
+            "raw": json.dumps(body, ensure_ascii=False),
+            "options": {"raw": {"language": "json"}},
+        }
+        return
+
+    request_obj["body"] = {
+        "mode": "raw",
+        "raw": str(body),
+    }
+
+
+def _item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optional[Dict[str, Any]]:
+    if not isinstance(item_path, list) or not item_path:
+        return None
+
+    items = collection_data.get("item")
+    if not isinstance(items, list):
+        return None
+
+    current: Optional[Dict[str, Any]] = None
+    for depth, index in enumerate(item_path):
+        if not isinstance(index, int) or index < 0 or index >= len(items):
+            return None
+        current = items[index]
+        if depth < len(item_path) - 1:
+            child_items = current.get("item") if isinstance(current, dict) else None
+            if not isinstance(child_items, list):
+                return None
+            items = child_items
+    if not isinstance(current, dict):
+        return None
+    if "request" not in current:
+        return None
+    return current
+
+
+def _iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[Dict[str, Any]]:
+    flattened: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        if "request" in item:
+            request = item.get("request") or {}
+            flattened.append({
+                "item": item,
+                "name": str(item.get("name", "")),
+                "folder": folder,
+                "method": str(request.get("method", "")).upper(),
+            })
+            continue
+        children = item.get("item")
+        if isinstance(children, list):
+            next_folder = str(item.get("name", ""))
+            flattened.extend(_iter_request_items(children, next_folder))
+    return flattened
+
+
+def _find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    items = collection_data.get("item")
+    if not isinstance(items, list):
+        return None
+
+    candidates = _iter_request_items(items)
+    name = str(result.get("name", ""))
+    method = str(result.get("method", "")).upper()
+    folder = str(result.get("folder", ""))
+
+    exact = [
+        row for row in candidates
+        if row["name"] == name and row["method"] == method and row["folder"] == folder
+    ]
+    if len(exact) == 1:
+        return exact[0]["item"]
+
+    loose = [row for row in candidates if row["name"] == name and row["method"] == method]
+    if len(loose) == 1:
+        return loose[0]["item"]
+    return None
+
+
+def export_collection_with_latest_params(report: Dict[str, Any], include_auth: bool = False) -> Dict[str, Any]:
+    source_file = str(report.get("source_file") or "").strip()
+    if not source_file:
+        raise ValueError("报告中缺少 source_file，无法导出。")
+
+    source_path = Path(source_file)
+    if not source_path.exists():
+        raise FileNotFoundError(f"找不到原始上传文件: {source_file}")
+
+    with source_path.open("r", encoding="utf-8") as f:
+        collection_data = json.load(f)
+
+    details_map = load_report_details_map(report)
+    updated_count = 0
+    skipped_count = 0
+    warnings: List[str] = []
+
+    for index, result in enumerate(report.get("results", [])):
+        detail = details_map.get(str(index)) or {}
+        request_info = detail.get("request_info") or {}
+
+        item = _item_by_path(collection_data, result.get("item_path") or [])
+        if item is None:
+            item = _find_item_fallback(collection_data, result)
+            if item is None:
+                skipped_count += 1
+                warnings.append(f"索引 {index} 无法定位到原始请求: {result.get('name', '-')}")
+                continue
+
+        request_obj = item.setdefault("request", {})
+        if not isinstance(request_obj, dict):
+            skipped_count += 1
+            warnings.append(f"索引 {index} 的 request 结构异常: {result.get('name', '-')}")
+            continue
+
+        method = str(result.get("method") or request_obj.get("method") or "GET").upper()
+        url = str(result.get("url") or request_obj.get("url") or "").strip()
+        headers = dict(request_info.get("headers") or {})
+        if not include_auth:
+            headers = _strip_auth_headers(headers)
+        params = dict(request_info.get("params") or {})
+        body = request_info.get("body")
+
+        request_obj["method"] = method
+        _set_request_url(request_obj, url, params)
+        _set_request_headers(request_obj, headers)
+        _set_request_body(request_obj, body)
+        updated_count += 1
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    preferred_name = report.get("source_original_file") or source_path.name
+    source_name = _sanitize_export_name(preferred_name)
+    stem = Path(source_name).stem
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    export_name = f"{stem}_latest_{timestamp}.json"
+    export_path = EXPORTS_DIR / export_name
+
+    with export_path.open("w", encoding="utf-8") as f:
+        json.dump(collection_data, f, indent=2, ensure_ascii=False)
+
+    return {
+        "file_name": export_name,
+        "file_path": str(export_path),
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "warnings": warnings,
+    }
 
 
 def filter_report_results(
@@ -1447,13 +1729,20 @@ def patch_report_result(
         merged = {
             "name": old_result.get("name", ""),
             "folder": old_result.get("folder", ""),
-            "method": old_result.get("method", ""),
-            "url": old_result.get("url", ""),
-            "key": old_result.get("key", ""),
+            "method": new_result_fields.get("method", old_result.get("method", "")),
+            "url": new_result_fields.get("url", old_result.get("url", "")),
+            "item_path": new_result_fields.get("item_path", old_result.get("item_path", [])),
+            "expected_status": new_result_fields.get("expected_status", old_result.get("expected_status", 200)),
             **new_result_fields,
             "retry_history": retry_history,
             "retried": True,
         }
+        merged["key"] = " | ".join([
+            merged.get("folder", "") or "-",
+            merged.get("name", "") or "-",
+            merged.get("method", "") or "-",
+            merged.get("url", "") or "-",
+        ])
         results[result_index] = merged
         meta["results"] = results
 
@@ -1512,6 +1801,8 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
         "folder": result.get("folder", ""),
         "method": result.get("method", ""),
         "url": result.get("url", ""),
+        "item_path": result.get("item_path", []),
+        "expected_status": result.get("expected_status", 200),
         "status": result.get("status", ""),
         "status_code": result.get("status_code"),
         "message": result.get("message", ""),
@@ -1571,9 +1862,43 @@ def serve_report(filename: str):
     return send_from_directory(REPORTS_DIR, filename)
 
 
+@app.route("/exports/<path:filename>")
+def serve_export(filename: str):
+    return send_from_directory(EXPORTS_DIR, filename)
+
+
 @app.route("/api/reports")
 def api_reports():
     return jsonify(list_reports())
+
+
+@app.route("/api/export-collection", methods=["POST"])
+def api_export_collection():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name", "")).strip()
+    include_auth = _to_bool(payload.get("include_auth"), default=False)
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    try:
+        exported = export_collection_with_latest_params(report, include_auth=include_auth)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({
+        "report_name": report_name,
+        "file_name": exported["file_name"],
+        "download_url": f"/exports/{exported['file_name']}",
+        "updated_count": exported["updated_count"],
+        "skipped_count": exported["skipped_count"],
+        "include_auth": include_auth,
+        "warnings": exported["warnings"],
+    })
 
 
 @app.route("/api/report-meta/<path:report_name>")
@@ -1706,6 +2031,10 @@ def re_request_api():
         new_response_info = {"headers": dict(response.headers), "body": response_body}
 
         result_fields = {
+            "method": method,
+            "url": url,
+            "item_path": payload.get("item_path", []),
+            "expected_status": expected_status,
             "status": result_status,
             "status_code": response.status_code,
             "message": result_message,
@@ -1783,7 +2112,7 @@ def api_run_postman():
 
     worker = threading.Thread(
         target=run_postman_job,
-        args=(job_id, str(saved_file), base_url, output_dir, token, report_name, results_per_page),
+        args=(job_id, str(saved_file), base_url, output_dir, token, report_name, original_name, results_per_page),
         daemon=True,
     )
     worker.start()

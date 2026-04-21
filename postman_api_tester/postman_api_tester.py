@@ -96,13 +96,13 @@ class PostmanApiParser:
         
         self.extract_base_url()
         
-        for item in items:
-            apis.extend(self._parse_item(item))
+        for index, item in enumerate(items):
+            apis.extend(self._parse_item(item, item_path=[index]))
         
         self.collections = apis
         return apis
     
-    def _parse_item(self, item: Dict, parent_name: str = "") -> List[Dict]:
+    def _parse_item(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> List[Dict]:
         """
         递归解析item（可能是文件夹或请求）
         :param item: item对象
@@ -111,21 +111,23 @@ class PostmanApiParser:
         """
         apis = []
         
+        item_path = list(item_path or [])
+
         # 如果是文件夹，递归处理
         if 'item' in item and not 'request' in item:
             folder_name = item.get('name', '')
-            for sub_item in item['item']:
-                apis.extend(self._parse_item(sub_item, folder_name))
+            for sub_index, sub_item in enumerate(item['item']):
+                apis.extend(self._parse_item(sub_item, folder_name, item_path=item_path + [sub_index]))
         
         # 解析请求
         elif 'request' in item:
-            api_info = self._parse_request(item, parent_name)
+            api_info = self._parse_request(item, parent_name, item_path=item_path)
             if api_info:
                 apis.append(api_info)
         
         return apis
     
-    def _parse_request(self, item: Dict, parent_name: str = "") -> Dict:
+    def _parse_request(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> Dict:
         """
         解析单个请求
         :param item: item对象
@@ -195,7 +197,8 @@ class PostmanApiParser:
             'body': body,
             'params': params,
             'expected_status': expected_status,
-            'description': item.get('description', '')
+            'description': item.get('description', ''),
+            'item_path': list(item_path or []),
         }
     
     def _build_url_from_dict(self, url_dict: Dict) -> str:
@@ -333,6 +336,8 @@ class PostmanTestExecutor:
                     'name': api['name'],
                     'method': api['method'],
                     'url': api['full_url'],
+                    'item_path': api.get('item_path', []),
+                    'expected_status': expected_status,
                     'status': 'PASSED',
                     'message': response_message,
                     'err_code': err_code,
@@ -350,6 +355,8 @@ class PostmanTestExecutor:
                     'name': api['name'],
                     'method': api['method'],
                     'url': api['full_url'],
+                    'item_path': api.get('item_path', []),
+                    'expected_status': expected_status,
                     'status': 'FAILED',
                     'message': fail_message,
                     'err_code': err_code,
@@ -364,6 +371,8 @@ class PostmanTestExecutor:
                 'name': api['name'],
                 'method': api['method'],
                 'url': api['full_url'],
+                'item_path': api.get('item_path', []),
+                'expected_status': api.get('expected_status', 200),
                 'status': 'ERROR',
                 'message': str(e),
                 'err_code': '',
@@ -416,6 +425,7 @@ class PostmanTestReport:
         self.end_time = None
         self.collection_name = ""
         self.source_file = ""
+        self.source_original_file = ""
         self.base_url = ""
         self.generated_report_file = ""
         self.generated_details_file = ""
@@ -504,6 +514,7 @@ class PostmanTestReport:
             'host_name': socket.gethostname(),
             'collection_name': self.collection_name,
             'source_file': self.source_file,
+            'source_original_file': self.source_original_file,
             'base_url': self.base_url,
             'summary': summary,
             'details_file': os.path.basename(details_file),
@@ -519,6 +530,8 @@ class PostmanTestReport:
                     'folder': result.get('folder', ''),
                     'method': result.get('method', ''),
                     'url': result.get('url', ''),
+                    'item_path': result.get('item_path', []),
+                    'expected_status': result.get('expected_status', 200),
                     'status': result.get('status', ''),
                     'status_code': result.get('status_code'),
                     'message': result.get('message', ''),
@@ -1390,6 +1403,7 @@ def run_postman_tests(
     output_dir: str = None,
     token: str = None,
     report_name: str = None,
+    source_original_file: str = None,
     results_per_page: int = 30,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> PostmanTestReport:
@@ -1401,6 +1415,7 @@ def run_postman_tests(
     :param output_dir: 报告输出目录（默认：优先读config.py中的REPORT_OUTPUT_DIR，否则../reports）
     :param token: 手动指定认证token（可选，指定后跳过自动登录；为None时读取config.py中的TOKEN）
     :param report_name: 报告名称（可选，支持 .html 文件名；留空则自动命名）
+    :param source_original_file: 原始上传文件名（可选，用于报告追溯与导出命名）
     :param results_per_page: 报告分页大小（默认30）
     :param progress_callback: 进度回调（可选），用于上层展示执行进度
     :return: 测试报告对象
@@ -1466,6 +1481,7 @@ def run_postman_tests(
     report = PostmanTestReport()
     report.collection_name = parser.data.get('info', {}).get('name', '') if isinstance(parser.data, dict) else ''
     report.source_file = os.path.abspath(postman_file)
+    report.source_original_file = str(source_original_file or '').strip()
     report.base_url = parser.base_url
     
     # 执行测试
@@ -1617,7 +1633,13 @@ if __name__ == '__main__':
         if len(sys.argv) > 5:
             results_per_page = int(sys.argv[5])
         
-        run_postman_tests(postman_file, base_url, output_dir, token, results_per_page)
+        run_postman_tests(
+            postman_file=postman_file,
+            base_url=base_url,
+            output_dir=output_dir,
+            token=token,
+            results_per_page=results_per_page,
+        )
     else:
         print("使用方法:")
         print("  python postman_api_tester.py <postman_file_path> [base_url] [output_dir] [token] [results_per_page]")
