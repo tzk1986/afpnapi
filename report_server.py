@@ -1864,7 +1864,7 @@ def serve_report(filename: str):
 
 @app.route("/exports/<path:filename>")
 def serve_export(filename: str):
-    return send_from_directory(EXPORTS_DIR, filename)
+    return send_from_directory(EXPORTS_DIR, filename, as_attachment=True)
 
 
 @app.route("/api/reports")
