@@ -635,7 +635,7 @@ function renderResults(data) {
             <colgroup>
                 <col style="width:12%">
                 <col style="width:9%">
-                <col style="width:56px">
+                <col style="width:80px">
                 <col style="width:20%">
                 <col style="width:72px">
                 <col style="width:60px">
