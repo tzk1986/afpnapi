@@ -51,4 +51,4 @@ RUN_JOBS_MAX = int(os.environ.get("RUN_JOBS_MAX", "200"))
 # - inline: 使用内嵌模板（更稳妥）
 # - external: 优先使用 templates/*.html，失败自动降级 inline
 # ==============================================================
-REPORT_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "inline")).strip().lower() or "inline"
+REPORT_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "external")).strip().lower() or "inline"

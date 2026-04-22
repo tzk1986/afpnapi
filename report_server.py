@@ -1216,6 +1216,48 @@ def find_report(report_name: str) -> Dict[str, Any]:
     raise FileNotFoundError(report_name)
 
 
+def _safe_report_artifact(name: str) -> Optional[Path]:
+    normalized = Path(str(name or "").strip()).name
+    if not normalized:
+        return None
+    candidate = (REPORTS_DIR / normalized).resolve()
+    try:
+        candidate.relative_to(REPORTS_DIR)
+    except ValueError:
+        return None
+    return candidate
+
+
+def collect_report_artifacts(report: Dict[str, Any]) -> List[Path]:
+    artifacts: List[Path] = []
+    seen: set[str] = set()
+
+    for file_name in (
+        report.get("report_name", ""),
+        report.get("details_file", ""),
+        report.get("meta_file", ""),
+    ):
+        path = _safe_report_artifact(str(file_name or ""))
+        if path is not None and path.name not in seen:
+            artifacts.append(path)
+            seen.add(path.name)
+
+    report_name = str(report.get("report_name") or "").strip()
+    report_stem = Path(report_name).stem
+    if report_stem:
+        for page_path in sorted(REPORTS_DIR.glob(f"{report_stem}_page_*.html")):
+            resolved = page_path.resolve()
+            try:
+                resolved.relative_to(REPORTS_DIR)
+            except ValueError:
+                continue
+            if resolved.name not in seen:
+                artifacts.append(resolved)
+                seen.add(resolved.name)
+
+    return artifacts
+
+
 def map_results(report: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return {item["key"]: item for item in report.get("results", [])}
 
@@ -2000,6 +2042,29 @@ def api_report_detail(report_name: str):
         return jsonify(find_report(report_name))
     except FileNotFoundError:
         return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+
+@app.route("/api/report-delete/<path:report_name>", methods=["DELETE"])
+def api_report_delete(report_name: str):
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    artifacts = collect_report_artifacts(report)
+    deleted_files: List[str] = []
+    for artifact in artifacts:
+        if artifact.exists() and artifact.is_file():
+            artifact.unlink()
+            deleted_files.append(artifact.name)
+
+    _invalidate_reports_cache()
+    logger.info("已删除报告及关联文件: report=%s files=%s", report_name, deleted_files)
+    return jsonify({
+        "success": True,
+        "report_name": report_name,
+        "deleted_files": deleted_files,
+    })
 
 
 @app.route("/api/report-results/<path:report_name>")
