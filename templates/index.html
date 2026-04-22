@@ -1,0 +1,353 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Postman 报告中心</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #1f2937; }
+        .page { max-width: 1240px; margin: 0 auto; padding: 24px; }
+        .hero { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; border-radius: 18px; padding: 24px 28px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2); }
+        .hero h1 { margin: 0 0 10px; font-size: 28px; }
+        .hero p { margin: 6px 0; opacity: 0.92; }
+        .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
+        .toolbar button { background: #1d4ed8; color: #fff; border: none; cursor: pointer; }
+        .toolbar button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+        .toolbar button:hover { opacity: 0.92; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+        th { color: #475569; font-size: 13px; }
+        tr:hover { background: #f8fafc; }
+        .summary { display: flex; gap: 10px; flex-wrap: wrap; }
+        .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: #e0f2fe; color: #075985; }
+        .actions a { margin-right: 10px; color: #1d4ed8; text-decoration: none; }
+        .report-link { color: #0f172a; font-weight: 700; text-decoration: none; }
+        .report-link:hover { color: #1d4ed8; }
+        .compare { margin-top: 18px; }
+        .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
+        .metric { font-size: 26px; font-weight: 700; margin-top: 8px; }
+        .diff-list { margin-top: 18px; border-top: 1px solid #e5e7eb; padding-top: 18px; }
+        .diff-item { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+        .diff-item:last-child { border-bottom: none; }
+        .status-up { color: #15803d; }
+        .status-down { color: #b91c1c; }
+        .muted { color: #64748b; }
+        .empty { padding: 32px 12px; text-align: center; color: #64748b; }
+        .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 12px; color: #334155; }
+        .field input { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
+        .run-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .run-status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
+        .run-status.success { background: #ecfdf5; color: #166534; border-color: #86efac; }
+        .run-status.error { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <section class="hero">
+            <h1>Postman 报告中心 1.0.2</h1>
+            <p>当前主机: {{ host_name }}</p>
+            <p>本机访问: <a style="color:#bfdbfe;" href="{{ self_url }}">{{ self_url }}</a></p>
+            <p>局域网访问: <a style="color:#bfdbfe;" href="{{ lan_url }}">{{ lan_url }}</a></p>
+        </section>
+
+        <section class="panel">
+            <h3 style="margin-top:0;">上传并执行 Postman JSON</h3>
+            <div class="upload-grid">
+                <div class="field">
+                    <label for="collectionFile">JSON 文件</label>
+                    <input id="collectionFile" type="file" accept=".json,application/json">
+                </div>
+                <div class="field">
+                    <label for="baseUrlInput">基础 URL（可选）</label>
+                    <input id="baseUrlInput" type="text" placeholder="例如: https://api.example.com">
+                </div>
+                <div class="field">
+                    <label for="tokenInput">Token（可选）</label>
+                    <input id="tokenInput" type="text" placeholder="手动 token，填写后跳过自动登录">
+                </div>
+                <div class="field">
+                    <label for="outputDirInput">报告输出目录（可选）</label>
+                    <input id="outputDirInput" type="text" placeholder="默认使用服务端配置的 reports 目录">
+                </div>
+                <div class="field">
+                    <label for="reportNameInput">报告名称（可选）</label>
+                    <input id="reportNameInput" type="text" placeholder="例如: 本次回归测试报告.html（留空则自动命名）">
+                </div>
+                <div class="field">
+                    <label for="resultsPerPageInput">报告分页大小（1-100）</label>
+                    <input id="resultsPerPageInput" type="number" min="1" max="100" value="30">
+                </div>
+            </div>
+            <div class="run-actions">
+                <button id="runJobBtn" onclick="startRunPostmanJob()">上传并执行</button>
+            </div>
+            <div id="runStatus" class="run-status">上传 JSON 后可直接执行，执行完成后会提示刷新页面查看最新报告。</div>
+        </section>
+
+        <section class="panel">
+            <div class="toolbar">
+                <input id="searchInput" type="text" placeholder="搜索报告名、集合名、源文件" oninput="renderReports()">
+                <button class="secondary" onclick="window.location.href='/'">刷新列表</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>选择</th>
+                        <th>报告</th>
+                        <th>集合 / 来源</th>
+                        <th>摘要</th>
+                        <th>生成时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="reportTable"></tbody>
+            </table>
+        </section>
+
+        <section class="panel compare">
+            <div class="toolbar">
+                <select id="leftReport"></select>
+                <select id="rightReport"></select>
+                <button onclick="compareReports()">开始对比</button>
+            </div>
+            <div id="compareResult" class="empty">选择两份报告后即可查看差异。</div>
+        </section>
+    </div>
+
+<script>
+const reports = {{ reports_json|safe }};
+let runJobTimer = null;
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+function reportOptionLabel(report) {
+    return `${report.report_name} | ${report.summary.passed}/${report.summary.total}`;
+}
+
+function renderSelects(filtered = reports) {
+    const left = document.getElementById('leftReport');
+    const right = document.getElementById('rightReport');
+    left.innerHTML = '';
+    right.innerHTML = '';
+    filtered.forEach((report) => {
+        const optionLeft = document.createElement('option');
+        optionLeft.value = report.report_name;
+        optionLeft.textContent = reportOptionLabel(report);
+        left.appendChild(optionLeft);
+
+        const optionRight = document.createElement('option');
+        optionRight.value = report.report_name;
+        optionRight.textContent = reportOptionLabel(report);
+        right.appendChild(optionRight);
+    });
+    if (filtered.length > 1) {
+        left.selectedIndex = 1;
+        right.selectedIndex = 0;
+    }
+}
+
+function renderReports() {
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    const filtered = reports.filter((report) => {
+        const text = [report.report_name, report.collection_name, report.source_file].join(' ').toLowerCase();
+        return text.includes(query);
+    });
+    const tbody = document.getElementById('reportTable');
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">没有匹配的报告。</td></tr>';
+        renderSelects([]);
+        return;
+    }
+    tbody.innerHTML = filtered.map((report) => `
+        <tr>
+            <td><input type="radio" name="reportPick" onclick="pickReport('${report.report_name}')"></td>
+            <td>
+                <a class="report-link" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">${escapeHtml(report.report_name)}</a>
+                <div class="muted">主机: ${escapeHtml(report.host_name || '-')}</div>
+            </td>
+            <td>${escapeHtml(report.collection_name || '-')}<div class="muted">${escapeHtml(report.source_file || '-')}</div></td>
+            <td>
+                <div class="summary">
+                    <span class="tag">总计 ${report.summary.total}</span>
+                    <span class="tag">通过 ${report.summary.passed}</span>
+                    <span class="tag">失败 ${report.summary.failed}</span>
+                    <span class="tag">错误 ${report.summary.error}</span>
+                </div>
+            </td>
+            <td>${escapeHtml(report.generated_at || '-')}</td>
+            <td class="actions">
+                <a href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">查看数据</a>
+                <a href="/reports/${encodeURIComponent(report.report_name)}" target="_blank">原始HTML</a>
+                <a href="/api/report-meta/${encodeURIComponent(report.report_name)}" target="_blank">元数据</a>
+            </td>
+        </tr>
+    `).join('');
+    renderSelects(filtered);
+}
+
+function pickReport(reportName) {
+    document.getElementById('rightReport').value = reportName;
+}
+
+async function compareReports() {
+    const left = document.getElementById('leftReport').value;
+    const right = document.getElementById('rightReport').value;
+    if (!left || !right) {
+        document.getElementById('compareResult').innerHTML = '<div class="empty">至少需要两份报告。</div>';
+        return;
+    }
+    if (left === right) {
+        document.getElementById('compareResult').innerHTML = '<div class="empty">请选择两份不同的报告进行对比。</div>';
+        return;
+    }
+    const response = await fetch(`/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`);
+    const data = await response.json();
+    const metrics = `
+        <div class="compare-grid">
+            <div class="card"><div class="muted">基准报告</div><div class="metric">${escapeHtml(data.left.report_name)}</div></div>
+            <div class="card"><div class="muted">当前报告</div><div class="metric">${escapeHtml(data.right.report_name)}</div></div>
+            <div class="card"><div class="muted">成功率变化</div><div class="metric ${data.summary.success_rate_delta >= 0 ? 'status-up' : 'status-down'}">${data.summary.success_rate_delta_text}</div></div>
+            <div class="card"><div class="muted">新增接口</div><div class="metric">${data.summary.added_count}</div></div>
+            <div class="card"><div class="muted">移除接口</div><div class="metric">${data.summary.removed_count}</div></div>
+            <div class="card"><div class="muted">状态变化</div><div class="metric">${data.summary.changed_count}</div></div>
+        </div>
+    `;
+    const changed = data.changed.map((item) => `
+        <div class="diff-item">
+            <strong>${escapeHtml(item.name)}</strong>
+            <div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div>
+            <div>${escapeHtml(item.before_status)} -> ${escapeHtml(item.after_status)}，状态码 ${escapeHtml(String(item.before_status_code))} -> ${escapeHtml(String(item.after_status_code))}</div>
+        </div>
+    `).join('') || '<div class="empty">没有状态变化的接口。</div>';
+    const added = data.added.map((item) => `
+        <div class="diff-item"><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div></div>
+    `).join('') || '<div class="empty">没有新增接口。</div>';
+    const removed = data.removed.map((item) => `
+        <div class="diff-item"><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div></div>
+    `).join('') || '<div class="empty">没有移除接口。</div>';
+
+    document.getElementById('compareResult').innerHTML = `
+        ${metrics}
+        <div class="diff-list"><h3>状态变化</h3>${changed}</div>
+        <div class="diff-list"><h3>新增接口</h3>${added}</div>
+        <div class="diff-list"><h3>移除接口</h3>${removed}</div>
+    `;
+}
+
+function setRunStatus(text, level = '') {
+    const statusEl = document.getElementById('runStatus');
+    statusEl.textContent = text;
+    statusEl.className = `run-status${level ? ' ' + level : ''}`;
+}
+
+async function startRunPostmanJob() {
+    const fileInput = document.getElementById('collectionFile');
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) {
+        setRunStatus('请先选择要上传的 Postman JSON 文件。', 'error');
+        return;
+    }
+
+    const runButton = document.getElementById('runJobBtn');
+    runButton.disabled = true;
+    setRunStatus('正在上传并创建执行任务，请稍候...');
+
+    const formData = new FormData();
+    formData.append('collection_file', file);
+    formData.append('base_url', document.getElementById('baseUrlInput').value.trim());
+    formData.append('token', document.getElementById('tokenInput').value.trim());
+    formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
+    formData.append('report_name', document.getElementById('reportNameInput').value.trim());
+    formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
+
+    try {
+        const response = await fetch('/api/run-postman', {
+            method: 'POST',
+            body: formData,
+        });
+        let data = {};
+        const rawText = await response.text();
+        try {
+            data = rawText ? JSON.parse(rawText) : {};
+        } catch (_e) {
+            data = { error: rawText || '服务返回了非 JSON 响应。' };
+        }
+        if (!response.ok) {
+            throw new Error(data.error || '任务创建失败');
+        }
+        setRunStatus(`任务已启动（${data.job_id}），正在执行...`);
+        watchRunPostmanJob(data.job_id);
+    } catch (error) {
+        runButton.disabled = false;
+        setRunStatus(`启动失败: ${error.message || error}`, 'error');
+    }
+}
+
+function watchRunPostmanJob(jobId) {
+    if (runJobTimer) {
+        clearInterval(runJobTimer);
+        runJobTimer = null;
+    }
+
+    const runButton = document.getElementById('runJobBtn');
+
+    const fetchStatus = async () => {
+        try {
+            const response = await fetch(`/api/run-postman-status/${encodeURIComponent(jobId)}`);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || '获取任务状态失败');
+            }
+
+            if (data.status === 'queued') {
+                setRunStatus(`任务排队中（${jobId}），请稍候...`);
+                return;
+            }
+            if (data.status === 'running') {
+                const total = Number(data.total || 0);
+                const completed = Number(data.completed || 0);
+                const percent = Number(data.percent || 0);
+                const progressText = total > 0 ? ` ${completed}/${total} (${percent}%)` : '';
+                const currentText = data.current_name ? `，当前接口: ${data.current_name}` : '';
+                setRunStatus(`任务执行中（${jobId}）${progressText}${currentText}`);
+                return;
+            }
+            if (data.status === 'success') {
+                clearInterval(runJobTimer);
+                runJobTimer = null;
+                runButton.disabled = false;
+                const reportHint = data.report_name ? `最新报告: ${data.report_name}。` : '';
+                setRunStatus(`执行完成。${reportHint}正在跳转到最新报告数据页...`, 'success');
+                setTimeout(() => {
+                    window.location.href = '/latest';
+                }, 600);
+                return;
+            }
+
+            clearInterval(runJobTimer);
+            runJobTimer = null;
+            runButton.disabled = false;
+            setRunStatus(`执行失败: ${data.message || '未知错误'}`, 'error');
+        } catch (error) {
+            clearInterval(runJobTimer);
+            runJobTimer = null;
+            runButton.disabled = false;
+            setRunStatus(`任务状态查询失败: ${error.message || error}`, 'error');
+        }
+    };
+
+    fetchStatus();
+    runJobTimer = setInterval(fetchStatus, 3000);
+}
+
+renderReports();
+</script>
+</body>
+</html>
+"""

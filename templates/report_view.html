@@ -1,0 +1,609 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_name }} - 报告数据视图</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #0f172a; }
+        .page { max-width: 1320px; margin: 0 auto; padding: 24px; }
+        .hero { background: linear-gradient(135deg, #0f172a, #2563eb); color: #fff; border-radius: 20px; padding: 24px 28px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18); }
+        .hero h1 { margin: 0 0 8px; font-size: 28px; word-break: break-all; }
+        .hero p { margin: 4px 0; opacity: 0.92; }
+        .hero a { color: #bfdbfe; }
+        .summary-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; }
+        .summary-card { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 12px 14px; }
+        .summary-card .label { font-size: 12px; opacity: 0.85; }
+        .summary-card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+        .panel { background: #fff; margin-top: 20px; border-radius: 18px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
+        .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
+        .toolbar button.secondary { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
+        .toolbar .hint { color: #64748b; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+        th { color: #475569; font-size: 13px; background: #f8fafc; }
+        tr:hover { background: #f0f9ff; }
+        .status { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+        .status-passed { background: #dcfce7; color: #166534; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-error { background: #ffedd5; color: #9a3412; }
+        .url { color: #1d4ed8; font-family: Consolas, monospace; }
+        .msg-td { cursor: pointer; }
+        .msg-td:hover { background: #fff8e1 !important; }
+        .msg-td.expanded { white-space: normal !important; overflow: visible !important; max-width: none !important; word-break: break-word; background: #fff8e1 !important; }
+        .msg-failed { color: #991b1b; }
+        td.errcode-td { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; word-break: break-all; }
+        td.td-op { white-space: normal; overflow: visible; max-width: none; }
+        .empty { padding: 30px 12px; text-align: center; color: #64748b; }
+        .pagination { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; margin-top: 16px; }
+        .pagination button { padding: 8px 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }
+        .pagination button.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pager-info { text-align: center; color: #64748b; margin-top: 4px; }
+        .detail-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.48); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .detail-mask.show { display: flex; }
+        .detail-dialog { width: min(1100px, 100%); max-height: 90vh; overflow: auto; background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24); }
+        .detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 16px; }
+        .detail-head h3 { margin: 0 0 6px; }
+        .detail-head button { border: none; background: #e2e8f0; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+        .detail-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+        .detail-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
+        .detail-card h4 { margin: 0 0 10px; font-size: 14px; }
+        pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: 12px; color: #0f172a; }
+        .muted { color: #64748b; }
+        .loading { text-align: center; padding: 24px; color: #64748b; }
+        /* 编辑重试 */
+        .retry-btn { background: #f59e0b; color: #fff; border: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 8px; }
+        .retry-btn:hover { background: #d97706; }
+        .edit-retry-panel { background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 16px; margin-top: 16px; }
+        .edit-retry-panel h4 { margin: 0 0 12px; font-size: 14px; color: #92400e; }
+        .edit-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .edit-row label { min-width: 72px; font-size: 13px; color: #475569; }
+        .edit-row input[type=text], .edit-row select { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
+        .edit-row textarea { flex: 1; min-width: 200px; height: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-family: Consolas, monospace; resize: vertical; }
+        .edit-row textarea.error { border-color: #ef4444; background: #fff1f2; }
+        .edit-actions { display: flex; gap: 10px; margin-top: 4px; }
+        .edit-actions button { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
+        .btn-send { background: #2563eb; color: #fff; }
+        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-cancel { background: #e2e8f0; color: #374151; }
+        .retry-result-box { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
+        .retry-result-box.ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .retry-result-box.fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        /* retry_history */
+        .history-toggle { font-size: 12px; color: #2563eb; cursor: pointer; border: none; background: none; padding: 4px 0; text-decoration: underline; }
+        .history-list { margin-top: 8px; border-left: 3px solid #fde68a; padding-left: 12px; }
+        .history-item { font-size: 12px; margin-bottom: 6px; color: #374151; }
+        .retried-badge { display: inline-block; background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; border-radius: 999px; font-size: 11px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <section class="hero">
+            <h1>{{ report_name }}</h1>
+            <p>集合: {{ collection_name or '-' }}</p>
+            <p>来源文件: {{ source_file or '-' }}</p>
+            <p>生成时间: {{ generated_at or '-' }}</p>
+            <p>
+                <a href="/">返回报告中心</a>
+                |
+                <a href="/reports/{{ report_name }}" target="_blank">打开原始 HTML</a>
+                |
+                <a href="/api/report-meta/{{ report_name }}" target="_blank">查看元数据</a>
+            </p>
+            <div class="summary-grid">
+                <div class="summary-card"><div class="label">总计</div><div class="value" id="sum-total">{{ summary.total }}</div></div>
+                <div class="summary-card"><div class="label">通过</div><div class="value" id="sum-passed">{{ summary.passed }}</div></div>
+                <div class="summary-card"><div class="label">失败</div><div class="value" id="sum-failed">{{ summary.failed }}</div></div>
+                <div class="summary-card"><div class="label">错误</div><div class="value" id="sum-error">{{ summary.error }}</div></div>
+                <div class="summary-card"><div class="label">成功率</div><div class="value" id="sum-rate">{{ summary.success_rate }}</div></div>
+                <div class="summary-card"><div class="label">耗时</div><div class="value">{{ summary.duration }}</div></div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="toolbar">
+                <input id="queryInput" type="text" placeholder="按接口名称或路径搜索" />
+                <input id="messageInput" type="text" placeholder="按 message 搜索" />
+                <input id="errCodeInput" type="text" placeholder="按 errCode 搜索" />
+                <select id="statusSelect">
+                    <option value="all">全部结果</option>
+                    <option value="PASSED">成功</option>
+                    <option value="FAILED">失败</option>
+                    <option value="ERROR">错误</option>
+                </select>
+                <select id="pageSizeSelect">
+                    <option value="20" selected>20 条/页</option>
+                    <option value="30">30 条/页</option>
+                    <option value="50">50 条/页</option>
+                    <option value="100">100 条/页</option>
+                </select>
+                <button onclick="reloadResults(1)">查询</button>
+                <button class="secondary" onclick="resetFilters()">重置</button>
+                <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;">
+                    <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;">
+                    导出包含 token/authorization
+                </label>
+                <span class="hint">默认 20 条/页，最高 100 条/页</span>
+            </div>
+            <div id="resultTableContainer" class="loading">加载报告数据中...</div>
+            <div id="pagerInfo" class="pager-info"></div>
+            <div id="pagination" class="pagination"></div>
+        </section>
+    </div>
+
+    <div id="detailMask" class="detail-mask" onclick="closeDetail(event)">
+        <div class="detail-dialog">
+            <div class="detail-head">
+                <div>
+                    <h3 id="detailTitle">接口详情</h3>
+                    <div id="detailMeta" class="muted"></div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button id="editRetryBtn" class="retry-btn" style="display:none;" onclick="openEditRetry()">编辑重试</button>
+                    <button onclick="closeDetail()">关闭</button>
+                </div>
+            </div>
+            <div id="detailBody" class="loading">加载详情中...</div>
+            <div id="editRetryPanel" style="display:none;"></div>
+        </div>
+    </div>
+
+<script>
+const reportName = {{ report_name_json|safe }};
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+function formatJson(value) {
+    if (value === null || value === undefined || value === '') {
+        return '无';
+    }
+    if (typeof value === 'string') {
+        return value;
+    }
+    return JSON.stringify(value, null, 2);
+}
+
+function currentFilters() {
+    return {
+        query: document.getElementById('queryInput').value.trim(),
+        messageQuery: document.getElementById('messageInput').value.trim(),
+        errCodeQuery: document.getElementById('errCodeInput').value.trim(),
+        status: document.getElementById('statusSelect').value,
+        pageSize: document.getElementById('pageSizeSelect').value
+    };
+}
+
+async function reloadResults(page = 1) {
+    const filters = currentFilters();
+    const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(filters.pageSize),
+        query: filters.query,
+        message_query: filters.messageQuery,
+        err_code_query: filters.errCodeQuery,
+        status: filters.status
+    });
+    document.getElementById('resultTableContainer').innerHTML = '<div class="loading">加载报告数据中...</div>';
+    const response = await fetch(`/api/report-results/${encodeURIComponent(reportName)}?${params.toString()}`);
+    const data = await response.json();
+    renderResults(data);
+}
+
+function renderResults(data) {
+    if (!data.items || data.items.length === 0) {
+        document.getElementById('resultTableContainer').innerHTML = '<div class="empty">没有匹配的数据。</div>';
+        document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条`;
+        document.getElementById('pagination').innerHTML = '';
+        return;
+    }
+
+    const rows = data.items.map((item) => `
+        <tr>
+            <td title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+            <td title="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
+            <td>${escapeHtml(item.method)}</td>
+            <td title="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
+            <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></td>
+            <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
+            <td class="msg-td ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" title="点击展开/收起" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
+            <td class="errcode-td">${escapeHtml(item.err_code || '-')}</td>
+            <td class="td-op"><button onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button></td>
+        </tr>
+    `).join('');
+
+    document.getElementById('resultTableContainer').innerHTML = `
+        <table>
+            <colgroup>
+                <col style="width:12%">
+                <col style="width:9%">
+                <col style="width:80px">
+                <col style="width:20%">
+                <col style="width:72px">
+                <col style="width:60px">
+                <col>
+                <col style="width:140px">
+                <col style="width:72px">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>接口名称</th>
+                    <th>文件夹</th>
+                    <th>方法</th>
+                    <th>路径</th>
+                    <th>状态</th>
+                    <th>状态码</th>
+                    <th>结果说明</th>
+                    <th>errCode</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+
+    document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条，当前每页 ${data.page_size} 条`;
+    renderPagination(data.page, data.total_pages);
+}
+
+function toggleMsg(td) {
+    td.classList.toggle('expanded');
+    td.title = td.classList.contains('expanded') ? '点击收起' : '点击展开/收起完整内容';
+}
+
+function renderPagination(page, totalPages) {
+    const container = document.getElementById('pagination');
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const buttons = [];
+    buttons.push(`<button onclick="reloadResults(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`);
+    const start = Math.max(1, page - 4);
+    const end = Math.min(totalPages, start + 8);
+    for (let index = start; index <= end; index += 1) {
+        buttons.push(`<button class="${index === page ? 'active' : ''}" onclick="reloadResults(${index})">${index}</button>`);
+    }
+    buttons.push(`<button onclick="reloadResults(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>`);
+    container.innerHTML = buttons.join('');
+}
+
+async function openDetail(index) {
+    const mask = document.getElementById('detailMask');
+    const body = document.getElementById('detailBody');
+    const editPanel = document.getElementById('editRetryPanel');
+    const editBtn = document.getElementById('editRetryBtn');
+    body.innerHTML = '<div class="loading">加载详情中...</div>';
+    editPanel.style.display = 'none';
+    editPanel.innerHTML = '';
+    editBtn.style.display = 'none';
+    mask.classList.add('show');
+    // 记录当前详情 index 供 openEditRetry 使用
+    mask.dataset.currentIndex = String(index);
+
+    const response = await fetch(`/api/report-result-detail/${encodeURIComponent(reportName)}/${index}`);
+    const data = await response.json();
+
+    document.getElementById('detailTitle').textContent = (data.name || '接口详情') +
+        (data.retried ? '<span class="retried-badge">已重试</span>' : '');
+    document.getElementById('detailTitle').innerHTML = (data.name || '接口详情') +
+        (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
+    document.getElementById('detailMeta').textContent =
+        `${data.method || '-'} | ${data.url || '-'} | ${data.status || '-'} | 状态码 ${data.status_code ?? '-'}`;
+
+    // 所有有 detail_available 或者只要有 url 的都可以重试
+    if (data.url) {
+        editBtn.style.display = '';
+    }
+
+    if (!data.detail_available) {
+        body.innerHTML = '<div class="empty">该报告没有可用的请求/响应详情数据。</div>';
+        // 即便无详情也允许编辑 URL/参数后重试
+        mask.dataset.currentData = JSON.stringify(data);
+        return;
+    }
+
+    // retry_history 区块
+    let historyHtml = '';
+    const history = data.retry_history || [];
+    if (history.length > 0) {
+        const items = history.map((h, i) => `
+            <div class="history-item">
+                第 ${i + 1} 次（原始/上次）：
+                <span class="status status-${(h.status || '').toLowerCase()}">${escapeHtml(h.status || '-')}</span>
+                状态码 ${h.status_code ?? '-'} &nbsp;|&nbsp; ${escapeHtml(h.message || '-')}
+            </div>
+        `).join('');
+        historyHtml = `
+            <div style="margin-top:12px;">
+                <button class="history-toggle" onclick="toggleHistory(this)">▶ 查看重试历史（${history.length} 次）</button>
+                <div class="history-list" style="display:none;">${items}</div>
+            </div>`;
+    }
+
+    body.innerHTML = `
+        <div class="detail-grid">
+            <div class="detail-card">
+                <h4>请求头</h4>
+                <pre>${escapeHtml(formatJson(data.request_info.headers))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>查询参数</h4>
+                <pre>${escapeHtml(formatJson(data.request_info.params))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>请求体</h4>
+                <pre>${escapeHtml(formatJson(data.request_info.body))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>响应头</h4>
+                <pre>${escapeHtml(formatJson(data.response_info.headers))}</pre>
+            </div>
+            <div class="detail-card" style="grid-column: 1 / -1;">
+                <h4>响应体</h4>
+                <pre>${escapeHtml(formatJson(data.response_info.body))}</pre>
+            </div>
+        </div>
+        ${historyHtml}
+    `;
+
+    // 缓存当前 data 供 openEditRetry 读取初始值
+    mask.dataset.currentData = JSON.stringify(data);
+}
+
+function toggleHistory(btn) {
+    const list = btn.nextElementSibling;
+    const open = list.style.display !== 'none';
+    list.style.display = open ? 'none' : 'block';
+    btn.textContent = (open ? '▶' : '▼') + btn.textContent.slice(1);
+}
+
+function openEditRetry() {
+    const mask = document.getElementById('detailMask');
+    const panel = document.getElementById('editRetryPanel');
+    const rawData = mask.dataset.currentData || '{}';
+    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
+
+    const reqInfo = data.request_info || {};
+    const methodOptions = ['GET','POST','PUT','DELETE','PATCH'].map(m =>
+        `<option value="${m}" ${m === (data.method || 'GET') ? 'selected' : ''}>${m}</option>`
+    ).join('');
+
+    panel.style.display = '';
+    panel.innerHTML = `
+        <div class="edit-retry-panel">
+            <h4>编辑重试参数</h4>
+            <div class="edit-row">
+                <label>Method</label>
+                <select id="er-method">${methodOptions}</select>
+            </div>
+            <div class="edit-row">
+                <label>URL</label>
+                <input type="text" id="er-url" value="${escapeHtml(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
+            </div>
+            <div class="edit-row">
+                <label>Token</label>
+                <input type="text" id="er-token" placeholder="留空则使用原始 Headers 中的认证" />
+            </div>
+            <div class="edit-row">
+                <label>Headers</label>
+                <textarea id="er-headers">${escapeHtml(formatJson(reqInfo.headers || {}))}</textarea>
+            </div>
+            <div class="edit-row">
+                <label>Params</label>
+                <textarea id="er-params">${escapeHtml(formatJson(reqInfo.params || {}))}</textarea>
+            </div>
+            <div class="edit-row">
+                <label>Body</label>
+                <textarea id="er-body">${escapeHtml(formatJson(reqInfo.body !== undefined ? reqInfo.body : null))}</textarea>
+            </div>
+            <div class="edit-row">
+                <label>期望状态码</label>
+                <input type="text" id="er-expected-status" value="${escapeHtml(String(data.expected_status || 200))}" style="max-width:80px;" />
+            </div>
+            <div class="edit-row">
+                <label></label>
+                <label style="min-width:auto;"><input type="checkbox" id="er-save" checked> 回写到报告</label>
+            </div>
+            <div class="edit-actions">
+                <button class="btn-send" id="er-send-btn" onclick="sendRetry()">发送</button>
+                <button class="btn-cancel" onclick="cancelEditRetry()">取消</button>
+            </div>
+            <div id="er-result" style="display:none;"></div>
+        </div>
+    `;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelEditRetry() {
+    const panel = document.getElementById('editRetryPanel');
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+}
+
+function parseJsonField(id) {
+    const el = document.getElementById(id);
+    const val = (el.value || '').trim();
+    el.classList.remove('error');
+    if (!val || val === '无') return [true, null];
+    try {
+        return [true, JSON.parse(val)];
+    } catch(e) {
+        el.classList.add('error');
+        return [false, null];
+    }
+}
+
+async function sendRetry() {
+    const mask = document.getElementById('detailMask');
+    const rawData = mask.dataset.currentData || '{}';
+    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
+    const resultIndex = parseInt(mask.dataset.currentIndex, 10);
+
+    const url = (document.getElementById('er-url').value || '').trim();
+    if (!url) { alert('URL 不能为空'); return; }
+
+    const [hOk, headers] = parseJsonField('er-headers');
+    const [pOk, params]  = parseJsonField('er-params');
+    const [bOk, bodyVal] = parseJsonField('er-body');
+    if (!hOk || !pOk || !bOk) { alert('Headers / Params / Body 中有 JSON 格式错误，请检查红色输入框。'); return; }
+
+    const method = document.getElementById('er-method').value;
+    const token = (document.getElementById('er-token').value || '').trim();
+    const expectedStatus = parseInt(document.getElementById('er-expected-status').value, 10) || 200;
+    const saveToReport = document.getElementById('er-save').checked;
+
+    const btn = document.getElementById('er-send-btn');
+    btn.disabled = true;
+    btn.textContent = '请求中...';
+    const resultDiv = document.getElementById('er-result');
+    resultDiv.style.display = '';
+    resultDiv.className = 'retry-result-box';
+    resultDiv.textContent = '正在发送请求...';
+
+    try {
+        const resp = await fetch('/re-request-api', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url, method,
+                headers: headers || {},
+                params: params || {},
+                body: bodyVal,
+                token,
+                expected_status: expectedStatus,
+                save_to_report: saveToReport,
+                report_name: reportName,
+                result_index: resultIndex,
+                name: data.name || url,
+                folder: data.folder || '',
+                item_path: data.item_path || [],
+            })
+        });
+        const result = await resp.json();
+
+        const isPass = result.status === 'PASSED';
+        resultDiv.className = 'retry-result-box ' + (isPass ? 'ok' : 'fail');
+        resultDiv.innerHTML = `
+            <strong>${escapeHtml(result.status)}</strong>
+            &nbsp;|&nbsp; 状态码: ${result.status_code ?? '-'}
+            &nbsp;|&nbsp; ${escapeHtml(result.message || '-')}
+            ${result.saved ? '<br><small>✓ 已回写到报告</small>' : ''}
+        `;
+
+        // 刷新 summary 卡片
+        if (result.new_summary && result.new_summary.total !== undefined) {
+            const s = result.new_summary;
+            document.getElementById('sum-total').textContent  = s.total  ?? '';
+            document.getElementById('sum-passed').textContent = s.passed ?? '';
+            document.getElementById('sum-failed').textContent = s.failed ?? '';
+            document.getElementById('sum-error').textContent  = s.error  ?? '';
+            document.getElementById('sum-rate').textContent   = s.success_rate ?? '';
+        }
+
+        // 更新列表行（状态、状态码、结果说明）
+        if (saveToReport) {
+            reloadResults();
+        }
+
+        // 更新弹窗 detailMeta 和标题徽标
+        document.getElementById('detailTitle').innerHTML =
+            escapeHtml(data.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
+        document.getElementById('detailMeta').textContent =
+            `${method} | ${url} | ${result.status} | 状态码 ${result.status_code ?? '-'}`;
+
+        // 更新 currentData 以便二次重试时能看到最新状态
+        const updated = { ...data, ...result, retry_history: (data.retry_history || []) };
+        mask.dataset.currentData = JSON.stringify(updated);
+
+    } catch(e) {
+        resultDiv.className = 'retry-result-box fail';
+        resultDiv.textContent = '请求失败: ' + String(e);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '发送';
+    }
+}
+
+function closeDetail(event) {
+    if (event && event.target && event.target.id !== 'detailMask') {
+        return;
+    }
+    document.getElementById('detailMask').classList.remove('show');
+    const panel = document.getElementById('editRetryPanel');
+    if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+    const editBtn = document.getElementById('editRetryBtn');
+    if (editBtn) { editBtn.style.display = 'none'; }
+}
+
+function resetFilters() {
+    document.getElementById('queryInput').value = '';
+    document.getElementById('messageInput').value = '';
+    document.getElementById('errCodeInput').value = '';
+    document.getElementById('statusSelect').value = 'all';
+    document.getElementById('pageSizeSelect').value = '20';
+    reloadResults(1);
+}
+
+async function exportLatestCollection() {
+    try {
+        const includeAuth = document.getElementById('includeAuthExport').checked;
+        const response = await fetch('/api/export-collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '导出失败');
+        }
+
+        const warningText = (data.warnings && data.warnings.length)
+            ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`
+            : '';
+        alert(
+            `导出完成！\n文件: ${data.file_name}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
+        );
+        if (data.warnings && data.warnings.length) {
+            console.warn('Export warnings:', data.warnings);
+        }
+        if (data.download_url) {
+            window.open(data.download_url, '_blank');
+        }
+    } catch (error) {
+        alert('导出失败: ' + (error.message || error));
+    }
+}
+
+document.getElementById('queryInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        reloadResults(1);
+    }
+});
+
+document.getElementById('messageInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        reloadResults(1);
+    }
+});
+
+document.getElementById('errCodeInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        reloadResults(1);
+    }
+});
+
+document.getElementById('statusSelect').addEventListener('change', () => reloadResults(1));
+document.getElementById('pageSizeSelect').addEventListener('change', () => reloadResults(1));
+
+reloadResults(1);
+</script>
+</body>
+</html>
+"""
+

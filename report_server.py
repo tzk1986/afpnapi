@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
-from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, url_for
+from flask import Flask, jsonify, redirect, render_template, render_template_string, request, send_from_directory, url_for
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,7 +61,21 @@ def get_report_write_lock(report_name: str) -> threading.Lock:
         return REPORT_WRITE_LOCKS[report_name]
 
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=str((PROJECT_ROOT / "templates").resolve()))
+
+# 模板渲染模式：
+# - inline（默认）：沿用内嵌模板，行为与历史版本一致
+# - external：优先使用 templates/*.html，失败时自动降级 inline
+_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "inline")).strip().lower() or "inline"
+
+
+def render_with_fallback(template_name: str, inline_template: str, **context: Any):
+    if _TEMPLATE_MODE == "external":
+        try:
+            return render_template(template_name, **context)
+        except Exception as exc:
+            logger.error("外置模板渲染失败，自动降级 inline: %s (%s)", template_name, exc)
+    return render_template_string(inline_template, **context)
 
 INDEX_TEMPLATE = """
 <!DOCTYPE html>
@@ -1880,7 +1894,8 @@ def health():
 def index():
     reports = list_reports()
     port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
-    return render_template_string(
+    return render_with_fallback(
+        "index.html",
         INDEX_TEMPLATE,
         host_name=socket.gethostname(),
         self_url=f"http://127.0.0.1:{port}",
@@ -1901,9 +1916,14 @@ def report_view():
     try:
         report = find_report(report_name)
     except FileNotFoundError:
-        return render_template_string("<h3>报告不存在</h3><p>{{ name }}</p>", name=report_name), 404
+        return render_with_fallback(
+            "report_not_found.html",
+            "<h3>报告不存在</h3><p>{{ name }}</p>",
+            name=report_name,
+        ), 404
 
-    return render_template_string(
+    return render_with_fallback(
+        "report_view.html",
         REPORT_VIEW_TEMPLATE,
         report_name=report.get("report_name", ""),
         report_name_json=json.dumps(report.get("report_name", ""), ensure_ascii=False),
