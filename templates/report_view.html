@@ -45,12 +45,21 @@
         .detail-mask.show { display: flex; }
         .detail-dialog { width: min(1100px, 100%); max-height: 90vh; overflow: auto; background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24); }
         .detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 16px; }
+        .detail-head-main { flex: 1; min-width: 0; }
         .detail-head h3 { margin: 0 0 6px; }
+        .detail-meta { display: flex; flex-direction: column; gap: 4px; }
+        .detail-meta-row { overflow-wrap: anywhere; word-break: break-word; }
+        .detail-meta-url { font-family: Consolas, monospace; color: #334155; }
         .detail-head button { border: none; background: #e2e8f0; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+        .detail-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+        .detail-actions button { white-space: nowrap; flex-shrink: 0; }
         .detail-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
         .detail-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
         .detail-card h4 { margin: 0 0 10px; font-size: 14px; }
         pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: 12px; color: #0f172a; }
+        .response-meta { margin-bottom: 8px; font-size: 12px; }
+        .response-actions { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .response-actions button { border: none; background: #e2e8f0; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .muted { color: #64748b; }
         .loading { text-align: center; padding: 24px; color: #64748b; }
         /* 编辑重试 */
@@ -137,11 +146,11 @@
     <div id="detailMask" class="detail-mask" onclick="closeDetail(event)">
         <div class="detail-dialog">
             <div class="detail-head">
-                <div>
+                <div class="detail-head-main">
                     <h3 id="detailTitle">接口详情</h3>
-                    <div id="detailMeta" class="muted"></div>
+                    <div id="detailMeta" class="muted detail-meta"></div>
                 </div>
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div class="detail-actions">
                     <button id="editRetryBtn" class="retry-btn" style="display:none;" onclick="openEditRetry()">编辑重试</button>
                     <button onclick="closeDetail()">关闭</button>
                 </div>
@@ -153,6 +162,25 @@
 
 <script>
 const reportName = {{ report_name_json|safe }};
+let currentDetailData = null;
+let currentDetailIndex = null;
+
+const PREVIEW_RENDER_LIMITS = {
+    nodeLimit: 1200,
+    depthLimit: 6,
+    arrayLimit: 120,
+    keyLimit: 120,
+    stringLimit: 3000,
+    totalCharLimit: 16000,
+};
+const FULL_RENDER_LIMITS = {
+    nodeLimit: 12000,
+    depthLimit: 12,
+    arrayLimit: 1000,
+    keyLimit: 1000,
+    stringLimit: 30000,
+    totalCharLimit: 200000,
+};
 
 function escapeHtml(value) {
     return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
@@ -166,6 +194,141 @@ function formatJson(value) {
         return value;
     }
     return JSON.stringify(value, null, 2);
+}
+
+function buildLimitedValue(value, limits) {
+    const state = { nodes: 0, truncated: false };
+
+    function walk(input, depth) {
+        if (state.nodes >= limits.nodeLimit) {
+            state.truncated = true;
+            return '[已截断: 节点数量超过上限]';
+        }
+        state.nodes += 1;
+
+        if (input === null || input === undefined) {
+            return input;
+        }
+
+        const t = typeof input;
+        if (t === 'string') {
+            if (input.length > limits.stringLimit) {
+                state.truncated = true;
+                return input.slice(0, limits.stringLimit) + ' ...[已截断]';
+            }
+            return input;
+        }
+        if (t === 'number' || t === 'boolean') {
+            return input;
+        }
+        if (t !== 'object') {
+            return String(input);
+        }
+
+        if (depth >= limits.depthLimit) {
+            state.truncated = true;
+            return '[已截断: 嵌套层级过深]';
+        }
+
+        if (Array.isArray(input)) {
+            const out = [];
+            const maxLen = Math.min(input.length, limits.arrayLimit);
+            for (let i = 0; i < maxLen; i += 1) {
+                out.push(walk(input[i], depth + 1));
+            }
+            if (input.length > maxLen) {
+                state.truncated = true;
+                out.push(`...[已截断: 其余 ${input.length - maxLen} 项]`);
+            }
+            return out;
+        }
+
+        const keys = Object.keys(input);
+        const out = {};
+        const maxKeys = Math.min(keys.length, limits.keyLimit);
+        for (let i = 0; i < maxKeys; i += 1) {
+            const key = keys[i];
+            out[key] = walk(input[key], depth + 1);
+        }
+        if (keys.length > maxKeys) {
+            state.truncated = true;
+            out.__truncated__ = `其余 ${keys.length - maxKeys} 个字段已省略`;
+        }
+        return out;
+    }
+
+    return { value: walk(value, 0), truncated: state.truncated };
+}
+
+function formatJsonLimited(value, limits) {
+    if (value === null || value === undefined || value === '') {
+        return { text: '无', truncated: false };
+    }
+
+    if (typeof value === 'string') {
+        if (value.length > limits.totalCharLimit) {
+            return { text: value.slice(0, limits.totalCharLimit) + '\n...[已截断: 文本过长]', truncated: true };
+        }
+        return { text: value, truncated: false };
+    }
+
+    const limited = buildLimitedValue(value, limits);
+    let text = JSON.stringify(limited.value, null, 2);
+    let truncated = limited.truncated;
+    if (text.length > limits.totalCharLimit) {
+        text = text.slice(0, limits.totalCharLimit) + '\n...[已截断: 序列化结果过长]';
+        truncated = true;
+    }
+    return { text, truncated };
+}
+
+function renderDetailMeta(data) {
+    const meta = document.getElementById('detailMeta');
+    meta.innerHTML = `
+        <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'}</div>
+        <div class="detail-meta-row detail-meta-url">${escapeHtml(data.url || '-')}</div>
+    `;
+}
+
+function renderResponseBody(body, mode = 'preview') {
+    const pre = document.getElementById('responseBodyPre');
+    const meta = document.getElementById('responseBodyMeta');
+    const actions = document.getElementById('responseBodyActions');
+    if (!pre || !meta || !actions) {
+        return;
+    }
+
+    const limits = mode === 'full' ? FULL_RENDER_LIMITS : PREVIEW_RENDER_LIMITS;
+    const rendered = formatJsonLimited(body, limits);
+    pre.textContent = rendered.text;
+
+    if (mode === 'preview' && rendered.truncated) {
+        meta.textContent = '响应体较大，当前为预览模式。';
+        actions.innerHTML = '<button onclick="expandResponseBody()">展开完整响应体</button>';
+    } else if (mode === 'full' && rendered.truncated) {
+        meta.textContent = '响应体过大，完整模式下仍触发安全截断。';
+        actions.innerHTML = '<button onclick="collapseResponseBody()">返回预览</button>';
+    } else if (mode === 'full') {
+        meta.textContent = '当前为完整模式。';
+        actions.innerHTML = '<button onclick="collapseResponseBody()">返回预览</button>';
+    } else {
+        meta.textContent = '';
+        actions.innerHTML = '';
+    }
+}
+
+function expandResponseBody() {
+    if (!currentDetailData) {
+        return;
+    }
+    renderResponseBody((currentDetailData.response_info || {}).body, 'full');
+}
+
+function collapseResponseBody() {
+    if (!currentDetailData) {
+        return;
+    }
+    renderResponseBody((currentDetailData.response_info || {}).body, 'preview');
 }
 
 function currentFilters() {
@@ -283,18 +446,15 @@ async function openDetail(index) {
     editPanel.innerHTML = '';
     editBtn.style.display = 'none';
     mask.classList.add('show');
-    // 记录当前详情 index 供 openEditRetry 使用
-    mask.dataset.currentIndex = String(index);
+    currentDetailIndex = index;
+    currentDetailData = null;
 
     const response = await fetch(`/api/report-result-detail/${encodeURIComponent(reportName)}/${index}`);
     const data = await response.json();
 
-    document.getElementById('detailTitle').textContent = (data.name || '接口详情') +
-        (data.retried ? '<span class="retried-badge">已重试</span>' : '');
-    document.getElementById('detailTitle').innerHTML = (data.name || '接口详情') +
+    document.getElementById('detailTitle').innerHTML = escapeHtml(data.name || '接口详情') +
         (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
-    document.getElementById('detailMeta').textContent =
-        `${data.method || '-'} | ${data.url || '-'} | ${data.status || '-'} | 状态码 ${data.status_code ?? '-'}`;
+    renderDetailMeta(data);
 
     // 所有有 detail_available 或者只要有 url 的都可以重试
     if (data.url) {
@@ -303,8 +463,7 @@ async function openDetail(index) {
 
     if (!data.detail_available) {
         body.innerHTML = '<div class="empty">该报告没有可用的请求/响应详情数据。</div>';
-        // 即便无详情也允许编辑 URL/参数后重试
-        mask.dataset.currentData = JSON.stringify(data);
+        currentDetailData = data;
         return;
     }
 
@@ -346,14 +505,16 @@ async function openDetail(index) {
             </div>
             <div class="detail-card" style="grid-column: 1 / -1;">
                 <h4>响应体</h4>
-                <pre>${escapeHtml(formatJson(data.response_info.body))}</pre>
+                <div id="responseBodyMeta" class="muted response-meta"></div>
+                <pre id="responseBodyPre"></pre>
+                <div id="responseBodyActions" class="response-actions"></div>
             </div>
         </div>
         ${historyHtml}
     `;
 
-    // 缓存当前 data 供 openEditRetry 读取初始值
-    mask.dataset.currentData = JSON.stringify(data);
+    currentDetailData = data;
+    renderResponseBody((data.response_info || {}).body, 'preview');
 }
 
 function toggleHistory(btn) {
@@ -364,10 +525,8 @@ function toggleHistory(btn) {
 }
 
 function openEditRetry() {
-    const mask = document.getElementById('detailMask');
     const panel = document.getElementById('editRetryPanel');
-    const rawData = mask.dataset.currentData || '{}';
-    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
+    const data = currentDetailData || {};
 
     const reqInfo = data.request_info || {};
     const methodOptions = ['GET','POST','PUT','DELETE','PATCH'].map(m =>
@@ -440,10 +599,8 @@ function parseJsonField(id) {
 }
 
 async function sendRetry() {
-    const mask = document.getElementById('detailMask');
-    const rawData = mask.dataset.currentData || '{}';
-    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
-    const resultIndex = parseInt(mask.dataset.currentIndex, 10);
+    const data = currentDetailData || {};
+    const resultIndex = Number.isInteger(currentDetailIndex) ? currentDetailIndex : -1;
 
     const url = (document.getElementById('er-url').value || '').trim();
     if (!url) { alert('URL 不能为空'); return; }
@@ -514,12 +671,11 @@ async function sendRetry() {
         // 更新弹窗 detailMeta 和标题徽标
         document.getElementById('detailTitle').innerHTML =
             escapeHtml(data.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
-        document.getElementById('detailMeta').textContent =
-            `${method} | ${url} | ${result.status} | 状态码 ${result.status_code ?? '-'}`;
+        renderDetailMeta({ method, url, status: result.status, status_code: result.status_code });
 
         // 更新 currentData 以便二次重试时能看到最新状态
         const updated = { ...data, ...result, retry_history: (data.retry_history || []) };
-        mask.dataset.currentData = JSON.stringify(updated);
+        currentDetailData = updated;
 
     } catch(e) {
         resultDiv.className = 'retry-result-box fail';
@@ -535,6 +691,8 @@ function closeDetail(event) {
         return;
     }
     document.getElementById('detailMask').classList.remove('show');
+    currentDetailData = null;
+    currentDetailIndex = null;
     const panel = document.getElementById('editRetryPanel');
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
     const editBtn = document.getElementById('editRetryBtn');
