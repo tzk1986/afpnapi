@@ -3,6 +3,7 @@
 """报告服务端，支持历史报告浏览、单报告查询、分页、详情与局域网访问。"""
 
 import json
+import logging
 import os
 import re
 import socket
@@ -15,6 +16,12 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, url_for
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -1116,7 +1123,23 @@ def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
     }
 
 
+import time as _time
+
+# 报告列表简单 TTL 缓存（30 秒），避免每次首页请求都全量读取 meta 文件
+_REPORTS_CACHE: Dict[str, Any] = {"data": None, "ts": 0.0}
+_REPORTS_CACHE_TTL = 30  # 秒
+
+
+def _invalidate_reports_cache() -> None:
+    """新报告生成或回写时主动失效缓存。"""
+    _REPORTS_CACHE["ts"] = 0.0
+
+
 def list_reports() -> List[Dict[str, Any]]:
+    _now = _time.monotonic()
+    if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
+        return list(_REPORTS_CACHE["data"])
+
     reports: List[Dict[str, Any]] = []
     seen_report_names = set()
 
@@ -1150,7 +1173,10 @@ def list_reports() -> List[Dict[str, Any]]:
     reports = [item for item in reports if is_total_report_name(item.get("report_name", ""))]
 
     reports.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
-    return reports
+
+    _REPORTS_CACHE["data"] = reports
+    _REPORTS_CACHE["ts"] = _time.monotonic()
+    return list(reports)
 
 
 def find_report(report_name: str) -> Dict[str, Any]:
@@ -1255,9 +1281,32 @@ def clamp_run_results_per_page(value: Any) -> int:
     return max(1, min(page_size, 100))
 
 
+try:
+    from postman_api_tester import config as _cfg
+    _RUN_JOBS_MAX = int(getattr(_cfg, "RUN_JOBS_MAX", 200))
+except Exception:
+    _RUN_JOBS_MAX = 200  # 最多保留的任务条数
+
+
+def _evict_old_jobs() -> None:
+    """已在 RUN_JOBS_LOCK 持有下调用：超出上限时清理最早完成的任务。"""
+    if len(RUN_JOBS) <= _RUN_JOBS_MAX:
+        return
+    terminal_statuses = {"success", "failed"}
+    finished = [
+        jid for jid, job in RUN_JOBS.items()
+        if job.get("status") in terminal_statuses
+    ]
+    # 按写入顺序保留最新一半已完成任务
+    to_evict = finished[: max(0, len(finished) - _RUN_JOBS_MAX // 2)]
+    for jid in to_evict:
+        del RUN_JOBS[jid]
+
+
 def set_run_job(job_id: str, **updates: Any) -> None:
     with RUN_JOBS_LOCK:
         RUN_JOBS[job_id] = {**RUN_JOBS.get(job_id, {}), **updates}
+        _evict_old_jobs()
 
 
 def get_run_job(job_id: str) -> Optional[Dict[str, Any]]:
@@ -1324,6 +1373,8 @@ def run_postman_job(
             report_name=os.path.basename(str(report.generated_report_file or "")),
             report_meta_name=os.path.basename(str(report.generated_meta_file or "")),
         )
+        # 新报告已生成，主动失效首页报告列表缓存
+        _invalidate_reports_cache()
     except Exception as exc:
         set_run_job(job_id, status="failed", message=str(exc))
 
@@ -1819,6 +1870,12 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
     return response
 
 
+@app.route("/health")
+def health():
+    """健康检查端点，供负载均衡或监控系统探测服务存活状态。"""
+    return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
+
+
 @app.route("/")
 def index():
     reports = list_reports()
@@ -2083,7 +2140,18 @@ def api_run_postman():
     if not original_name.lower().endswith(".json"):
         return jsonify({"error": "仅支持上传 .json 文件。"}), 400
 
+    # 清洗原始文件名：仅保留合法字符，防止路径穿越和注入风险
+    import re as _re
+    _safe_name = _re.sub(r'[^\w\u4e00-\u9fff\-. ()（）【】]', '_', original_name).strip('. ')
+    original_name = _safe_name if _safe_name else "collection.json"
+
     base_url = str(request.form.get("base_url", "")).strip() or None
+    # 校验 base_url 格式，防止 SSRF：仅允许 http/https，禁止 file://、ftp:// 等
+    if base_url is not None:
+        from urllib.parse import urlparse as _urlparse
+        _parsed = _urlparse(base_url)
+        if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
+            return jsonify({"error": "base_url 格式无效，仅支持 http/https 协议。"}), 400
     token = str(request.form.get("token", "")).strip() or None
     output_dir = str(request.form.get("output_dir", "")).strip() or str(REPORTS_DIR)
     report_name = str(request.form.get("report_name", "")).strip() or None
@@ -2145,6 +2213,12 @@ if __name__ == "__main__":
     port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
     host = os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")
     print(f"报告目录: {REPORTS_DIR}")
-    print(f"报告服务启动: http://127.0.0.1:{port}")
-    print(f"局域网访问地址: http://{get_local_ip()}:{port}")
-    app.run(host=host, port=port, debug=False)
+    logger.info("报告服务启动: http://127.0.0.1:%d", port)
+    logger.info("局域网访问地址: http://%s:%d", get_local_ip(), port)
+    try:
+        from waitress import serve
+        logger.info("使用 waitress WSGI 服务器（生产模式）")
+        serve(app, host=host, port=port)
+    except ImportError:
+        logger.warning("waitress 未安装，降级使用 Flask 开发服务器（建议 pip install waitress）")
+        app.run(host=host, port=port, debug=False)

@@ -27,6 +27,7 @@ Postman API 文件测试模块
 """
 
 import json
+import logging
 import os
 import socket
 import sys
@@ -34,6 +35,8 @@ from typing import Dict, List, Any, Optional, Callable, Tuple
 from datetime import datetime
 import re
 from urllib.parse import urljoin
+
+logger = logging.getLogger(__name__)
 
 
 class PostmanApiParser:
@@ -123,7 +126,12 @@ class PostmanApiParser:
         elif 'request' in item:
             api_info = self._parse_request(item, parent_name, item_path=item_path)
             if api_info:
-                apis.append(api_info)
+                # 校验必填字段：name/method/url 任一缺失则跳过，避免执行层崩溃
+                _missing = [k for k in ('name', 'method', 'url') if not api_info.get(k)]
+                if _missing:
+                    logger.warning("跳过无效 API（字段缺失: %s）: %s", _missing, api_info)
+                else:
+                    apis.append(api_info)
         
         return apis
     
@@ -159,7 +167,7 @@ class PostmanApiParser:
             if body_data.get('mode') == 'raw':
                 try:
                     body = json.loads(body_data.get('raw', '{}'))
-                except:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     body = body_data.get('raw', '')
             elif body_data.get('mode') == 'formdata':
                 body = {}
@@ -223,38 +231,37 @@ class PostmanTestExecutor:
     """Postman API测试执行器"""
     
     test_results = []
-    _auth_token = None  # 类级别的token存储
-    
-    def __init__(self, api_config: Dict, auth_token: str = None):
+
+    def __init__(self, api_config: Dict, auth_token: str = None, session=None):
         """
         初始化执行器
         :param api_config: API配置信息
-        :param auth_token: 认证token（可选）
+        :param auth_token: 认证token（可选）；每个实例独立持有，不共享，避免并发污染
+        :param session: 可选的外部 requests.Session（由调用方统一管理生命周期）；
+                        传入时本实例不拥有该 Session，execute_test 结束后不关闭它。
         """
-        import requests
+        import requests as _requests_mod
         self.api_config = api_config
         self.http_response = None
         self.resp_status_code = None
         self.response_data = None
-        self.session = requests.Session()
-        
-        # 如果提供了token，设置为类级别token
-        if auth_token:
-            PostmanTestExecutor._auth_token = auth_token
-    
+        # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
+        self._owns_session = session is None
+        self.session = session if session is not None else _requests_mod.Session()
+        # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
+        self._auth_token: Optional[str] = auth_token or None
+
     def start(self):
         """测试前准备"""
         pass
-    
-    @classmethod
-    def set_auth_token(cls, token: str):
-        """设置全局认证token"""
-        cls._auth_token = token
-    
-    @classmethod
-    def get_auth_token(cls) -> str:
-        """获取全局认证token"""
-        return cls._auth_token
+
+    def set_auth_token(self, token: str):
+        """设置本实例的认证token（兼容旧调用）"""
+        self._auth_token = token
+
+    def get_auth_token(self) -> Optional[str]:
+        """获取本实例的认证token"""
+        return self._auth_token
     
     def execute_test(self):
         """执行单个API测试"""
@@ -266,31 +273,38 @@ class PostmanTestExecutor:
         body = api.get('body')
         
         # 自动添加认证token（如果存在则始终覆盖，确保使用最新token）
-        if PostmanTestExecutor._auth_token:
+        if self._auth_token:
             # 大小写不敏感地查找已有认证头，避免重复键
             headers_lower = {k.lower(): k for k in headers}
             if 'authorization' in headers_lower:
                 orig_key = headers_lower['authorization']
-                headers[orig_key] = f'Bearer {PostmanTestExecutor._auth_token}'
+                headers[orig_key] = f'Bearer {self._auth_token}'
             else:
                 # 删除大小写不一致的 token 键，统一用小写 token
                 for k in list(headers.keys()):
                     if k.lower() == 'token':
                         del headers[k]
-                headers['token'] = PostmanTestExecutor._auth_token
+                headers['token'] = self._auth_token
 
         try:
+            from postman_api_tester import config as _cfg
+            _REQUEST_TIMEOUT = (int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', 10)), int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', 30)))
+        except Exception:
+            _REQUEST_TIMEOUT = (10, 30)  # (connect_timeout, read_timeout) 秒
+
+        try:
+            import requests as _requests
             # 发送请求
             if method == 'get':
-                response = self.session.get(url, params=params, headers=headers)
+                response = self.session.get(url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
             elif method == 'post':
-                response = self.session.post(url, json=body, params=params, headers=headers)
+                response = self.session.post(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
             elif method == 'put':
-                response = self.session.put(url, json=body, params=params, headers=headers)
+                response = self.session.put(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
             elif method == 'delete':
-                response = self.session.delete(url, params=params, headers=headers)
+                response = self.session.delete(url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
             elif method == 'patch':
-                response = self.session.patch(url, json=body, params=params, headers=headers)
+                response = self.session.patch(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
             else:
                 return {
                     'name': api['name'],
@@ -307,7 +321,7 @@ class PostmanTestExecutor:
             
             try:
                 self.response_data = response.json()
-            except:
+            except (json.JSONDecodeError, ValueError):
                 self.response_data = response.text
 
             response_message, err_code = self._extract_message_and_err_code(self.response_data)
@@ -367,6 +381,8 @@ class PostmanTestExecutor:
                 }
         
         except Exception as e:
+            import requests as _requests
+            err_type = '请求超时' if isinstance(e, _requests.exceptions.Timeout) else '请求异常'
             return {
                 'name': api['name'],
                 'method': api['method'],
@@ -374,7 +390,7 @@ class PostmanTestExecutor:
                 'item_path': api.get('item_path', []),
                 'expected_status': api.get('expected_status', 200),
                 'status': 'ERROR',
-                'message': str(e),
+                'message': f'[{err_type}] {e}',
                 'err_code': '',
                 'status_code': None,
                 'folder': api.get('folder', ''),
@@ -388,6 +404,10 @@ class PostmanTestExecutor:
                     'body': str(e)
                 }
             }
+        finally:
+            # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
+            if self._owns_session:
+                self.session.close()
 
     def _extract_message_and_err_code(self, response_data: Any) -> Tuple[str, str]:
         """从响应体中提取 message 与 errCode 字段，用于成功判定与报告查询。"""
@@ -471,11 +491,20 @@ class PostmanTestReport:
         total_results = len(self.results)
         total_pages = (total_results + results_per_page - 1) // results_per_page
         
-        # 准备详情数据
+        # 准备详情数据，过滤请求头中的敏感凭据字段
+        _SENSITIVE_HEADERS = frozenset({
+            'authorization', 'token', 'x-token', 'x-access-token', 'access-token',
+        })
         details_data = {}
         for idx, result in enumerate(self.results):
+            req_info = result.get('request_info', {})
+            raw_req_headers = req_info.get('headers', {}) or {}
+            sanitized_headers = {
+                k: ('***' if k.lower() in _SENSITIVE_HEADERS else v)
+                for k, v in raw_req_headers.items()
+            }
             details_data[str(idx)] = {
-                'request_info': result.get('request_info', {}),
+                'request_info': {**req_info, 'headers': sanitized_headers},
                 'response_info': result.get('response_info', {})
             }
         
@@ -1436,8 +1465,15 @@ def run_postman_tests(
     if output_dir is None:
         # 报告输出到上级目录的reports文件夹
         output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
-    
-    print(f"\n开始加载Postman文件: {postman_file}")
+
+    # 校验 base_url 格式，防止 SSRF：仅允许 http/https 协议
+    if base_url is not None:
+        from urllib.parse import urlparse as _urlparse
+        _parsed = _urlparse(base_url)
+        if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
+            raise ValueError(f"base_url 格式无效（仅支持 http/https）: {base_url!r}")
+
+    logger.info("开始加载Postman文件: %s", postman_file)
     
     # 解析Postman文件
     parser = PostmanApiParser(postman_file)
@@ -1448,8 +1484,7 @@ def run_postman_tests(
         for api in apis:
             api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
     
-    print(f"✓ 成功加载 {len(apis)} 个API接口")
-    print(f"  基础URL: {parser.base_url}")
+    logger.info("成功加载 %d 个API接口，基础URL: %s", len(apis), parser.base_url)
 
     if progress_callback:
         try:
@@ -1466,16 +1501,17 @@ def run_postman_tests(
         except Exception:
             pass
     
-    # 预获取认证token
+    # 预获取认证token，保存为局部变量，通过实例传递，不使用类变量
+    resolved_token: Optional[str] = None
     if token:
         # 使用手动指定的token（来自参数或配置文件），跳过自动登录
-        PostmanTestExecutor.set_auth_token(token)
-        print(f"✓ 使用手动指定的token: {token[:20]}...")
+        resolved_token = token
+        logger.info("使用手动指定的token: %s...", token[:20])
     else:
         auth_token = get_auth_token(apis, parser.base_url)
         if auth_token:
-            PostmanTestExecutor.set_auth_token(auth_token)
-            print(f"✓ 已获取认证token: {auth_token[:20]}...")
+            resolved_token = auth_token
+            logger.info("已获取认证token: %s...", auth_token[:20])
     
     # 创建报告对象
     report = PostmanTestReport()
@@ -1484,35 +1520,38 @@ def run_postman_tests(
     report.source_original_file = str(source_original_file or '').strip()
     report.base_url = parser.base_url
     
-    # 执行测试
-    print("\n开始执行测试...")
-    for idx, api in enumerate(apis, 1):
-        print(f"  [{idx}/{len(apis)}] 测试: {api['name']} ({api['method']} {api['url']}) ...", end='')
-        
-        executor = PostmanTestExecutor(api)
-        executor.start()
-        result = executor.execute_test()
-        report.add_result(result)
-        
-        status_symbol = "✓" if result['status'] == 'PASSED' else "✗" if result['status'] == 'FAILED' else "!"
-        print(f" {status_symbol} {result['status']}")
+    # 执行测试 —— 所有 API 共享同一 Session，避免每次建立新 TCP 连接
+    import requests as _requests_mod
+    logger.info("开始执行测试，共 %d 个接口", len(apis))
+    _shared_session = _requests_mod.Session()
+    try:
+        for idx, api in enumerate(apis, 1):
+            logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
+            
+            executor = PostmanTestExecutor(api, auth_token=resolved_token, session=_shared_session)
+            executor.start()
+            result = executor.execute_test()
+            report.add_result(result)
+            
+            _log = logger.info if result['status'] == 'PASSED' else logger.warning
+            _log("[%d/%d] %s %s → %s", idx, len(apis), api['method'], api['name'], result['status'])
 
-        if progress_callback:
-            try:
-                progress_callback({
-                    'stage': 'running',
-                    'total': len(apis),
-                    'completed': idx,
-                    'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
-                    'current_name': str(api.get('name', '')),
-                    'current_method': str(api.get('method', '')),
-                    'current_url': str(api.get('url', '')),
-                    'last_status': str(result.get('status', '')),
-                })
-            except Exception:
-                pass
-    
-    # 生成报告
+            if progress_callback:
+                try:
+                    progress_callback({
+                        'stage': 'running',
+                        'total': len(apis),
+                        'completed': idx,
+                        'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
+                        'current_name': str(api.get('name', '')),
+                        'current_method': str(api.get('method', '')),
+                        'current_url': str(api.get('url', '')),
+                        'last_status': str(result.get('status', '')),
+                    })
+                except Exception:
+                    pass
+    finally:
+        _shared_session.close()
     print("\n生成测试报告...")
     summary = report.generate_summary()
     
@@ -1535,8 +1574,8 @@ def run_postman_tests(
         report_file = os.path.join(output_dir, f'{name_no_ext}_{timestamp}{ext or ".html"}')
 
     report.generate_html_report(report_file, results_per_page=results_per_page)
-    print(f"✓ HTML报告已保存: {report_file}")
-    print(f"✓ 报告元数据已保存: {report.generated_meta_file}")
+    logger.info("HTML报告已保存: %s", report_file)
+    logger.info("报告元数据已保存: %s", report.generated_meta_file)
     
     # 打印控制台报告
     report.print_console_report()
