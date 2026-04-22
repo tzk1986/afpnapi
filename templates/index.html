@@ -16,15 +16,37 @@
         .toolbar button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
         .toolbar button:hover { opacity: 0.92; }
         table { width: 100%; border-collapse: collapse; }
+        .report-table { table-layout: fixed; }
         th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
         th { color: #475569; font-size: 13px; }
         tr:hover { background: #f8fafc; }
+        .col-pick { width: 40px; }
+        .col-report { width: 22%; }
+        .col-source { width: 43%; }
+        .col-summary { width: 11%; }
+        .col-generated { width: 12%; }
+        .col-actions { width: 176px; }
         .summary { display: flex; gap: 10px; flex-wrap: wrap; }
         .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: #e0f2fe; color: #075985; }
-        .actions a { margin-right: 10px; color: #1d4ed8; text-decoration: none; }
-        .actions button { margin-right: 10px; }
-        .danger-link { background: #fff; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-        .danger-link:hover { background: #fef2f2; }
+        .actions { width: 176px; min-width: 176px; padding-top: 10px; padding-bottom: 10px; box-sizing: border-box; }
+        .action-block { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; width: 100%; align-content: start; }
+        .action-pill { display: inline-flex; align-items: center; justify-content: center; min-height: 0; min-width: 0; height: 30px; padding: 0 6px; border-radius: 999px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 12px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; box-sizing: border-box; overflow: hidden; }
+        .action-pill:hover { background: #dbeafe; }
+        .action-pill.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+        .action-pill.primary:hover { background: #1e40af; }
+        .action-pill.subtle { background: #fff; border-color: #cbd5e1; color: #334155; }
+        .action-pill.subtle:hover { background: #f8fafc; }
+        .action-pill.danger { background: #fff; color: #b91c1c; border-color: #fecaca; }
+        .action-pill.danger:hover { background: #fef2f2; }
+        .report-cell, .source-cell { min-width: 0; }
+        .report-cell .report-link, .report-cell .muted, .source-cell, .source-cell .muted { overflow-wrap: anywhere; word-break: break-word; }
+        @media (max-width: 900px) {
+            .actions { width: 164px; min-width: 164px; }
+            .action-pill { font-size: 11px; padding: 0 4px; }
+            .col-source { width: 38%; }
+            .col-generated { width: 13%; }
+            .col-actions { width: 164px; }
+        }
         .report-link { color: #0f172a; font-weight: 700; text-decoration: none; }
         .report-link:hover { color: #1d4ed8; }
         .compare { margin-top: 18px; }
@@ -96,7 +118,15 @@
                 <input id="searchInput" type="text" placeholder="搜索报告名、集合名、源文件" oninput="renderReports()">
                 <button class="secondary" onclick="window.location.href='/'">刷新列表</button>
             </div>
-            <table>
+            <table class="report-table">
+                <colgroup>
+                    <col class="col-pick">
+                    <col class="col-report">
+                    <col class="col-source">
+                    <col class="col-summary">
+                    <col class="col-generated">
+                    <col class="col-actions">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>选择</th>
@@ -170,11 +200,11 @@ function renderReports() {
     tbody.innerHTML = filtered.map((report) => `
         <tr>
             <td><input type="radio" name="reportPick" onclick="pickReport('${report.report_name}')"></td>
-            <td>
+            <td class="report-cell">
                 <a class="report-link" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">${escapeHtml(report.report_name)}</a>
                 <div class="muted">主机: ${escapeHtml(report.host_name || '-')}</div>
             </td>
-            <td>${escapeHtml(report.collection_name || '-')}<div class="muted">${escapeHtml(report.source_file || '-')}</div></td>
+            <td class="source-cell">${escapeHtml(report.collection_name || '-')}<div class="muted">${escapeHtml(report.source_file || '-')}</div></td>
             <td>
                 <div class="summary">
                     <span class="tag">总计 ${report.summary.total}</span>
@@ -185,10 +215,12 @@ function renderReports() {
             </td>
             <td>${escapeHtml(report.generated_at || '-')}</td>
             <td class="actions">
-                <a href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">查看数据</a>
-                <a href="/reports/${encodeURIComponent(report.report_name)}" target="_blank">原始HTML</a>
-                <a href="/api/report-meta/${encodeURIComponent(report.report_name)}" target="_blank">元数据</a>
-                <button type="button" class="danger-link" onclick='deleteReport(${JSON.stringify(report.report_name)})'>删除</button>
+                <div class="action-block">
+                    <a class="action-pill primary" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">数据视图</a>
+                    <a class="action-pill" href="/reports/${encodeURIComponent(report.report_name)}" target="_blank">原始 HTML</a>
+                    <a class="action-pill subtle" href="/api/report-meta/${encodeURIComponent(report.report_name)}" target="_blank">元数据</a>
+                    <button type="button" class="action-pill danger" onclick='deleteReport(${JSON.stringify(report.report_name)})'>删除报告</button>
+                </div>
             </td>
         </tr>
     `).join('');
