@@ -44,3 +44,11 @@ REQUEST_READ_TIMEOUT = int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))
 # 超出上限时最早的任务记录会被淘汰（已在 report_server.py 中实现）
 # ==============================================================
 RUN_JOBS_MAX = int(os.environ.get("RUN_JOBS_MAX", "200"))
+
+# ==============================================================
+# 报告服务模板渲染模式
+# 可选值："inline" 或 "external"
+# - inline: 使用内嵌模板（更稳妥）
+# - external: 优先使用 templates/*.html，失败自动降级 inline
+# ==============================================================
+REPORT_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "inline")).strip().lower() or "inline"

@@ -63,10 +63,26 @@ def get_report_write_lock(report_name: str) -> threading.Lock:
 
 app = Flask(__name__, template_folder=str((PROJECT_ROOT / "templates").resolve()))
 
+
+def _resolve_template_mode() -> str:
+    """读取模板模式：环境变量优先，其次 config.py，最后回退 inline。"""
+    mode = str(os.environ.get("REPORT_TEMPLATE_MODE", "")).strip().lower()
+    if not mode:
+        try:
+            from postman_api_tester import config as _cfg
+            mode = str(getattr(_cfg, "REPORT_TEMPLATE_MODE", "")).strip().lower()
+        except Exception:
+            mode = ""
+
+    if mode not in ("inline", "external"):
+        mode = "inline"
+    return mode
+
+
 # 模板渲染模式：
 # - inline（默认）：沿用内嵌模板，行为与历史版本一致
 # - external：优先使用 templates/*.html，失败时自动降级 inline
-_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "inline")).strip().lower() or "inline"
+_TEMPLATE_MODE = _resolve_template_mode()
 
 
 def render_with_fallback(template_name: str, inline_template: str, **context: Any):
@@ -2235,6 +2251,7 @@ if __name__ == "__main__":
     print(f"报告目录: {REPORTS_DIR}")
     logger.info("报告服务启动: http://127.0.0.1:%d", port)
     logger.info("局域网访问地址: http://%s:%d", get_local_ip(), port)
+    logger.info("当前模板模式: %s", _TEMPLATE_MODE)
     try:
         from waitress import serve
         logger.info("使用 waitress WSGI 服务器（生产模式）")
