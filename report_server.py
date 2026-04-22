@@ -1156,12 +1156,39 @@ def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
 import time as _time
 
 # 报告列表简单 TTL 缓存（30 秒），避免每次首页请求都全量读取 meta 文件
-_REPORTS_CACHE: Dict[str, Any] = {"data": None, "ts": 0.0}
+_REPORTS_CACHE: Dict[str, Any] = {"data": None, "by_name": None, "ts": 0.0}
 _REPORTS_CACHE_TTL = 30  # 秒
+
+
+def _report_list_item(report: Dict[str, Any]) -> Dict[str, Any]:
+    summary = dict(report.get("summary") or {})
+    return {
+        "report_name": report.get("report_name", ""),
+        "generated_at": report.get("generated_at", ""),
+        "host_name": report.get("host_name", ""),
+        "collection_name": report.get("collection_name", ""),
+        "source_file": report.get("source_file", ""),
+        "source_original_file": report.get("source_original_file", ""),
+        "summary": {
+            "total": summary.get("total", 0),
+            "passed": summary.get("passed", 0),
+            "failed": summary.get("failed", 0),
+            "error": summary.get("error", 0),
+            "success_rate": summary.get("success_rate", "0%"),
+        },
+        "load_error": report.get("load_error", ""),
+        "legacy": bool(report.get("legacy", False)),
+    }
+
+
+def list_report_summaries() -> List[Dict[str, Any]]:
+    return [_report_list_item(report) for report in list_reports()]
 
 
 def _invalidate_reports_cache() -> None:
     """新报告生成或回写时主动失效缓存。"""
+    _REPORTS_CACHE["data"] = None
+    _REPORTS_CACHE["by_name"] = None
     _REPORTS_CACHE["ts"] = 0.0
 
 
@@ -1205,14 +1232,18 @@ def list_reports() -> List[Dict[str, Any]]:
     reports.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
 
     _REPORTS_CACHE["data"] = reports
+    _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
     _REPORTS_CACHE["ts"] = _time.monotonic()
     return list(reports)
 
 
 def find_report(report_name: str) -> Dict[str, Any]:
-    for report in list_reports():
-        if report.get("report_name") == report_name:
-            return report
+    reports_by_name = _REPORTS_CACHE.get("by_name")
+    if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
+        list_reports()
+        reports_by_name = _REPORTS_CACHE.get("by_name")
+    if reports_by_name and report_name in reports_by_name:
+        return reports_by_name[report_name]
     raise FileNotFoundError(report_name)
 
 
@@ -1950,7 +1981,7 @@ def health():
 
 @app.route("/")
 def index():
-    reports = list_reports()
+    reports = list_report_summaries()
     port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
     return render_with_fallback(
         "index.html",

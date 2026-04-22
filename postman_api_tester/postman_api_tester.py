@@ -229,16 +229,15 @@ class PostmanApiParser:
 
 class PostmanTestExecutor:
     """Postman API测试执行器"""
-    
-    test_results = []
 
-    def __init__(self, api_config: Dict, auth_token: str = None, session=None):
+    def __init__(self, api_config: Dict, auth_token: str = None, session=None, request_timeout: Optional[Tuple[int, int]] = None):
         """
         初始化执行器
         :param api_config: API配置信息
         :param auth_token: 认证token（可选）；每个实例独立持有，不共享，避免并发污染
         :param session: 可选的外部 requests.Session（由调用方统一管理生命周期）；
                         传入时本实例不拥有该 Session，execute_test 结束后不关闭它。
+        :param request_timeout: 请求超时配置（connect_timeout, read_timeout）
         """
         import requests as _requests_mod
         self.api_config = api_config
@@ -250,6 +249,7 @@ class PostmanTestExecutor:
         self.session = session if session is not None else _requests_mod.Session()
         # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
         self._auth_token: Optional[str] = auth_token or None
+        self.request_timeout: Tuple[int, int] = request_timeout or (10, 30)
 
     def start(self):
         """测试前准备"""
@@ -287,25 +287,8 @@ class PostmanTestExecutor:
                 headers['token'] = self._auth_token
 
         try:
-            from postman_api_tester import config as _cfg
-            _REQUEST_TIMEOUT = (int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', 10)), int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', 30)))
-        except Exception:
-            _REQUEST_TIMEOUT = (10, 30)  # (connect_timeout, read_timeout) 秒
-
-        try:
             import requests as _requests
-            # 发送请求
-            if method == 'get':
-                response = self.session.get(url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
-            elif method == 'post':
-                response = self.session.post(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
-            elif method == 'put':
-                response = self.session.put(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
-            elif method == 'delete':
-                response = self.session.delete(url, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
-            elif method == 'patch':
-                response = self.session.patch(url, json=body, params=params, headers=headers, timeout=_REQUEST_TIMEOUT)
-            else:
+            if method not in {'get', 'post', 'put', 'delete', 'patch'}:
                 return {
                     'name': api['name'],
                     'method': api['method'],
@@ -315,6 +298,16 @@ class PostmanTestExecutor:
                     'err_code': '',
                     'status_code': None
                 }
+
+            request_kwargs = {
+                'params': params,
+                'headers': headers,
+                'timeout': self.request_timeout,
+            }
+            if method in {'post', 'put', 'patch'}:
+                request_kwargs['json'] = body
+
+            response = getattr(self.session, method)(url, **request_kwargs)
             
             self.http_response = response
             self.resp_status_code = response.status_code
@@ -450,27 +443,42 @@ class PostmanTestReport:
         self.generated_report_file = ""
         self.generated_details_file = ""
         self.generated_meta_file = ""
+        self._summary_cache: Optional[Dict[str, Any]] = None
     
     def add_result(self, result: Dict):
         """添加测试结果"""
         self.results.append(result)
+        self._summary_cache = None
     
     def add_results(self, results: List[Dict]):
         """批量添加测试结果"""
         self.results.extend(results)
+        self._summary_cache = None
     
     def generate_summary(self) -> Dict:
         """生成测试摘要"""
+        if self._summary_cache is not None:
+            return dict(self._summary_cache)
+
         self.end_time = datetime.now()
-        
+
+        passed = 0
+        failed = 0
+        error = 0
+        for result in self.results:
+            status = result.get('status')
+            if status == 'PASSED':
+                passed += 1
+            elif status == 'FAILED':
+                failed += 1
+            elif status == 'ERROR':
+                error += 1
+
         total = len(self.results)
-        passed = len([r for r in self.results if r['status'] == 'PASSED'])
-        failed = len([r for r in self.results if r['status'] == 'FAILED'])
-        error = len([r for r in self.results if r['status'] == 'ERROR'])
         
         duration = (self.end_time - self.start_time).total_seconds()
-        
-        return {
+
+        summary = {
             'total': total,
             'passed': passed,
             'failed': failed,
@@ -480,6 +488,8 @@ class PostmanTestReport:
             'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
             'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S')
         }
+        self._summary_cache = summary
+        return dict(summary)
     
     def generate_html_report(self, output_path: str, results_per_page: int = 30):
         """生成HTML报告"""
@@ -1525,10 +1535,15 @@ def run_postman_tests(
     logger.info("开始执行测试，共 %d 个接口", len(apis))
     _shared_session = _requests_mod.Session()
     try:
+        from postman_api_tester import config as _cfg
+        request_timeout = (int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', 10)), int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', 30)))
+    except Exception:
+        request_timeout = (10, 30)
+    try:
         for idx, api in enumerate(apis, 1):
             logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
             
-            executor = PostmanTestExecutor(api, auth_token=resolved_token, session=_shared_session)
+            executor = PostmanTestExecutor(api, auth_token=resolved_token, session=_shared_session, request_timeout=request_timeout)
             executor.start()
             result = executor.execute_test()
             report.add_result(result)
