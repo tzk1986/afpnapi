@@ -1610,6 +1610,7 @@ def run_postman_tests(
     report_name: str = None,
     source_original_file: str = None,
     results_per_page: int = 30,
+    selected_item_paths: Optional[List[List[int]]] = None,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> PostmanTestReport:
     """
@@ -1622,6 +1623,7 @@ def run_postman_tests(
     :param report_name: 报告名称（可选，支持 .html 文件名；留空则自动命名）
     :param source_original_file: 原始上传文件名（可选，用于报告追溯与导出命名）
     :param results_per_page: 报告分页大小（默认30）
+    :param selected_item_paths: 仅执行指定 item_path 的接口（可选）；为空则全量执行
     :param progress_callback: 进度回调（可选），用于上层展示执行进度
     :return: 测试报告对象
     """
@@ -1654,6 +1656,26 @@ def run_postman_tests(
     # 解析Postman文件
     parser = PostmanApiParser(postman_file)
     apis = parser.extract_apis()
+    total_apis_count = len(apis)
+
+    selected_path_set: Optional[set] = None
+    if selected_item_paths:
+        normalized_paths = []
+        for path in selected_item_paths:
+            if not isinstance(path, list):
+                continue
+            if all(isinstance(index, int) and index >= 0 for index in path):
+                normalized_paths.append(tuple(path))
+        selected_path_set = set(normalized_paths)
+        if not selected_path_set:
+            raise ValueError("selected_item_paths 格式无效，未解析到可执行接口路径。")
+
+        apis = [
+            api for api in apis
+            if tuple(api.get('item_path') or []) in selected_path_set
+        ]
+        if not apis:
+            raise ValueError("未匹配到可执行接口，请确认所选接口是否仍存在于当前集合。")
     
     if base_url:
         parser.base_url = base_url
@@ -1661,12 +1683,15 @@ def run_postman_tests(
             api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
     
     logger.info("成功加载 %d 个API接口，基础URL: %s", len(apis), parser.base_url)
+    if selected_path_set is not None:
+        logger.info("本次执行范围：已选接口 %d / 全量 %d", len(apis), total_apis_count)
 
     if progress_callback:
         try:
             progress_callback({
                 'stage': 'running',
                 'total': len(apis),
+                'total_all': total_apis_count,
                 'completed': 0,
                 'percent': 0,
                 'current_name': '',
@@ -1722,6 +1747,7 @@ def run_postman_tests(
                     progress_callback({
                         'stage': 'running',
                         'total': len(apis),
+                        'total_all': total_apis_count,
                         'completed': idx,
                         'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
                         'current_name': str(api.get('name', '')),

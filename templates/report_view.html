@@ -128,11 +128,17 @@
                     <option value="50">50 条/页</option>
                     <option value="100">100 条/页</option>
                 </select>
+                <select id="exportScopeSelect">
+                    <option value="full" {% if report_export_default_scope == 'full' %}selected{% endif %}>全量导出</option>
+                    {% if report_export_allow_report_only %}
+                    <option value="report_only" {% if report_export_default_scope == 'report_only' %}selected{% endif %}>导出本次报告接口</option>
+                    {% endif %}
+                </select>
                 <button onclick="reloadResults(1)">查询</button>
                 <button class="secondary" onclick="resetFilters()">重置</button>
                 <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
                 <label class="hint" style="display:flex;align-items:center;gap:6px;">
-                    <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;">
+                    <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;" {% if report_export_include_auth_default %}checked{% endif %}>
                     导出包含 token/authorization
                 </label>
                 <span class="hint">默认 20 条/页，最高 100 条/页</span>
@@ -162,6 +168,8 @@
 
 <script>
 const reportName = {{ report_name_json|safe }};
+const REPORT_VIEW_PAGE_SIZE_DEFAULT = {{ report_view_page_size_default }};
+const REPORT_EXPORT_DEFAULT_SCOPE = {{ report_export_default_scope|tojson }};
 let currentDetailData = null;
 let currentDetailIndex = null;
 
@@ -704,17 +712,18 @@ function resetFilters() {
     document.getElementById('messageInput').value = '';
     document.getElementById('errCodeInput').value = '';
     document.getElementById('statusSelect').value = 'all';
-    document.getElementById('pageSizeSelect').value = '20';
+    document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
     reloadResults(1);
 }
 
 async function exportLatestCollection() {
     try {
         const includeAuth = document.getElementById('includeAuthExport').checked;
+        const exportScope = (document.getElementById('exportScopeSelect')?.value || REPORT_EXPORT_DEFAULT_SCOPE || 'full');
         const response = await fetch('/api/export-collection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth })
+            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth, export_scope: exportScope })
         });
         const data = await response.json();
         if (!response.ok) {
@@ -724,8 +733,11 @@ async function exportLatestCollection() {
         const warningText = (data.warnings && data.warnings.length)
             ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`
             : '';
+        const scopeText = data.export_scope === 'report_only'
+            ? `仅本次报告接口（${data.report_only_count || 0} 个）`
+            : '全量集合';
         alert(
-            `导出完成！\n文件: ${data.file_name}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
+            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
         );
         if (data.warnings && data.warnings.length) {
             console.warn('Export warnings:', data.warnings);
@@ -758,6 +770,11 @@ document.getElementById('errCodeInput').addEventListener('keydown', (event) => {
 
 document.getElementById('statusSelect').addEventListener('change', () => reloadResults(1));
 document.getElementById('pageSizeSelect').addEventListener('change', () => reloadResults(1));
+
+document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
+if (document.getElementById('exportScopeSelect')) {
+    document.getElementById('exportScopeSelect').value = REPORT_EXPORT_DEFAULT_SCOPE;
+}
 
 reloadResults(1);
 </script>

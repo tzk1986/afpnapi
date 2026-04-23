@@ -52,3 +52,43 @@ RUN_JOBS_MAX = int(os.environ.get("RUN_JOBS_MAX", "200"))
 # - external: 优先使用 templates/*.html，失败自动降级 inline
 # ==============================================================
 REPORT_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "external")).strip().lower() or "inline"
+
+# ==============================================================
+# 运行页与结果页分页配置（集中管理）
+# ============================================================== 
+RUN_RESULTS_PER_PAGE_DEFAULT = int(os.environ.get("RUN_RESULTS_PER_PAGE_DEFAULT", "30"))
+RUN_RESULTS_PER_PAGE_MIN = int(os.environ.get("RUN_RESULTS_PER_PAGE_MIN", "1"))
+RUN_RESULTS_PER_PAGE_MAX = int(os.environ.get("RUN_RESULTS_PER_PAGE_MAX", "100"))
+
+REPORT_VIEW_PAGE_SIZE_DEFAULT = int(os.environ.get("REPORT_VIEW_PAGE_SIZE_DEFAULT", "20"))
+REPORT_VIEW_PAGE_SIZE_MIN = int(os.environ.get("REPORT_VIEW_PAGE_SIZE_MIN", "1"))
+REPORT_VIEW_PAGE_SIZE_MAX = int(os.environ.get("REPORT_VIEW_PAGE_SIZE_MAX", "100"))
+
+# ==============================================================
+# 上传执行任务轮询配置
+# ============================================================== 
+RUN_STATUS_POLL_INTERVAL_MS = int(os.environ.get("RUN_STATUS_POLL_INTERVAL_MS", "3000"))
+
+# ==============================================================
+# 可选接口执行（导入后选择接口再执行）
+# ENABLE_SELECTIVE_RUN: 是否启用“仅执行已选接口”能力
+# COLLECTION_PREVIEW_MAX_ITEMS: 单次预览最多返回的接口数量（防止超大集合拖慢页面）
+# ============================================================== 
+ENABLE_SELECTIVE_RUN = str(os.environ.get("ENABLE_SELECTIVE_RUN", "true")).strip().lower() in {
+	"1", "true", "yes", "y", "on"
+}
+COLLECTION_PREVIEW_MAX_ITEMS = int(os.environ.get("COLLECTION_PREVIEW_MAX_ITEMS", "3000"))
+
+# ==============================================================
+# 报告导出范围配置
+# REPORT_EXPORT_DEFAULT_SCOPE: full | report_only
+# REPORT_EXPORT_ALLOW_REPORT_ONLY: 是否允许“仅导出本次报告接口”
+# REPORT_EXPORT_INCLUDE_AUTH_DEFAULT: 导出时是否默认包含认证头
+# ============================================================== 
+REPORT_EXPORT_DEFAULT_SCOPE = str(os.environ.get("REPORT_EXPORT_DEFAULT_SCOPE", "full")).strip().lower() or "full"
+REPORT_EXPORT_ALLOW_REPORT_ONLY = str(os.environ.get("REPORT_EXPORT_ALLOW_REPORT_ONLY", "true")).strip().lower() in {
+	"1", "true", "yes", "y", "on"
+}
+REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = str(os.environ.get("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", "false")).strip().lower() in {
+	"1", "true", "yes", "y", "on"
+}

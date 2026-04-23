@@ -25,6 +25,60 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
+try:
+    from postman_api_tester import config as _cfg
+except Exception:
+    _cfg = None
+
+
+def _cfg_int(name: str, default: int) -> int:
+    if _cfg is None:
+        return int(default)
+    try:
+        return int(getattr(_cfg, name, default))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _cfg_bool(name: str, default: bool) -> bool:
+    if _cfg is None:
+        return bool(default)
+    value = getattr(_cfg, name, default)
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return bool(default)
+
+
+def _cfg_str(name: str, default: str) -> str:
+    if _cfg is None:
+        return str(default)
+    value = getattr(_cfg, name, default)
+    return str(value).strip() if value is not None else str(default)
+
+
+RUN_RESULTS_PER_PAGE_DEFAULT = _cfg_int("RUN_RESULTS_PER_PAGE_DEFAULT", 30)
+RUN_RESULTS_PER_PAGE_MIN = _cfg_int("RUN_RESULTS_PER_PAGE_MIN", 1)
+RUN_RESULTS_PER_PAGE_MAX = _cfg_int("RUN_RESULTS_PER_PAGE_MAX", 100)
+
+REPORT_VIEW_PAGE_SIZE_DEFAULT = _cfg_int("REPORT_VIEW_PAGE_SIZE_DEFAULT", 20)
+REPORT_VIEW_PAGE_SIZE_MIN = _cfg_int("REPORT_VIEW_PAGE_SIZE_MIN", 1)
+REPORT_VIEW_PAGE_SIZE_MAX = _cfg_int("REPORT_VIEW_PAGE_SIZE_MAX", 100)
+
+RUN_STATUS_POLL_INTERVAL_MS = _cfg_int("RUN_STATUS_POLL_INTERVAL_MS", 3000)
+ENABLE_SELECTIVE_RUN = _cfg_bool("ENABLE_SELECTIVE_RUN", True)
+COLLECTION_PREVIEW_MAX_ITEMS = _cfg_int("COLLECTION_PREVIEW_MAX_ITEMS", 3000)
+
+REPORT_EXPORT_DEFAULT_SCOPE = _cfg_str("REPORT_EXPORT_DEFAULT_SCOPE", "full").lower() or "full"
+if REPORT_EXPORT_DEFAULT_SCOPE not in {"full", "report_only"}:
+    REPORT_EXPORT_DEFAULT_SCOPE = "full"
+REPORT_EXPORT_ALLOW_REPORT_ONLY = _cfg_bool("REPORT_EXPORT_ALLOW_REPORT_ONLY", True)
+REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _cfg_bool("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", False)
+
 
 def resolve_reports_dir() -> Path:
     env_dir = (os.environ.get("POSTMAN_REPORTS_DIR") or os.environ.get("REPORTS_DIR") or "").strip()
@@ -1364,8 +1418,8 @@ def clamp_page_size(value: Any) -> int:
     try:
         page_size = int(value)
     except (TypeError, ValueError):
-        page_size = 20
-    return max(1, min(page_size, 100))
+        page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
+    return max(REPORT_VIEW_PAGE_SIZE_MIN, min(page_size, REPORT_VIEW_PAGE_SIZE_MAX))
 
 
 def clamp_page(value: Any) -> int:
@@ -1380,15 +1434,11 @@ def clamp_run_results_per_page(value: Any) -> int:
     try:
         page_size = int(value)
     except (TypeError, ValueError):
-        page_size = 30
-    return max(1, min(page_size, 100))
+        page_size = RUN_RESULTS_PER_PAGE_DEFAULT
+    return max(RUN_RESULTS_PER_PAGE_MIN, min(page_size, RUN_RESULTS_PER_PAGE_MAX))
 
 
-try:
-    from postman_api_tester import config as _cfg
-    _RUN_JOBS_MAX = int(getattr(_cfg, "RUN_JOBS_MAX", 200))
-except Exception:
-    _RUN_JOBS_MAX = 200  # 最多保留的任务条数
+_RUN_JOBS_MAX = _cfg_int("RUN_JOBS_MAX", 200)
 
 
 def _evict_old_jobs() -> None:
@@ -1427,6 +1477,7 @@ def run_postman_job(
     report_name: Optional[str],
     source_original_file: Optional[str],
     results_per_page: int,
+    selected_item_paths: Optional[List[List[int]]],
 ) -> None:
     set_run_job(job_id, status="running", message="正在执行接口测试...")
     try:
@@ -1467,6 +1518,7 @@ def run_postman_job(
             report_name=report_name,
             source_original_file=source_original_file,
             results_per_page=results_per_page,
+            selected_item_paths=selected_item_paths,
             progress_callback=on_progress,
         )
         set_run_job(
@@ -1544,6 +1596,148 @@ def _to_bool(value: Any, default: bool = False) -> bool:
     if text in {"0", "false", "no", "n", "off"}:
         return False
     return default
+
+
+def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
+    if raw is None:
+        return []
+
+    data = raw
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"selected_item_paths 不是有效 JSON: {exc}") from exc
+
+    if not isinstance(data, list):
+        raise ValueError("selected_item_paths 必须是二维数组。")
+
+    normalized: List[List[int]] = []
+    seen = set()
+    for item in data:
+        if not isinstance(item, list) or not item:
+            continue
+        if not all(isinstance(index, int) and index >= 0 for index in item):
+            raise ValueError("selected_item_paths 中每个路径都必须是非负整数数组。")
+        key = tuple(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(list(item))
+    return normalized
+
+
+def _build_preview_url(url_obj: Any) -> str:
+    if isinstance(url_obj, str):
+        return url_obj
+    if not isinstance(url_obj, dict):
+        return ""
+
+    raw = str(url_obj.get("raw") or "").strip()
+    if raw:
+        return raw
+
+    path = url_obj.get("path")
+    if isinstance(path, list):
+        path_text = "/" + "/".join(str(part) for part in path if str(part).strip())
+    else:
+        path_text = str(path or "")
+    if path_text and not path_text.startswith("/"):
+        path_text = "/" + path_text
+
+    query_list = url_obj.get("query") if isinstance(url_obj.get("query"), list) else []
+    query_parts = []
+    for query in query_list:
+        if not isinstance(query, dict) or query.get("disabled"):
+            continue
+        key = str(query.get("key") or "")
+        if not key:
+            continue
+        query_parts.append(f"{key}={str(query.get('value') or '')}")
+    query_text = ("?" + "&".join(query_parts)) if query_parts else ""
+    return f"{path_text}{query_text}" if path_text else query_text
+
+
+def _extract_collection_preview_items(collection_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    result: List[Dict[str, Any]] = []
+    root_items = collection_data.get("item")
+    if not isinstance(root_items, list):
+        return result
+
+    def walk(items: List[Any], folder_chain: List[str], path_prefix: List[int]) -> None:
+        for index, item in enumerate(items):
+            if len(result) >= COLLECTION_PREVIEW_MAX_ITEMS:
+                return
+            if not isinstance(item, dict):
+                continue
+            current_path = path_prefix + [index]
+            name = str(item.get("name") or "")
+            request_obj = item.get("request")
+            if isinstance(request_obj, dict):
+                method = str(request_obj.get("method") or "GET").upper()
+                url = _build_preview_url(request_obj.get("url"))
+                folder = " / ".join([x for x in folder_chain if x])
+                result.append({
+                    "index": len(result),
+                    "name": name,
+                    "folder": folder,
+                    "method": method,
+                    "url": url,
+                    "item_path": current_path,
+                    "item_path_text": ".".join(str(x) for x in current_path),
+                })
+                continue
+
+            children = item.get("item")
+            if isinstance(children, list):
+                walk(children, folder_chain + [name], current_path)
+
+    walk(root_items, [], [])
+    return result
+
+
+def _collect_report_item_paths(report: Dict[str, Any]) -> set:
+    path_set = set()
+    for result in report.get("results", []):
+        path = result.get("item_path")
+        if isinstance(path, list) and path and all(isinstance(i, int) and i >= 0 for i in path):
+            path_set.add(tuple(path))
+    return path_set
+
+
+def _prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: set) -> Dict[str, Any]:
+    import copy
+
+    root_items = collection_data.get("item")
+    if not isinstance(root_items, list):
+        return copy.deepcopy(collection_data)
+
+    def walk(items: List[Any], prefix: List[int]) -> List[Dict[str, Any]]:
+        kept: List[Dict[str, Any]] = []
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            current_path = prefix + [idx]
+            if "request" in item:
+                if tuple(current_path) in selected_paths:
+                    kept.append(copy.deepcopy(item))
+                continue
+
+            children = item.get("item")
+            if isinstance(children, list):
+                kept_children = walk(children, current_path)
+                if kept_children:
+                    copied = copy.deepcopy(item)
+                    copied["item"] = kept_children
+                    kept.append(copied)
+        return kept
+
+    copied_collection = copy.deepcopy(collection_data)
+    copied_collection["item"] = walk(root_items, [])
+    return copied_collection
 
 
 def _merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
@@ -1669,7 +1863,11 @@ def _find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any])
     return None
 
 
-def export_collection_with_latest_params(report: Dict[str, Any], include_auth: bool = False) -> Dict[str, Any]:
+def export_collection_with_latest_params(
+    report: Dict[str, Any],
+    include_auth: bool = False,
+    export_scope: str = "full",
+) -> Dict[str, Any]:
     source_file = str(report.get("source_file") or "").strip()
     if not source_file:
         raise ValueError("报告中缺少 source_file，无法导出。")
@@ -1680,6 +1878,12 @@ def export_collection_with_latest_params(report: Dict[str, Any], include_auth: b
 
     with source_path.open("r", encoding="utf-8") as f:
         collection_data = json.load(f)
+
+    scope = str(export_scope or "full").strip().lower()
+    if scope not in {"full", "report_only"}:
+        scope = "full"
+    if scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
+        scope = "full"
 
     details_map = load_report_details_map(report)
     updated_count = 0
@@ -1718,22 +1922,35 @@ def export_collection_with_latest_params(report: Dict[str, Any], include_auth: b
         _set_request_body(request_obj, body)
         updated_count += 1
 
+    final_collection = collection_data
+    report_only_count = 0
+    if scope == "report_only":
+        selected_paths = _collect_report_item_paths(report)
+        if not selected_paths:
+            raise ValueError("当前报告缺少 item_path，无法执行“本次报告接口导出”。")
+        final_collection = _prune_collection_to_paths(collection_data, selected_paths)
+        pruned_items = _extract_collection_preview_items(final_collection)
+        report_only_count = len(pruned_items)
+
     EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
     preferred_name = report.get("source_original_file") or source_path.name
     source_name = _sanitize_export_name(preferred_name)
     stem = Path(source_name).stem
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    export_name = f"{stem}_latest_{timestamp}.json"
+    suffix = "latest" if scope == "full" else "report_only"
+    export_name = f"{stem}_{suffix}_{timestamp}.json"
     export_path = EXPORTS_DIR / export_name
 
     with export_path.open("w", encoding="utf-8") as f:
-        json.dump(collection_data, f, indent=2, ensure_ascii=False)
+        json.dump(final_collection, f, indent=2, ensure_ascii=False)
 
     return {
         "file_name": export_name,
         "file_path": str(export_path),
         "updated_count": updated_count,
         "skipped_count": skipped_count,
+        "export_scope": scope,
+        "report_only_count": report_only_count,
         "warnings": warnings,
     }
 
@@ -1990,6 +2207,12 @@ def index():
         self_url=f"http://127.0.0.1:{port}",
         lan_url=f"http://{get_local_ip()}:{port}",
         reports_json=json.dumps(reports, ensure_ascii=False),
+        run_results_per_page_default=RUN_RESULTS_PER_PAGE_DEFAULT,
+        run_results_per_page_min=RUN_RESULTS_PER_PAGE_MIN,
+        run_results_per_page_max=RUN_RESULTS_PER_PAGE_MAX,
+        run_status_poll_interval_ms=RUN_STATUS_POLL_INTERVAL_MS,
+        enable_selective_run=ENABLE_SELECTIVE_RUN,
+        collection_preview_max_items=COLLECTION_PREVIEW_MAX_ITEMS,
     )
 
 
@@ -2020,6 +2243,10 @@ def report_view():
         source_file=report.get("source_file", ""),
         generated_at=report.get("generated_at", ""),
         summary=report.get("summary", {}),
+        report_view_page_size_default=REPORT_VIEW_PAGE_SIZE_DEFAULT,
+        report_export_default_scope=REPORT_EXPORT_DEFAULT_SCOPE,
+        report_export_allow_report_only=REPORT_EXPORT_ALLOW_REPORT_ONLY,
+        report_export_include_auth_default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT,
     )
 
 
@@ -2038,11 +2265,49 @@ def api_reports():
     return jsonify(list_reports())
 
 
+@app.route("/api/collection-preview", methods=["POST"])
+def api_collection_preview():
+    if not ENABLE_SELECTIVE_RUN:
+        return jsonify({"error": "当前环境未启用接口选择执行功能。"}), 403
+
+    collection_file = request.files.get("collection_file")
+    if not collection_file or not str(collection_file.filename or "").strip():
+        return jsonify({"error": "请先上传 Postman JSON 文件。"}), 400
+
+    original_name = str(collection_file.filename or "").strip()
+    if not original_name.lower().endswith(".json"):
+        return jsonify({"error": "仅支持上传 .json 文件。"}), 400
+
+    try:
+        collection_data = json.load(collection_file.stream)
+    except Exception as exc:
+        return jsonify({"error": f"JSON 解析失败: {exc}"}), 400
+
+    preview_items = _extract_collection_preview_items(collection_data)
+    total = len(preview_items)
+    truncated = False
+    if total >= COLLECTION_PREVIEW_MAX_ITEMS:
+        truncated = True
+
+    return jsonify({
+        "file_name": original_name,
+        "total": total,
+        "truncated": truncated,
+        "max_items": COLLECTION_PREVIEW_MAX_ITEMS,
+        "items": preview_items,
+    })
+
+
 @app.route("/api/export-collection", methods=["POST"])
 def api_export_collection():
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
-    include_auth = _to_bool(payload.get("include_auth"), default=False)
+    include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
+    export_scope = str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower() or REPORT_EXPORT_DEFAULT_SCOPE
+    if export_scope not in {"full", "report_only"}:
+        export_scope = REPORT_EXPORT_DEFAULT_SCOPE
+    if export_scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
+        export_scope = "full"
     if not report_name:
         return jsonify({"error": "report_name 不能为空"}), 400
 
@@ -2052,7 +2317,11 @@ def api_export_collection():
         return jsonify({"error": f"报告不存在: {report_name}"}), 404
 
     try:
-        exported = export_collection_with_latest_params(report, include_auth=include_auth)
+        exported = export_collection_with_latest_params(
+            report,
+            include_auth=include_auth,
+            export_scope=export_scope,
+        )
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -2063,6 +2332,8 @@ def api_export_collection():
         "updated_count": exported["updated_count"],
         "skipped_count": exported["skipped_count"],
         "include_auth": include_auth,
+        "export_scope": exported["export_scope"],
+        "report_only_count": exported["report_only_count"],
         "warnings": exported["warnings"],
     })
 
@@ -2106,7 +2377,7 @@ def api_report_results(report_name: str):
         return jsonify({"error": f"报告不存在: {report_name}"}), 404
 
     page = clamp_page(request.args.get("page", 1))
-    page_size = clamp_page_size(request.args.get("page_size", 20))
+    page_size = clamp_page_size(request.args.get("page_size", REPORT_VIEW_PAGE_SIZE_DEFAULT))
     keyword = request.args.get("query", "")
     message_keyword = request.args.get("message_query", "")
     err_code_keyword = request.args.get("err_code_query", "")
@@ -2287,7 +2558,17 @@ def api_run_postman():
     token = str(request.form.get("token", "")).strip() or None
     output_dir = str(request.form.get("output_dir", "")).strip() or str(REPORTS_DIR)
     report_name = str(request.form.get("report_name", "")).strip() or None
-    results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", 30))
+    results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
+    run_scope = str(request.form.get("run_scope", "all")).strip().lower() or "all"
+    raw_selected_paths = request.form.get("selected_item_paths", "")
+    selected_item_paths: List[List[int]] = []
+    if ENABLE_SELECTIVE_RUN and run_scope == "selected":
+        try:
+            selected_item_paths = _parse_selected_item_paths(raw_selected_paths)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if not selected_item_paths:
+            return jsonify({"error": "已选择“仅执行已选接口”，但未提供可执行接口路径。"}), 400
 
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     suffix = Path(original_name).suffix or ".json"
@@ -2308,11 +2589,23 @@ def api_run_postman():
         saved_file=str(saved_file),
         output_dir=output_dir,
         report_name=report_name or "",
+        run_scope=("selected" if selected_item_paths else "all"),
+        selected_count=len(selected_item_paths),
     )
 
     worker = threading.Thread(
         target=run_postman_job,
-        args=(job_id, str(saved_file), base_url, output_dir, token, report_name, original_name, results_per_page),
+        args=(
+            job_id,
+            str(saved_file),
+            base_url,
+            output_dir,
+            token,
+            report_name,
+            original_name,
+            results_per_page,
+            selected_item_paths,
+        ),
         daemon=True,
     )
     worker.start()

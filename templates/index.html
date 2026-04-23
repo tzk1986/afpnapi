@@ -68,6 +68,37 @@
         .run-status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
         .run-status.success { background: #ecfdf5; color: #166534; border-color: #86efac; }
         .run-status.error { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+        .selector-box { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; }
+        .selector-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .selector-toolbar input, .selector-toolbar button { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+        .selector-toolbar button { background: #fff; color: #1d4ed8; cursor: pointer; }
+        .selector-toolbar button:hover { background: #eff6ff; }
+        .selector-tip { font-size: 12px; color: #64748b; }
+        .selector-hint { margin-top: 8px; font-size: 12px; color: #64748b; }
+        .selector-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+        .selector-preview-column, .selector-selected-column { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+        .column-header { display: flex; justify-content: space-between; align-items: center; min-height: 32px; font-size: 13px; font-weight: 600; color: #334155; padding: 0 4px; }
+        .column-left, .column-right { display: inline-flex; align-items: center; gap: 8px; }
+        .column-title { line-height: 1; }
+        .count-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 8px; border-radius: 999px; background: #dbeafe; color: #1e3a8a; font-size: 12px; font-weight: 700; line-height: 1; }
+        .clear-btn { padding: 4px 8px; font-size: 12px; background: #fff; color: #ef4444; border: 1px solid #fca5a5; border-radius: 6px; cursor: pointer; }
+        .clear-btn:hover { background: #fef2f2; }
+        .selector-preview-list, .selected-apis-list { border: 1px solid #d1d5db; border-radius: 8px; padding: 6px; min-height: 240px; max-height: 300px; overflow-y: auto; background: #fff; }
+        .selected-apis-list { border-color: #dbeafe; background: #f0f9ff; }
+        .preview-api-row, .selected-api-item { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; font-size: 12px; font-family: Consolas, monospace; line-height: 1.35; }
+        .preview-api-row { cursor: pointer; border: 1px solid #e2e8f0; background: #fff; }
+        .preview-api-row:hover { background: #f8fafc; }
+        .preview-api-row.checked { border-color: #93c5fd; background: #eff6ff; }
+        .preview-api-row input { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; }
+        .preview-api-text, .selected-api-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .selected-api-item { justify-content: space-between; background: #fff; border: 1px solid #bfdbfe; }
+        .selected-api-item:last-child { margin-bottom: 0; }
+        .selected-api-remove { margin-left: 6px; padding: 2px 6px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        .selected-api-remove:hover { background: #dc2626; }
+        @media (max-width: 768px) {
+            .selector-container { grid-template-columns: 1fr; }
+            .selector-preview-list, .selected-apis-list { min-height: 180px; max-height: 220px; }
+        }
     </style>
 </head>
 <body>
@@ -104,12 +135,54 @@
                 </div>
                 <div class="field">
                     <label for="resultsPerPageInput">报告分页大小（1-100）</label>
-                    <input id="resultsPerPageInput" type="number" min="1" max="100" value="30">
+                    <input id="resultsPerPageInput" type="number" min="{{ run_results_per_page_min }}" max="{{ run_results_per_page_max }}" value="{{ run_results_per_page_default }}">
                 </div>
             </div>
             <div class="run-actions">
                 <button id="runJobBtn" onclick="startRunPostmanJob()">上传并执行</button>
             </div>
+            {% if enable_selective_run %}
+            <div class="selector-box">
+                <div class="selector-toolbar">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#334155;">
+                        <input id="runSelectedOnly" type="checkbox" style="width:14px;height:14px;">
+                        仅执行已选接口
+                    </label>
+                    <button type="button" onclick="previewCollectionApis()">解析接口</button>
+                    <button type="button" onclick="selectAllPreviewApis()">全选</button>
+                    <button type="button" onclick="invertPreviewApiSelection()">反选</button>
+                    <button type="button" onclick="clearPreviewApiSelection()">清空选择</button>
+                    <button type="button" onclick="clearVisiblePreviewSelection()">清空筛选结果</button>
+                    <input id="apiFilterInput" type="text" placeholder="按名称/方法/路径筛选" oninput="filterPreviewApis()">
+                    <span id="filterMatchInfo" class="selector-tip"></span>
+                    <span class="selector-tip">单击即可多选，无需按 Ctrl</span>
+                </div>
+                <div class="selector-container">
+                    <div class="selector-preview-column">
+                        <div class="column-header">
+                            <div class="column-left">
+                                <span class="column-title">可选接口</span>
+                                <span id="previewCount" class="count-badge">0</span>
+                            </div>
+                        </div>
+                        <div id="apiPreviewList" class="selector-preview-list"></div>
+                    </div>
+                    <div class="selector-selected-column">
+                        <div class="column-header">
+                            <div class="column-left">
+                                <span class="column-title">已选接口</span>
+                                <span id="selectedCount" class="count-badge">0</span>
+                            </div>
+                            <div class="column-right">
+                                <button class="clear-btn" type="button" onclick="clearSelectedApis()">清空</button>
+                            </div>
+                        </div>
+                        <div id="selectedApisList" class="selected-apis-list"></div>
+                    </div>
+                </div>
+                <div id="apiPreviewSummary" class="selector-hint">尚未解析接口列表。</div>
+            </div>
+            {% endif %}
             <div id="runStatus" class="run-status">上传 JSON 后可直接执行，执行完成后会提示刷新页面查看最新报告。</div>
         </section>
 
@@ -154,9 +227,177 @@
 <script>
 let reports = {{ reports_json|safe }};
 let runJobTimer = null;
+const ENABLE_SELECTIVE_RUN = {{ 'true' if enable_selective_run else 'false' }};
+const RUN_STATUS_POLL_INTERVAL_MS = {{ run_status_poll_interval_ms }};
+const COLLECTION_PREVIEW_MAX_ITEMS = {{ collection_preview_max_items }};
+let previewApis = [];
+let visiblePreviewApis = [];
+let previewApiByPath = new Map();
+let selectedApis = new Map();
 
 function escapeHtml(value) {
     return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+function getItemPathKey(item) {
+    return JSON.stringify(item && item.item_path ? item.item_path : []);
+}
+
+function getFilterKeyword() {
+    return (document.getElementById('apiFilterInput')?.value || '').trim().toLowerCase();
+}
+
+function matchesKeyword(item, keyword) {
+    if (!keyword) {
+        return true;
+    }
+    const text = [item.name, item.folder, item.method, item.url].join(' ').toLowerCase();
+    return text.includes(keyword);
+}
+
+function refreshPreviewCount() {
+    const el = document.getElementById('previewCount');
+    if (!el) {
+        return;
+    }
+    if (!previewApis.length) {
+        el.textContent = '0';
+        return;
+    }
+    const keyword = getFilterKeyword();
+    el.textContent = keyword ? `${visiblePreviewApis.length}/${previewApis.length}` : String(previewApis.length);
+}
+
+function refreshSelectionSummary() {
+    refreshPreviewCount();
+    updateFilterMatchInfo();
+    updatePreviewSummary(`已解析 ${previewApis.length} 个接口，当前选中 ${selectedApis.size} 个（上限 ${COLLECTION_PREVIEW_MAX_ITEMS}）。`);
+}
+
+function updateFilterMatchInfo() {
+    const el = document.getElementById('filterMatchInfo');
+    if (!el) {
+        return;
+    }
+    const keyword = getFilterKeyword();
+    if (!previewApis.length) {
+        el.textContent = '';
+        return;
+    }
+    if (!keyword) {
+        el.textContent = `筛选: ${previewApis.length}/${previewApis.length}`;
+        return;
+    }
+    el.textContent = `筛选: ${visiblePreviewApis.length}/${previewApis.length}`;
+}
+
+function confirmBatchAction(actionLabel) {
+    if (!visiblePreviewApis.length) {
+        setRunStatus(`当前筛选无可操作接口：${actionLabel}。`, 'error');
+        return false;
+    }
+    return window.confirm(`确认执行“${actionLabel}”吗？\n\n当前筛选命中：${visiblePreviewApis.length} 个接口`);
+}
+
+function setPreviewApiSelected(pathKey, selected) {
+    const api = previewApiByPath.get(pathKey);
+    if (!api) {
+        return;
+    }
+    if (selected) {
+        selectedApis.set(pathKey, api);
+    } else {
+        selectedApis.delete(pathKey);
+    }
+}
+
+function renderPreviewApis(list) {
+    const container = document.getElementById('apiPreviewList');
+    if (!container) {
+        return;
+    }
+    container.innerHTML = '';
+    if (!list.length) {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">没有匹配的可选接口</div>';
+        refreshPreviewCount();
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    list.forEach((item) => {
+        const pathKey = getItemPathKey(item);
+        const label = document.createElement('label');
+        label.className = `preview-api-row${selectedApis.has(pathKey) ? ' checked' : ''}`;
+        label.title = `[${item.method}] ${item.name} -> ${item.url}`;
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = selectedApis.has(pathKey);
+        checkbox.addEventListener('change', (event) => {
+            setPreviewApiSelected(pathKey, Boolean(event.target.checked));
+            renderPreviewApis(visiblePreviewApis);
+            updateSelectedList();
+            refreshSelectionSummary();
+        });
+
+        const text = document.createElement('span');
+        text.className = 'preview-api-text';
+        const folder = item.folder ? `${item.folder} | ` : '';
+        text.textContent = `[${item.method}] ${folder}${item.name} -> ${item.url}`;
+
+        label.appendChild(checkbox);
+        label.appendChild(text);
+        fragment.appendChild(label);
+    });
+    container.appendChild(fragment);
+    refreshPreviewCount();
+}
+
+function updateSelectedList() {
+    const container = document.getElementById('selectedApisList');
+    if (!container) {
+        return;
+    }
+
+    const keyword = getFilterKeyword();
+    const selectedItems = Array.from(selectedApis.values());
+    const visibleSelectedItems = selectedItems.filter((item) => matchesKeyword(item, keyword));
+    document.getElementById('selectedCount').textContent = String(selectedItems.length);
+
+    if (!visibleSelectedItems.length) {
+        const message = selectedItems.length
+            ? '当前筛选下无已选接口'
+            : '还未选中任何接口';
+        container.innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;">${message}</div>`;
+        return;
+    }
+
+    const items = visibleSelectedItems.map((item) => {
+        const folder = item.folder ? `${item.folder} | ` : '';
+        const label = `[${item.method}] ${folder}${item.name}`;
+        const pathKey = getItemPathKey(item);
+        return `
+            <div class="selected-api-item" title="${escapeHtml(label)} -> ${escapeHtml(item.url)}">
+                <span class="selected-api-text">${escapeHtml(label)}</span>
+                <button class="selected-api-remove" onclick='removeSelectedApi(${JSON.stringify(pathKey)})' type="button">✕</button>
+            </div>
+        `;
+    }).join('');
+    container.innerHTML = items;
+}
+
+function removeSelectedApi(pathKey) {
+    selectedApis.delete(pathKey);
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
+}
+
+function clearSelectedApis() {
+    selectedApis.clear();
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
 }
 
 function reportOptionLabel(report) {
@@ -309,6 +550,126 @@ function setRunStatus(text, level = '') {
     statusEl.className = `run-status${level ? ' ' + level : ''}`;
 }
 
+function updatePreviewSummary(text) {
+    const el = document.getElementById('apiPreviewSummary');
+    if (el) {
+        el.textContent = text;
+    }
+}
+
+function selectedPreviewPaths() {
+    return Array.from(selectedApis.values()).map((item) => item.item_path || []);
+}
+
+async function previewCollectionApis() {
+    const fileInput = document.getElementById('collectionFile');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) {
+        setRunStatus('请先选择要上传的 Postman JSON 文件。', 'error');
+        return;
+    }
+
+    try {
+        updatePreviewSummary('正在解析接口列表，请稍候...');
+        const formData = new FormData();
+        formData.append('collection_file', file);
+        const response = await fetch('/api/collection-preview', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '接口解析失败');
+        }
+        previewApis = Array.isArray(data.items) ? data.items : [];
+        previewApiByPath = new Map();
+        selectedApis = new Map();
+        previewApis.forEach((item) => {
+            const pathKey = getItemPathKey(item);
+            previewApiByPath.set(pathKey, item);
+            selectedApis.set(pathKey, item);
+        });
+        filterPreviewApis();
+        updateSelectedList();
+        refreshSelectionSummary();
+        if (data.truncated) {
+            setRunStatus(`接口解析完成，但数量超过上限，仅展示前 ${data.max_items} 个。`, '');
+        } else {
+            setRunStatus(`接口解析完成，共 ${previewApis.length} 个可执行接口。`, '');
+        }
+    } catch (error) {
+        updatePreviewSummary('接口解析失败。');
+        setRunStatus(`接口解析失败: ${error.message || error}`, 'error');
+    }
+}
+
+function selectAllPreviewApis() {
+    visiblePreviewApis.forEach((item) => {
+        const pathKey = getItemPathKey(item);
+        selectedApis.set(pathKey, item);
+    });
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
+}
+
+function clearPreviewApiSelection() {
+    clearSelectedApis();
+}
+
+function clearVisiblePreviewSelection() {
+    if (!confirmBatchAction('清空筛选结果')) {
+        return;
+    }
+    const affectedCount = visiblePreviewApis.length;
+    visiblePreviewApis.forEach((item) => {
+        selectedApis.delete(getItemPathKey(item));
+    });
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
+    setRunStatus(`已清空当前筛选结果中的 ${affectedCount} 个接口。`);
+}
+
+function invertPreviewApiSelection() {
+    if (!confirmBatchAction('反选')) {
+        return;
+    }
+    const affectedCount = visiblePreviewApis.length;
+    visiblePreviewApis.forEach((item) => {
+        const pathKey = getItemPathKey(item);
+        if (selectedApis.has(pathKey)) {
+            selectedApis.delete(pathKey);
+        } else {
+            selectedApis.set(pathKey, item);
+        }
+    });
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
+    setRunStatus(`已对当前筛选结果中的 ${affectedCount} 个接口执行反选。`);
+}
+
+function filterPreviewApis() {
+    const keyword = (document.getElementById('apiFilterInput')?.value || '').trim().toLowerCase();
+    visiblePreviewApis = keyword
+        ? previewApis.filter((item) => matchesKeyword(item, keyword))
+        : previewApis.slice();
+    renderPreviewApis(visiblePreviewApis);
+    updateSelectedList();
+    refreshSelectionSummary();
+}
+
+document.getElementById('apiFilterInput')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        const input = event.currentTarget;
+        if (input && input.value) {
+            input.value = '';
+            filterPreviewApis();
+        }
+    }
+});
+
 async function startRunPostmanJob() {
     const fileInput = document.getElementById('collectionFile');
     const file = fileInput.files && fileInput.files[0];
@@ -328,6 +689,21 @@ async function startRunPostmanJob() {
     formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
     formData.append('report_name', document.getElementById('reportNameInput').value.trim());
     formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
+    if (ENABLE_SELECTIVE_RUN) {
+        const selectedOnly = Boolean(document.getElementById('runSelectedOnly')?.checked);
+        if (selectedOnly) {
+            const selectedPaths = selectedPreviewPaths();
+            if (!selectedPaths.length) {
+                runButton.disabled = false;
+                setRunStatus('已选择“仅执行已选接口”，但当前没有选中的接口。请先解析并选择接口。', 'error');
+                return;
+            }
+            formData.append('run_scope', 'selected');
+            formData.append('selected_item_paths', JSON.stringify(selectedPaths));
+        } else {
+            formData.append('run_scope', 'all');
+        }
+    }
 
     try {
         const response = await fetch('/api/run-postman', {
@@ -374,11 +750,15 @@ function watchRunPostmanJob(jobId) {
             }
             if (data.status === 'running') {
                 const total = Number(data.total || 0);
+                const totalAll = Number(data.total_all || total);
                 const completed = Number(data.completed || 0);
                 const percent = Number(data.percent || 0);
                 const progressText = total > 0 ? ` ${completed}/${total} (${percent}%)` : '';
                 const currentText = data.current_name ? `，当前接口: ${data.current_name}` : '';
-                setRunStatus(`任务执行中（${jobId}）${progressText}${currentText}`);
+                const scopeText = (data.run_scope === 'selected' && totalAll > total)
+                    ? `，执行范围: 已选 ${total}/${totalAll}`
+                    : '';
+                setRunStatus(`任务执行中（${jobId}）${progressText}${scopeText}${currentText}`);
                 return;
             }
             if (data.status === 'success') {
@@ -406,7 +786,7 @@ function watchRunPostmanJob(jobId) {
     };
 
     fetchStatus();
-    runJobTimer = setInterval(fetchStatus, 3000);
+    runJobTimer = setInterval(fetchStatus, RUN_STATUS_POLL_INTERVAL_MS);
 }
 
 renderReports();
