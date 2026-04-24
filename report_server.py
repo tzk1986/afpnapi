@@ -9,13 +9,14 @@ import re
 import socket
 import threading
 import uuid
+import time as _time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, render_template_string, request, send_from_directory, url_for
+from flask import Flask, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 
 logging.basicConfig(
     level=logging.INFO,
@@ -78,6 +79,8 @@ if REPORT_EXPORT_DEFAULT_SCOPE not in {"full", "report_only"}:
     REPORT_EXPORT_DEFAULT_SCOPE = "full"
 REPORT_EXPORT_ALLOW_REPORT_ONLY = _cfg_bool("REPORT_EXPORT_ALLOW_REPORT_ONLY", True)
 REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _cfg_bool("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", False)
+ENABLE_MANUAL_CASES = _cfg_bool("ENABLE_MANUAL_CASES", True)
+MANUAL_CASE_FOLDER_NAME = _cfg_str("MANUAL_CASE_FOLDER_NAME", "人工补录") or "人工补录"
 
 
 def resolve_reports_dir() -> Path:
@@ -100,10 +103,13 @@ REPORTS_DIR = resolve_reports_dir()
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()
 EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
 
+
+_REPORTS_CACHE_TTL = 30.0
+_REPORTS_CACHE = {"data": None, "by_name": None, "ts": 0.0}
 RUN_JOBS: Dict[str, Dict[str, Any]] = {}
 RUN_JOBS_LOCK = threading.Lock()
 
-# 按报告名维护独立写锁，防止并发回写同一报告时产生竞争
+# 按报告名维护独立写锁，避免并发回写同一报告时发生覆盖。
 REPORT_WRITE_LOCKS: Dict[str, threading.Lock] = {}
 _REPORT_WRITE_LOCKS_META = threading.Lock()
 
@@ -118,1030 +124,782 @@ def get_report_write_lock(report_name: str) -> threading.Lock:
 app = Flask(__name__, template_folder=str((PROJECT_ROOT / "templates").resolve()))
 
 
-def _resolve_template_mode() -> str:
-    """读取模板模式：环境变量优先，其次 config.py，最后回退 inline。"""
-    mode = str(os.environ.get("REPORT_TEMPLATE_MODE", "")).strip().lower()
-    if not mode:
-        try:
-            from postman_api_tester import config as _cfg
-            mode = str(getattr(_cfg, "REPORT_TEMPLATE_MODE", "")).strip().lower()
-        except Exception:
-            mode = ""
-
-    if mode not in ("inline", "external"):
-        mode = "inline"
-    return mode
-
-
-# 模板渲染模式：
-# - inline（默认）：沿用内嵌模板，行为与历史版本一致
-# - external：优先使用 templates/*.html，失败时自动降级 inline
-_TEMPLATE_MODE = _resolve_template_mode()
-
-
-def render_with_fallback(template_name: str, inline_template: str, **context: Any):
-    if _TEMPLATE_MODE == "external":
-        try:
-            return render_template(template_name, **context)
-        except Exception as exc:
-            logger.error("外置模板渲染失败，自动降级 inline: %s (%s)", template_name, exc)
-    return render_template_string(inline_template, **context)
-
-INDEX_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>Postman 报告中心</title>
-    <style>
-        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #1f2937; }
-        .page { max-width: 1240px; margin: 0 auto; padding: 24px; }
-        .hero { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; border-radius: 18px; padding: 24px 28px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2); }
-        .hero h1 { margin: 0 0 10px; font-size: 28px; }
-        .hero p { margin: 6px 0; opacity: 0.92; }
-        .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
-        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-        .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
-        .toolbar button { background: #1d4ed8; color: #fff; border: none; cursor: pointer; }
-        .toolbar button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
-        .toolbar button:hover { opacity: 0.92; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-        th { color: #475569; font-size: 13px; }
-        tr:hover { background: #f8fafc; }
-        .summary { display: flex; gap: 10px; flex-wrap: wrap; }
-        .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: #e0f2fe; color: #075985; }
-        .actions a { margin-right: 10px; color: #1d4ed8; text-decoration: none; }
-        .report-link { color: #0f172a; font-weight: 700; text-decoration: none; }
-        .report-link:hover { color: #1d4ed8; }
-        .compare { margin-top: 18px; }
-        .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
-        .metric { font-size: 26px; font-weight: 700; margin-top: 8px; }
-        .diff-list { margin-top: 18px; border-top: 1px solid #e5e7eb; padding-top: 18px; }
-        .diff-item { padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
-        .diff-item:last-child { border-bottom: none; }
-        .status-up { color: #15803d; }
-        .status-down { color: #b91c1c; }
-        .muted { color: #64748b; }
-        .empty { padding: 32px 12px; text-align: center; color: #64748b; }
-        .upload-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-        .field { display: flex; flex-direction: column; gap: 6px; }
-        .field label { font-size: 12px; color: #334155; }
-        .field input { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
-        .run-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-        .run-status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
-        .run-status.success { background: #ecfdf5; color: #166534; border-color: #86efac; }
-        .run-status.error { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
-    </style>
-</head>
-<body>
-    <div class="page">
-        <section class="hero">
-            <h1>Postman 报告中心 1.0.2</h1>
-            <p>当前主机: {{ host_name }}</p>
-            <p>本机访问: <a style="color:#bfdbfe;" href="{{ self_url }}">{{ self_url }}</a></p>
-            <p>局域网访问: <a style="color:#bfdbfe;" href="{{ lan_url }}">{{ lan_url }}</a></p>
-        </section>
-
-        <section class="panel">
-            <h3 style="margin-top:0;">上传并执行 Postman JSON</h3>
-            <div class="upload-grid">
-                <div class="field">
-                    <label for="collectionFile">JSON 文件</label>
-                    <input id="collectionFile" type="file" accept=".json,application/json">
-                </div>
-                <div class="field">
-                    <label for="baseUrlInput">基础 URL（可选）</label>
-                    <input id="baseUrlInput" type="text" placeholder="例如: https://api.example.com">
-                </div>
-                <div class="field">
-                    <label for="tokenInput">Token（可选）</label>
-                    <input id="tokenInput" type="text" placeholder="手动 token，填写后跳过自动登录">
-                </div>
-                <div class="field">
-                    <label for="outputDirInput">报告输出目录（可选）</label>
-                    <input id="outputDirInput" type="text" placeholder="默认使用服务端配置的 reports 目录">
-                </div>
-                <div class="field">
-                    <label for="reportNameInput">报告名称（可选）</label>
-                    <input id="reportNameInput" type="text" placeholder="例如: 本次回归测试报告.html（留空则自动命名）">
-                </div>
-                <div class="field">
-                    <label for="resultsPerPageInput">报告分页大小（1-100）</label>
-                    <input id="resultsPerPageInput" type="number" min="1" max="100" value="30">
-                </div>
-            </div>
-            <div class="run-actions">
-                <button id="runJobBtn" onclick="startRunPostmanJob()">上传并执行</button>
-            </div>
-            <div id="runStatus" class="run-status">上传 JSON 后可直接执行，执行完成后会提示刷新页面查看最新报告。</div>
-        </section>
-
-        <section class="panel">
-            <div class="toolbar">
-                <input id="searchInput" type="text" placeholder="搜索报告名、集合名、源文件" oninput="renderReports()">
-                <button class="secondary" onclick="window.location.href='/'">刷新列表</button>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>选择</th>
-                        <th>报告</th>
-                        <th>集合 / 来源</th>
-                        <th>摘要</th>
-                        <th>生成时间</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="reportTable"></tbody>
-            </table>
-        </section>
-
-        <section class="panel compare">
-            <div class="toolbar">
-                <select id="leftReport"></select>
-                <select id="rightReport"></select>
-                <button onclick="compareReports()">开始对比</button>
-            </div>
-            <div id="compareResult" class="empty">选择两份报告后即可查看差异。</div>
-        </section>
-    </div>
-
-<script>
-const reports = {{ reports_json|safe }};
-let runJobTimer = null;
-
-function escapeHtml(value) {
-    return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
-}
-
-function reportOptionLabel(report) {
-    return `${report.report_name} | ${report.summary.passed}/${report.summary.total}`;
-}
-
-function renderSelects(filtered = reports) {
-    const left = document.getElementById('leftReport');
-    const right = document.getElementById('rightReport');
-    left.innerHTML = '';
-    right.innerHTML = '';
-    filtered.forEach((report) => {
-        const optionLeft = document.createElement('option');
-        optionLeft.value = report.report_name;
-        optionLeft.textContent = reportOptionLabel(report);
-        left.appendChild(optionLeft);
-
-        const optionRight = document.createElement('option');
-        optionRight.value = report.report_name;
-        optionRight.textContent = reportOptionLabel(report);
-        right.appendChild(optionRight);
-    });
-    if (filtered.length > 1) {
-        left.selectedIndex = 1;
-        right.selectedIndex = 0;
-    }
-}
-
-function renderReports() {
-    const query = document.getElementById('searchInput').value.trim().toLowerCase();
-    const filtered = reports.filter((report) => {
-        const text = [report.report_name, report.collection_name, report.source_file].join(' ').toLowerCase();
-        return text.includes(query);
-    });
-    const tbody = document.getElementById('reportTable');
-    if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">没有匹配的报告。</td></tr>';
-        renderSelects([]);
-        return;
-    }
-    tbody.innerHTML = filtered.map((report) => `
-        <tr>
-            <td><input type="radio" name="reportPick" onclick="pickReport('${report.report_name}')"></td>
-            <td>
-                <a class="report-link" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">${escapeHtml(report.report_name)}</a>
-                <div class="muted">主机: ${escapeHtml(report.host_name || '-')}</div>
-            </td>
-            <td>${escapeHtml(report.collection_name || '-')}<div class="muted">${escapeHtml(report.source_file || '-')}</div></td>
-            <td>
-                <div class="summary">
-                    <span class="tag">总计 ${report.summary.total}</span>
-                    <span class="tag">通过 ${report.summary.passed}</span>
-                    <span class="tag">失败 ${report.summary.failed}</span>
-                    <span class="tag">错误 ${report.summary.error}</span>
-                </div>
-            </td>
-            <td>${escapeHtml(report.generated_at || '-')}</td>
-            <td class="actions">
-                <a href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">查看数据</a>
-                <a href="/reports/${encodeURIComponent(report.report_name)}" target="_blank">原始HTML</a>
-                <a href="/api/report-meta/${encodeURIComponent(report.report_name)}" target="_blank">元数据</a>
-            </td>
-        </tr>
-    `).join('');
-    renderSelects(filtered);
-}
-
-function pickReport(reportName) {
-    document.getElementById('rightReport').value = reportName;
-}
-
-async function compareReports() {
-    const left = document.getElementById('leftReport').value;
-    const right = document.getElementById('rightReport').value;
-    if (!left || !right) {
-        document.getElementById('compareResult').innerHTML = '<div class="empty">至少需要两份报告。</div>';
-        return;
-    }
-    if (left === right) {
-        document.getElementById('compareResult').innerHTML = '<div class="empty">请选择两份不同的报告进行对比。</div>';
-        return;
-    }
-    const response = await fetch(`/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`);
-    const data = await response.json();
-    const metrics = `
-        <div class="compare-grid">
-            <div class="card"><div class="muted">基准报告</div><div class="metric">${escapeHtml(data.left.report_name)}</div></div>
-            <div class="card"><div class="muted">当前报告</div><div class="metric">${escapeHtml(data.right.report_name)}</div></div>
-            <div class="card"><div class="muted">成功率变化</div><div class="metric ${data.summary.success_rate_delta >= 0 ? 'status-up' : 'status-down'}">${data.summary.success_rate_delta_text}</div></div>
-            <div class="card"><div class="muted">新增接口</div><div class="metric">${data.summary.added_count}</div></div>
-            <div class="card"><div class="muted">移除接口</div><div class="metric">${data.summary.removed_count}</div></div>
-            <div class="card"><div class="muted">状态变化</div><div class="metric">${data.summary.changed_count}</div></div>
-        </div>
-    `;
-    const changed = data.changed.map((item) => `
-        <div class="diff-item">
-            <strong>${escapeHtml(item.name)}</strong>
-            <div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div>
-            <div>${escapeHtml(item.before_status)} -> ${escapeHtml(item.after_status)}，状态码 ${escapeHtml(String(item.before_status_code))} -> ${escapeHtml(String(item.after_status_code))}</div>
-        </div>
-    `).join('') || '<div class="empty">没有状态变化的接口。</div>';
-    const added = data.added.map((item) => `
-        <div class="diff-item"><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div></div>
-    `).join('') || '<div class="empty">没有新增接口。</div>';
-    const removed = data.removed.map((item) => `
-        <div class="diff-item"><strong>${escapeHtml(item.name)}</strong><div class="muted">${escapeHtml(item.method)} ${escapeHtml(item.url)}</div></div>
-    `).join('') || '<div class="empty">没有移除接口。</div>';
-
-    document.getElementById('compareResult').innerHTML = `
-        ${metrics}
-        <div class="diff-list"><h3>状态变化</h3>${changed}</div>
-        <div class="diff-list"><h3>新增接口</h3>${added}</div>
-        <div class="diff-list"><h3>移除接口</h3>${removed}</div>
-    `;
-}
-
-function setRunStatus(text, level = '') {
-    const statusEl = document.getElementById('runStatus');
-    statusEl.textContent = text;
-    statusEl.className = `run-status${level ? ' ' + level : ''}`;
-}
-
-async function startRunPostmanJob() {
-    const fileInput = document.getElementById('collectionFile');
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) {
-        setRunStatus('请先选择要上传的 Postman JSON 文件。', 'error');
-        return;
-    }
-
-    const runButton = document.getElementById('runJobBtn');
-    runButton.disabled = true;
-    setRunStatus('正在上传并创建执行任务，请稍候...');
-
-    const formData = new FormData();
-    formData.append('collection_file', file);
-    formData.append('base_url', document.getElementById('baseUrlInput').value.trim());
-    formData.append('token', document.getElementById('tokenInput').value.trim());
-    formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
-    formData.append('report_name', document.getElementById('reportNameInput').value.trim());
-    formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
-
-    try {
-        const response = await fetch('/api/run-postman', {
-            method: 'POST',
-            body: formData,
-        });
-        let data = {};
-        const rawText = await response.text();
-        try {
-            data = rawText ? JSON.parse(rawText) : {};
-        } catch (_e) {
-            data = { error: rawText || '服务返回了非 JSON 响应。' };
-        }
-        if (!response.ok) {
-            throw new Error(data.error || '任务创建失败');
-        }
-        setRunStatus(`任务已启动（${data.job_id}），正在执行...`);
-        watchRunPostmanJob(data.job_id);
-    } catch (error) {
-        runButton.disabled = false;
-        setRunStatus(`启动失败: ${error.message || error}`, 'error');
-    }
-}
-
-function watchRunPostmanJob(jobId) {
-    if (runJobTimer) {
-        clearInterval(runJobTimer);
-        runJobTimer = null;
-    }
-
-    const runButton = document.getElementById('runJobBtn');
-
-    const fetchStatus = async () => {
-        try {
-            const response = await fetch(`/api/run-postman-status/${encodeURIComponent(jobId)}`);
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || '获取任务状态失败');
-            }
-
-            if (data.status === 'queued') {
-                setRunStatus(`任务排队中（${jobId}），请稍候...`);
-                return;
-            }
-            if (data.status === 'running') {
-                const total = Number(data.total || 0);
-                const completed = Number(data.completed || 0);
-                const percent = Number(data.percent || 0);
-                const progressText = total > 0 ? ` ${completed}/${total} (${percent}%)` : '';
-                const currentText = data.current_name ? `，当前接口: ${data.current_name}` : '';
-                setRunStatus(`任务执行中（${jobId}）${progressText}${currentText}`);
-                return;
-            }
-            if (data.status === 'success') {
-                clearInterval(runJobTimer);
-                runJobTimer = null;
-                runButton.disabled = false;
-                const reportHint = data.report_name ? `最新报告: ${data.report_name}。` : '';
-                setRunStatus(`执行完成。${reportHint}正在跳转到最新报告数据页...`, 'success');
-                setTimeout(() => {
-                    window.location.href = '/latest';
-                }, 600);
-                return;
-            }
-
-            clearInterval(runJobTimer);
-            runJobTimer = null;
-            runButton.disabled = false;
-            setRunStatus(`执行失败: ${data.message || '未知错误'}`, 'error');
-        } catch (error) {
-            clearInterval(runJobTimer);
-            runJobTimer = null;
-            runButton.disabled = false;
-            setRunStatus(`任务状态查询失败: ${error.message || error}`, 'error');
-        }
-    };
-
-    fetchStatus();
-    runJobTimer = setInterval(fetchStatus, 3000);
-}
-
-renderReports();
-</script>
-</body>
-</html>
-"""
-
-REPORT_VIEW_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ report_name }} - 报告数据视图</title>
-    <style>
-        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #0f172a; }
-        .page { max-width: 1320px; margin: 0 auto; padding: 24px; }
-        .hero { background: linear-gradient(135deg, #0f172a, #2563eb); color: #fff; border-radius: 20px; padding: 24px 28px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18); }
-        .hero h1 { margin: 0 0 8px; font-size: 28px; word-break: break-all; }
-        .hero p { margin: 4px 0; opacity: 0.92; }
-        .hero a { color: #bfdbfe; }
-        .summary-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; }
-        .summary-card { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 12px 14px; }
-        .summary-card .label { font-size: 12px; opacity: 0.85; }
-        .summary-card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
-        .panel { background: #fff; margin-top: 20px; border-radius: 18px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
-        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-        .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
-        .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
-        .toolbar button.secondary { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
-        .toolbar .hint { color: #64748b; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
-        th { color: #475569; font-size: 13px; background: #f8fafc; }
-        tr:hover { background: #f0f9ff; }
-        .status { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-        .status-passed { background: #dcfce7; color: #166534; }
-        .status-failed { background: #fee2e2; color: #991b1b; }
-        .status-error { background: #ffedd5; color: #9a3412; }
-        .url { color: #1d4ed8; font-family: Consolas, monospace; }
-        .msg-td { cursor: pointer; }
-        .msg-td:hover { background: #fff8e1 !important; }
-        .msg-td.expanded { white-space: normal !important; overflow: visible !important; max-width: none !important; word-break: break-word; background: #fff8e1 !important; }
-        .msg-failed { color: #991b1b; }
-        td.errcode-td { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; word-break: break-all; }
-        td.td-op { white-space: normal; overflow: visible; max-width: none; }
-        .empty { padding: 30px 12px; text-align: center; color: #64748b; }
-        .pagination { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center; margin-top: 16px; }
-        .pagination button { padding: 8px 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; }
-        .pagination button.active { background: #0f172a; color: #fff; border-color: #0f172a; }
-        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .pager-info { text-align: center; color: #64748b; margin-top: 4px; }
-        .detail-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.48); display: none; align-items: center; justify-content: center; padding: 20px; }
-        .detail-mask.show { display: flex; }
-        .detail-dialog { width: min(1100px, 100%); max-height: 90vh; overflow: auto; background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24); }
-        .detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 16px; }
-        .detail-head h3 { margin: 0 0 6px; }
-        .detail-head button { border: none; background: #e2e8f0; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
-        .detail-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-        .detail-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
-        .detail-card h4 { margin: 0 0 10px; font-size: 14px; }
-        pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: 12px; color: #0f172a; }
-        .muted { color: #64748b; }
-        .loading { text-align: center; padding: 24px; color: #64748b; }
-        /* 编辑重试 */
-        .retry-btn { background: #f59e0b; color: #fff; border: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 8px; }
-        .retry-btn:hover { background: #d97706; }
-        .edit-retry-panel { background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 16px; margin-top: 16px; }
-        .edit-retry-panel h4 { margin: 0 0 12px; font-size: 14px; color: #92400e; }
-        .edit-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .edit-row label { min-width: 72px; font-size: 13px; color: #475569; }
-        .edit-row input[type=text], .edit-row select { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
-        .edit-row textarea { flex: 1; min-width: 200px; height: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-family: Consolas, monospace; resize: vertical; }
-        .edit-row textarea.error { border-color: #ef4444; background: #fff1f2; }
-        .edit-actions { display: flex; gap: 10px; margin-top: 4px; }
-        .edit-actions button { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
-        .btn-send { background: #2563eb; color: #fff; }
-        .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-cancel { background: #e2e8f0; color: #374151; }
-        .retry-result-box { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
-        .retry-result-box.ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        .retry-result-box.fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-        /* retry_history */
-        .history-toggle { font-size: 12px; color: #2563eb; cursor: pointer; border: none; background: none; padding: 4px 0; text-decoration: underline; }
-        .history-list { margin-top: 8px; border-left: 3px solid #fde68a; padding-left: 12px; }
-        .history-item { font-size: 12px; margin-bottom: 6px; color: #374151; }
-        .retried-badge { display: inline-block; background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; border-radius: 999px; font-size: 11px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
-    </style>
-</head>
-<body>
-    <div class="page">
-        <section class="hero">
-            <h1>{{ report_name }}</h1>
-            <p>集合: {{ collection_name or '-' }}</p>
-            <p>来源文件: {{ source_file or '-' }}</p>
-            <p>生成时间: {{ generated_at or '-' }}</p>
-            <p>
-                <a href="/">返回报告中心</a>
-                |
-                <a href="/reports/{{ report_name }}" target="_blank">打开原始 HTML</a>
-                |
-                <a href="/api/report-meta/{{ report_name }}" target="_blank">查看元数据</a>
-            </p>
-            <div class="summary-grid">
-                <div class="summary-card"><div class="label">总计</div><div class="value" id="sum-total">{{ summary.total }}</div></div>
-                <div class="summary-card"><div class="label">通过</div><div class="value" id="sum-passed">{{ summary.passed }}</div></div>
-                <div class="summary-card"><div class="label">失败</div><div class="value" id="sum-failed">{{ summary.failed }}</div></div>
-                <div class="summary-card"><div class="label">错误</div><div class="value" id="sum-error">{{ summary.error }}</div></div>
-                <div class="summary-card"><div class="label">成功率</div><div class="value" id="sum-rate">{{ summary.success_rate }}</div></div>
-                <div class="summary-card"><div class="label">耗时</div><div class="value">{{ summary.duration }}</div></div>
-            </div>
-        </section>
-
-        <section class="panel">
-            <div class="toolbar">
-                <input id="queryInput" type="text" placeholder="按接口名称或路径搜索" />
-                <input id="messageInput" type="text" placeholder="按 message 搜索" />
-                <input id="errCodeInput" type="text" placeholder="按 errCode 搜索" />
-                <select id="statusSelect">
-                    <option value="all">全部结果</option>
-                    <option value="PASSED">成功</option>
-                    <option value="FAILED">失败</option>
-                    <option value="ERROR">错误</option>
-                </select>
-                <select id="pageSizeSelect">
-                    <option value="20" selected>20 条/页</option>
-                    <option value="30">30 条/页</option>
-                    <option value="50">50 条/页</option>
-                    <option value="100">100 条/页</option>
-                </select>
-                <button onclick="reloadResults(1)">查询</button>
-                <button class="secondary" onclick="resetFilters()">重置</button>
-                <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
-                <label class="hint" style="display:flex;align-items:center;gap:6px;">
-                    <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;">
-                    导出包含 token/authorization
-                </label>
-                <span class="hint">默认 20 条/页，最高 100 条/页</span>
-            </div>
-            <div id="resultTableContainer" class="loading">加载报告数据中...</div>
-            <div id="pagerInfo" class="pager-info"></div>
-            <div id="pagination" class="pagination"></div>
-        </section>
-    </div>
-
-    <div id="detailMask" class="detail-mask" onclick="closeDetail(event)">
-        <div class="detail-dialog">
-            <div class="detail-head">
-                <div>
-                    <h3 id="detailTitle">接口详情</h3>
-                    <div id="detailMeta" class="muted"></div>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <button id="editRetryBtn" class="retry-btn" style="display:none;" onclick="openEditRetry()">编辑重试</button>
-                    <button onclick="closeDetail()">关闭</button>
-                </div>
-            </div>
-            <div id="detailBody" class="loading">加载详情中...</div>
-            <div id="editRetryPanel" style="display:none;"></div>
-        </div>
-    </div>
-
-<script>
-const reportName = {{ report_name_json|safe }};
-
-function escapeHtml(value) {
-    return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
-}
-
-function formatJson(value) {
-    if (value === null || value === undefined || value === '') {
-        return '无';
-    }
-    if (typeof value === 'string') {
-        return value;
-    }
-    return JSON.stringify(value, null, 2);
-}
-
-function currentFilters() {
-    return {
-        query: document.getElementById('queryInput').value.trim(),
-        messageQuery: document.getElementById('messageInput').value.trim(),
-        errCodeQuery: document.getElementById('errCodeInput').value.trim(),
-        status: document.getElementById('statusSelect').value,
-        pageSize: document.getElementById('pageSizeSelect').value
-    };
-}
-
-async function reloadResults(page = 1) {
-    const filters = currentFilters();
-    const params = new URLSearchParams({
-        page: String(page),
-        page_size: String(filters.pageSize),
-        query: filters.query,
-        message_query: filters.messageQuery,
-        err_code_query: filters.errCodeQuery,
-        status: filters.status
-    });
-    document.getElementById('resultTableContainer').innerHTML = '<div class="loading">加载报告数据中...</div>';
-    const response = await fetch(`/api/report-results/${encodeURIComponent(reportName)}?${params.toString()}`);
-    const data = await response.json();
-    renderResults(data);
-}
-
-function renderResults(data) {
-    if (!data.items || data.items.length === 0) {
-        document.getElementById('resultTableContainer').innerHTML = '<div class="empty">没有匹配的数据。</div>';
-        document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条`;
-        document.getElementById('pagination').innerHTML = '';
-        return;
-    }
-
-    const rows = data.items.map((item) => `
-        <tr>
-            <td title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
-            <td title="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
-            <td>${escapeHtml(item.method)}</td>
-            <td title="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
-            <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></td>
-            <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
-            <td class="msg-td ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" title="点击展开/收起" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
-            <td class="errcode-td">${escapeHtml(item.err_code || '-')}</td>
-            <td class="td-op"><button onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button></td>
-        </tr>
-    `).join('');
-
-    document.getElementById('resultTableContainer').innerHTML = `
-        <table>
-            <colgroup>
-                <col style="width:12%">
-                <col style="width:9%">
-                <col style="width:80px">
-                <col style="width:20%">
-                <col style="width:72px">
-                <col style="width:60px">
-                <col>
-                <col style="width:140px">
-                <col style="width:72px">
-            </colgroup>
-            <thead>
-                <tr>
-                    <th>接口名称</th>
-                    <th>文件夹</th>
-                    <th>方法</th>
-                    <th>路径</th>
-                    <th>状态</th>
-                    <th>状态码</th>
-                    <th>结果说明</th>
-                    <th>errCode</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
-    `;
-
-    document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条，当前每页 ${data.page_size} 条`;
-    renderPagination(data.page, data.total_pages);
-}
-
-function toggleMsg(td) {
-    td.classList.toggle('expanded');
-    td.title = td.classList.contains('expanded') ? '点击收起' : '点击展开/收起完整内容';
-}
-
-function renderPagination(page, totalPages) {
-    const container = document.getElementById('pagination');
-    if (totalPages <= 1) {
-        container.innerHTML = '';
-        return;
-    }
-
-    const buttons = [];
-    buttons.push(`<button onclick="reloadResults(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`);
-    const start = Math.max(1, page - 4);
-    const end = Math.min(totalPages, start + 8);
-    for (let index = start; index <= end; index += 1) {
-        buttons.push(`<button class="${index === page ? 'active' : ''}" onclick="reloadResults(${index})">${index}</button>`);
-    }
-    buttons.push(`<button onclick="reloadResults(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>`);
-    container.innerHTML = buttons.join('');
-}
-
-async function openDetail(index) {
-    const mask = document.getElementById('detailMask');
-    const body = document.getElementById('detailBody');
-    const editPanel = document.getElementById('editRetryPanel');
-    const editBtn = document.getElementById('editRetryBtn');
-    body.innerHTML = '<div class="loading">加载详情中...</div>';
-    editPanel.style.display = 'none';
-    editPanel.innerHTML = '';
-    editBtn.style.display = 'none';
-    mask.classList.add('show');
-    // 记录当前详情 index 供 openEditRetry 使用
-    mask.dataset.currentIndex = String(index);
-
-    const response = await fetch(`/api/report-result-detail/${encodeURIComponent(reportName)}/${index}`);
-    const data = await response.json();
-
-    document.getElementById('detailTitle').textContent = (data.name || '接口详情') +
-        (data.retried ? '<span class="retried-badge">已重试</span>' : '');
-    document.getElementById('detailTitle').innerHTML = (data.name || '接口详情') +
-        (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
-    document.getElementById('detailMeta').textContent =
-        `${data.method || '-'} | ${data.url || '-'} | ${data.status || '-'} | 状态码 ${data.status_code ?? '-'}`;
-
-    // 所有有 detail_available 或者只要有 url 的都可以重试
-    if (data.url) {
-        editBtn.style.display = '';
-    }
-
-    if (!data.detail_available) {
-        body.innerHTML = '<div class="empty">该报告没有可用的请求/响应详情数据。</div>';
-        // 即便无详情也允许编辑 URL/参数后重试
-        mask.dataset.currentData = JSON.stringify(data);
-        return;
-    }
-
-    // retry_history 区块
-    let historyHtml = '';
-    const history = data.retry_history || [];
-    if (history.length > 0) {
-        const items = history.map((h, i) => `
-            <div class="history-item">
-                第 ${i + 1} 次（原始/上次）：
-                <span class="status status-${(h.status || '').toLowerCase()}">${escapeHtml(h.status || '-')}</span>
-                状态码 ${h.status_code ?? '-'} &nbsp;|&nbsp; ${escapeHtml(h.message || '-')}
-            </div>
-        `).join('');
-        historyHtml = `
-            <div style="margin-top:12px;">
-                <button class="history-toggle" onclick="toggleHistory(this)">▶ 查看重试历史（${history.length} 次）</button>
-                <div class="history-list" style="display:none;">${items}</div>
-            </div>`;
-    }
-
-    body.innerHTML = `
-        <div class="detail-grid">
-            <div class="detail-card">
-                <h4>请求头</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.headers))}</pre>
-            </div>
-            <div class="detail-card">
-                <h4>查询参数</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.params))}</pre>
-            </div>
-            <div class="detail-card">
-                <h4>请求体</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.body))}</pre>
-            </div>
-            <div class="detail-card">
-                <h4>响应头</h4>
-                <pre>${escapeHtml(formatJson(data.response_info.headers))}</pre>
-            </div>
-            <div class="detail-card" style="grid-column: 1 / -1;">
-                <h4>响应体</h4>
-                <pre>${escapeHtml(formatJson(data.response_info.body))}</pre>
-            </div>
-        </div>
-        ${historyHtml}
-    `;
-
-    // 缓存当前 data 供 openEditRetry 读取初始值
-    mask.dataset.currentData = JSON.stringify(data);
-}
-
-function toggleHistory(btn) {
-    const list = btn.nextElementSibling;
-    const open = list.style.display !== 'none';
-    list.style.display = open ? 'none' : 'block';
-    btn.textContent = (open ? '▶' : '▼') + btn.textContent.slice(1);
-}
-
-function openEditRetry() {
-    const mask = document.getElementById('detailMask');
-    const panel = document.getElementById('editRetryPanel');
-    const rawData = mask.dataset.currentData || '{}';
-    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
-
-    const reqInfo = data.request_info || {};
-    const methodOptions = ['GET','POST','PUT','DELETE','PATCH'].map(m =>
-        `<option value="${m}" ${m === (data.method || 'GET') ? 'selected' : ''}>${m}</option>`
-    ).join('');
-
-    panel.style.display = '';
-    panel.innerHTML = `
-        <div class="edit-retry-panel">
-            <h4>编辑重试参数</h4>
-            <div class="edit-row">
-                <label>Method</label>
-                <select id="er-method">${methodOptions}</select>
-            </div>
-            <div class="edit-row">
-                <label>URL</label>
-                <input type="text" id="er-url" value="${escapeHtml(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
-            </div>
-            <div class="edit-row">
-                <label>Token</label>
-                <input type="text" id="er-token" placeholder="留空则使用原始 Headers 中的认证" />
-            </div>
-            <div class="edit-row">
-                <label>Headers</label>
-                <textarea id="er-headers">${escapeHtml(formatJson(reqInfo.headers || {}))}</textarea>
-            </div>
-            <div class="edit-row">
-                <label>Params</label>
-                <textarea id="er-params">${escapeHtml(formatJson(reqInfo.params || {}))}</textarea>
-            </div>
-            <div class="edit-row">
-                <label>Body</label>
-                <textarea id="er-body">${escapeHtml(formatJson(reqInfo.body !== undefined ? reqInfo.body : null))}</textarea>
-            </div>
-            <div class="edit-row">
-                <label>期望状态码</label>
-                <input type="text" id="er-expected-status" value="${escapeHtml(String(data.expected_status || 200))}" style="max-width:80px;" />
-            </div>
-            <div class="edit-row">
-                <label></label>
-                <label style="min-width:auto;"><input type="checkbox" id="er-save" checked> 回写到报告</label>
-            </div>
-            <div class="edit-actions">
-                <button class="btn-send" id="er-send-btn" onclick="sendRetry()">发送</button>
-                <button class="btn-cancel" onclick="cancelEditRetry()">取消</button>
-            </div>
-            <div id="er-result" style="display:none;"></div>
-        </div>
-    `;
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function cancelEditRetry() {
-    const panel = document.getElementById('editRetryPanel');
-    panel.style.display = 'none';
-    panel.innerHTML = '';
-}
-
-function parseJsonField(id) {
-    const el = document.getElementById(id);
-    const val = (el.value || '').trim();
-    el.classList.remove('error');
-    if (!val || val === '无') return [true, null];
-    try {
-        return [true, JSON.parse(val)];
-    } catch(e) {
-        el.classList.add('error');
-        return [false, null];
-    }
-}
-
-async function sendRetry() {
-    const mask = document.getElementById('detailMask');
-    const rawData = mask.dataset.currentData || '{}';
-    const data = (() => { try { return JSON.parse(rawData); } catch(e) { return {}; } })();
-    const resultIndex = parseInt(mask.dataset.currentIndex, 10);
-
-    const url = (document.getElementById('er-url').value || '').trim();
-    if (!url) { alert('URL 不能为空'); return; }
-
-    const [hOk, headers] = parseJsonField('er-headers');
-    const [pOk, params]  = parseJsonField('er-params');
-    const [bOk, bodyVal] = parseJsonField('er-body');
-    if (!hOk || !pOk || !bOk) { alert('Headers / Params / Body 中有 JSON 格式错误，请检查红色输入框。'); return; }
-
-    const method = document.getElementById('er-method').value;
-    const token = (document.getElementById('er-token').value || '').trim();
-    const expectedStatus = parseInt(document.getElementById('er-expected-status').value, 10) || 200;
-    const saveToReport = document.getElementById('er-save').checked;
-
-    const btn = document.getElementById('er-send-btn');
-    btn.disabled = true;
-    btn.textContent = '请求中...';
-    const resultDiv = document.getElementById('er-result');
-    resultDiv.style.display = '';
-    resultDiv.className = 'retry-result-box';
-    resultDiv.textContent = '正在发送请求...';
-
-    try {
-        const resp = await fetch('/re-request-api', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                url, method,
-                headers: headers || {},
-                params: params || {},
-                body: bodyVal,
-                token,
-                expected_status: expectedStatus,
-                save_to_report: saveToReport,
-                report_name: reportName,
-                result_index: resultIndex,
-                name: data.name || url,
-                folder: data.folder || '',
-                item_path: data.item_path || [],
-            })
-        });
-        const result = await resp.json();
-
-        const isPass = result.status === 'PASSED';
-        resultDiv.className = 'retry-result-box ' + (isPass ? 'ok' : 'fail');
-        resultDiv.innerHTML = `
-            <strong>${escapeHtml(result.status)}</strong>
-            &nbsp;|&nbsp; 状态码: ${result.status_code ?? '-'}
-            &nbsp;|&nbsp; ${escapeHtml(result.message || '-')}
-            ${result.saved ? '<br><small>✓ 已回写到报告</small>' : ''}
-        `;
-
-        // 刷新 summary 卡片
-        if (result.new_summary && result.new_summary.total !== undefined) {
-            const s = result.new_summary;
-            document.getElementById('sum-total').textContent  = s.total  ?? '';
-            document.getElementById('sum-passed').textContent = s.passed ?? '';
-            document.getElementById('sum-failed').textContent = s.failed ?? '';
-            document.getElementById('sum-error').textContent  = s.error  ?? '';
-            document.getElementById('sum-rate').textContent   = s.success_rate ?? '';
-        }
-
-        // 更新列表行（状态、状态码、结果说明）
-        if (saveToReport) {
-            reloadResults();
-        }
-
-        // 更新弹窗 detailMeta 和标题徽标
-        document.getElementById('detailTitle').innerHTML =
-            escapeHtml(data.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
-        document.getElementById('detailMeta').textContent =
-            `${method} | ${url} | ${result.status} | 状态码 ${result.status_code ?? '-'}`;
-
-        // 更新 currentData 以便二次重试时能看到最新状态
-        const updated = { ...data, ...result, retry_history: (data.retry_history || []) };
-        mask.dataset.currentData = JSON.stringify(updated);
-
-    } catch(e) {
-        resultDiv.className = 'retry-result-box fail';
-        resultDiv.textContent = '请求失败: ' + String(e);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '发送';
-    }
-}
-
-function closeDetail(event) {
-    if (event && event.target && event.target.id !== 'detailMask') {
-        return;
-    }
-    document.getElementById('detailMask').classList.remove('show');
-    const panel = document.getElementById('editRetryPanel');
-    if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
-    const editBtn = document.getElementById('editRetryBtn');
-    if (editBtn) { editBtn.style.display = 'none'; }
-}
-
-function resetFilters() {
-    document.getElementById('queryInput').value = '';
-    document.getElementById('messageInput').value = '';
-    document.getElementById('errCodeInput').value = '';
-    document.getElementById('statusSelect').value = 'all';
-    document.getElementById('pageSizeSelect').value = '20';
-    reloadResults(1);
-}
-
-async function exportLatestCollection() {
-    try {
-        const includeAuth = document.getElementById('includeAuthExport').checked;
-        const response = await fetch('/api/export-collection', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth })
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || '导出失败');
-        }
-
-        const warningText = (data.warnings && data.warnings.length)
-            ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`
-            : '';
-        alert(
-            `导出完成！\n文件: ${data.file_name}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
-        );
-        if (data.warnings && data.warnings.length) {
-            console.warn('Export warnings:', data.warnings);
-        }
-        if (data.download_url) {
-            window.open(data.download_url, '_blank');
-        }
-    } catch (error) {
-        alert('导出失败: ' + (error.message || error));
-    }
-}
-
-document.getElementById('queryInput').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-        reloadResults(1);
-    }
-});
-
-document.getElementById('messageInput').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-        reloadResults(1);
-    }
-});
-
-document.getElementById('errCodeInput').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-        reloadResults(1);
-    }
-});
-
-document.getElementById('statusSelect').addEventListener('change', () => reloadResults(1));
-document.getElementById('pageSizeSelect').addEventListener('change', () => reloadResults(1));
-
-reloadResults(1);
-</script>
-</body>
-</html>
-"""
-
 
 def get_local_ip() -> str:
+    """Return LAN IP and fallback to loopback when detection fails."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
-    except OSError:
+        sock.connect(("8.8.8.8", 80))
+        return str(sock.getsockname()[0])
+    except Exception:
         return "127.0.0.1"
+    finally:
+        sock.close()
 
 
-def is_total_report_file(path: Path) -> bool:
-    name = path.name.lower()
-    return "_page_" not in name
+def find_report(report_name: str) -> Dict[str, Any]:
+    reports_by_name = _REPORTS_CACHE.get("by_name")
+    if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
+        list_reports()
+        reports_by_name = _REPORTS_CACHE.get("by_name")
+    if reports_by_name and report_name in reports_by_name:
+        return reports_by_name[report_name]
+    raise FileNotFoundError(report_name)
+
+def _invalidate_reports_cache() -> None:
+    """主动清理报告列表缓存。"""
+    _REPORTS_CACHE["data"] = None
+    _REPORTS_CACHE["by_name"] = None
+    _REPORTS_CACHE["ts"] = 0.0
+
+def load_report_details_map(report: Dict[str, Any]) -> Dict[str, Any]:
+    details_file = str(report.get("details_file") or "").strip()
+    if not details_file:
+        return {}
+    details_path = REPORTS_DIR / details_file
+    if not details_path.exists():
+        return {}
+    try:
+        with details_path.open("r", encoding="utf-8") as file:
+            details = json.load(file)
+        return details if isinstance(details, dict) else {}
+    except Exception:
+        return {}
+
+def list_report_summaries() -> List[Dict[str, Any]]:
+    return [_report_list_item(report) for report in list_reports()]
+
+def list_reports() -> List[Dict[str, Any]]:
+    _now = _time.monotonic()
+    if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
+        return list(_REPORTS_CACHE["data"])
+
+    reports: List[Dict[str, Any]] = []
+    seen_report_names = set()
+
+    for meta_path in report_meta_files():
+        try:
+            report = load_report_meta(meta_path)
+            report["meta_file"] = meta_path.name
+            reports.append(report)
+            seen_report_names.add(report.get("report_name"))
+        except Exception as exc:
+            reports.append({
+                "report_name": meta_path.name,
+                "generated_at": "",
+                "host_name": "",
+                "collection_name": "",
+                "source_file": "",
+                "summary": {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"},
+                "load_error": str(exc),
+                "results": [],
+            })
+
+    for html_path in legacy_postman_html_files():
+        if html_path.name in seen_report_names:
+            continue
+        try:
+            reports.append(load_legacy_postman_report(html_path))
+        except Exception:
+            continue
+
+    # Final guard: regardless of data source, do not expose paged child reports.
+    reports = [item for item in reports if is_total_report_name(item.get("report_name", ""))]
+
+    reports.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
+
+    _REPORTS_CACHE["data"] = reports
+    _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
+    _REPORTS_CACHE["ts"] = _time.monotonic()
+    return list(reports)
+
+def _extract_collection_preview_items(collection_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    result: List[Dict[str, Any]] = []
+    root_items = collection_data.get("item")
+    if not isinstance(root_items, list):
+        return result
+
+    def walk(items: List[Any], folder_chain: List[str], path_prefix: List[int]) -> None:
+        for index, item in enumerate(items):
+            if len(result) >= COLLECTION_PREVIEW_MAX_ITEMS:
+                return
+            if not isinstance(item, dict):
+                continue
+            current_path = path_prefix + [index]
+            name = str(item.get("name") or "")
+            request_obj = item.get("request")
+            if isinstance(request_obj, dict):
+                method = str(request_obj.get("method") or "GET").upper()
+                url = _build_preview_url(request_obj.get("url"))
+                folder = " / ".join([x for x in folder_chain if x])
+                result.append({
+                    "index": len(result),
+                    "name": name,
+                    "folder": folder,
+                    "method": method,
+                    "url": url,
+                    "item_path": current_path,
+                    "item_path_text": ".".join(str(x) for x in current_path),
+                })
+                continue
+
+            children = item.get("item")
+            if isinstance(children, list):
+                walk(children, folder_chain + [name], current_path)
+
+    walk(root_items, [], [])
+    return result
+
+def _to_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
 
 
-def is_total_report_name(report_name: str) -> bool:
-    return "_page_" not in str(report_name or "").lower()
+def _build_exclusion_key(folder: Any, name: Any, method: Any, url: Any) -> str:
+    folder_text = str(folder or "").strip()
+    name_text = str(name or "").strip()
+    method_text = str(method or "").strip().upper()
+    url_text = str(url or "").strip()
+    return " | ".join([folder_text, name_text, method_text, url_text])
 
+
+def _result_exclusion_key(result: Dict[str, Any]) -> str:
+    return _build_exclusion_key(
+        result.get("folder", ""),
+        result.get("name", ""),
+        result.get("method", ""),
+        result.get("url", ""),
+    )
+
+
+def _manual_case_exclusion_key(case: Dict[str, Any]) -> str:
+    return _build_exclusion_key(
+        case.get("folder", ""),
+        case.get("name", ""),
+        case.get("method", ""),
+        case.get("url", ""),
+    )
+
+
+def _normalize_manual_exclusions(values: Any) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    normalized: List[str] = []
+    seen = set()
+    for value in values:
+        text = str(value or "").strip()
+        if not text or text in seen:
+            continue
+        normalized.append(text)
+        seen.add(text)
+    return normalized
+
+
+def _normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str, Any]:
+    case_id = str(case.get("id") or "").strip()
+    method = str(case.get("method") or "GET").strip().upper() or "GET"
+    url = str(case.get("url") or "").strip()
+    name = str(case.get("name") or "").strip()
+    folder = str(case.get("folder") or default_folder or MANUAL_CASE_FOLDER_NAME).strip() or MANUAL_CASE_FOLDER_NAME
+    message = str(case.get("message") or "").strip()
+    status = str(case.get("status") or "FAILED").strip().upper() or "FAILED"
+    actual_request_url = str(case.get("actual_request_url") or url).strip() or url
+    err_code = str(case.get("err_code") or "").strip()
+
+    try:
+        expected_status = int(case.get("expected_status") or 200)
+    except (TypeError, ValueError):
+        expected_status = 200
+
+    status_code = case.get("status_code")
+    if status_code is not None:
+        try:
+            status_code = int(status_code)
+        except (TypeError, ValueError):
+            status_code = None
+
+    elapsed_ms = case.get("elapsed_ms")
+    if elapsed_ms is not None:
+        try:
+            elapsed_ms = int(elapsed_ms)
+        except (TypeError, ValueError):
+            elapsed_ms = None
+
+    raw_request_info = case.get("request_info") if isinstance(case.get("request_info"), dict) else {}
+    req_headers = raw_request_info.get("headers")
+    if not isinstance(req_headers, dict):
+        req_headers = case.get("headers") if isinstance(case.get("headers"), dict) else {}
+    req_params = raw_request_info.get("params")
+    if not isinstance(req_params, dict):
+        req_params = case.get("params") if isinstance(case.get("params"), dict) else {}
+    req_body = raw_request_info.get("body") if "body" in raw_request_info else case.get("body")
+    request_info = {
+        "headers": req_headers,
+        "params": req_params,
+        "body": req_body,
+    }
+
+    raw_response_info = case.get("response_info") if isinstance(case.get("response_info"), dict) else {}
+    resp_headers = raw_response_info.get("headers")
+    if not isinstance(resp_headers, dict):
+        resp_headers = case.get("response_headers") if isinstance(case.get("response_headers"), dict) else {}
+    if "body" in raw_response_info:
+        resp_body = raw_response_info.get("body")
+    else:
+        resp_body = case.get("response_body")
+    response_info = {
+        "headers": resp_headers,
+        "body": resp_body,
+        "status_code": raw_response_info.get("status_code", status_code),
+        "elapsed_ms": raw_response_info.get("elapsed_ms", elapsed_ms),
+    }
+
+    return {
+        "id": case_id,
+        "name": name,
+        "folder": folder,
+        "method": method,
+        "url": url,
+        "actual_request_url": actual_request_url,
+        "expected_status": expected_status,
+        "status": status,
+        "status_code": status_code,
+        "elapsed_ms": elapsed_ms,
+        "message": message,
+        "err_code": err_code,
+        "retried": bool(case.get("retried", False)),
+        "retry_history": case.get("retry_history") if isinstance(case.get("retry_history"), list) else [],
+        "item_path": case.get("item_path") if isinstance(case.get("item_path"), list) else [],
+        "request_info": request_info,
+        "response_info": response_info,
+    }
+
+
+def _remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: List[str]) -> int:
+    excluded = set(_normalize_manual_exclusions(manual_exclusions))
+    if not excluded:
+        return 0
+
+    removed = 0
+
+    def walk(items: List[Dict[str, Any]], parent_folder: str) -> List[Dict[str, Any]]:
+        nonlocal removed
+        kept: List[Dict[str, Any]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            name = str(item.get("name") or "")
+            request = item.get("request") if isinstance(item.get("request"), dict) else None
+            children = item.get("item") if isinstance(item.get("item"), list) else None
+
+            if request is not None:
+                key = _build_exclusion_key(
+                    parent_folder,
+                    name,
+                    request.get("method", ""),
+                    (request.get("url") or {}).get("raw", "") if isinstance(request.get("url"), dict) else request.get("url", ""),
+                )
+                if key in excluded:
+                    removed += 1
+                    continue
+                kept.append(item)
+                continue
+
+            if children is not None:
+                next_folder = name if not parent_folder else f"{parent_folder}/{name}"
+                item["item"] = walk(children, next_folder)
+                if item["item"]:
+                    kept.append(item)
+                continue
+
+            kept.append(item)
+        return kept
+
+    root_items = collection_data.get("item")
+    if isinstance(root_items, list):
+        collection_data["item"] = walk(root_items, "")
+    return removed
+
+
+def _append_manual_cases_to_collection(collection_data: Dict[str, Any], manual_cases: List[Dict[str, Any]], default_folder: str) -> int:
+    if not manual_cases:
+        return 0
+
+    root_items = collection_data.get("item")
+    if not isinstance(root_items, list):
+        collection_data["item"] = []
+        root_items = collection_data["item"]
+
+    folder_name = str(default_folder or MANUAL_CASE_FOLDER_NAME).strip() or MANUAL_CASE_FOLDER_NAME
+    folder_item = None
+    for item in root_items:
+        if isinstance(item, dict) and "request" not in item and str(item.get("name") or "") == folder_name:
+            if isinstance(item.get("item"), list):
+                folder_item = item
+                break
+
+    if folder_item is None:
+        folder_item = {"name": folder_name, "item": []}
+        root_items.append(folder_item)
+
+    children = folder_item.setdefault("item", [])
+    if not isinstance(children, list):
+        children = []
+        folder_item["item"] = children
+
+    appended = 0
+    for raw in manual_cases:
+        if not isinstance(raw, dict):
+            continue
+        case = _normalize_manual_case(raw, folder_name)
+        if not case.get("name") or not case.get("url"):
+            continue
+
+        method = case.get("method", "GET")
+        url = case.get("url", "")
+        request_obj = {
+            "method": method,
+            "header": [],
+            "url": {"raw": url},
+        }
+        children.append({"name": case.get("name", ""), "request": request_obj, "response": []})
+        appended += 1
+
+    return appended
+
+def export_collection_with_latest_params(
+    report: Dict[str, Any],
+    include_auth: bool = False,
+    export_scope: str = "full",
+) -> Dict[str, Any]:
+    source_file = str(report.get("source_file") or "").strip()
+    if not source_file:
+        raise ValueError("报告缺少 source_file，无法导出集合。")
+
+    source_path = Path(source_file)
+    if not source_path.exists():
+        raise FileNotFoundError(f"源集合文件不存在: {source_file}")
+
+    with source_path.open("r", encoding="utf-8") as f:
+        collection_data = json.load(f)
+
+    scope = str(export_scope or "full").strip().lower()
+    if scope not in {"full", "report_only"}:
+        scope = "full"
+    if scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
+        scope = "full"
+
+    details_map = load_report_details_map(report)
+    updated_count = 0
+    skipped_count = 0
+    warnings: List[str] = []
+
+    for index, result in enumerate(report.get("results", [])):
+        detail = details_map.get(str(index)) or {}
+        request_info = detail.get("request_info") or {}
+
+        item = _item_by_path(collection_data, result.get("item_path") or [])
+        if item is None:
+            item = _find_item_fallback(collection_data, result)
+            if item is None:
+                skipped_count += 1
+                warnings.append(f"索引 {index} 无法定位到集合节点: {result.get('name', '-')}")
+                continue
+
+        request_obj = item.setdefault("request", {})
+        if not isinstance(request_obj, dict):
+            skipped_count += 1
+            warnings.append(f"索引 {index} 的 request 结构异常: {result.get('name', '-')}")
+            continue
+
+        method = str(result.get("method") or request_obj.get("method") or "GET").upper()
+        url = str(result.get("url") or request_obj.get("url") or "").strip()
+        headers = dict(request_info.get("headers") or {})
+        if not include_auth:
+            headers = _strip_auth_headers(headers)
+        params = dict(request_info.get("params") or {})
+        body = request_info.get("body")
+
+        request_obj["method"] = method
+        _set_request_url(request_obj, url, params)
+        _set_request_headers(request_obj, headers)
+        _set_request_body(request_obj, body)
+        updated_count += 1
+
+    final_collection = collection_data
+    report_only_count = 0
+    if scope == "report_only":
+        selected_paths = _collect_report_item_paths(report)
+        if not selected_paths:
+            raise ValueError("导出范围为 report_only 时，报告中缺少可用 item_path。")
+        final_collection = _prune_collection_to_paths(collection_data, selected_paths)
+        pruned_items = _extract_collection_preview_items(final_collection)
+        report_only_count = len(pruned_items)
+
+    manual_cases: List[Dict[str, Any]] = []
+    if ENABLE_MANUAL_CASES:
+        for case in report.get("manual_cases", []):
+            if isinstance(case, dict):
+                manual_cases.append(_normalize_manual_case(case, str(case.get("folder") or MANUAL_CASE_FOLDER_NAME)))
+
+    manual_exclusions = _normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    appended_manual_count = _append_manual_cases_to_collection(
+        final_collection,
+        manual_cases,
+        MANUAL_CASE_FOLDER_NAME,
+    )
+    removed_excluded_count = _remove_excluded_items(final_collection, manual_exclusions)
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    preferred_name = report.get("source_original_file") or source_path.name
+    source_name = _sanitize_export_name(preferred_name)
+    stem = Path(source_name).stem
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    suffix = "latest" if scope == "full" else "report_only"
+    export_name = f"{stem}_{suffix}_{timestamp}.json"
+    export_path = EXPORTS_DIR / export_name
+
+    with export_path.open("w", encoding="utf-8") as f:
+        json.dump(final_collection, f, indent=2, ensure_ascii=False)
+
+    return {
+        "file_name": export_name,
+        "file_path": str(export_path),
+        "updated_count": updated_count,
+        "skipped_count": skipped_count,
+        "export_scope": scope,
+        "report_only_count": report_only_count,
+        "manual_cases_count": len(manual_cases),
+        "appended_manual_count": appended_manual_count,
+        "excluded_count": len(manual_exclusions),
+        "removed_excluded_count": removed_excluded_count,
+        "composition": {
+            "updated_requests": updated_count,
+            "manual_cases_added": appended_manual_count,
+            "excluded_removed": removed_excluded_count,
+        },
+        "warnings": warnings,
+    }
+
+def collect_report_artifacts(report: Dict[str, Any]) -> List[Path]:
+    artifacts: List[Path] = []
+    seen: set[str] = set()
+
+    for file_name in (
+        report.get("report_name", ""),
+        report.get("details_file", ""),
+        report.get("meta_file", ""),
+    ):
+        path = _safe_report_artifact(str(file_name or ""))
+        if path is not None and path.name not in seen:
+            artifacts.append(path)
+            seen.add(path.name)
+
+    report_name = str(report.get("report_name") or "").strip()
+    report_stem = Path(report_name).stem
+    if report_stem:
+        for page_path in sorted(REPORTS_DIR.glob(f"{report_stem}_page_*.html")):
+            resolved = page_path.resolve()
+            try:
+                resolved.relative_to(REPORTS_DIR)
+            except ValueError:
+                continue
+            if resolved.name not in seen:
+                artifacts.append(resolved)
+                seen.add(resolved.name)
+
+    return artifacts
+
+def clamp_page(value: Any) -> int:
+    try:
+        page = int(value)
+    except (TypeError, ValueError):
+        page = 1
+    return max(1, page)
+
+def clamp_page_size(value: Any) -> int:
+    try:
+        page_size = int(value)
+    except (TypeError, ValueError):
+        page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
+    return max(REPORT_VIEW_PAGE_SIZE_MIN, min(page_size, REPORT_VIEW_PAGE_SIZE_MAX))
+
+def normalize_status_filter(value: str) -> Optional[str]:
+    normalized = str(value or "").strip().upper()
+    if normalized in {"", "ALL", "RESULT", "全部", "结果"}:
+        return None
+    if normalized in {"PASSED", "SUCCESS", "成功"}:
+        return "PASSED"
+    if normalized in {"FAILED", "FAIL", "失败"}:
+        return "FAILED"
+    if normalized in {"ERROR", "错误"}:
+        return "ERROR"
+    return None
+
+def filter_report_results(
+    report: Dict[str, Any],
+    keyword: str,
+    status_filter: Optional[str],
+    message_keyword: str,
+    err_code_keyword: str,
+    include_excluded: bool = True,
+) -> List[Dict[str, Any]]:
+    lowered_keyword = str(keyword or "").strip().lower()
+    lowered_message_keyword = str(message_keyword or "").strip().lower()
+    lowered_err_code_keyword = str(err_code_keyword or "").strip().lower()
+    exclusion_set = set(_normalize_manual_exclusions(report.get("manual_exclusions") or []))
+    details_map = load_report_details_map(report)
+    filtered_items: List[Dict[str, Any]] = []
+
+    for index, item in enumerate(report.get("results", [])):
+        exclusion_key = _result_exclusion_key(item)
+        excluded = exclusion_key in exclusion_set
+        if excluded and not include_excluded:
+            continue
+        if status_filter and item.get("status") != status_filter:
+            continue
+        if lowered_keyword:
+            search_text = " ".join([
+                str(item.get("name", "")),
+                str(item.get("url", "")),
+                str(item.get("folder", "")),
+                str(item.get("key", "")),
+            ]).lower()
+            if lowered_keyword not in search_text:
+                continue
+        if lowered_message_keyword:
+            message_text = str(item.get("message", "")).lower()
+            if lowered_message_keyword not in message_text:
+                continue
+        if lowered_err_code_keyword:
+            err_code_text = str(item.get("err_code", "")).lower()
+            if lowered_err_code_keyword not in err_code_text:
+                continue
+        filtered_items.append({
+            "index": index,
+            "name": item.get("name", ""),
+            "folder": item.get("folder", ""),
+            "method": item.get("method", ""),
+            "url": item.get("url", ""),
+            "status": item.get("status", ""),
+            "status_code": item.get("status_code"),
+            "message": item.get("message", ""),
+            "err_code": item.get("err_code", ""),
+            "excluded": excluded,
+            "exclusion_key": exclusion_key,
+            "detail_available": str(index) in details_map,
+        })
+    return filtered_items
+
+def paginate_items(items: List[Dict[str, Any]], page: int, page_size: int) -> Dict[str, Any]:
+    total = len(items)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    current_page = min(page, total_pages)
+    start = (current_page - 1) * page_size
+    end = start + page_size
+    return {
+        "items": items[start:end],
+        "page": current_page,
+        "page_size": page_size,
+        "total": total,
+        "total_pages": total_pages,
+    }
+
+def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+    left_map = map_results(left)
+    right_map = map_results(right)
+    left_keys = set(left_map.keys())
+    right_keys = set(right_map.keys())
+
+    added_keys = sorted(right_keys - left_keys)
+    removed_keys = sorted(left_keys - right_keys)
+    common_keys = sorted(left_keys & right_keys)
+    changed: List[Dict[str, Any]] = []
+
+    for key in common_keys:
+        before = left_map[key]
+        after = right_map[key]
+        if before.get("status") != after.get("status") or before.get("status_code") != after.get("status_code"):
+            changed.append({
+                "key": key,
+                "name": after.get("name") or before.get("name"),
+                "folder": after.get("folder") or before.get("folder"),
+                "method": after.get("method") or before.get("method"),
+                "url": after.get("url") or before.get("url"),
+                "before_status": before.get("status"),
+                "after_status": after.get("status"),
+                "before_status_code": before.get("status_code"),
+                "after_status_code": after.get("status_code"),
+            })
+
+    left_rate = _to_rate(left.get("summary", {}).get("success_rate", "0%"))
+    right_rate = _to_rate(right.get("summary", {}).get("success_rate", "0%"))
+    delta = right_rate - left_rate
+
+    return {
+        "left": left,
+        "right": right,
+        "summary": {
+            "added_count": len(added_keys),
+            "removed_count": len(removed_keys),
+            "changed_count": len(changed),
+            "success_rate_delta": round(delta, 2),
+            "success_rate_delta_text": f"{delta:+.2f}%",
+        },
+        "added": [right_map[key] for key in added_keys],
+        "removed": [left_map[key] for key in removed_keys],
+        "changed": changed,
+    }
+
+def clamp_run_results_per_page(value: Any) -> int:
+    try:
+        page_size = int(value)
+    except (TypeError, ValueError):
+        page_size = RUN_RESULTS_PER_PAGE_DEFAULT
+    return max(RUN_RESULTS_PER_PAGE_MIN, min(page_size, RUN_RESULTS_PER_PAGE_MAX))
+
+
+_RUN_JOBS_MAX = _cfg_int("RUN_JOBS_MAX", 200)
+
+def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
+    if raw is None:
+        return []
+
+    data = raw
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"selected_item_paths 不是有效 JSON: {exc}") from exc
+
+    if not isinstance(data, list):
+        raise ValueError("selected_item_paths 必须是数组。")
+
+    normalized: List[List[int]] = []
+    seen = set()
+    for item in data:
+        if not isinstance(item, list) or not item:
+            continue
+        if not all(isinstance(index, int) and index >= 0 for index in item):
+            raise ValueError("selected_item_paths 的每条路径必须是非负整数数组。")
+        key = tuple(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(list(item))
+    return normalized
+
+def set_run_job(job_id: str, **updates: Any) -> None:
+    with RUN_JOBS_LOCK:
+        RUN_JOBS[job_id] = {**RUN_JOBS.get(job_id, {}), **updates}
+        _evict_old_jobs()
+
+def run_postman_job(
+    job_id: str,
+    postman_file: str,
+    base_url: Optional[str],
+    output_dir: str,
+    token: Optional[str],
+    report_name: Optional[str],
+    source_original_file: Optional[str],
+    results_per_page: int,
+    selected_item_paths: Optional[List[List[int]]],
+) -> None:
+    set_run_job(job_id, status="running", message="任务正在执行中...")
+    try:
+        from postman_api_tester.postman_api_tester import run_postman_tests
+
+        def on_progress(progress: Dict[str, Any]) -> None:
+            total = int(progress.get("total") or 0)
+            completed = int(progress.get("completed") or 0)
+            percent = int(progress.get("percent") or 0)
+            current_name = str(progress.get("current_name") or "")
+            current_method = str(progress.get("current_method") or "")
+            current_url = str(progress.get("current_url") or "")
+
+            message = "任务正在执行中..."
+            if total > 0:
+                message = f"任务正在执行中: {completed}/{total} ({percent}%)"
+                if current_name:
+                    message = f"{message}，当前接口: {current_name}"
+
+            set_run_job(
+                job_id,
+                status="running",
+                message=message,
+                total=total,
+                completed=completed,
+                percent=percent,
+                current_name=current_name,
+                current_method=current_method,
+                current_url=current_url,
+                last_status=str(progress.get("last_status") or ""),
+            )
+
+        report = run_postman_tests(
+            postman_file=postman_file,
+            base_url=base_url,
+            output_dir=output_dir,
+            token=token,
+            report_name=report_name,
+            source_original_file=source_original_file,
+            results_per_page=results_per_page,
+            selected_item_paths=selected_item_paths,
+            progress_callback=on_progress,
+        )
+        set_run_job(
+            job_id,
+            status="success",
+            message="执行完成，正在刷新报告索引。",
+            report_name=os.path.basename(str(report.generated_report_file or "")),
+            report_meta_name=os.path.basename(str(report.generated_meta_file or "")),
+        )
+        # 执行成功后立即使报告列表缓存失效
+        _invalidate_reports_cache()
+    except Exception as exc:
+        set_run_job(job_id, status="failed", message=str(exc))
+
+def get_run_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with RUN_JOBS_LOCK:
+        job = RUN_JOBS.get(job_id)
+        return dict(job) if job else None
+
+def _report_list_item(report: Dict[str, Any]) -> Dict[str, Any]:
+    summary = dict(report.get("summary") or {})
+    return {
+        "report_name": report.get("report_name", ""),
+        "generated_at": report.get("generated_at", ""),
+        "host_name": report.get("host_name", ""),
+        "collection_name": report.get("collection_name", ""),
+        "source_file": report.get("source_file", ""),
+        "source_original_file": report.get("source_original_file", ""),
+        "summary": {
+            "total": summary.get("total", 0),
+            "passed": summary.get("passed", 0),
+            "failed": summary.get("failed", 0),
+            "error": summary.get("error", 0),
+            "success_rate": summary.get("success_rate", "0%"),
+        },
+        "load_error": report.get("load_error", ""),
+        "legacy": bool(report.get("legacy", False)),
+    }
 
 def report_meta_files() -> List[Path]:
     if not REPORTS_DIR.exists():
         return []
     return [path for path in sorted(REPORTS_DIR.glob("*_meta.json"), reverse=True) if is_total_report_file(path)]
-
-
-def legacy_postman_html_files() -> List[Path]:
-    if not REPORTS_DIR.exists():
-        return []
-    return [path for path in sorted(REPORTS_DIR.glob("*.html"), reverse=True) if is_total_report_file(path)]
-
 
 def load_report_meta(meta_path: Path) -> Dict[str, Any]:
     with meta_path.open("r", encoding="utf-8") as file:
@@ -1150,13 +908,17 @@ def load_report_meta(meta_path: Path) -> Dict[str, Any]:
         data["summary"] = {}
     return data
 
+def legacy_postman_html_files() -> List[Path]:
+    if not REPORTS_DIR.exists():
+        return []
+    return [path for path in sorted(REPORTS_DIR.glob("*.html"), reverse=True) if is_total_report_file(path)]
 
 def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
     content = report_path.read_text(encoding="utf-8")
     results_match = re.search(r"let\s+allResults\s*=\s*(\[.*?\]);", content, re.S)
     total_match = re.search(r"<label>总计</label>\s*<span>(\d+)</span>", content)
-    passed_match = re.search(r"<label>✓ 通过</label>\s*<span>(\d+)</span>", content)
-    failed_match = re.search(r"<label>✗ 失败</label>\s*<span>(\d+)</span>", content)
+    passed_match = re.search(r"<label>? 通过</label>\s*<span>(\d+)</span>", content)
+    failed_match = re.search(r"<label>? 失败</label>\s*<span>(\d+)</span>", content)
     error_match = re.search(r"<label>! 错误</label>\s*<span>(\d+)</span>", content)
     rate_match = re.search(r"<label>成功率</label>\s*<span>([^<]+)</span>", content)
     duration_match = re.search(r"<label>耗时</label>\s*<span>([^<]+)</span>", content)
@@ -1213,422 +975,8 @@ import time as _time
 _REPORTS_CACHE: Dict[str, Any] = {"data": None, "by_name": None, "ts": 0.0}
 _REPORTS_CACHE_TTL = 30  # 秒
 
-
-def _report_list_item(report: Dict[str, Any]) -> Dict[str, Any]:
-    summary = dict(report.get("summary") or {})
-    return {
-        "report_name": report.get("report_name", ""),
-        "generated_at": report.get("generated_at", ""),
-        "host_name": report.get("host_name", ""),
-        "collection_name": report.get("collection_name", ""),
-        "source_file": report.get("source_file", ""),
-        "source_original_file": report.get("source_original_file", ""),
-        "summary": {
-            "total": summary.get("total", 0),
-            "passed": summary.get("passed", 0),
-            "failed": summary.get("failed", 0),
-            "error": summary.get("error", 0),
-            "success_rate": summary.get("success_rate", "0%"),
-        },
-        "load_error": report.get("load_error", ""),
-        "legacy": bool(report.get("legacy", False)),
-    }
-
-
-def list_report_summaries() -> List[Dict[str, Any]]:
-    return [_report_list_item(report) for report in list_reports()]
-
-
-def _invalidate_reports_cache() -> None:
-    """新报告生成或回写时主动失效缓存。"""
-    _REPORTS_CACHE["data"] = None
-    _REPORTS_CACHE["by_name"] = None
-    _REPORTS_CACHE["ts"] = 0.0
-
-
-def list_reports() -> List[Dict[str, Any]]:
-    _now = _time.monotonic()
-    if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
-        return list(_REPORTS_CACHE["data"])
-
-    reports: List[Dict[str, Any]] = []
-    seen_report_names = set()
-
-    for meta_path in report_meta_files():
-        try:
-            report = load_report_meta(meta_path)
-            report["meta_file"] = meta_path.name
-            reports.append(report)
-            seen_report_names.add(report.get("report_name"))
-        except Exception as exc:
-            reports.append({
-                "report_name": meta_path.name,
-                "generated_at": "",
-                "host_name": "",
-                "collection_name": "",
-                "source_file": "",
-                "summary": {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"},
-                "load_error": str(exc),
-                "results": [],
-            })
-
-    for html_path in legacy_postman_html_files():
-        if html_path.name in seen_report_names:
-            continue
-        try:
-            reports.append(load_legacy_postman_report(html_path))
-        except Exception:
-            continue
-
-    # Final guard: regardless of data source, do not expose paged child reports.
-    reports = [item for item in reports if is_total_report_name(item.get("report_name", ""))]
-
-    reports.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
-
-    _REPORTS_CACHE["data"] = reports
-    _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
-    _REPORTS_CACHE["ts"] = _time.monotonic()
-    return list(reports)
-
-
-def find_report(report_name: str) -> Dict[str, Any]:
-    reports_by_name = _REPORTS_CACHE.get("by_name")
-    if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
-        list_reports()
-        reports_by_name = _REPORTS_CACHE.get("by_name")
-    if reports_by_name and report_name in reports_by_name:
-        return reports_by_name[report_name]
-    raise FileNotFoundError(report_name)
-
-
-def _safe_report_artifact(name: str) -> Optional[Path]:
-    normalized = Path(str(name or "").strip()).name
-    if not normalized:
-        return None
-    candidate = (REPORTS_DIR / normalized).resolve()
-    try:
-        candidate.relative_to(REPORTS_DIR)
-    except ValueError:
-        return None
-    return candidate
-
-
-def collect_report_artifacts(report: Dict[str, Any]) -> List[Path]:
-    artifacts: List[Path] = []
-    seen: set[str] = set()
-
-    for file_name in (
-        report.get("report_name", ""),
-        report.get("details_file", ""),
-        report.get("meta_file", ""),
-    ):
-        path = _safe_report_artifact(str(file_name or ""))
-        if path is not None and path.name not in seen:
-            artifacts.append(path)
-            seen.add(path.name)
-
-    report_name = str(report.get("report_name") or "").strip()
-    report_stem = Path(report_name).stem
-    if report_stem:
-        for page_path in sorted(REPORTS_DIR.glob(f"{report_stem}_page_*.html")):
-            resolved = page_path.resolve()
-            try:
-                resolved.relative_to(REPORTS_DIR)
-            except ValueError:
-                continue
-            if resolved.name not in seen:
-                artifacts.append(resolved)
-                seen.add(resolved.name)
-
-    return artifacts
-
-
-def map_results(report: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    return {item["key"]: item for item in report.get("results", [])}
-
-
-def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
-    left_map = map_results(left)
-    right_map = map_results(right)
-    left_keys = set(left_map.keys())
-    right_keys = set(right_map.keys())
-
-    added_keys = sorted(right_keys - left_keys)
-    removed_keys = sorted(left_keys - right_keys)
-    common_keys = sorted(left_keys & right_keys)
-    changed: List[Dict[str, Any]] = []
-
-    for key in common_keys:
-        before = left_map[key]
-        after = right_map[key]
-        if before.get("status") != after.get("status") or before.get("status_code") != after.get("status_code"):
-            changed.append({
-                "key": key,
-                "name": after.get("name") or before.get("name"),
-                "folder": after.get("folder") or before.get("folder"),
-                "method": after.get("method") or before.get("method"),
-                "url": after.get("url") or before.get("url"),
-                "before_status": before.get("status"),
-                "after_status": after.get("status"),
-                "before_status_code": before.get("status_code"),
-                "after_status_code": after.get("status_code"),
-            })
-
-    left_rate = _to_rate(left.get("summary", {}).get("success_rate", "0%"))
-    right_rate = _to_rate(right.get("summary", {}).get("success_rate", "0%"))
-    delta = right_rate - left_rate
-
-    return {
-        "left": left,
-        "right": right,
-        "summary": {
-            "added_count": len(added_keys),
-            "removed_count": len(removed_keys),
-            "changed_count": len(changed),
-            "success_rate_delta": round(delta, 2),
-            "success_rate_delta_text": f"{delta:+.2f}%",
-        },
-        "added": [right_map[key] for key in added_keys],
-        "removed": [left_map[key] for key in removed_keys],
-        "changed": changed,
-    }
-
-
-def _to_rate(value: str) -> float:
-    try:
-        return float(str(value).replace("%", ""))
-    except ValueError:
-        return 0.0
-
-
-def normalize_status_filter(value: str) -> Optional[str]:
-    normalized = str(value or "").strip().upper()
-    if normalized in {"", "ALL", "RESULT", "全部", "结果"}:
-        return None
-    if normalized in {"PASSED", "SUCCESS", "成功"}:
-        return "PASSED"
-    if normalized in {"FAILED", "FAIL", "失败"}:
-        return "FAILED"
-    if normalized in {"ERROR", "错误"}:
-        return "ERROR"
-    return None
-
-
-def clamp_page_size(value: Any) -> int:
-    try:
-        page_size = int(value)
-    except (TypeError, ValueError):
-        page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
-    return max(REPORT_VIEW_PAGE_SIZE_MIN, min(page_size, REPORT_VIEW_PAGE_SIZE_MAX))
-
-
-def clamp_page(value: Any) -> int:
-    try:
-        page = int(value)
-    except (TypeError, ValueError):
-        page = 1
-    return max(1, page)
-
-
-def clamp_run_results_per_page(value: Any) -> int:
-    try:
-        page_size = int(value)
-    except (TypeError, ValueError):
-        page_size = RUN_RESULTS_PER_PAGE_DEFAULT
-    return max(RUN_RESULTS_PER_PAGE_MIN, min(page_size, RUN_RESULTS_PER_PAGE_MAX))
-
-
-_RUN_JOBS_MAX = _cfg_int("RUN_JOBS_MAX", 200)
-
-
-def _evict_old_jobs() -> None:
-    """已在 RUN_JOBS_LOCK 持有下调用：超出上限时清理最早完成的任务。"""
-    if len(RUN_JOBS) <= _RUN_JOBS_MAX:
-        return
-    terminal_statuses = {"success", "failed"}
-    finished = [
-        jid for jid, job in RUN_JOBS.items()
-        if job.get("status") in terminal_statuses
-    ]
-    # 按写入顺序保留最新一半已完成任务
-    to_evict = finished[: max(0, len(finished) - _RUN_JOBS_MAX // 2)]
-    for jid in to_evict:
-        del RUN_JOBS[jid]
-
-
-def set_run_job(job_id: str, **updates: Any) -> None:
-    with RUN_JOBS_LOCK:
-        RUN_JOBS[job_id] = {**RUN_JOBS.get(job_id, {}), **updates}
-        _evict_old_jobs()
-
-
-def get_run_job(job_id: str) -> Optional[Dict[str, Any]]:
-    with RUN_JOBS_LOCK:
-        job = RUN_JOBS.get(job_id)
-        return dict(job) if job else None
-
-
-def run_postman_job(
-    job_id: str,
-    postman_file: str,
-    base_url: Optional[str],
-    output_dir: str,
-    token: Optional[str],
-    report_name: Optional[str],
-    source_original_file: Optional[str],
-    results_per_page: int,
-    selected_item_paths: Optional[List[List[int]]],
-) -> None:
-    set_run_job(job_id, status="running", message="正在执行接口测试...")
-    try:
-        from postman_api_tester.postman_api_tester import run_postman_tests
-
-        def on_progress(progress: Dict[str, Any]) -> None:
-            total = int(progress.get("total") or 0)
-            completed = int(progress.get("completed") or 0)
-            percent = int(progress.get("percent") or 0)
-            current_name = str(progress.get("current_name") or "")
-            current_method = str(progress.get("current_method") or "")
-            current_url = str(progress.get("current_url") or "")
-
-            message = "正在执行接口测试..."
-            if total > 0:
-                message = f"正在执行接口测试: {completed}/{total} ({percent}%)"
-                if current_name:
-                    message = f"{message}，当前接口: {current_name}"
-
-            set_run_job(
-                job_id,
-                status="running",
-                message=message,
-                total=total,
-                completed=completed,
-                percent=percent,
-                current_name=current_name,
-                current_method=current_method,
-                current_url=current_url,
-                last_status=str(progress.get("last_status") or ""),
-            )
-
-        report = run_postman_tests(
-            postman_file=postman_file,
-            base_url=base_url,
-            output_dir=output_dir,
-            token=token,
-            report_name=report_name,
-            source_original_file=source_original_file,
-            results_per_page=results_per_page,
-            selected_item_paths=selected_item_paths,
-            progress_callback=on_progress,
-        )
-        set_run_job(
-            job_id,
-            status="success",
-            message="执行完成，请刷新页面查看最新报告。",
-            report_name=os.path.basename(str(report.generated_report_file or "")),
-            report_meta_name=os.path.basename(str(report.generated_meta_file or "")),
-        )
-        # 新报告已生成，主动失效首页报告列表缓存
-        _invalidate_reports_cache()
-    except Exception as exc:
-        set_run_job(job_id, status="failed", message=str(exc))
-
-
-def load_report_details_map(report: Dict[str, Any]) -> Dict[str, Any]:
-    details_file = str(report.get("details_file") or "").strip()
-    if not details_file:
-        return {}
-    details_path = REPORTS_DIR / details_file
-    if not details_path.exists():
-        return {}
-    try:
-        with details_path.open("r", encoding="utf-8") as file:
-            details = json.load(file)
-        return details if isinstance(details, dict) else {}
-    except Exception:
-        return {}
-
-
-def _sanitize_export_name(name: str) -> str:
-    normalized = str(name or "").replace("\\", "/").split("/")[-1]
-    normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', normalized).strip(' .')
-    return normalized or "collection"
-
-
-def _apply_token_to_headers(headers: Dict[str, Any], token: str) -> Dict[str, Any]:
-    token = str(token or "").strip()
-    if not token:
-        return dict(headers or {})
-
-    fixed_headers = dict(headers or {})
-    auth_key = None
-    for key in list(fixed_headers.keys()):
-        lower_key = str(key).lower()
-        if lower_key == "authorization":
-            auth_key = key
-        if lower_key == "token":
-            fixed_headers.pop(key)
-    if auth_key:
-        fixed_headers[auth_key] = f"Bearer {token}"
-    else:
-        fixed_headers["token"] = token
-    return fixed_headers
-
-
-def _strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
-    cleaned: Dict[str, Any] = {}
-    for key, value in (headers or {}).items():
-        lower_key = str(key).lower()
-        if lower_key in {"authorization", "token", "access_token", "auth_token"}:
-            continue
-        cleaned[key] = value
-    return cleaned
-
-
-def _to_bool(value: Any, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "on"}:
-        return True
-    if text in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
-
-
-def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
-    if raw is None:
-        return []
-
-    data = raw
-    if isinstance(raw, str):
-        text = raw.strip()
-        if not text:
-            return []
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"selected_item_paths 不是有效 JSON: {exc}") from exc
-
-    if not isinstance(data, list):
-        raise ValueError("selected_item_paths 必须是二维数组。")
-
-    normalized: List[List[int]] = []
-    seen = set()
-    for item in data:
-        if not isinstance(item, list) or not item:
-            continue
-        if not all(isinstance(index, int) and index >= 0 for index in item):
-            raise ValueError("selected_item_paths 中每个路径都必须是非负整数数组。")
-        key = tuple(item)
-        if key in seen:
-            continue
-        seen.add(key)
-        normalized.append(list(item))
-    return normalized
-
+def is_total_report_name(report_name: str) -> bool:
+    return "_page_" not in str(report_name or "").lower()
 
 def _build_preview_url(url_obj: Any) -> str:
     if isinstance(url_obj, str):
@@ -1660,44 +1008,96 @@ def _build_preview_url(url_obj: Any) -> str:
     query_text = ("?" + "&".join(query_parts)) if query_parts else ""
     return f"{path_text}{query_text}" if path_text else query_text
 
+def _item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optional[Dict[str, Any]]:
+    if not isinstance(item_path, list) or not item_path:
+        return None
 
-def _extract_collection_preview_items(collection_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    result: List[Dict[str, Any]] = []
-    root_items = collection_data.get("item")
-    if not isinstance(root_items, list):
-        return result
+    items = collection_data.get("item")
+    if not isinstance(items, list):
+        return None
 
-    def walk(items: List[Any], folder_chain: List[str], path_prefix: List[int]) -> None:
-        for index, item in enumerate(items):
-            if len(result) >= COLLECTION_PREVIEW_MAX_ITEMS:
-                return
-            if not isinstance(item, dict):
-                continue
-            current_path = path_prefix + [index]
-            name = str(item.get("name") or "")
-            request_obj = item.get("request")
-            if isinstance(request_obj, dict):
-                method = str(request_obj.get("method") or "GET").upper()
-                url = _build_preview_url(request_obj.get("url"))
-                folder = " / ".join([x for x in folder_chain if x])
-                result.append({
-                    "index": len(result),
-                    "name": name,
-                    "folder": folder,
-                    "method": method,
-                    "url": url,
-                    "item_path": current_path,
-                    "item_path_text": ".".join(str(x) for x in current_path),
-                })
-                continue
+    current: Optional[Dict[str, Any]] = None
+    for depth, index in enumerate(item_path):
+        if not isinstance(index, int) or index < 0 or index >= len(items):
+            return None
+        current = items[index]
+        if depth < len(item_path) - 1:
+            child_items = current.get("item") if isinstance(current, dict) else None
+            if not isinstance(child_items, list):
+                return None
+            items = child_items
+    if not isinstance(current, dict):
+        return None
+    if "request" not in current:
+        return None
+    return current
 
-            children = item.get("item")
-            if isinstance(children, list):
-                walk(children, folder_chain + [name], current_path)
+def _find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    items = collection_data.get("item")
+    if not isinstance(items, list):
+        return None
 
-    walk(root_items, [], [])
-    return result
+    candidates = _iter_request_items(items)
+    name = str(result.get("name", ""))
+    method = str(result.get("method", "")).upper()
+    folder = str(result.get("folder", ""))
 
+    exact = [
+        row for row in candidates
+        if row["name"] == name and row["method"] == method and row["folder"] == folder
+    ]
+    if len(exact) == 1:
+        return exact[0]["item"]
+
+    loose = [row for row in candidates if row["name"] == name and row["method"] == method]
+    if len(loose) == 1:
+        return loose[0]["item"]
+    return None
+
+def _strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
+    cleaned: Dict[str, Any] = {}
+    for key, value in (headers or {}).items():
+        lower_key = str(key).lower()
+        if lower_key in {"authorization", "token", "access_token", "auth_token"}:
+            continue
+        cleaned[key] = value
+    return cleaned
+
+def _set_request_url(request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]) -> None:
+    merged_url = _merge_url_with_params(raw_url, params)
+    url_obj = request_obj.get("url")
+    if isinstance(url_obj, dict):
+        request_obj["url"]["raw"] = merged_url
+        request_obj["url"]["query"] = [
+            {"key": str(key), "value": "" if value is None else str(value)}
+            for key, value in (params or {}).items()
+        ]
+    else:
+        request_obj["url"] = merged_url
+
+def _set_request_headers(request_obj: Dict[str, Any], headers: Dict[str, Any]) -> None:
+    request_obj["header"] = [
+        {"key": str(key), "value": "" if value is None else str(value)}
+        for key, value in (headers or {}).items()
+    ]
+
+def _set_request_body(request_obj: Dict[str, Any], body: Any) -> None:
+    if body is None:
+        request_obj.pop("body", None)
+        return
+
+    if isinstance(body, (dict, list)):
+        request_obj["body"] = {
+            "mode": "raw",
+            "raw": json.dumps(body, ensure_ascii=False),
+            "options": {"raw": {"language": "json"}},
+        }
+        return
+
+    request_obj["body"] = {
+        "mode": "raw",
+        "raw": str(body),
+    }
 
 def _collect_report_item_paths(report: Dict[str, Any]) -> set:
     path_set = set()
@@ -1706,7 +1106,6 @@ def _collect_report_item_paths(report: Dict[str, Any]) -> set:
         if isinstance(path, list) and path and all(isinstance(i, int) and i >= 0 for i in path):
             path_set.add(tuple(path))
     return path_set
-
 
 def _prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: set) -> Dict[str, Any]:
     import copy
@@ -1739,85 +1138,48 @@ def _prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: 
     copied_collection["item"] = walk(root_items, [])
     return copied_collection
 
+def _sanitize_export_name(name: str) -> str:
+    normalized = str(name or "").replace("\\", "/").split("/")[-1]
+    normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', normalized).strip(' .')
+    return normalized or "collection"
 
-def _merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
-    raw_url = str(raw_url or "").strip()
-    if not params:
-        return raw_url
+def _safe_report_artifact(name: str) -> Optional[Path]:
+    normalized = Path(str(name or "").strip()).name
+    if not normalized:
+        return None
+    candidate = (REPORTS_DIR / normalized).resolve()
+    try:
+        candidate.relative_to(REPORTS_DIR)
+    except ValueError:
+        return None
+    return candidate
 
-    split = urlsplit(raw_url)
-    existing_pairs = parse_qsl(split.query, keep_blank_values=True)
-    merged = {key: value for key, value in existing_pairs}
-    for key, value in (params or {}).items():
-        merged[str(key)] = "" if value is None else str(value)
+def map_results(report: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {item["key"]: item for item in report.get("results", [])}
 
-    new_query = urlencode(merged, doseq=False)
-    return urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
+def _to_rate(value: str) -> float:
+    try:
+        return float(str(value).replace("%", ""))
+    except ValueError:
+        return 0.0
 
-
-def _set_request_url(request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]) -> None:
-    merged_url = _merge_url_with_params(raw_url, params)
-    url_obj = request_obj.get("url")
-    if isinstance(url_obj, dict):
-        request_obj["url"]["raw"] = merged_url
-        request_obj["url"]["query"] = [
-            {"key": str(key), "value": "" if value is None else str(value)}
-            for key, value in (params or {}).items()
-        ]
-    else:
-        request_obj["url"] = merged_url
-
-
-def _set_request_headers(request_obj: Dict[str, Any], headers: Dict[str, Any]) -> None:
-    request_obj["header"] = [
-        {"key": str(key), "value": "" if value is None else str(value)}
-        for key, value in (headers or {}).items()
+def _evict_old_jobs() -> None:
+    """已在 RUN_JOBS_LOCK 持有下调用：超出上限时清理最早完成的任务。"""
+    if len(RUN_JOBS) <= _RUN_JOBS_MAX:
+        return
+    terminal_statuses = {"success", "failed"}
+    finished = [
+        jid for jid, job in RUN_JOBS.items()
+        if job.get("status") in terminal_statuses
     ]
+    # 按写入顺序保留最新一半已完成任务
+    to_evict = finished[: max(0, len(finished) - _RUN_JOBS_MAX // 2)]
+    for jid in to_evict:
+        del RUN_JOBS[jid]
 
-
-def _set_request_body(request_obj: Dict[str, Any], body: Any) -> None:
-    if body is None:
-        request_obj.pop("body", None)
-        return
-
-    if isinstance(body, (dict, list)):
-        request_obj["body"] = {
-            "mode": "raw",
-            "raw": json.dumps(body, ensure_ascii=False),
-            "options": {"raw": {"language": "json"}},
-        }
-        return
-
-    request_obj["body"] = {
-        "mode": "raw",
-        "raw": str(body),
-    }
-
-
-def _item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optional[Dict[str, Any]]:
-    if not isinstance(item_path, list) or not item_path:
-        return None
-
-    items = collection_data.get("item")
-    if not isinstance(items, list):
-        return None
-
-    current: Optional[Dict[str, Any]] = None
-    for depth, index in enumerate(item_path):
-        if not isinstance(index, int) or index < 0 or index >= len(items):
-            return None
-        current = items[index]
-        if depth < len(item_path) - 1:
-            child_items = current.get("item") if isinstance(current, dict) else None
-            if not isinstance(child_items, list):
-                return None
-            items = child_items
-    if not isinstance(current, dict):
-        return None
-    if "request" not in current:
-        return None
-    return current
-
+def is_total_report_file(path: Path) -> bool:
+    name = path.name.lower()
+    return "_page_" not in name
 
 def _iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[Dict[str, Any]]:
     flattened: List[Dict[str, Any]] = []
@@ -1839,187 +1201,22 @@ def _iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[D
             flattened.extend(_iter_request_items(children, next_folder))
     return flattened
 
+def _merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
+    raw_url = str(raw_url or "").strip()
+    if not params:
+        return raw_url
 
-def _find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    items = collection_data.get("item")
-    if not isinstance(items, list):
-        return None
+    split = urlsplit(raw_url)
+    existing_pairs = parse_qsl(split.query, keep_blank_values=True)
+    merged = {key: value for key, value in existing_pairs}
+    for key, value in (params or {}).items():
+        merged[str(key)] = "" if value is None else str(value)
 
-    candidates = _iter_request_items(items)
-    name = str(result.get("name", ""))
-    method = str(result.get("method", "")).upper()
-    folder = str(result.get("folder", ""))
-
-    exact = [
-        row for row in candidates
-        if row["name"] == name and row["method"] == method and row["folder"] == folder
-    ]
-    if len(exact) == 1:
-        return exact[0]["item"]
-
-    loose = [row for row in candidates if row["name"] == name and row["method"] == method]
-    if len(loose) == 1:
-        return loose[0]["item"]
-    return None
-
-
-def export_collection_with_latest_params(
-    report: Dict[str, Any],
-    include_auth: bool = False,
-    export_scope: str = "full",
-) -> Dict[str, Any]:
-    source_file = str(report.get("source_file") or "").strip()
-    if not source_file:
-        raise ValueError("报告中缺少 source_file，无法导出。")
-
-    source_path = Path(source_file)
-    if not source_path.exists():
-        raise FileNotFoundError(f"找不到原始上传文件: {source_file}")
-
-    with source_path.open("r", encoding="utf-8") as f:
-        collection_data = json.load(f)
-
-    scope = str(export_scope or "full").strip().lower()
-    if scope not in {"full", "report_only"}:
-        scope = "full"
-    if scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
-        scope = "full"
-
-    details_map = load_report_details_map(report)
-    updated_count = 0
-    skipped_count = 0
-    warnings: List[str] = []
-
-    for index, result in enumerate(report.get("results", [])):
-        detail = details_map.get(str(index)) or {}
-        request_info = detail.get("request_info") or {}
-
-        item = _item_by_path(collection_data, result.get("item_path") or [])
-        if item is None:
-            item = _find_item_fallback(collection_data, result)
-            if item is None:
-                skipped_count += 1
-                warnings.append(f"索引 {index} 无法定位到原始请求: {result.get('name', '-')}")
-                continue
-
-        request_obj = item.setdefault("request", {})
-        if not isinstance(request_obj, dict):
-            skipped_count += 1
-            warnings.append(f"索引 {index} 的 request 结构异常: {result.get('name', '-')}")
-            continue
-
-        method = str(result.get("method") or request_obj.get("method") or "GET").upper()
-        url = str(result.get("url") or request_obj.get("url") or "").strip()
-        headers = dict(request_info.get("headers") or {})
-        if not include_auth:
-            headers = _strip_auth_headers(headers)
-        params = dict(request_info.get("params") or {})
-        body = request_info.get("body")
-
-        request_obj["method"] = method
-        _set_request_url(request_obj, url, params)
-        _set_request_headers(request_obj, headers)
-        _set_request_body(request_obj, body)
-        updated_count += 1
-
-    final_collection = collection_data
-    report_only_count = 0
-    if scope == "report_only":
-        selected_paths = _collect_report_item_paths(report)
-        if not selected_paths:
-            raise ValueError("当前报告缺少 item_path，无法执行“本次报告接口导出”。")
-        final_collection = _prune_collection_to_paths(collection_data, selected_paths)
-        pruned_items = _extract_collection_preview_items(final_collection)
-        report_only_count = len(pruned_items)
-
-    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    preferred_name = report.get("source_original_file") or source_path.name
-    source_name = _sanitize_export_name(preferred_name)
-    stem = Path(source_name).stem
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    suffix = "latest" if scope == "full" else "report_only"
-    export_name = f"{stem}_{suffix}_{timestamp}.json"
-    export_path = EXPORTS_DIR / export_name
-
-    with export_path.open("w", encoding="utf-8") as f:
-        json.dump(final_collection, f, indent=2, ensure_ascii=False)
-
-    return {
-        "file_name": export_name,
-        "file_path": str(export_path),
-        "updated_count": updated_count,
-        "skipped_count": skipped_count,
-        "export_scope": scope,
-        "report_only_count": report_only_count,
-        "warnings": warnings,
-    }
-
-
-def filter_report_results(
-    report: Dict[str, Any],
-    keyword: str,
-    status_filter: Optional[str],
-    message_keyword: str,
-    err_code_keyword: str,
-) -> List[Dict[str, Any]]:
-    lowered_keyword = str(keyword or "").strip().lower()
-    lowered_message_keyword = str(message_keyword or "").strip().lower()
-    lowered_err_code_keyword = str(err_code_keyword or "").strip().lower()
-    details_map = load_report_details_map(report)
-    filtered_items: List[Dict[str, Any]] = []
-
-    for index, item in enumerate(report.get("results", [])):
-        if status_filter and item.get("status") != status_filter:
-            continue
-        if lowered_keyword:
-            search_text = " ".join([
-                str(item.get("name", "")),
-                str(item.get("url", "")),
-                str(item.get("folder", "")),
-                str(item.get("key", "")),
-            ]).lower()
-            if lowered_keyword not in search_text:
-                continue
-        if lowered_message_keyword:
-            message_text = str(item.get("message", "")).lower()
-            if lowered_message_keyword not in message_text:
-                continue
-        if lowered_err_code_keyword:
-            err_code_text = str(item.get("err_code", "")).lower()
-            if lowered_err_code_keyword not in err_code_text:
-                continue
-        filtered_items.append({
-            "index": index,
-            "name": item.get("name", ""),
-            "folder": item.get("folder", ""),
-            "method": item.get("method", ""),
-            "url": item.get("url", ""),
-            "status": item.get("status", ""),
-            "status_code": item.get("status_code"),
-            "message": item.get("message", ""),
-            "err_code": item.get("err_code", ""),
-            "detail_available": str(index) in details_map,
-        })
-    return filtered_items
-
-
-def paginate_items(items: List[Dict[str, Any]], page: int, page_size: int) -> Dict[str, Any]:
-    total = len(items)
-    total_pages = max(1, (total + page_size - 1) // page_size)
-    current_page = min(page, total_pages)
-    start = (current_page - 1) * page_size
-    end = start + page_size
-    return {
-        "items": items[start:end],
-        "page": current_page,
-        "page_size": page_size,
-        "total": total,
-        "total_pages": total_pages,
-    }
-
+    new_query = urlencode(merged, doseq=False)
+    return urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
 
 def _extract_msg_errcode(body: Any) -> tuple:
-    """从响应 JSON body 中提取 message 和 errCode（兼容嵌套 data 层）。"""
+    """从 JSON body 中提取 message 和 errCode，兼容 data 嵌套结构。"""
     if not isinstance(body, dict):
         return "", ""
 
@@ -2047,13 +1244,150 @@ def _extract_msg_errcode(body: Any) -> tuple:
 
 
 def _compute_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """根据结果列表重新计算 summary（不含 duration/start_time/end_time）。"""
+    """按结果重算 summary，避免回写后统计字段不一致。"""
     total = len(results)
     passed = sum(1 for r in results if r.get("status") == "PASSED")
     failed = sum(1 for r in results if r.get("status") == "FAILED")
     error = sum(1 for r in results if r.get("status") == "ERROR")
     rate = f"{(passed / total * 100):.2f}%" if total > 0 else "0.00%"
     return {"total": total, "passed": passed, "failed": failed, "error": error, "success_rate": rate}
+
+
+def _update_report_meta(report_name: str, updater) -> Dict[str, Any]:
+    lock = get_report_write_lock(report_name)
+    with lock:
+        report = find_report(report_name)
+        meta_file_name = str(report.get("meta_file") or "").strip()
+        if not meta_file_name:
+            raise ValueError("报告缺少 meta_file，无法更新元数据。")
+        meta_path = REPORTS_DIR / meta_file_name
+        if not meta_path.exists():
+            raise FileNotFoundError(f"元数据文件不存在: {meta_file_name}")
+
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        if not isinstance(meta.get("manual_cases"), list):
+            meta["manual_cases"] = []
+        if not isinstance(meta.get("manual_exclusions"), list):
+            meta["manual_exclusions"] = []
+
+        updated_meta = updater(meta)
+        if not isinstance(updated_meta, dict):
+            raise ValueError("meta 更新回调必须返回 dict")
+
+        tmp_meta = meta_path.with_suffix(".tmp")
+        with tmp_meta.open("w", encoding="utf-8") as f:
+            json.dump(updated_meta, f, indent=2, ensure_ascii=False)
+        os.replace(str(tmp_meta), str(meta_path))
+
+        _invalidate_reports_cache()
+        return updated_meta
+
+
+def add_manual_case(report_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not ENABLE_MANUAL_CASES:
+        raise ValueError("当前环境未启用人工用例能力。")
+
+    case = _normalize_manual_case(payload, str(payload.get("folder") or MANUAL_CASE_FOLDER_NAME))
+    if not case.get("id"):
+        case["id"] = uuid.uuid4().hex
+    if not case.get("name"):
+        raise ValueError("name 不能为空")
+    if not case.get("url"):
+        raise ValueError("url 不能为空")
+
+    def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
+        manual_cases = [c for c in meta.get("manual_cases", []) if isinstance(c, dict)]
+        manual_cases.append(case)
+        meta["manual_cases"] = manual_cases
+        return meta
+
+    updated_meta = _update_report_meta(report_name, updater)
+    return {"case": case, "manual_cases": updated_meta.get("manual_cases", [])}
+
+
+def update_manual_case(report_name: str, case_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not ENABLE_MANUAL_CASES:
+        raise ValueError("当前环境未启用人工用例能力。")
+    case_id = str(case_id or "").strip()
+    if not case_id:
+        raise ValueError("case_id 不能为空")
+
+    holder: Dict[str, Any] = {}
+
+    def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
+        manual_cases = [c for c in meta.get("manual_cases", []) if isinstance(c, dict)]
+        found = False
+        updated: List[Dict[str, Any]] = []
+        for raw in manual_cases:
+            if str(raw.get("id") or "") != case_id:
+                updated.append(raw)
+                continue
+            merged = dict(raw)
+            merged.update(payload)
+            normalized = _normalize_manual_case(merged, str(merged.get("folder") or MANUAL_CASE_FOLDER_NAME))
+            normalized["id"] = case_id
+            updated.append(normalized)
+            holder["case"] = normalized
+            found = True
+        if not found:
+            raise FileNotFoundError(f"未找到指定人工用例: {case_id}")
+        meta["manual_cases"] = updated
+        return meta
+
+    updated_meta = _update_report_meta(report_name, updater)
+    return {"case": holder.get("case"), "manual_cases": updated_meta.get("manual_cases", [])}
+
+
+def delete_manual_case(report_name: str, case_id: str) -> Dict[str, Any]:
+    if not ENABLE_MANUAL_CASES:
+        raise ValueError("当前环境未启用人工用例能力。")
+    case_id = str(case_id or "").strip()
+    if not case_id:
+        raise ValueError("case_id 不能为空")
+
+    removed_key = ""
+
+    def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
+        nonlocal removed_key
+        manual_cases = [c for c in meta.get("manual_cases", []) if isinstance(c, dict)]
+        kept: List[Dict[str, Any]] = []
+        found = False
+        for item in manual_cases:
+            if str(item.get("id") or "") == case_id:
+                removed_key = _manual_case_exclusion_key(item)
+                found = True
+                continue
+            kept.append(item)
+        if not found:
+            raise FileNotFoundError(f"未找到指定人工用例: {case_id}")
+        meta["manual_cases"] = kept
+        # 删除人工用例时同步移除该用例对应的 exclusion 标记
+        exclusions = [x for x in _normalize_manual_exclusions(meta.get("manual_exclusions") or []) if x != removed_key]
+        meta["manual_exclusions"] = exclusions
+        return meta
+
+    updated_meta = _update_report_meta(report_name, updater)
+    return {"manual_cases": updated_meta.get("manual_cases", [])}
+
+
+def set_case_exclusion(report_name: str, exclusion_key: str, excluded: bool) -> Dict[str, Any]:
+    exclusion_key = str(exclusion_key or "").strip()
+    if not exclusion_key:
+        raise ValueError("exclusion_key 不能为空")
+
+    def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
+        exclusions = _normalize_manual_exclusions(meta.get("manual_exclusions") or [])
+        exclusion_set = set(exclusions)
+        if excluded:
+            exclusion_set.add(exclusion_key)
+        else:
+            exclusion_set.discard(exclusion_key)
+        meta["manual_exclusions"] = sorted(exclusion_set)
+        return meta
+
+    updated_meta = _update_report_meta(report_name, updater)
+    return {"manual_exclusions": updated_meta.get("manual_exclusions", [])}
 
 
 def patch_report_result(
@@ -2064,10 +1398,10 @@ def patch_report_result(
     new_response_info: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
-    原子写回 _meta.json 和 _details.json：
-    - 将 result_index 处的旧结果追加到 retry_history 后再覆盖
-    - 重新计算 summary（保留 duration/time 字段不变）
-    - 返回更新后的 summary
+    同步更新 _meta.json 与 _details.json。
+    - 按 result_index 覆盖主结果并保留 retry_history 追踪
+    - 自动重算 summary，保持 duration/time 等字段一致
+    - 返回最新 summary
     """
     lock = get_report_write_lock(report_name)
     with lock:
@@ -2091,12 +1425,12 @@ def patch_report_result(
         if result_index < 0 or result_index >= len(results):
             return {}
 
-        # 保留旧结果到 retry_history
+        # 记录本次重试历史到 retry_history
         old_result = dict(results[result_index])
         old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
         retry_history = old_history + [old_result]
 
-        # 构造写入 meta 的新结果（不含 request_info/response_info 避免 meta 膨胀）
+        # 若结果来自人工补录，则优先使用 meta 中保存的 request_info/response_info
         merged = {
             "name": old_result.get("name", ""),
             "folder": old_result.get("folder", ""),
@@ -2117,8 +1451,9 @@ def patch_report_result(
         results[result_index] = merged
         meta["results"] = results
 
-        # 重算 summary，保留不可重算的时间字段
+        # 更新 summary，确保统计值与结果集一致
         new_stats = _compute_summary(results)
+
         old_summary = meta.get("summary", {})
         meta["summary"] = {
             **old_summary,
@@ -2129,13 +1464,13 @@ def patch_report_result(
             "success_rate": new_stats["success_rate"],
         }
 
-        # 原子写 meta
+        # 回写 meta
         tmp_meta = meta_path.with_suffix(".tmp")
         with tmp_meta.open("w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2, ensure_ascii=False)
         os.replace(str(tmp_meta), str(meta_path))
 
-        # 原子写 details
+        # 回写 details
         details_file_name = str(report.get("details_file") or "").strip()
         if details_file_name:
             details_path = REPORTS_DIR / details_file_name
@@ -2155,6 +1490,9 @@ def patch_report_result(
                 json.dump(details, f, indent=2, ensure_ascii=False)
             os.replace(str(tmp_details), str(details_path))
 
+        # 统一使报告列表缓存失效，避免页面看到旧 summary / stats
+        _invalidate_reports_cache()
+
         return meta["summary"]
 
 
@@ -2164,6 +1502,8 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
         raise IndexError(result_index)
 
     result = dict(results[result_index])
+    exclusion_key = _result_exclusion_key(result)
+    exclusion_set = set(_normalize_manual_exclusions(report.get("manual_exclusions") or []))
     details_map = load_report_details_map(report)
     detail = details_map.get(str(result_index))
     response = {
@@ -2172,6 +1512,7 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
         "folder": result.get("folder", ""),
         "method": result.get("method", ""),
         "url": result.get("url", ""),
+        "actual_request_url": result.get("actual_request_url", ""),
         "item_path": result.get("item_path", []),
         "expected_status": result.get("expected_status", 200),
         "status": result.get("status", ""),
@@ -2180,6 +1521,8 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
         "err_code": result.get("err_code", ""),
         "retried": result.get("retried", False),
         "retry_history": result.get("retry_history", []),
+        "excluded": exclusion_key in exclusion_set,
+        "exclusion_key": exclusion_key,
         "detail_available": bool(detail),
         "request_info": {"headers": {}, "params": {}, "body": None},
         "response_info": {"headers": {}, "body": None},
@@ -2192,7 +1535,7 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
 
 @app.route("/health")
 def health():
-    """健康检查端点，供负载均衡或监控系统探测服务存活状态。"""
+    """健康检查端点，用于监控系统存活状态。"""
     return jsonify({"status": "ok", "timestamp": datetime.now().isoformat()})
 
 
@@ -2200,9 +1543,8 @@ def health():
 def index():
     reports = list_report_summaries()
     port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
-    return render_with_fallback(
+    return render_template(
         "index.html",
-        INDEX_TEMPLATE,
         host_name=socket.gethostname(),
         self_url=f"http://127.0.0.1:{port}",
         lan_url=f"http://{get_local_ip()}:{port}",
@@ -2228,15 +1570,17 @@ def report_view():
     try:
         report = find_report(report_name)
     except FileNotFoundError:
-        return render_with_fallback(
-            "report_not_found.html",
-            "<h3>报告不存在</h3><p>{{ name }}</p>",
-            name=report_name,
-        ), 404
+        return render_template("report_not_found.html", name=report_name), 404
 
-    return render_with_fallback(
+    template_updated_at = "-"
+    try:
+        template_path = (PROJECT_ROOT / "templates" / "report_view.html").resolve()
+        template_updated_at = datetime.fromtimestamp(template_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        template_updated_at = "-"
+
+    html = render_template(
         "report_view.html",
-        REPORT_VIEW_TEMPLATE,
         report_name=report.get("report_name", ""),
         report_name_json=json.dumps(report.get("report_name", ""), ensure_ascii=False),
         collection_name=report.get("collection_name", ""),
@@ -2247,7 +1591,16 @@ def report_view():
         report_export_default_scope=REPORT_EXPORT_DEFAULT_SCOPE,
         report_export_allow_report_only=REPORT_EXPORT_ALLOW_REPORT_ONLY,
         report_export_include_auth_default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT,
+        enable_manual_cases=ENABLE_MANUAL_CASES,
+        manual_case_folder_name=MANUAL_CASE_FOLDER_NAME,
+        template_updated_at=template_updated_at,
     )
+    response = make_response(html)
+    # 避免浏览器缓存旧版页面，确保模板改动即时生效。
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/reports/<path:filename>")
@@ -2272,11 +1625,11 @@ def api_collection_preview():
 
     collection_file = request.files.get("collection_file")
     if not collection_file or not str(collection_file.filename or "").strip():
-        return jsonify({"error": "请先上传 Postman JSON 文件。"}), 400
+        return jsonify({"error": "请上传有效的 Postman JSON 文件"}), 400
 
     original_name = str(collection_file.filename or "").strip()
     if not original_name.lower().endswith(".json"):
-        return jsonify({"error": "仅支持上传 .json 文件。"}), 400
+        return jsonify({"error": "上传文件必须是 .json 格式"}), 400
 
     try:
         collection_data = json.load(collection_file.stream)
@@ -2331,6 +1684,9 @@ def api_export_collection():
         "download_url": f"/exports/{exported['file_name']}",
         "updated_count": exported["updated_count"],
         "skipped_count": exported["skipped_count"],
+        "manual_case_count": exported.get("manual_case_count", 0),
+        "manual_case_exported_count": exported.get("manual_case_exported_count", 0),
+        "excluded_count": exported.get("excluded_count", 0),
         "include_auth": include_auth,
         "export_scope": exported["export_scope"],
         "report_only_count": exported["report_only_count"],
@@ -2344,6 +1700,126 @@ def api_report_detail(report_name: str):
         return jsonify(find_report(report_name))
     except FileNotFoundError:
         return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+
+@app.route("/api/manual-cases/<path:report_name>")
+def api_manual_cases(report_name: str):
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    manual_cases = [
+        _normalize_manual_case(case, str(case.get("folder") or MANUAL_CASE_FOLDER_NAME))
+        for case in (report.get("manual_cases") or [])
+        if isinstance(case, dict)
+    ]
+    manual_exclusions = _normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    exclusion_set = set(manual_exclusions)
+    response_cases = []
+    for case in manual_cases:
+        key = _manual_case_exclusion_key(case)
+        response_cases.append({
+            **case,
+            "exclusion_key": key,
+            "excluded": key in exclusion_set,
+        })
+    return jsonify({
+        "report_name": report_name,
+        "enabled": ENABLE_MANUAL_CASES,
+        "default_folder": MANUAL_CASE_FOLDER_NAME,
+        "manual_cases": response_cases,
+        "manual_exclusions": manual_exclusions,
+    })
+
+
+@app.route("/api/manual-cases/add", methods=["POST"])
+def api_manual_case_add():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name") or "").strip()
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+    case_payload = dict(payload.get("case") or {})
+    if not case_payload:
+        return jsonify({"error": "case 不能为空"}), 400
+    try:
+        result = add_manual_case(report_name, case_payload)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "report_name": report_name,
+        "case": result.get("case"),
+        "manual_cases": result.get("manual_cases", []),
+    })
+
+
+@app.route("/api/manual-cases/update", methods=["PUT"])
+def api_manual_case_update():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name") or "").strip()
+    case_id = str(payload.get("case_id") or "").strip()
+    case_payload = dict(payload.get("case") or {})
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+    if not case_id:
+        return jsonify({"error": "case_id 不能为空"}), 400
+    try:
+        result = update_manual_case(report_name, case_id, case_payload)
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "report_name": report_name,
+        "case": result.get("case"),
+        "manual_cases": result.get("manual_cases", []),
+    })
+
+
+@app.route("/api/manual-cases/delete", methods=["DELETE"])
+def api_manual_case_delete():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name") or "").strip()
+    case_id = str(payload.get("case_id") or "").strip()
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+    if not case_id:
+        return jsonify({"error": "case_id 不能为空"}), 400
+    try:
+        result = delete_manual_case(report_name, case_id)
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "report_name": report_name,
+        "manual_cases": result.get("manual_cases", []),
+    })
+
+
+@app.route("/api/report-case-exclusion", methods=["POST"])
+def api_report_case_exclusion():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name") or "").strip()
+    exclusion_key = str(payload.get("exclusion_key") or "").strip()
+    excluded = _to_bool(payload.get("excluded"), default=True)
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+    if not exclusion_key:
+        return jsonify({"error": "exclusion_key 不能为空"}), 400
+    try:
+        result = set_case_exclusion(report_name, exclusion_key, excluded)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({
+        "report_name": report_name,
+        "excluded": excluded,
+        "manual_exclusions": result.get("manual_exclusions", []),
+    })
 
 
 @app.route("/api/report-delete/<path:report_name>", methods=["DELETE"])
@@ -2361,7 +1837,7 @@ def api_report_delete(report_name: str):
             deleted_files.append(artifact.name)
 
     _invalidate_reports_cache()
-    logger.info("已删除报告及关联文件: report=%s files=%s", report_name, deleted_files)
+    logger.info("删除报告产物成功: report=%s files=%s", report_name, deleted_files)
     return jsonify({
         "success": True,
         "report_name": report_name,
@@ -2382,7 +1858,15 @@ def api_report_results(report_name: str):
     message_keyword = request.args.get("message_query", "")
     err_code_keyword = request.args.get("err_code_query", "")
     status_filter = normalize_status_filter(request.args.get("status", "all"))
-    filtered_items = filter_report_results(report, keyword, status_filter, message_keyword, err_code_keyword)
+    include_excluded = _to_bool(request.args.get("include_excluded"), default=True)
+    filtered_items = filter_report_results(
+        report,
+        keyword,
+        status_filter,
+        message_keyword,
+        err_code_keyword,
+        include_excluded=include_excluded,
+    )
     paged = paginate_items(filtered_items, page, page_size)
     paged.update({
         "report_name": report.get("report_name", ""),
@@ -2390,6 +1874,7 @@ def api_report_results(report_name: str):
         "message_query": message_keyword,
         "err_code_query": err_code_keyword,
         "status": status_filter or "all",
+        "include_excluded": include_excluded,
     })
     return jsonify(paged)
 
@@ -2427,7 +1912,7 @@ def test_token():
     token = str(payload.get("token", "")).strip()
     if not token:
         return jsonify({"success": False, "message": "token 不能为空"}), 400
-    return jsonify({"success": True, "message": "已接收 token，可用于重新请求。"})
+    return jsonify({"success": True, "message": "token 格式有效，可用于后续请求"})
 
 
 @app.route("/re-request-api", methods=["POST"])
@@ -2439,7 +1924,7 @@ def re_request_api():
     params = dict(payload.get("params") or {})
     body = payload.get("body")
     token = str(payload.get("token", "")).strip()
-    # 回写相关字段（可选，不影响原有不传这几个字段的调用路径）
+    # 是否将重试结果回写到报告文件
     save_to_report = bool(payload.get("save_to_report", False))
     rpt_name = str(payload.get("report_name", "")).strip()
     rpt_index_raw = payload.get("result_index")
@@ -2470,8 +1955,9 @@ def re_request_api():
             response_body: Any = response.json()
         except ValueError:
             response_body = response.text
+        actual_request_url = str(getattr(response.request, "url", "") or "")
 
-        # 应用与执行层一致的业务判定规则
+        # 读取响应中的 message/errCode 作为判定依据
         response_message, err_code = _extract_msg_errcode(response_body)
         status_code_ok = response.status_code == expected_status
         normalized_msg = str(response_message or "").strip().lower()
@@ -2483,9 +1969,9 @@ def re_request_api():
         else:
             result_status = "FAILED"
             if not status_code_ok:
-                result_message = f"期望状态码: {expected_status}, 实际: {response.status_code}; message: {response_message}"
+                result_message = f"状态码不匹配: 期望 {expected_status}, 实际 {response.status_code}; message: {response_message}"
             else:
-                result_message = f"message 不满足成功条件(应为空或 success), 实际返回: {response_message}"
+                result_message = f"message 校验未通过(期望为空或 success), 实际为: {response_message}"
 
         new_request_info = {"headers": headers, "params": params, "body": body}
         new_response_info = {"headers": dict(response.headers), "body": response_body}
@@ -2493,6 +1979,7 @@ def re_request_api():
         result_fields = {
             "method": method,
             "url": url,
+            "actual_request_url": actual_request_url,
             "item_path": payload.get("item_path", []),
             "expected_status": expected_status,
             "status": result_status,
@@ -2510,6 +1997,7 @@ def re_request_api():
             "folder": payload.get("folder", ""),
             "method": method,
             "url": url,
+            "actual_request_url": actual_request_url,
             **result_fields,
             "request_info": new_request_info,
             "response_info": new_response_info,
@@ -2522,6 +2010,7 @@ def re_request_api():
             "folder": payload.get("folder", ""),
             "method": method,
             "url": url,
+            "actual_request_url": url,
             "status": "ERROR",
             "status_code": None,
             "message": str(exc),
@@ -2533,28 +2022,74 @@ def re_request_api():
         })
 
 
+@app.route("/api/proxy-request", methods=["POST"])
+def api_proxy_request():
+    """代理执行 HTTP 请求，供人工用例「发送」功能调用。仅允许 http/https。"""
+    from urllib.parse import urlparse as _up
+    payload = request.get_json(silent=True) or {}
+    url = str(payload.get("url") or "").strip()
+    method = str(payload.get("method") or "GET").upper()
+    req_headers = dict(payload.get("headers") or {})
+    req_params = dict(payload.get("params") or {})
+    req_body = payload.get("body")
+    if not url:
+        return jsonify({"error": "url 不能为空"}), 400
+    _parsed = _up(url)
+    if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
+        return jsonify({"error": "url 仅允许合法的 http/https 地址"}), 400
+    try:
+        import postman_api_tester.config as _cfg
+        connect_timeout = int(getattr(_cfg, "REQUEST_CONNECT_TIMEOUT", 10))
+        read_timeout = int(getattr(_cfg, "REQUEST_READ_TIMEOUT", 30))
+    except Exception:
+        connect_timeout, read_timeout = 10, 30
+    try:
+        t0 = _time.time()
+        resp = requests.request(
+            method=method,
+            url=url,
+            headers=req_headers,
+            params=req_params,
+            json=req_body if req_body is not None else None,
+            timeout=(connect_timeout, read_timeout),
+        )
+        elapsed_ms = round((_time.time() - t0) * 1000)
+        try:
+            response_body: Any = resp.json()
+        except ValueError:
+            response_body = resp.text
+        return jsonify({
+            "status_code": resp.status_code,
+            "elapsed_ms": elapsed_ms,
+            "response_headers": dict(resp.headers),
+            "response_body": response_body,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.route("/api/run-postman", methods=["POST"])
 def api_run_postman():
     collection_file = request.files.get("collection_file")
     if not collection_file or not str(collection_file.filename or "").strip():
-        return jsonify({"error": "请先上传 Postman JSON 文件。"}), 400
+        return jsonify({"error": "请上传有效的 Postman JSON 文件"}), 400
 
     original_name = str(collection_file.filename or "").strip()
     if not original_name.lower().endswith(".json"):
-        return jsonify({"error": "仅支持上传 .json 文件。"}), 400
+        return jsonify({"error": "上传文件必须是 .json 格式"}), 400
 
-    # 清洗原始文件名：仅保留合法字符，防止路径穿越和注入风险
+    # 清洗文件名，避免路径穿越或注入
     import re as _re
     _safe_name = _re.sub(r'[^\w\u4e00-\u9fff\-. ()（）【】]', '_', original_name).strip('. ')
     original_name = _safe_name if _safe_name else "collection.json"
 
     base_url = str(request.form.get("base_url", "")).strip() or None
-    # 校验 base_url 格式，防止 SSRF：仅允许 http/https，禁止 file://、ftp:// 等
+    # 严格校验 base_url，仅允许 http/https，阻断 SSRF 风险
     if base_url is not None:
         from urllib.parse import urlparse as _urlparse
         _parsed = _urlparse(base_url)
         if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
-            return jsonify({"error": "base_url 格式无效，仅支持 http/https 协议。"}), 400
+            return jsonify({"error": "base_url 仅允许合法的 http/https 地址"}), 400
     token = str(request.form.get("token", "")).strip() or None
     output_dir = str(request.form.get("output_dir", "")).strip() or str(REPORTS_DIR)
     report_name = str(request.form.get("report_name", "")).strip() or None
@@ -2568,7 +2103,7 @@ def api_run_postman():
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         if not selected_item_paths:
-            return jsonify({"error": "已选择“仅执行已选接口”，但未提供可执行接口路径。"}), 400
+            return jsonify({"error": "选择了仅执行已选接口，但未提供有效 selected_item_paths"}), 400
 
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     suffix = Path(original_name).suffix or ".json"
@@ -2580,7 +2115,7 @@ def api_run_postman():
         job_id,
         id=job_id,
         status="queued",
-        message="任务已创建，等待执行。",
+        message="任务已入队，等待执行。",
         total=0,
         completed=0,
         percent=0,
@@ -2613,7 +2148,7 @@ def api_run_postman():
     return jsonify({
         "job_id": job_id,
         "status": "queued",
-        "message": "任务已启动，请稍后查看执行状态。",
+        "message": "任务已创建，请轮询状态接口获取执行进度。",
     })
 
 
@@ -2640,7 +2175,6 @@ if __name__ == "__main__":
     print(f"报告目录: {REPORTS_DIR}")
     logger.info("报告服务启动: http://127.0.0.1:%d", port)
     logger.info("局域网访问地址: http://%s:%d", get_local_ip(), port)
-    logger.info("当前模板模式: %s", _TEMPLATE_MODE)
     try:
         from waitress import serve
         logger.info("使用 waitress WSGI 服务器（生产模式）")

@@ -46,14 +46,6 @@ REQUEST_READ_TIMEOUT = int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))
 RUN_JOBS_MAX = int(os.environ.get("RUN_JOBS_MAX", "200"))
 
 # ==============================================================
-# 报告服务模板渲染模式
-# 可选值："inline" 或 "external"
-# - inline: 使用内嵌模板（更稳妥）
-# - external: 优先使用 templates/*.html，失败自动降级 inline
-# ==============================================================
-REPORT_TEMPLATE_MODE = str(os.environ.get("REPORT_TEMPLATE_MODE", "external")).strip().lower() or "inline"
-
-# ==============================================================
 # 运行页与结果页分页配置（集中管理）
 # ============================================================== 
 RUN_RESULTS_PER_PAGE_DEFAULT = int(os.environ.get("RUN_RESULTS_PER_PAGE_DEFAULT", "30"))
@@ -92,3 +84,13 @@ REPORT_EXPORT_ALLOW_REPORT_ONLY = str(os.environ.get("REPORT_EXPORT_ALLOW_REPORT
 REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = str(os.environ.get("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", "false")).strip().lower() in {
 	"1", "true", "yes", "y", "on"
 }
+
+# ==============================================================
+# 人工用例管理配置
+# ENABLE_MANUAL_CASES: 是否启用报告页人工用例能力
+# MANUAL_CASE_FOLDER_NAME: 人工用例默认目录名称（可在页面手动修改）
+# ==============================================================
+ENABLE_MANUAL_CASES = str(os.environ.get("ENABLE_MANUAL_CASES", "true")).strip().lower() in {
+	"1", "true", "yes", "y", "on"
+}
+MANUAL_CASE_FOLDER_NAME = str(os.environ.get("MANUAL_CASE_FOLDER_NAME", "人工补录")).strip() or "人工补录"

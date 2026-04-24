@@ -10,6 +10,16 @@
         .hero h1 { margin: 0 0 8px; font-size: 28px; word-break: break-all; }
         .hero p { margin: 4px 0; opacity: 0.92; }
         .hero a { color: #bfdbfe; }
+        .hero-version { margin-top: 8px; }
+        .version-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(191, 219, 254, 0.45);
+            background: rgba(15, 23, 42, 0.2);
+            color: #dbeafe;
+            font-size: 12px;
+        }
         .summary-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); margin-top: 18px; }
         .summary-card { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px; padding: 12px 14px; }
         .summary-card .label { font-size: 12px; opacity: 0.85; }
@@ -20,7 +30,8 @@
         .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
         .toolbar button.secondary { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
         .toolbar .hint { color: #64748b; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1100px; }
+        .table-scroll { width: 100%; overflow-x: auto; }
         th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
         th { color: #475569; font-size: 13px; background: #f8fafc; }
         tr:hover { background: #f0f9ff; }
@@ -85,6 +96,67 @@
         .history-list { margin-top: 8px; border-left: 3px solid #fde68a; padding-left: 12px; }
         .history-item { font-size: 12px; margin-bottom: 6px; color: #374151; }
         .retried-badge { display: inline-block; background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; border-radius: 999px; font-size: 11px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+        .excluded-row { opacity: 0.55; }
+        .excluded-row td { text-decoration: line-through; }
+        .manual-panel { margin-top: 20px; }
+        .manual-head { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .manual-head h3 { margin: 0; font-size: 16px; }
+        .manual-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .manual-field { display: flex; flex-direction: column; gap: 6px; }
+        .manual-field label { font-size: 12px; color: #475569; }
+        .manual-field .hint { font-size: 11px; color: #64748b; }
+        .manual-field input, .manual-field select, .manual-field textarea { width: 100%; box-sizing: border-box; }
+        .manual-group-title { margin: 8px 0 4px; font-size: 12px; color: #334155; font-weight: 700; }
+        .manual-form textarea { min-height: 96px; font-family: Consolas, monospace; font-size: 12px; }
+        .manual-form .wide { grid-column: 1 / -1; }
+        .manual-actions { display: flex; gap: 8px; align-items: center; }
+        /* 三段式编辑器 */
+        .mc-response-panel { background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 14px; margin-top: 12px; }
+        .mc-response-panel h5 { margin: 0 0 10px; font-size: 13px; color: #166534; }
+        .mc-save-confirm { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px; margin-top: 10px; }
+        .mc-save-confirm h5 { margin: 0 0 10px; font-size: 13px; color: #92400e; }
+        .mc-result-selector { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
+        .mc-result-selector label { display: flex; gap: 6px; align-items: center; cursor: pointer; font-size: 13px; }
+        .mc-status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; margin-right: 8px; }
+        .mc-status-badge.s2xx { background: #dcfce7; color: #166534; }
+        .mc-status-badge.s4xx { background: #fee2e2; color: #991b1b; }
+        .mc-status-badge.s5xx { background: #ffedd5; color: #9a3412; }
+        .mc-status-badge.serr { background: #f1f5f9; color: #475569; }
+        /* 基础紧凑按钮 */
+        .btn-compact {
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-compact:hover {
+            background: #e2e8f0;
+            border-color: #94a3b8;
+        }
+        .btn-compact:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* 列表内联排除按钮 */
+        .btn-exclude { padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 11px; cursor: pointer; white-space: nowrap; }
+        .btn-exclude:hover { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+        .btn-exclude.is-excluded { background: #fef9c3; border-color: #fde68a; color: #854d0e; }
+        .btn-exclude.is-excluded:hover { background: #dcfce7; border-color: #86efac; color: #166534; }
+        /* 操作列容器 */
+        td.td-op {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+            justify-content: flex-start;
+        }
+        .manual-table { table-layout: fixed; }
     </style>
 </head>
 <body>
@@ -101,6 +173,7 @@
                 |
                 <a href="/api/report-meta/{{ report_name }}" target="_blank">查看元数据</a>
             </p>
+            <div class="hero-version"><span class="version-badge">页面模板更新时间: {{ template_updated_at or '-' }}</span></div>
             <div class="summary-grid">
                 <div class="summary-card"><div class="label">总计</div><div class="value" id="sum-total">{{ summary.total }}</div></div>
                 <div class="summary-card"><div class="label">通过</div><div class="value" id="sum-passed">{{ summary.passed }}</div></div>
@@ -141,11 +214,27 @@
                     <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;" {% if report_export_include_auth_default %}checked{% endif %}>
                     导出包含 token/authorization
                 </label>
+                <label class="hint" style="display:flex;align-items:center;gap:6px;">
+                    <input id="includeExcludedToggle" type="checkbox" style="width:14px;height:14px;" checked>
+                    显示已排除用例
+                </label>
                 <span class="hint">默认 20 条/页，最高 100 条/页</span>
             </div>
             <div id="resultTableContainer" class="loading">加载报告数据中...</div>
             <div id="pagerInfo" class="pager-info"></div>
             <div id="pagination" class="pagination"></div>
+        </section>
+
+        <section class="panel manual-panel" id="manualCasesPanel" {% if not enable_manual_cases %}style="display:none;"{% endif %}>
+            <div class="manual-head">
+                <h3>人工用例管理</h3>
+                <div class="manual-actions">
+                    <button class="secondary" onclick="renderManualEditor()">新增人工用例</button>
+                    <button class="secondary" onclick="reloadManualCases()">刷新</button>
+                </div>
+            </div>
+            <div id="manualEditor" style="display:none;"></div>
+            <div id="manualCasesTable" class="loading">加载人工用例中...</div>
         </section>
     </div>
 
@@ -158,6 +247,8 @@
                 </div>
                 <div class="detail-actions">
                     <button id="editRetryBtn" class="retry-btn" style="display:none;" onclick="openEditRetry()">编辑重试</button>
+                    <button id="saveManualBtn" class="secondary" style="display:none;" onclick="saveCurrentAsManualCase()">保存为人工用例</button>
+                    <button id="excludeCaseBtn" class="secondary" style="display:none;" onclick="toggleCurrentCaseExclusion()">排除此用例</button>
                     <button onclick="closeDetail()">关闭</button>
                 </div>
             </div>
@@ -170,8 +261,29 @@
 const reportName = {{ report_name_json|safe }};
 const REPORT_VIEW_PAGE_SIZE_DEFAULT = {{ report_view_page_size_default }};
 const REPORT_EXPORT_DEFAULT_SCOPE = {{ report_export_default_scope|tojson }};
+const ENABLE_MANUAL_CASES = {{ enable_manual_cases|tojson }};
+const MANUAL_CASE_FOLDER_NAME = {{ manual_case_folder_name|tojson }};
 let currentDetailData = null;
 let currentDetailIndex = null;
+let currentResultsPage = 1;
+let manualCases = [];
+let manualExclusions = new Set();
+let _mcLastResponse = null;
+let _mcEditingCase = null;
+
+const REPORT_TABLE_COLGROUP = `
+    <colgroup>
+        <col style="width:12%">
+        <col style="width:9%">
+        <col style="width:80px">
+        <col style="width:20%">
+        <col style="width:72px">
+        <col style="width:60px">
+        <col>
+        <col style="width:120px">
+        <col style="width:180px">
+    </colgroup>
+`;
 
 const PREVIEW_RENDER_LIMITS = {
     nodeLimit: 1200,
@@ -290,12 +402,88 @@ function formatJsonLimited(value, limits) {
     return { text, truncated };
 }
 
+function buildActualRequestUrl(data) {
+    const actual = String((data.actual_request_url || '')).trim();
+    if (actual) {
+        return actual;
+    }
+
+    const rawUrl = String((data.url || '')).trim();
+    if (!rawUrl) {
+        return '';
+    }
+
+    const reqInfo = data.request_info || {};
+    const params = reqInfo.params;
+    if (!params || typeof params !== 'object') {
+        return rawUrl;
+    }
+
+    const pairs = [];
+    const pushPair = (k, v) => {
+        if (k === undefined || k === null || k === '') {
+            return;
+        }
+        if (Array.isArray(v)) {
+            v.forEach((item) => pushPair(k, item));
+            return;
+        }
+        const key = encodeURIComponent(String(k));
+        const value = v === undefined || v === null ? '' : encodeURIComponent(String(v));
+        pairs.push(`${key}=${value}`);
+    };
+
+    if (Array.isArray(params)) {
+        params.forEach((entry) => {
+            if (Array.isArray(entry) && entry.length >= 2) {
+                pushPair(entry[0], entry[1]);
+            } else if (entry && typeof entry === 'object') {
+                pushPair(entry.key, entry.value);
+            }
+        });
+    } else {
+        Object.entries(params).forEach(([k, v]) => pushPair(k, v));
+    }
+
+    if (pairs.length === 0) {
+        return rawUrl;
+    }
+    return rawUrl + (rawUrl.includes('?') ? '&' : '?') + pairs.join('&');
+}
+
 function renderDetailMeta(data) {
     const meta = document.getElementById('detailMeta');
+    const actualRequestUrl = buildActualRequestUrl(data) || '-';
     meta.innerHTML = `
         <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'}</div>
-        <div class="detail-meta-row detail-meta-url">${escapeHtml(data.url || '-')}</div>
+        <div class="detail-meta-row detail-meta-url">配置 URL: ${escapeHtml(data.url || '-')}</div>
+        <div class="detail-meta-row detail-meta-url">实际请求 URL: ${escapeHtml(actualRequestUrl)}</div>
     `;
+}
+
+function renderDetailPanels(data) {
+    const reqInfo = data.request_info || {};
+    const respInfo = data.response_info || {};
+
+    const reqHeadersPre = document.getElementById('reqHeadersPre');
+    const reqParamsPre = document.getElementById('reqParamsPre');
+    const reqBodyPre = document.getElementById('reqBodyPre');
+    const respHeadersPre = document.getElementById('respHeadersPre');
+
+    if (reqHeadersPre) {
+        reqHeadersPre.textContent = formatJson(reqInfo.headers);
+    }
+    if (reqParamsPre) {
+        reqParamsPre.textContent = formatJson(reqInfo.params);
+    }
+    if (reqBodyPre) {
+        reqBodyPre.textContent = formatJson(reqInfo.body);
+    }
+    if (respHeadersPre) {
+        respHeadersPre.textContent = formatJson(respInfo.headers);
+    }
+
+    renderResponseBody(respInfo.body, 'preview');
 }
 
 function renderResponseBody(body, mode = 'preview') {
@@ -345,11 +533,13 @@ function currentFilters() {
         messageQuery: document.getElementById('messageInput').value.trim(),
         errCodeQuery: document.getElementById('errCodeInput').value.trim(),
         status: document.getElementById('statusSelect').value,
-        pageSize: document.getElementById('pageSizeSelect').value
+        pageSize: document.getElementById('pageSizeSelect').value,
+        includeExcluded: document.getElementById('includeExcludedToggle').checked
     };
 }
 
 async function reloadResults(page = 1) {
+    currentResultsPage = page;
     const filters = currentFilters();
     const params = new URLSearchParams({
         page: String(page),
@@ -357,7 +547,8 @@ async function reloadResults(page = 1) {
         query: filters.query,
         message_query: filters.messageQuery,
         err_code_query: filters.errCodeQuery,
-        status: filters.status
+        status: filters.status,
+        include_excluded: filters.includeExcluded ? 'true' : 'false'
     });
     document.getElementById('resultTableContainer').innerHTML = '<div class="loading">加载报告数据中...</div>';
     const response = await fetch(`/api/report-results/${encodeURIComponent(reportName)}?${params.toString()}`);
@@ -373,48 +564,46 @@ function renderResults(data) {
         return;
     }
 
-    const rows = data.items.map((item) => `
-        <tr>
+    const rows = data.items.map((item) => {
+        const exKey = encodeURIComponent(item.exclusion_key || '');
+        const excluded = Boolean(item.excluded);
+        const excludeBtn = item.exclusion_key
+            ? `<button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" onclick="toggleResultExclusion('${exKey}', ${excluded})" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>`
+            : '';
+        return `
+        <tr class="${excluded ? 'excluded-row' : ''}" title="${excluded ? '已排除（导出时会忽略）' : ''}">
             <td title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
             <td title="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
             <td>${escapeHtml(item.method)}</td>
             <td title="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
-            <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span></td>
+            <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>${excluded ? ' <span class="retried-badge">已排除</span>' : ''}</td>
             <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
             <td class="msg-td ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" title="点击展开/收起" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
             <td class="errcode-td">${escapeHtml(item.err_code || '-')}</td>
-            <td class="td-op"><button onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button></td>
+            <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button>${excludeBtn}</td>
         </tr>
-    `).join('');
+    `}).join('');
 
     document.getElementById('resultTableContainer').innerHTML = `
-        <table>
-            <colgroup>
-                <col style="width:12%">
-                <col style="width:9%">
-                <col style="width:80px">
-                <col style="width:20%">
-                <col style="width:72px">
-                <col style="width:60px">
-                <col>
-                <col style="width:140px">
-                <col style="width:72px">
-            </colgroup>
-            <thead>
-                <tr>
-                    <th>接口名称</th>
-                    <th>文件夹</th>
-                    <th>方法</th>
-                    <th>路径</th>
-                    <th>状态</th>
-                    <th>状态码</th>
-                    <th>结果说明</th>
-                    <th>errCode</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
+        <div class="table-scroll">
+            <table>
+                ${REPORT_TABLE_COLGROUP}
+                <thead>
+                    <tr>
+                        <th>接口名称</th>
+                        <th>文件夹</th>
+                        <th>方法</th>
+                        <th>路径</th>
+                        <th>状态</th>
+                        <th>状态码</th>
+                        <th>结果说明</th>
+                        <th>errCode</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
     `;
 
     document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条，当前每页 ${data.page_size} 条`;
@@ -449,10 +638,14 @@ async function openDetail(index) {
     const body = document.getElementById('detailBody');
     const editPanel = document.getElementById('editRetryPanel');
     const editBtn = document.getElementById('editRetryBtn');
+    const saveManualBtn = document.getElementById('saveManualBtn');
+    const excludeCaseBtn = document.getElementById('excludeCaseBtn');
     body.innerHTML = '<div class="loading">加载详情中...</div>';
     editPanel.style.display = 'none';
     editPanel.innerHTML = '';
     editBtn.style.display = 'none';
+    saveManualBtn.style.display = 'none';
+    excludeCaseBtn.style.display = 'none';
     mask.classList.add('show');
     currentDetailIndex = index;
     currentDetailData = null;
@@ -467,6 +660,13 @@ async function openDetail(index) {
     // 所有有 detail_available 或者只要有 url 的都可以重试
     if (data.url) {
         editBtn.style.display = '';
+        if (ENABLE_MANUAL_CASES) {
+            saveManualBtn.style.display = '';
+        }
+    }
+    if (data.exclusion_key) {
+        excludeCaseBtn.style.display = '';
+        excludeCaseBtn.textContent = data.excluded ? '取消排除' : '排除此用例';
     }
 
     if (!data.detail_available) {
@@ -497,19 +697,19 @@ async function openDetail(index) {
         <div class="detail-grid">
             <div class="detail-card">
                 <h4>请求头</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.headers))}</pre>
+                <pre id="reqHeadersPre">${escapeHtml(formatJson(data.request_info.headers))}</pre>
             </div>
             <div class="detail-card">
                 <h4>查询参数</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.params))}</pre>
+                <pre id="reqParamsPre">${escapeHtml(formatJson(data.request_info.params))}</pre>
             </div>
             <div class="detail-card">
                 <h4>请求体</h4>
-                <pre>${escapeHtml(formatJson(data.request_info.body))}</pre>
+                <pre id="reqBodyPre">${escapeHtml(formatJson(data.request_info.body))}</pre>
             </div>
             <div class="detail-card">
                 <h4>响应头</h4>
-                <pre>${escapeHtml(formatJson(data.response_info.headers))}</pre>
+                <pre id="respHeadersPre">${escapeHtml(formatJson(data.response_info.headers))}</pre>
             </div>
             <div class="detail-card" style="grid-column: 1 / -1;">
                 <h4>响应体</h4>
@@ -658,6 +858,7 @@ async function sendRetry() {
             <strong>${escapeHtml(result.status)}</strong>
             &nbsp;|&nbsp; 状态码: ${result.status_code ?? '-'}
             &nbsp;|&nbsp; ${escapeHtml(result.message || '-')}
+            <br><small>实际请求 URL: ${escapeHtml(buildActualRequestUrl(result) || '-')}</small>
             ${result.saved ? '<br><small>✓ 已回写到报告</small>' : ''}
         `;
 
@@ -673,17 +874,16 @@ async function sendRetry() {
 
         // 更新列表行（状态、状态码、结果说明）
         if (saveToReport) {
-            reloadResults();
+            await reloadResults(currentResultsPage);
         }
 
-        // 更新弹窗 detailMeta 和标题徽标
-        document.getElementById('detailTitle').innerHTML =
-            escapeHtml(data.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
-        renderDetailMeta({ method, url, status: result.status, status_code: result.status_code });
-
-        // 更新 currentData 以便二次重试时能看到最新状态
-        const updated = { ...data, ...result, retry_history: (data.retry_history || []) };
+        // 更新弹窗 detailMeta、详情卡片和标题徽标，保持当前页即时可见
+        const updated = { ...data, ...result, retried: true, retry_history: (data.retry_history || []) };
         currentDetailData = updated;
+        document.getElementById('detailTitle').innerHTML =
+            escapeHtml(updated.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
+        renderDetailMeta(updated);
+        renderDetailPanels(updated);
 
     } catch(e) {
         resultDiv.className = 'retry-result-box fail';
@@ -691,6 +891,656 @@ async function sendRetry() {
     } finally {
         btn.disabled = false;
         btn.textContent = '发送';
+    }
+}
+
+async function toggleCurrentCaseExclusion() {
+    if (!currentDetailData || !currentDetailData.exclusion_key) {
+        return;
+    }
+    const nextExcluded = !Boolean(currentDetailData.excluded);
+    try {
+        const resp = await fetch('/api/report-case-exclusion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                exclusion_key: currentDetailData.exclusion_key,
+                excluded: nextExcluded,
+            })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '排除操作失败');
+        }
+        currentDetailData.excluded = nextExcluded;
+        const btn = document.getElementById('excludeCaseBtn');
+        if (btn) {
+            btn.textContent = nextExcluded ? '取消排除' : '排除此用例';
+        }
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('排除操作失败: ' + (error.message || error));
+    }
+}
+
+async function saveCurrentAsManualCase() {
+    if (!currentDetailData) {
+        return;
+    }
+    const suggestedFolder = (currentDetailData.folder || MANUAL_CASE_FOLDER_NAME || '').trim() || MANUAL_CASE_FOLDER_NAME;
+    const folder = window.prompt('请输入人工用例目录名称：', suggestedFolder);
+    if (folder === null) {
+        return;
+    }
+    const casePayload = {
+        name: currentDetailData.name || '未命名接口',
+        folder: (folder || '').trim() || MANUAL_CASE_FOLDER_NAME,
+        method: currentDetailData.method || 'GET',
+        url: currentDetailData.url || '',
+        expected_status: currentDetailData.expected_status || 200,
+        message: currentDetailData.message || '',
+        err_code: currentDetailData.err_code || '',
+        request_info: currentDetailData.request_info || { headers: {}, params: {}, body: null },
+        response_info: currentDetailData.response_info || { headers: {}, body: null },
+    };
+
+    try {
+        const resp = await fetch('/api/manual-cases/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName, case: casePayload }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '保存人工用例失败');
+        }
+        await reloadManualCases();
+        alert('已保存为人工用例');
+    } catch (error) {
+        alert('保存失败: ' + (error.message || error));
+    }
+}
+
+function renderManualEditor(existingCase = null) {
+    if (!ENABLE_MANUAL_CASES) {
+        return;
+    }
+    _mcLastResponse = null;
+    _mcEditingCase = existingCase || null;
+    const editor = document.getElementById('manualEditor');
+    const isEdit = !!existingCase;
+    const reqInfo = getManualCaseRequestInfo(existingCase);
+    const currentMethod = String((existingCase && existingCase.method) || 'GET').trim().toUpperCase() || 'GET';
+    const standardMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+    const methodOptions = [...standardMethods];
+    if (!methodOptions.includes(currentMethod)) {
+        methodOptions.push(currentMethod);
+    }
+    editor.style.display = '';
+    /*
+    旧版实现（含分组标签，保留回退）：
+    editor.innerHTML = `
+        <div class="edit-retry-panel">
+            <h4>${isEdit ? '编辑人工用例' : '新增人工用例'}</h4>
+            <div class="manual-form">
+                <div class="manual-field">
+                    <label for="mc-name">接口名称 *</label>
+                    <input type="text" id="mc-name" placeholder="例如：创建订单" value="${escapeHtml((existingCase && existingCase.name) || '')}">
+                </div>
+                <div class="manual-field">
+                    <label for="mc-folder">目录</label>
+                    <input type="text" id="mc-folder" placeholder="默认目录：${escapeHtml(MANUAL_CASE_FOLDER_NAME)}" value="${escapeHtml((existingCase && existingCase.folder) || MANUAL_CASE_FOLDER_NAME)}">
+                </div>
+                <div class="manual-field">
+                    <label for="mc-method-select">请求方法</label>
+                    <select id="mc-method-select">
+                        ${methodOptions.map((m) => `<option value="${m}" ${m === currentMethod ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="manual-field wide">
+                    <label for="mc-url">URL *</label>
+                    <input type="text" id="mc-url" placeholder="例如：https://api.example.com/orders" value="${escapeHtml((existingCase && existingCase.url) || '')}">
+                </div>
+                <div class="manual-group-title wide">请求信息（参考 Postman）</div>
+                <div class="manual-field">
+                    <label for="mc-headers">请求头 Headers（JSON）</label>
+                    <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
+                    <div class="hint">对象格式，空值可填 {} 或 无</div>
+                </div>
+                <div class="manual-field">
+                    <label for="mc-params">查询参数 Params（JSON）</label>
+                    <textarea id="mc-params" placeholder='{"page": 1, "size": 20}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
+                    <div class="hint">对象格式，空值可填 {} 或 无</div>
+                </div>
+                <div class="manual-field wide">
+                    <label for="mc-body">请求体 Body（JSON）</label>
+                    <textarea id="mc-body" placeholder='{"orderNo": "A1001"}'>${escapeHtml(formatJson(reqInfo.body))}</textarea>
+                </div>
+                <div class="manual-group-title wide">响应信息</div>
+                <div class="manual-field">
+                    <label for="mc-resp-headers">响应头（JSON）</label>
+                    <textarea id="mc-resp-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(respInfo.headers))}</textarea>
+                </div>
+                <div class="manual-field wide">
+                    <label for="mc-resp-body">响应体（JSON）</label>
+                    <textarea id="mc-resp-body" placeholder='{"message": "success"}'>${escapeHtml(formatJson(respInfo.body))}</textarea>
+                </div>
+            </div>
+            <div class="edit-actions">
+                <button class="btn-send" onclick="saveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">保存</button>
+                <button class="btn-cancel" onclick="closeManualEditor()">取消</button>
+            </div>
+        </div>
+    `;
+    */
+    editor.innerHTML = `
+        <div class="edit-retry-panel">
+            <h4>${isEdit ? '编辑人工用例' : '新增人工用例'}</h4>
+
+            <!-- 段一：请求信息 -->
+            <div class="manual-form" id="mc-request-form">
+                <div class="manual-field">
+                    <label for="mc-name">接口名称 *</label>
+                    <input type="text" id="mc-name" placeholder="例如：创建订单" value="${escapeHtml((existingCase && existingCase.name) || '')}">
+                </div>
+                <div class="manual-field">
+                    <label for="mc-folder">目录</label>
+                    <input type="text" id="mc-folder" placeholder="默认：${escapeHtml(MANUAL_CASE_FOLDER_NAME)}" value="${escapeHtml((existingCase && existingCase.folder) || MANUAL_CASE_FOLDER_NAME)}">
+                </div>
+                <div class="manual-field">
+                    <label for="mc-method-select">请求方法</label>
+                    <select id="mc-method-select">
+                        ${methodOptions.map((m) => `<option value="${m}" ${m === currentMethod ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="manual-field wide">
+                    <label for="mc-url">URL *</label>
+                    <input type="text" id="mc-url" placeholder="例如：https://api.example.com/orders" value="${escapeHtml((existingCase && existingCase.url) || '')}">
+                </div>
+                <div class="manual-group-title wide">请求参数</div>
+                <div class="manual-field">
+                    <label for="mc-headers">请求头 Headers（JSON）</label>
+                    <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
+                    <div class="hint">对象格式，空值可填 {} 或留空</div>
+                </div>
+                <div class="manual-field">
+                    <label for="mc-params">查询参数 Params（JSON）</label>
+                    <textarea id="mc-params" placeholder='{"page": 1}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
+                    <div class="hint">对象格式，空值可填 {} 或留空</div>
+                </div>
+                <div class="manual-field wide">
+                    <label for="mc-body">请求体 Body（JSON）</label>
+                    <textarea id="mc-body" placeholder='{"key": "value"}'>${escapeHtml(formatJson(reqInfo.body))}</textarea>
+                </div>
+            </div>
+
+            <div class="edit-actions" style="margin-top:12px;">
+                <button class="btn-send" id="mc-send-btn" onclick="sendManualRequest()">发送请求</button>
+                ${isEdit ? `<button class="btn-cancel" id="mc-direct-save-btn" onclick="directSaveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">直接保存（不重发）</button>` : ''}
+                <button class="btn-cancel" onclick="closeManualEditor()">取消</button>
+            </div>
+
+            <!-- 段二：响应面板（发送后显示） -->
+            <div id="mc-response-panel" class="mc-response-panel" style="display:none;">
+                <h5>响应结果</h5>
+                <div id="mc-response-meta" style="margin-bottom:8px;"></div>
+                <details>
+                    <summary style="cursor:pointer;font-size:12px;color:#64748b;">响应头（点击展开）</summary>
+                    <pre id="mc-resp-headers-pre" style="margin-top:6px;max-height:120px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:11px;"></pre>
+                </details>
+                <div style="margin-top:8px;">
+                    <div style="font-size:12px;color:#64748b;margin-bottom:4px;">响应体</div>
+                    <pre id="mc-resp-body-pre" style="max-height:260px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:11px;"></pre>
+                </div>
+            </div>
+
+            <!-- 段三：保存确认（段二出现后显示） -->
+            <div id="mc-save-confirm" class="mc-save-confirm" style="display:none;">
+                <h5>保存为人工用例</h5>
+                <div class="mc-result-selector">
+                    <span style="font-size:12px;color:#64748b;">记录结果：</span>
+                    <label><input type="radio" name="mc-result-status" value="PASSED" checked> <span class="status status-passed">PASSED</span></label>
+                    <label><input type="radio" name="mc-result-status" value="FAILED"> <span class="status status-failed">FAILED</span></label>
+                </div>
+                <div class="edit-actions">
+                    <button class="btn-send" onclick="confirmSaveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">保存</button>
+                    <button class="btn-cancel" onclick="closeManualEditor()">取消</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function closeManualEditor() {
+    const editor = document.getElementById('manualEditor');
+    editor.style.display = 'none';
+    editor.innerHTML = '';
+    _mcLastResponse = null;
+    _mcEditingCase = null;
+}
+
+async function sendManualRequest() {
+    const [hOk, headers] = parseManualJson('mc-headers');
+    const [pOk, params] = parseManualJson('mc-params');
+    const [bOk, body] = parseManualJson('mc-body');
+    if (!hOk || !pOk || !bOk) {
+        alert('JSON 格式错误，请检查红色输入框');
+        return;
+    }
+    const url = (document.getElementById('mc-url').value || '').trim();
+    const method = (document.getElementById('mc-method-select').value || 'GET').trim().toUpperCase();
+    if (!url) {
+        alert('URL 不能为空');
+        return;
+    }
+    const sendBtn = document.getElementById('mc-send-btn');
+    const responsePanel = document.getElementById('mc-response-panel');
+    const saveConfirm = document.getElementById('mc-save-confirm');
+    sendBtn.disabled = true;
+    sendBtn.textContent = '发送中...';
+    responsePanel.style.display = 'none';
+    saveConfirm.style.display = 'none';
+    try {
+        const resp = await fetch('/api/proxy-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ method, url, headers: headers || {}, params: params || {}, body }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '请求失败');
+        }
+        _mcLastResponse = data;
+        const sc = data.status_code;
+        let badgeClass = 'serr';
+        if (sc >= 200 && sc < 300) badgeClass = 's2xx';
+        else if (sc >= 400 && sc < 500) badgeClass = 's4xx';
+        else if (sc >= 500) badgeClass = 's5xx';
+        document.getElementById('mc-response-meta').innerHTML =
+            `<span class="mc-status-badge ${badgeClass}">${sc}</span><span style="font-size:12px;color:#64748b;">耗时 ${data.elapsed_ms}ms</span>`;
+        document.getElementById('mc-resp-headers-pre').textContent = formatJson(data.response_headers);
+        document.getElementById('mc-resp-body-pre').textContent = formatJson(data.response_body);
+        const defaultStatus = (sc >= 200 && sc < 300) ? 'PASSED' : 'FAILED';
+        const radioEl = document.querySelector(`input[name="mc-result-status"][value="${defaultStatus}"]`);
+        if (radioEl) radioEl.checked = true;
+        responsePanel.style.display = '';
+        saveConfirm.style.display = '';
+        responsePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (error) {
+        _mcLastResponse = null;
+        document.getElementById('mc-response-meta').innerHTML =
+            `<span class="mc-status-badge serr">错误</span><span style="font-size:12px;color:#991b1b;margin-left:8px;">${escapeHtml(error.message || '请求失败')}</span>`;
+        document.getElementById('mc-resp-headers-pre').textContent = '';
+        document.getElementById('mc-resp-body-pre').textContent = '';
+        responsePanel.style.display = '';
+        saveConfirm.style.display = 'none';
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = '重新发送';
+    }
+}
+
+async function confirmSaveManualCase(caseId) {
+    if (!_mcLastResponse) {
+        alert('请先点击「发送请求」获取响应后再保存');
+        return;
+    }
+    const [hOk, headers] = parseManualJson('mc-headers');
+    const [pOk, params] = parseManualJson('mc-params');
+    const [bOk, body] = parseManualJson('mc-body');
+    if (!hOk || !pOk || !bOk) {
+        alert('JSON 格式错误，请检查请求输入框');
+        return;
+    }
+    const selectedRadio = document.querySelector('input[name="mc-result-status"]:checked');
+    const status = selectedRadio ? selectedRadio.value : 'PASSED';
+    const payload = {
+        name: (document.getElementById('mc-name').value || '').trim(),
+        folder: (document.getElementById('mc-folder').value || '').trim() || MANUAL_CASE_FOLDER_NAME,
+        method: (document.getElementById('mc-method-select').value || 'GET').trim().toUpperCase(),
+        url: (document.getElementById('mc-url').value || '').trim(),
+        status: status,
+        status_code: _mcLastResponse.status_code,
+        elapsed_ms: _mcLastResponse.elapsed_ms,
+        request_info: { headers: headers || {}, params: params || {}, body: body },
+        response_info: {
+            headers: _mcLastResponse.response_headers || {},
+            body: _mcLastResponse.response_body,
+            status_code: _mcLastResponse.status_code,
+            elapsed_ms: _mcLastResponse.elapsed_ms,
+        },
+    };
+    if (!payload.name || !payload.url) {
+        alert('接口名称和 URL 不能为空');
+        return;
+    }
+    const isEdit = !!caseId;
+    const endpoint = isEdit ? '/api/manual-cases/update' : '/api/manual-cases/add';
+    const httpMethod = isEdit ? 'PUT' : 'POST';
+    const bodyData = isEdit
+        ? { report_name: reportName, case_id: caseId, case: payload }
+        : { report_name: reportName, case: payload };
+    try {
+        const resp = await fetch(endpoint, {
+            method: httpMethod,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '保存失败');
+        }
+        closeManualEditor();
+        await reloadManualCases();
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('保存失败: ' + (error.message || error));
+    }
+}
+
+async function directSaveManualCase(caseId) {
+    /* 编辑模式下不重发，直接用现有响应数据保存 */
+    const [hOk, headers] = parseManualJson('mc-headers');
+    const [pOk, params] = parseManualJson('mc-params');
+    const [bOk, body] = parseManualJson('mc-body');
+    if (!hOk || !pOk || !bOk) {
+        alert('JSON 格式错误，请检查请求输入框');
+        return;
+    }
+    const existingResp = (_mcEditingCase && _mcEditingCase.response_info) || { headers: {}, body: null };
+    const existingStatus = (_mcEditingCase && _mcEditingCase.status) || 'PASSED';
+    const payload = {
+        name: (document.getElementById('mc-name').value || '').trim(),
+        folder: (document.getElementById('mc-folder').value || '').trim() || MANUAL_CASE_FOLDER_NAME,
+        method: (document.getElementById('mc-method-select').value || 'GET').trim().toUpperCase(),
+        url: (document.getElementById('mc-url').value || '').trim(),
+        status: existingStatus,
+        status_code: (_mcEditingCase && _mcEditingCase.status_code) || null,
+        elapsed_ms: (_mcEditingCase && _mcEditingCase.elapsed_ms) || null,
+        request_info: { headers: headers || {}, params: params || {}, body: body },
+        response_info: existingResp,
+    };
+    if (!payload.name || !payload.url) {
+        alert('接口名称和 URL 不能为空');
+        return;
+    }
+    const isEdit = !!caseId;
+    const endpoint = isEdit ? '/api/manual-cases/update' : '/api/manual-cases/add';
+    const httpMethod = isEdit ? 'PUT' : 'POST';
+    const bodyData = isEdit
+        ? { report_name: reportName, case_id: caseId, case: payload }
+        : { report_name: reportName, case: payload };
+    try {
+        const resp = await fetch(endpoint, {
+            method: httpMethod,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '保存失败');
+        }
+        closeManualEditor();
+        await reloadManualCases();
+    } catch (error) {
+        alert('保存失败: ' + (error.message || error));
+    }
+}
+
+function parseManualJson(id) {
+    const el = document.getElementById(id);
+    if (!el) {
+        return [true, null];
+    }
+    const val = (el.value || '').trim();
+    el.classList.remove('error');
+    if (!val || val === '无') {
+        return [true, null];
+    }
+    try {
+        return [true, JSON.parse(val)];
+    } catch (e) {
+        el.classList.add('error');
+        return [false, null];
+    }
+}
+
+async function saveManualCase(caseId) {
+    const [hOk, headers] = parseManualJson('mc-headers');
+    const [pOk, params] = parseManualJson('mc-params');
+    const [bOk, body] = parseManualJson('mc-body');
+    const [rhOk, respHeaders] = parseManualJson('mc-resp-headers');
+    const [rbOk, respBody] = parseManualJson('mc-resp-body');
+    if (!hOk || !pOk || !bOk || !rhOk || !rbOk) {
+        alert('JSON 格式错误，请检查红色输入框');
+        return;
+    }
+    const payload = {
+        name: (document.getElementById('mc-name').value || '').trim(),
+        folder: (document.getElementById('mc-folder').value || '').trim() || MANUAL_CASE_FOLDER_NAME,
+        method: (document.getElementById('mc-method-select').value || 'GET').trim().toUpperCase(),
+        url: (document.getElementById('mc-url').value || '').trim(),
+        request_info: { headers: headers || {}, params: params || {}, body: body },
+        response_info: { headers: respHeaders || {}, body: respBody },
+    };
+    if (!payload.name || !payload.url) {
+        alert('接口名称和 URL 不能为空');
+        return;
+    }
+
+    const isEdit = !!caseId;
+    const endpoint = isEdit ? '/api/manual-cases/update' : '/api/manual-cases/add';
+    const method = isEdit ? 'PUT' : 'POST';
+    const bodyData = isEdit
+        ? { report_name: reportName, case_id: caseId, case: payload }
+        : { report_name: reportName, case: payload };
+    try {
+        const resp = await fetch(endpoint, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bodyData),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '保存失败');
+        }
+        closeManualEditor();
+        await reloadManualCases();
+    } catch (error) {
+        alert('保存失败: ' + (error.message || error));
+    }
+}
+
+async function deleteManualCase(caseId) {
+    if (!window.confirm('确认删除该人工用例吗？')) {
+        return;
+    }
+    try {
+        const resp = await fetch('/api/manual-cases/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName, case_id: caseId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '删除失败');
+        }
+        await reloadManualCases();
+    } catch (error) {
+        alert('删除失败: ' + (error.message || error));
+    }
+}
+
+async function toggleManualCaseExclusion(exclusionKey, excluded) {
+    try {
+        const resp = await fetch('/api/report-case-exclusion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                exclusion_key: exclusionKey,
+                excluded: !excluded,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '操作失败');
+        }
+        await reloadManualCases();
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('操作失败: ' + (error.message || error));
+    }
+}
+
+function toggleManualCaseExclusionByEncoded(encodedKey, excluded) {
+    const key = decodeURIComponent(String(encodedKey || ''));
+    return toggleManualCaseExclusion(key, excluded);
+}
+
+async function toggleResultExclusion(encodedKey, excluded) {
+    const key = decodeURIComponent(String(encodedKey || ''));
+    try {
+        const resp = await fetch('/api/report-case-exclusion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                exclusion_key: key,
+                excluded: !excluded,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '操作失败');
+        }
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('排除操作失败: ' + (error.message || error));
+    }
+}
+
+function renderManualCases() {
+    const container = document.getElementById('manualCasesTable');
+    if (!ENABLE_MANUAL_CASES) {
+        container.innerHTML = '<div class="empty">当前环境未启用人工用例功能。</div>';
+        return;
+    }
+    if (!manualCases.length) {
+        container.innerHTML = '<div class="empty">暂无人工用例。</div>';
+        return;
+    }
+    const rows = manualCases.map((item, idx) => {
+        const exclusionKey = item.exclusion_key || '';
+        const excluded = Boolean(item.excluded);
+        const caseStatus = String(item.status || '').toUpperCase();
+        const statusBadge = caseStatus
+            ? `<span class="status status-${caseStatus.toLowerCase()}">${escapeHtml(caseStatus)}</span>`
+            : '-';
+        const encodedCaseId = encodeURIComponent(String(item.id || ''));
+        return `
+            <tr class="${excluded ? 'excluded-row' : ''}">
+                <td>${escapeHtml(item.name || '-')}</td>
+                <td>${escapeHtml(item.folder || '-')}</td>
+                <td>${escapeHtml(item.method || '-')}</td>
+                <td><span class="url">${escapeHtml(item.url || '-')}</span></td>
+                <td>${statusBadge}${excluded ? ' <span class="retried-badge">已排除</span>' : ''}</td>
+                <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
+                <td class="msg-td">${escapeHtml(item.message || '-')}</td>
+                <td>${escapeHtml(item.err_code || '-')}</td>
+                <td class="td-op">
+                    <button class="btn-compact" data-mc-action="detail" data-mc-index="${idx}">详情</button>
+                    <button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" data-mc-action="toggle-exclude" data-mc-key="${encodeURIComponent(exclusionKey)}" data-mc-excluded="${excluded ? 'true' : 'false'}" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>
+                    <button class="btn-compact" data-mc-action="edit" data-mc-index="${idx}">编辑</button>
+                    <button class="btn-compact" data-mc-action="delete" data-mc-id="${encodedCaseId}">删除</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    container.innerHTML = `
+        <div class="table-scroll">
+            <table class="manual-table">
+                ${REPORT_TABLE_COLGROUP}
+                <thead>
+                    <tr>
+                        <th>接口名称</th>
+                        <th>文件夹</th>
+                        <th>方法</th>
+                        <th>路径</th>
+                        <th>状态</th>
+                        <th>状态码</th>
+                        <th>结果说明</th>
+                        <th>errCode</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+document.getElementById('manualCasesTable').addEventListener('click', async (event) => {
+    const btn = event.target.closest('button[data-mc-action]');
+    if (!btn) {
+        return;
+    }
+
+    const action = btn.getAttribute('data-mc-action');
+    if (action === 'detail') {
+        const index = Number(btn.getAttribute('data-mc-index'));
+        if (Number.isFinite(index)) {
+            openManualCaseDetail(index);
+        }
+        return;
+    }
+
+    if (action === 'edit') {
+        const index = Number(btn.getAttribute('data-mc-index'));
+        if (Number.isFinite(index)) {
+            editManualCase(index);
+        }
+        return;
+    }
+
+    if (action === 'toggle-exclude') {
+        const encodedKey = btn.getAttribute('data-mc-key') || '';
+        const excluded = btn.getAttribute('data-mc-excluded') === 'true';
+        await toggleManualCaseExclusionByEncoded(encodedKey, excluded);
+        return;
+    }
+
+    if (action === 'delete') {
+        const caseId = decodeURIComponent(btn.getAttribute('data-mc-id') || '');
+        if (caseId) {
+            await deleteManualCase(caseId);
+        }
+    }
+});
+
+function editManualCase(index) {
+    const row = manualCases[index];
+    renderManualEditor(row || null);
+}
+
+async function reloadManualCases() {
+    if (!ENABLE_MANUAL_CASES) {
+        return;
+    }
+    const container = document.getElementById('manualCasesTable');
+    container.innerHTML = '<div class="loading">加载人工用例中...</div>';
+    try {
+        const resp = await fetch(`/api/manual-cases/${encodeURIComponent(reportName)}`);
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '加载失败');
+        }
+        manualExclusions = new Set(data.manual_exclusions || []);
+        manualCases = (data.manual_cases || []).map((item) => ({ ...item }));
+        renderManualCases();
+    } catch (error) {
+        container.innerHTML = `<div class="empty">加载失败: ${escapeHtml(error.message || error)}</div>`;
     }
 }
 
@@ -705,6 +1555,163 @@ function closeDetail(event) {
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
     const editBtn = document.getElementById('editRetryBtn');
     if (editBtn) { editBtn.style.display = 'none'; }
+    const saveManualBtn = document.getElementById('saveManualBtn');
+    if (saveManualBtn) { saveManualBtn.style.display = 'none'; }
+    const excludeCaseBtn = document.getElementById('excludeCaseBtn');
+    if (excludeCaseBtn) { excludeCaseBtn.style.display = 'none'; }
+}
+
+async function openManualCaseDetail(index) {
+    const caseData = manualCases[index];
+    if (!caseData) {
+        return;
+    }
+
+    const mask = document.getElementById('detailMask');
+    const title = document.getElementById('detailTitle');
+    const meta = document.getElementById('detailMeta');
+    const body = document.getElementById('detailBody');
+    const editBtn = document.getElementById('editRetryBtn');
+    const saveManualBtn = document.getElementById('saveManualBtn');
+    const excludeCaseBtn = document.getElementById('excludeCaseBtn');
+    const editPanel = document.getElementById('editRetryPanel');
+
+    currentDetailData = caseData;
+    currentDetailIndex = null;
+
+    title.innerHTML = `${escapeHtml(caseData.name || '接口详情')} <span style="font-size:12px;color:#64748b;">(人工用例)</span>`;
+    const actualRequestUrl = buildActualRequestUrl(caseData) || caseData.url || '-';
+    meta.innerHTML = `
+        <div class="detail-meta-row">${escapeHtml(caseData.method || '-')} | 状态 ${escapeHtml(String(caseData.status || '-'))} | 状态码 ${caseData.status_code ?? '-'}</div>
+        <div class="detail-meta-row detail-meta-url">URL: ${escapeHtml(actualRequestUrl)}</div>
+    `;
+
+    if (editPanel) {
+        editPanel.style.display = 'none';
+        editPanel.innerHTML = '';
+    }
+    if (saveManualBtn) {
+        saveManualBtn.style.display = 'none';
+    }
+    if (editBtn) {
+        editBtn.style.display = '';
+        editBtn.textContent = '编辑';
+        editBtn.onclick = () => {
+            closeDetail();
+            editManualCase(index);
+        };
+    }
+    if (excludeCaseBtn && caseData.exclusion_key) {
+        excludeCaseBtn.style.display = '';
+        excludeCaseBtn.textContent = caseData.excluded ? '取消排除' : '排除此用例';
+        excludeCaseBtn.onclick = () => toggleCurrentManualCaseExclusion(index);
+    } else if (excludeCaseBtn) {
+        excludeCaseBtn.style.display = 'none';
+    }
+
+    renderManualCaseDetailPanels(caseData);
+    mask.classList.add('show');
+}
+
+function renderManualCaseDetailPanels(caseData) {
+    const reqInfo = getManualCaseRequestInfo(caseData);
+    const respInfo = getManualCaseResponseInfo(caseData);
+    const body = document.getElementById('detailBody');
+
+    body.innerHTML = `
+        <div class="detail-grid">
+            <div class="detail-card">
+                <h4>请求头</h4>
+                <pre>${escapeHtml(formatJson(reqInfo.headers || {}))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>查询参数</h4>
+                <pre>${escapeHtml(formatJson(reqInfo.params || {}))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>请求体</h4>
+                <pre>${escapeHtml(formatJson(reqInfo.body))}</pre>
+            </div>
+            <div class="detail-card">
+                <h4>响应头</h4>
+                <pre>${escapeHtml(formatJson(respInfo.headers || {}))}</pre>
+            </div>
+            <div class="detail-card" style="grid-column: 1 / -1;">
+                <h4>响应体</h4>
+                <div id="responseBodyMeta" class="muted response-meta"></div>
+                <pre id="responseBodyPre"></pre>
+                <div id="responseBodyActions" class="response-actions"></div>
+            </div>
+        </div>
+    `;
+    currentDetailData = {
+        ...(caseData || {}),
+        request_info: reqInfo,
+        response_info: respInfo,
+    };
+    renderResponseBody(respInfo.body, 'preview');
+}
+
+function getManualCaseRequestInfo(caseData) {
+    const source = caseData || {};
+    const req = (source.request_info && typeof source.request_info === 'object') ? source.request_info : {};
+    const headers = (req.headers && typeof req.headers === 'object' && !Array.isArray(req.headers))
+        ? req.headers
+        : ((source.headers && typeof source.headers === 'object' && !Array.isArray(source.headers)) ? source.headers : {});
+    const params = (req.params && typeof req.params === 'object' && !Array.isArray(req.params))
+        ? req.params
+        : ((source.params && typeof source.params === 'object' && !Array.isArray(source.params)) ? source.params : {});
+    const body = Object.prototype.hasOwnProperty.call(req, 'body') ? req.body : source.body;
+    return { headers, params, body };
+}
+
+function getManualCaseResponseInfo(caseData) {
+    const source = caseData || {};
+    const resp = (source.response_info && typeof source.response_info === 'object') ? source.response_info : {};
+    const headers = (resp.headers && typeof resp.headers === 'object' && !Array.isArray(resp.headers))
+        ? resp.headers
+        : ((source.response_headers && typeof source.response_headers === 'object' && !Array.isArray(source.response_headers)) ? source.response_headers : {});
+    const body = Object.prototype.hasOwnProperty.call(resp, 'body') ? resp.body : source.response_body;
+    const statusCode = Object.prototype.hasOwnProperty.call(resp, 'status_code') ? resp.status_code : source.status_code;
+    const elapsedMs = Object.prototype.hasOwnProperty.call(resp, 'elapsed_ms') ? resp.elapsed_ms : source.elapsed_ms;
+    return {
+        ...resp,
+        headers,
+        body,
+        status_code: statusCode,
+        elapsed_ms: elapsedMs,
+    };
+}
+
+async function toggleCurrentManualCaseExclusion(index) {
+    const caseData = manualCases[index];
+    if (!caseData || !caseData.exclusion_key) {
+        return;
+    }
+    const nextExcluded = !Boolean(caseData.excluded);
+    try {
+        const resp = await fetch('/api/report-case-exclusion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                exclusion_key: caseData.exclusion_key,
+                excluded: nextExcluded,
+            })
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '排除操作失败');
+        }
+        manualCases[index].excluded = nextExcluded;
+        await reloadManualCases();
+        await reloadResults(currentResultsPage);
+        if (document.getElementById('detailMask').classList.contains('show')) {
+            await openManualCaseDetail(index);
+        }
+    } catch (error) {
+        alert('排除操作失败: ' + (error.message || error));
+    }
 }
 
 function resetFilters() {
@@ -713,6 +1720,7 @@ function resetFilters() {
     document.getElementById('errCodeInput').value = '';
     document.getElementById('statusSelect').value = 'all';
     document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
+    document.getElementById('includeExcludedToggle').checked = true;
     reloadResults(1);
 }
 
@@ -736,8 +1744,9 @@ async function exportLatestCollection() {
         const scopeText = data.export_scope === 'report_only'
             ? `仅本次报告接口（${data.report_only_count || 0} 个）`
             : '全量集合';
+        const composeText = `原执行更新 ${data.updated_count} + 人工用例 ${data.manual_case_exported_count || 0}（配置 ${data.manual_case_count || 0}）- 排除 ${data.excluded_count || 0}`;
         alert(
-            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n更新接口: ${data.updated_count}\n跳过接口: ${data.skipped_count}${warningText}`
+            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n组成: ${composeText}\n跳过接口: ${data.skipped_count}${warningText}`
         );
         if (data.warnings && data.warnings.length) {
             console.warn('Export warnings:', data.warnings);
@@ -770,6 +1779,7 @@ document.getElementById('errCodeInput').addEventListener('keydown', (event) => {
 
 document.getElementById('statusSelect').addEventListener('change', () => reloadResults(1));
 document.getElementById('pageSizeSelect').addEventListener('change', () => reloadResults(1));
+document.getElementById('includeExcludedToggle').addEventListener('change', () => reloadResults(1));
 
 document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
 if (document.getElementById('exportScopeSelect')) {
@@ -777,8 +1787,8 @@ if (document.getElementById('exportScopeSelect')) {
 }
 
 reloadResults(1);
+reloadManualCases();
 </script>
 </body>
 </html>
-"""
 
