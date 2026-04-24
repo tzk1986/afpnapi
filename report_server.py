@@ -415,7 +415,8 @@ def _remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: L
                 continue
 
             if children is not None:
-                next_folder = name if not parent_folder else f"{parent_folder}/{name}"
+                # 与报告结果中的 folder 保持一致，只使用直接父级目录名，而不是完整链路。
+                next_folder = name
                 item["item"] = walk(children, next_folder)
                 if item["item"]:
                     kept.append(item)
@@ -579,7 +580,9 @@ def export_collection_with_latest_params(
         "export_scope": scope,
         "report_only_count": report_only_count,
         "manual_cases_count": len(manual_cases),
+        "manual_case_count": len(manual_cases),
         "appended_manual_count": appended_manual_count,
+        "manual_case_exported_count": appended_manual_count,
         "excluded_count": len(manual_exclusions),
         "removed_excluded_count": removed_excluded_count,
         "composition": {
