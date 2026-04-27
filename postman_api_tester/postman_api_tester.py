@@ -215,15 +215,30 @@ class PostmanApiParser:
         :param url_dict: URL字典
         :return: URL字符串
         """
-        path = '/'.join(url_dict.get('path', []))
+        path_parts = url_dict.get('path', [])
+        path = '/'.join(path_parts) if isinstance(path_parts, list) else ''
         if path and not path.startswith('/'):
             path = '/' + path
-        
+
+        # 兼容仅提供 raw 的 URL（常见于导出后再次导入场景）
+        if not path:
+            raw_url = str(url_dict.get('raw') or '').strip()
+            if raw_url:
+                if raw_url.startswith('http://') or raw_url.startswith('https://'):
+                    return raw_url
+                if raw_url.startswith('{{') and '}}' in raw_url:
+                    _, suffix = raw_url.split('}}', 1)
+                    suffix = suffix.strip()
+                    if suffix and not suffix.startswith('/'):
+                        suffix = '/' + suffix
+                    return suffix
+                return raw_url
+
         query = ''
         if url_dict.get('query'):
             query_parts = [f"{q.get('key')}={q.get('value')}" for q in url_dict['query']]
             query = '?' + '&'.join(query_parts)
-        
+
         return path + query
 
 
