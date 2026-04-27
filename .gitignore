@@ -5,3 +5,4 @@ __pycache__/
 # 报告 data
 reports/
 *.log
+uploaded_collections/
