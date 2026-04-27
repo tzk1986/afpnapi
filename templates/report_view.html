@@ -109,6 +109,37 @@
         .manual-group-title { margin: 8px 0 4px; font-size: 12px; color: #334155; font-weight: 700; }
         .manual-form textarea { min-height: 96px; font-family: Consolas, monospace; font-size: 12px; }
         .manual-form .wide { grid-column: 1 / -1; }
+        .body-mode-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .body-mode-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; }
+        .body-mode-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .body-panel { display: none; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff; }
+        .body-panel.active { display: block; }
+        .body-mini-hint { font-size: 11px; color: #64748b; margin-top: 6px; }
+        .body-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 680px; }
+        .body-table th, .body-table td { border-bottom: 1px solid #e2e8f0; padding: 6px; white-space: normal; overflow: visible; text-overflow: clip; }
+        .body-table th { background: #f8fafc; font-size: 12px; color: #475569; }
+        .body-table input[type='text'], .body-table select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+        .body-row-op { display: flex; gap: 6px; }
+        .body-raw-tools { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .body-raw-wrap { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .body-raw-wrap textarea { min-height: 180px; font-family: Consolas, monospace; font-size: 12px; }
+        .raw-highlight-box { background: #0b1220; color: #dbeafe; border-radius: 8px; padding: 8px; max-height: 180px; overflow: auto; font-family: Consolas, monospace; font-size: 12px; }
+        .raw-highlight-box .k { color: #93c5fd; }
+        .raw-highlight-box .s { color: #86efac; }
+        .raw-highlight-box .n { color: #fcd34d; }
+        .raw-highlight-box .b { color: #c4b5fd; }
+        .raw-highlight-box .null { color: #f9a8d4; }
+        .raw-status-line { font-size: 12px; color: #475569; display: flex; gap: 12px; flex-wrap: wrap; }
+        .raw-status-line.ok { color: #166534; }
+        .raw-status-line.err { color: #991b1b; }
+        .graphql-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .graphql-col-title { font-size: 12px; color: #334155; margin-bottom: 6px; font-weight: 700; }
+        .graphql-split textarea { min-height: 200px; font-family: Consolas, monospace; font-size: 12px; }
+        .binary-upload-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .file-name-tag { font-size: 12px; color: #334155; }
+        @media (max-width: 980px) {
+            .graphql-split { grid-template-columns: 1fr; }
+        }
         .manual-actions { display: flex; gap: 8px; align-items: center; }
         /* 三段式编辑器 */
         .mc-response-panel { background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 14px; margin-top: 12px; }
@@ -122,6 +153,20 @@
         .mc-status-badge.s4xx { background: #fee2e2; color: #991b1b; }
         .mc-status-badge.s5xx { background: #ffedd5; color: #9a3412; }
         .mc-status-badge.serr { background: #f1f5f9; color: #475569; }
+        /* JSON↔表单模式切换器 */
+        .mc-mode-switcher { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .mc-mode-switcher span { font-size: 12px; color: #64748b; margin-right: 4px; }
+        .mc-mode-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+        .mc-mode-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+        /* KV 表格行 */
+        .kv-table-wrap { display: flex; flex-direction: column; gap: 4px; }
+        .kv-header-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; padding: 0 2px; font-size: 11px; color: #94a3b8; font-weight: 600; }
+        .kv-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; align-items: center; }
+        .kv-row input { padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; width: 100%; box-sizing: border-box; }
+        .kv-row input:focus { outline: none; border-color: #94a3b8; }
+        .kv-row-del { width: 24px; height: 24px; border: none; background: #fee2e2; color: #991b1b; border-radius: 5px; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+        .kv-add-btn { margin-top: 6px; padding: 4px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .kv-add-btn:hover { border-color: #475569; color: #334155; }
         /* 基础紧凑按钮 */
         .btn-compact {
             padding: 4px 8px;
@@ -270,6 +315,11 @@ let manualCases = [];
 let manualExclusions = new Set();
 let _mcLastResponse = null;
 let _mcEditingCase = null;
+let _mcBodyEditorState = null;
+let _mcEditMode = 'json'; // 'json' | 'form'
+let _mcBodySeq = 1;
+let _erBodyEditorState = null;
+let _erEditMode = 'json'; // 'json' | 'form' — for edit-retry panel
 
 const REPORT_TABLE_COLGROUP = `
     <colgroup>
@@ -314,6 +364,574 @@ function formatJson(value) {
         return value;
     }
     return JSON.stringify(value, null, 2);
+}
+
+function nextManualBodyId(prefix) {
+    _mcBodySeq += 1;
+    return `${prefix}-${Date.now()}-${_mcBodySeq}`;
+}
+
+function escapeAttr(value) {
+    return String(value || '').replace(/"/g, '&quot;');
+}
+
+function toBodyRows(source) {
+    if (!Array.isArray(source)) {
+        return [];
+    }
+    return source.map((row) => ({
+        id: row.id || nextManualBodyId('row'),
+        key: String(row.key || ''),
+        type: row.type === 'file' ? 'file' : 'text',
+        value: row.value === undefined || row.value === null ? '' : String(row.value),
+        file_name: row.file_name ? String(row.file_name) : '',
+    }));
+}
+
+function normalizeManualBodyState(body) {
+    const fallback = {
+        mode: 'none',
+        raw_language: 'json',
+        raw_content: '',
+        raw_content_type: 'application/json',
+        urlencoded: [],
+        formdata: [],
+        graphql: { query: '', variables: '{}' },
+        binary: { file_name: '' },
+    };
+    if (!body || body === '无') {
+        return fallback;
+    }
+    if (typeof body === 'object' && body.__manual_body_mode) {
+        return {
+            mode: String(body.__manual_body_mode || 'none'),
+            raw_language: String(body.raw_language || 'json'),
+            raw_content: String(body.raw_content || ''),
+            raw_content_type: String(body.raw_content_type || 'application/json'),
+            urlencoded: toBodyRows(body.urlencoded),
+            formdata: toBodyRows(body.formdata),
+            graphql: {
+                query: String((body.graphql && body.graphql.query) || ''),
+                variables: String((body.graphql && body.graphql.variables) || '{}'),
+            },
+            binary: {
+                file_name: String((body.binary && body.binary.file_name) || ''),
+            },
+        };
+    }
+    if (typeof body === 'string') {
+        return {
+            ...fallback,
+            mode: 'raw',
+            raw_language: 'text',
+            raw_content_type: 'text/plain',
+            raw_content: body,
+        };
+    }
+    return {
+        ...fallback,
+        mode: 'raw',
+        raw_language: 'json',
+        raw_content_type: 'application/json',
+        raw_content: JSON.stringify(body, null, 2),
+    };
+}
+
+function getRawContentTypeByLanguage(language) {
+    const lang = String(language || 'json').toLowerCase();
+    if (lang === 'json') return 'application/json';
+    if (lang === 'xml') return 'application/xml';
+    if (lang === 'html') return 'text/html';
+    if (lang === 'javascript') return 'application/javascript';
+    return 'text/plain';
+}
+
+function renderBodyRow(row, idx, tbodyId, isFormData) {
+    const rid = row.id || nextManualBodyId('row');
+    const fileInputId = `${rid}-file`;
+    const isFile = isFormData && row.type === 'file';
+    const valueCell = isFile
+        ? `<div class="binary-upload-box"><input id="${fileInputId}" type="file" /><span class="file-name-tag" id="${fileInputId}-name">${escapeHtml(row.file_name || '')}</span></div>`
+        : `<input type="text" value="${escapeAttr(row.value || '')}" />`;
+    const typeCell = isFormData
+        ? `<select onchange="onFormDataTypeChange(this)"><option value="text" ${isFile ? '' : 'selected'}>text</option><option value="file" ${isFile ? 'selected' : ''}>file</option></select>`
+        : '';
+    return `
+        <tr data-row-id="${escapeAttr(rid)}" data-formdata="${isFormData ? '1' : '0'}">
+            <td><input type="text" value="${escapeAttr(row.key || '')}" placeholder="支持 address.city" /></td>
+            <td>${valueCell}</td>
+            ${isFormData ? `<td>${typeCell}</td>` : ''}
+            <td><div class="body-row-op"><button type="button" class="btn-compact" onclick="removeBodyRow(this)">删除</button></div></td>
+        </tr>
+    `;
+}
+
+function renderManualBodyEditor(bodyValue) {
+    _mcBodyEditorState = normalizeManualBodyState(bodyValue);
+    if (!_mcBodyEditorState.formdata.length) {
+        _mcBodyEditorState.formdata.push({ id: nextManualBodyId('fd'), key: '', type: 'text', value: '', file_name: '' });
+    }
+    if (!_mcBodyEditorState.urlencoded.length) {
+        _mcBodyEditorState.urlencoded.push({ id: nextManualBodyId('ue'), key: '', value: '' });
+    }
+    const root = document.getElementById('mc-body-editor');
+    if (!root) {
+        return;
+    }
+    const fdRows = _mcBodyEditorState.formdata.map((row, idx) => renderBodyRow(row, idx, 'mc-formdata-rows', true)).join('');
+    const ueRows = _mcBodyEditorState.urlencoded.map((row, idx) => renderBodyRow(row, idx, 'mc-urlencoded-rows', false)).join('');
+    root.innerHTML = `
+        <div class="body-mode-selector">
+            <button type="button" class="body-mode-btn" data-mode="none" onclick="switchManualBodyMode('none')">none</button>
+            <button type="button" class="body-mode-btn" data-mode="formdata" onclick="switchManualBodyMode('formdata')">form-data</button>
+            <button type="button" class="body-mode-btn" data-mode="urlencoded" onclick="switchManualBodyMode('urlencoded')">x-www-form-urlencoded</button>
+            <button type="button" class="body-mode-btn" data-mode="raw" onclick="switchManualBodyMode('raw')">raw</button>
+            <button type="button" class="body-mode-btn" data-mode="binary" onclick="switchManualBodyMode('binary')">binary</button>
+            <button type="button" class="body-mode-btn" data-mode="graphql" onclick="switchManualBodyMode('graphql')">GraphQL</button>
+        </div>
+
+        <div id="mc-body-none" class="body-panel"><div class="body-mini-hint">当前请求不发送 Body。</div></div>
+
+        <div id="mc-body-formdata" class="body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:30%;">Key</th><th style="width:34%;">Value/File</th><th style="width:14%;">Type</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="mc-formdata-rows">${fdRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools">
+                <button type="button" class="btn-compact" onclick="addFormDataRow('text')">新增 text</button>
+                <button type="button" class="btn-compact" onclick="addFormDataRow('file')">新增 file</button>
+            </div>
+            <div class="body-mini-hint">支持点号路径 Key，例如 address.city。</div>
+        </div>
+
+        <div id="mc-body-urlencoded" class="body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:38%;">Key</th><th style="width:46%;">Value</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="mc-urlencoded-rows">${ueRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools"><button type="button" class="btn-compact" onclick="addUrlEncodedRow()">新增字段</button></div>
+        </div>
+
+        <div id="mc-body-raw" class="body-panel">
+            <div class="body-raw-wrap">
+                <div class="edit-row" style="margin:0;">
+                    <label style="min-width:96px;">Raw 类型</label>
+                    <select id="mc-raw-language" onchange="onManualRawLanguageChange()">
+                        <option value="text">Text</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="json">JSON</option>
+                        <option value="html">HTML</option>
+                        <option value="xml">XML</option>
+                    </select>
+                </div>
+                <textarea id="mc-raw-content" placeholder="输入 Raw 内容" oninput="onManualRawInput()">${escapeHtml(_mcBodyEditorState.raw_content || '')}</textarea>
+                <div class="body-raw-tools">
+                    <button type="button" class="btn-compact" onclick="formatManualRawContent()">格式化</button>
+                    <button type="button" class="btn-compact" onclick="validateManualRawContent(true)">校验</button>
+                </div>
+                <div id="mc-raw-status" class="raw-status-line"></div>
+                <pre id="mc-raw-highlight" class="raw-highlight-box"></pre>
+            </div>
+        </div>
+
+        <div id="mc-body-binary" class="body-panel">
+            <div class="binary-upload-box">
+                <input id="mc-binary-file" type="file" />
+                <span id="mc-binary-file-name" class="file-name-tag">${escapeHtml((_mcBodyEditorState.binary && _mcBodyEditorState.binary.file_name) || '')}</span>
+            </div>
+            <div class="body-mini-hint">binary 模式发送时将真实上传所选文件。</div>
+        </div>
+
+        <div id="mc-body-graphql" class="body-panel">
+            <div class="graphql-split">
+                <div>
+                    <div class="graphql-col-title">QUERY</div>
+                    <textarea id="mc-graphql-query" placeholder="query {\n  ping\n}">${escapeHtml((_mcBodyEditorState.graphql && _mcBodyEditorState.graphql.query) || '')}</textarea>
+                </div>
+                <div>
+                    <div class="graphql-col-title">GRAPHQL VARIABLES</div>
+                    <textarea id="mc-graphql-variables" placeholder="{}" oninput="validateGraphqlVariablesRealtime()">${escapeHtml((_mcBodyEditorState.graphql && _mcBodyEditorState.graphql.variables) || '{}')}</textarea>
+                </div>
+            </div>
+            <div id="mc-graphql-status" class="raw-status-line"></div>
+        </div>
+    `;
+
+    const rawLanguage = document.getElementById('mc-raw-language');
+    if (rawLanguage) {
+        rawLanguage.value = String(_mcBodyEditorState.raw_language || 'json');
+    }
+    const binaryInput = document.getElementById('mc-binary-file');
+    if (binaryInput) {
+        binaryInput.addEventListener('change', () => {
+            const f = binaryInput.files && binaryInput.files[0] ? binaryInput.files[0] : null;
+            document.getElementById('mc-binary-file-name').textContent = f ? f.name : '';
+        });
+    }
+    bindFormDataFileChange();
+    switchManualBodyMode(_mcBodyEditorState.mode || 'none');
+    onManualRawInput();
+    validateGraphqlVariablesRealtime();
+}
+
+function switchManualBodyMode(mode) {
+    _mcBodyEditorState = _mcBodyEditorState || {};
+    _mcBodyEditorState.mode = mode;
+    const mcContainer = document.getElementById('mc-body-editor');
+    if (!mcContainer) {
+        return;
+    }
+    mcContainer.querySelectorAll('.body-mode-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+    });
+    mcContainer.querySelectorAll('.body-panel').forEach((panel) => panel.classList.remove('active'));
+    const panel = document.getElementById(`mc-body-${mode}`);
+    if (panel) {
+        panel.classList.add('active');
+    }
+}
+
+function bindFormDataFileChange() {
+    const rows = document.querySelectorAll('#mc-formdata-rows tr[data-formdata="1"]');
+    rows.forEach((row) => {
+        const fileInput = row.querySelector('input[type="file"]');
+        if (!fileInput) {
+            return;
+        }
+        const nameTag = row.querySelector('.file-name-tag');
+        fileInput.onchange = () => {
+            const f = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            if (nameTag) {
+                nameTag.textContent = f ? f.name : '';
+            }
+        };
+    });
+}
+
+function onFormDataTypeChange(selectEl) {
+    const tr = selectEl.closest('tr');
+    if (!tr) {
+        return;
+    }
+    const type = String(selectEl.value || 'text').toLowerCase();
+    const valueCell = tr.querySelector('td:nth-child(2)');
+    if (!valueCell) {
+        return;
+    }
+    if (type === 'file') {
+        const rid = tr.getAttribute('data-row-id') || nextManualBodyId('fd');
+        const inputId = `${rid}-file`;
+        valueCell.innerHTML = `<div class="binary-upload-box"><input id="${inputId}" type="file" /><span class="file-name-tag" id="${inputId}-name"></span></div>`;
+        bindFormDataFileChange();
+    } else {
+        valueCell.innerHTML = '<input type="text" value="" />';
+    }
+}
+
+function removeBodyRow(btn) {
+    const tr = btn.closest('tr');
+    if (tr) {
+        tr.remove();
+    }
+}
+
+function removeRetryBodyRow(btn) {
+    const tr = btn.closest('tr');
+    if (tr) {
+        tr.remove();
+    }
+}
+
+function addFormDataRow(type) {
+    const tbody = document.getElementById('mc-formdata-rows');
+    if (!tbody) {
+        return;
+    }
+    const row = renderBodyRow({ id: nextManualBodyId('fd'), key: '', type: type === 'file' ? 'file' : 'text', value: '', file_name: '' }, 0, 'mc-formdata-rows', true);
+    tbody.insertAdjacentHTML('beforeend', row);
+    bindFormDataFileChange();
+}
+
+function addUrlEncodedRow() {
+    const tbody = document.getElementById('mc-urlencoded-rows');
+    if (!tbody) {
+        return;
+    }
+    const row = renderBodyRow({ id: nextManualBodyId('ue'), key: '', value: '' }, 0, 'mc-urlencoded-rows', false);
+    tbody.insertAdjacentHTML('beforeend', row);
+}
+
+function parseBodyTableRows(tbodyId, isFormData) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) {
+        return [];
+    }
+    const rows = [];
+    tbody.querySelectorAll('tr').forEach((tr, index) => {
+        const keyInput = tr.querySelector('td:nth-child(1) input[type="text"]');
+        const key = (keyInput && keyInput.value ? keyInput.value : '').trim();
+        if (!key) {
+            return;
+        }
+        if (!isFormData) {
+            const valueInput = tr.querySelector('td:nth-child(2) input[type="text"]');
+            rows.push({ key, value: valueInput ? valueInput.value : '' });
+            return;
+        }
+        const typeSelect = tr.querySelector('td:nth-child(3) select');
+        const rowType = typeSelect ? typeSelect.value : 'text';
+        if (rowType === 'file') {
+            const fInput = tr.querySelector('input[type="file"]');
+            const file = fInput && fInput.files && fInput.files[0] ? fInput.files[0] : null;
+            rows.push({ key, type: 'file', file, file_name: file ? file.name : '' });
+        } else {
+            const valueInput = tr.querySelector('td:nth-child(2) input[type="text"]');
+            rows.push({ key, type: 'text', value: valueInput ? valueInput.value : '' });
+        }
+    });
+    return rows;
+}
+
+function onManualRawLanguageChange() {
+    const langEl = document.getElementById('mc-raw-language');
+    if (_mcBodyEditorState) {
+        _mcBodyEditorState.raw_language = langEl ? langEl.value : 'json';
+    }
+    onManualRawInput();
+}
+
+function highlightRawContent(text, language) {
+    const escaped = escapeHtml(text || '');
+    if (language !== 'json' && language !== 'javascript') {
+        return escaped;
+    }
+    return escaped
+        .replace(/("(?:\\.|[^"\\])*"\s*:)/g, '<span class="k">$1</span>')
+        .replace(/(:\s*)("(?:\\.|[^"\\])*")/g, '$1<span class="s">$2</span>')
+        .replace(/(:\s*)(-?\d+(?:\.\d+)?)/g, '$1<span class="n">$2</span>')
+        .replace(/(:\s*)(true|false)/g, '$1<span class="b">$2</span>')
+        .replace(/(:\s*)(null)/g, '$1<span class="null">$2</span>');
+}
+
+function validateManualRawContent(showAlert) {
+    const lang = (document.getElementById('mc-raw-language')?.value || 'json').toLowerCase();
+    const text = document.getElementById('mc-raw-content')?.value || '';
+    const status = document.getElementById('mc-raw-status');
+    let ok = true;
+    let message = '实时校验通过';
+    if (lang === 'json' || lang === 'javascript') {
+        try {
+            JSON.parse(text || 'null');
+        } catch (e) {
+            ok = false;
+            message = `JSON 校验失败: ${e.message || e}`;
+        }
+    } else if (lang === 'xml') {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text || '<root/>', 'application/xml');
+            const hasErr = doc.getElementsByTagName('parsererror').length > 0;
+            if (hasErr) {
+                ok = false;
+                message = 'XML 校验失败，请检查标签闭合';
+            }
+        } catch (e) {
+            ok = false;
+            message = `XML 校验失败: ${e.message || e}`;
+        }
+    }
+    if (status) {
+        status.textContent = `${message} | 字数 ${text.length}`;
+        status.classList.toggle('ok', ok);
+        status.classList.toggle('err', !ok);
+    }
+    if (!ok && showAlert) {
+        alert(message);
+    }
+    return ok;
+}
+
+function onManualRawInput() {
+    const rawText = document.getElementById('mc-raw-content')?.value || '';
+    const lang = (document.getElementById('mc-raw-language')?.value || 'json').toLowerCase();
+    const pre = document.getElementById('mc-raw-highlight');
+    if (pre) {
+        pre.innerHTML = highlightRawContent(rawText, lang);
+    }
+    validateManualRawContent(false);
+}
+
+function formatXmlText(xml) {
+    const p = (xml || '').replace(/>\s*</g, '><').trim();
+    if (!p) {
+        return '';
+    }
+    const parts = p.replace(/></g, '>|<').split('|');
+    let level = 0;
+    const out = [];
+    parts.forEach((node) => {
+        if (/^<\/\w/.test(node)) {
+            level = Math.max(level - 1, 0);
+        }
+        out.push(`${'  '.repeat(level)}${node}`);
+        if (/^<\w[^>]*[^/]?>$/.test(node)) {
+            level += 1;
+        }
+    });
+    return out.join('\n');
+}
+
+function formatManualRawContent() {
+    const lang = (document.getElementById('mc-raw-language')?.value || 'json').toLowerCase();
+    const rawEl = document.getElementById('mc-raw-content');
+    if (!rawEl) {
+        return;
+    }
+    const text = rawEl.value || '';
+    try {
+        if (lang === 'json' || lang === 'javascript') {
+            rawEl.value = JSON.stringify(JSON.parse(text || 'null'), null, 2);
+        } else if (lang === 'xml') {
+            rawEl.value = formatXmlText(text);
+        }
+        onManualRawInput();
+    } catch (e) {
+        alert(`格式化失败: ${e.message || e}`);
+    }
+}
+
+function validateGraphqlVariablesRealtime() {
+    const text = document.getElementById('mc-graphql-variables')?.value || '{}';
+    const status = document.getElementById('mc-graphql-status');
+    let ok = true;
+    let message = 'GraphQL Variables 校验通过';
+    try {
+        JSON.parse(text || '{}');
+    } catch (e) {
+        ok = false;
+        message = `GraphQL Variables 不是有效 JSON: ${e.message || e}`;
+    }
+    if (status) {
+        status.textContent = message;
+        status.classList.toggle('ok', ok);
+        status.classList.toggle('err', !ok);
+    }
+    return ok;
+}
+
+function buildManualBodyFromEditor(forSend) {
+    const mode = (_mcBodyEditorState && _mcBodyEditorState.mode) || 'none';
+    if (mode === 'none') {
+        return { ok: true, mode, storage: { __manual_body_mode: 'none' }, request: { body_mode: 'none', body_data: null }, multipart: null };
+    }
+    if (mode === 'raw') {
+        const lang = (document.getElementById('mc-raw-language')?.value || 'json').toLowerCase();
+        if (!validateManualRawContent(false)) {
+            return { ok: false, error: 'Raw 内容校验失败，请修正后再发送/保存' };
+        }
+        const content = document.getElementById('mc-raw-content')?.value || '';
+        const contentType = getRawContentTypeByLanguage(lang);
+        return {
+            ok: true,
+            mode,
+            storage: { __manual_body_mode: 'raw', raw_language: lang, raw_content_type: contentType, raw_content: content },
+            request: { body_mode: 'raw', body_data: { raw_language: lang, raw_content_type: contentType, raw_content: content } },
+            multipart: null,
+        };
+    }
+    if (mode === 'urlencoded') {
+        const rows = parseBodyTableRows('mc-urlencoded-rows', false);
+        return {
+            ok: true,
+            mode,
+            storage: { __manual_body_mode: 'urlencoded', urlencoded: rows },
+            request: { body_mode: 'urlencoded', body_data: { urlencoded: rows } },
+            multipart: null,
+        };
+    }
+    if (mode === 'graphql') {
+        const query = document.getElementById('mc-graphql-query')?.value || '';
+        const variablesText = document.getElementById('mc-graphql-variables')?.value || '{}';
+        if (!validateGraphqlVariablesRealtime()) {
+            return { ok: false, error: 'GraphQL Variables 不是有效 JSON' };
+        }
+        return {
+            ok: true,
+            mode,
+            storage: { __manual_body_mode: 'graphql', graphql: { query, variables: variablesText } },
+            request: { body_mode: 'graphql', body_data: { query, variables: variablesText } },
+            multipart: null,
+        };
+    }
+    if (mode === 'formdata') {
+        const rows = parseBodyTableRows('mc-formdata-rows', true);
+        const storageRows = rows.map((row) => row.type === 'file'
+            ? { key: row.key, type: 'file', file_name: row.file_name || '' }
+            : { key: row.key, type: 'text', value: row.value || '' });
+        if (!forSend) {
+            return {
+                ok: true,
+                mode,
+                storage: { __manual_body_mode: 'formdata', formdata: storageRows },
+                request: { body_mode: 'formdata', body_data: { formdata: storageRows } },
+                multipart: null,
+            };
+        }
+        const formData = new FormData();
+        const relayRows = [];
+        let fileIndex = 0;
+        rows.forEach((row) => {
+            if (row.type === 'file') {
+                const uploadKey = `upload_${fileIndex}`;
+                fileIndex += 1;
+                relayRows.push({ key: row.key, type: 'file', upload_key: uploadKey, file_name: row.file_name || '' });
+                if (row.file) {
+                    formData.append(uploadKey, row.file);
+                }
+            } else {
+                relayRows.push({ key: row.key, type: 'text', value: row.value || '' });
+            }
+        });
+        return {
+            ok: true,
+            mode,
+            storage: { __manual_body_mode: 'formdata', formdata: storageRows },
+            request: { body_mode: 'formdata', body_data: { formdata: relayRows } },
+            multipart: formData,
+        };
+    }
+    if (mode === 'binary') {
+        const fileInput = document.getElementById('mc-binary-file');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (forSend && !file) {
+            return { ok: false, error: 'binary 模式请选择要上传的文件' };
+        }
+        if (!forSend) {
+            return {
+                ok: true,
+                mode,
+                storage: { __manual_body_mode: 'binary', binary: { file_name: file ? file.name : '' } },
+                request: { body_mode: 'binary', body_data: { file_name: file ? file.name : '' } },
+                multipart: null,
+            };
+        }
+        const formData = new FormData();
+        if (file) {
+            formData.append('upload_0', file);
+        }
+        return {
+            ok: true,
+            mode,
+            storage: { __manual_body_mode: 'binary', binary: { file_name: file ? file.name : '' } },
+            request: { body_mode: 'binary', body_data: { upload_key: 'upload_0', file_name: file ? file.name : '' } },
+            multipart: formData,
+        };
+    }
+    return { ok: false, error: `不支持的 Body 模式: ${mode}` };
 }
 
 function buildLimitedValue(value, limits) {
@@ -732,14 +1350,399 @@ function toggleHistory(btn) {
     btn.textContent = (open ? '▶' : '▼') + btn.textContent.slice(1);
 }
 
+/* ===== 编辑重试面板：er- 前缀辅助函数（顶层） ===== */
+function erAddKvRow(prefix) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    row.innerHTML = '<input type="text" placeholder="Key"><input type="text" placeholder="Value"><button type="button" class="kv-row-del" onclick="removeKvRow(this)" title="删除">×</button>';
+    container.appendChild(row);
+}
+
+function erPopulateKvTable(prefix, obj) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return;
+    container.innerHTML = '';
+    const entries = (obj && typeof obj === 'object') ? Object.entries(obj) : [];
+    if (!entries.length) { erAddKvRow(prefix); return; }
+    entries.forEach(([k, v]) => {
+        const row = document.createElement('div');
+        row.className = 'kv-row';
+        row.innerHTML = `<input type="text" placeholder="Key" value="${escapeHtml(String(k))}"><input type="text" placeholder="Value" value="${escapeHtml(String(v))}"><button type="button" class="kv-row-del" onclick="removeKvRow(this)" title="删除">×</button>`;
+        container.appendChild(row);
+    });
+}
+
+function erKvTableToObj(prefix) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return {};
+    const result = {};
+    container.querySelectorAll('.kv-row').forEach((row) => {
+        const inputs = row.querySelectorAll('input');
+        const key = (inputs[0] && inputs[0].value.trim()) || '';
+        const val = (inputs[1] && inputs[1].value) || '';
+        if (key) result[key] = val;
+    });
+    return result;
+}
+
+function erParseJsonField(id) {
+    const el = document.getElementById(id);
+    if (!el) return [true, null];
+    const val = (el.value || '').trim();
+    el.classList.remove('error');
+    if (!val || val === '无') return [true, null];
+    try { return [true, JSON.parse(val)]; }
+    catch(e) { el.classList.add('error'); return [false, null]; }
+}
+
+function switchRetryEditMode(mode) {
+    if (mode === _erEditMode) return;
+    if (mode === 'form') {
+        const [hOk, headers] = erParseJsonField('er-headers');
+        const [pOk, params] = erParseJsonField('er-params');
+        if (!hOk || !pOk) { alert('当前 JSON 格式有误，请修正后再切换到表单模式'); return; }
+        erPopulateKvTable('er-headers', headers || {});
+        erPopulateKvTable('er-params', params || {});
+    } else {
+        const headers = erKvTableToObj('er-headers');
+        const params = erKvTableToObj('er-params');
+        const hEl = document.getElementById('er-headers');
+        const pEl = document.getElementById('er-params');
+        if (hEl) hEl.value = Object.keys(headers).length ? JSON.stringify(headers, null, 2) : '';
+        if (pEl) pEl.value = Object.keys(params).length ? JSON.stringify(params, null, 2) : '';
+    }
+    _erEditMode = mode;
+    ['er-headers-json-panel', 'er-params-json-panel'].forEach((id) => {
+        const el = document.getElementById(id); if (el) el.style.display = mode === 'json' ? '' : 'none';
+    });
+    ['er-headers-form-panel', 'er-params-form-panel'].forEach((id) => {
+        const el = document.getElementById(id); if (el) el.style.display = mode === 'form' ? '' : 'none';
+    });
+    const jsonBtn = document.getElementById('er-mode-json');
+    const formBtn = document.getElementById('er-mode-form');
+    if (jsonBtn) jsonBtn.classList.toggle('active', mode === 'json');
+    if (formBtn) formBtn.classList.toggle('active', mode === 'form');
+}
+
+function getRetryHeaders() {
+    if (_erEditMode === 'form') return [true, erKvTableToObj('er-headers')];
+    return erParseJsonField('er-headers');
+}
+
+function getRetryParams() {
+    if (_erEditMode === 'form') return [true, erKvTableToObj('er-params')];
+    return erParseJsonField('er-params');
+}
+
+function switchRetryBodyMode(mode) {
+    _erBodyEditorState = _erBodyEditorState || {};
+    _erBodyEditorState.mode = mode;
+    const container = document.getElementById('er-body-editor');
+    if (!container) return;
+    container.querySelectorAll('.er-body-mode-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+    });
+    container.querySelectorAll('.er-body-panel').forEach((panel) => panel.classList.remove('active'));
+    const panel = document.getElementById(`er-body-${mode}`);
+    if (panel) panel.classList.add('active');
+}
+
+function bindRetryFormDataFileChange() {
+    const rows = document.querySelectorAll('#er-formdata-rows tr[data-formdata="1"]');
+    rows.forEach((row) => {
+        const fileInput = row.querySelector('input[type="file"]');
+        if (!fileInput) return;
+        const nameTag = row.querySelector('.file-name-tag');
+        fileInput.onchange = () => {
+            const f = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+            if (nameTag) nameTag.textContent = f ? f.name : '';
+        };
+    });
+}
+
+function onRetryFormDataTypeChange(selectEl) {
+    const tr = selectEl.closest('tr');
+    if (!tr) return;
+    const type = String(selectEl.value || 'text').toLowerCase();
+    const valueCell = tr.querySelector('td:nth-child(2)');
+    if (!valueCell) return;
+    if (type === 'file') {
+        const rid = tr.getAttribute('data-row-id') || nextManualBodyId('erfd');
+        const inputId = `${rid}-file`;
+        valueCell.innerHTML = `<div class="binary-upload-box"><input id="${inputId}" type="file" /><span class="file-name-tag" id="${inputId}-name"></span></div>`;
+        bindRetryFormDataFileChange();
+    } else {
+        valueCell.innerHTML = '<input type="text" value="" />';
+    }
+}
+
+function renderRetryBodyRow(row, isFormData) {
+    const rid = row.id || nextManualBodyId('errow');
+    const fileInputId = `${rid}-file`;
+    const isFile = isFormData && row.type === 'file';
+    const valueCell = isFile
+        ? `<div class="binary-upload-box"><input id="${fileInputId}" type="file" /><span class="file-name-tag" id="${fileInputId}-name">${escapeHtml(row.file_name || '')}</span></div>`
+        : `<input type="text" value="${escapeAttr(row.value || '')}" />`;
+    const typeCell = isFormData
+        ? `<select onchange="onRetryFormDataTypeChange(this)"><option value="text" ${isFile ? '' : 'selected'}>text</option><option value="file" ${isFile ? 'selected' : ''}>file</option></select>`
+        : '';
+    return `
+        <tr data-row-id="${escapeAttr(rid)}" data-formdata="${isFormData ? '1' : '0'}">
+            <td><input type="text" value="${escapeAttr(row.key || '')}" placeholder="Key" /></td>
+            <td>${valueCell}</td>
+            ${isFormData ? `<td>${typeCell}</td>` : ''}
+            <td><div class="body-row-op"><button type="button" class="btn-compact" onclick="removeRetryBodyRow(this)">删除</button></div></td>
+        </tr>
+    `;
+}
+
+function addRetryFormDataRow(type) {
+    const tbody = document.getElementById('er-formdata-rows');
+    if (!tbody) return;
+    const row = renderRetryBodyRow({ id: nextManualBodyId('erfd'), key: '', type: type === 'file' ? 'file' : 'text', value: '', file_name: '' }, true);
+    tbody.insertAdjacentHTML('beforeend', row);
+    bindRetryFormDataFileChange();
+}
+
+function addRetryUrlEncodedRow() {
+    const tbody = document.getElementById('er-urlencoded-rows');
+    if (!tbody) return;
+    const row = renderRetryBodyRow({ id: nextManualBodyId('erue'), key: '', value: '' }, false);
+    tbody.insertAdjacentHTML('beforeend', row);
+}
+
+function validateRetryRawContent(showAlert) {
+    const lang = (document.getElementById('er-raw-language')?.value || 'json').toLowerCase();
+    const text = document.getElementById('er-raw-content')?.value || '';
+    const status = document.getElementById('er-raw-status');
+    let ok = true, message = '实时校验通过';
+    if (lang === 'json' || lang === 'javascript') {
+        try { JSON.parse(text || 'null'); }
+        catch (e) { ok = false; message = `JSON 校验失败: ${e.message || e}`; }
+    } else if (lang === 'xml') {
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text || '<root/>', 'application/xml');
+            if (doc.getElementsByTagName('parsererror').length > 0) { ok = false; message = 'XML 校验失败，请检查标签闭合'; }
+        } catch (e) { ok = false; message = `XML 校验失败: ${e.message || e}`; }
+    }
+    if (status) { status.textContent = `${message} | 字数 ${text.length}`; status.classList.toggle('ok', ok); status.classList.toggle('err', !ok); }
+    if (!ok && showAlert) alert(message);
+    return ok;
+}
+
+function onRetryRawInput() {
+    const rawText = document.getElementById('er-raw-content')?.value || '';
+    const lang = (document.getElementById('er-raw-language')?.value || 'json').toLowerCase();
+    const pre = document.getElementById('er-raw-highlight');
+    if (pre) pre.innerHTML = highlightRawContent(rawText, lang);
+    validateRetryRawContent(false);
+}
+
+function formatRetryRawContent() {
+    const lang = (document.getElementById('er-raw-language')?.value || 'json').toLowerCase();
+    const rawEl = document.getElementById('er-raw-content');
+    if (!rawEl) return;
+    const text = rawEl.value || '';
+    try {
+        if (lang === 'json' || lang === 'javascript') { rawEl.value = JSON.stringify(JSON.parse(text || 'null'), null, 2); }
+        else if (lang === 'xml') { rawEl.value = formatXmlText(text); }
+        onRetryRawInput();
+    } catch (e) { alert(`格式化失败: ${e.message || e}`); }
+}
+
+function validateRetryGraphqlVariables() {
+    const text = document.getElementById('er-graphql-variables')?.value || '{}';
+    const status = document.getElementById('er-graphql-status');
+    let ok = true, message = 'GraphQL Variables 校验通过';
+    try { JSON.parse(text || '{}'); }
+    catch (e) { ok = false; message = `GraphQL Variables 不是有效 JSON: ${e.message || e}`; }
+    if (status) { status.textContent = message; status.classList.toggle('ok', ok); status.classList.toggle('err', !ok); }
+    return ok;
+}
+
+function renderRetryBodyEditor(bodyValue) {
+    _erBodyEditorState = normalizeManualBodyState(bodyValue);
+    if (!_erBodyEditorState.formdata.length) {
+        _erBodyEditorState.formdata.push({ id: nextManualBodyId('erfd'), key: '', type: 'text', value: '', file_name: '' });
+    }
+    if (!_erBodyEditorState.urlencoded.length) {
+        _erBodyEditorState.urlencoded.push({ id: nextManualBodyId('erue'), key: '', value: '' });
+    }
+    const root = document.getElementById('er-body-editor');
+    if (!root) return;
+    const fdRows = _erBodyEditorState.formdata.map((row) => renderRetryBodyRow(row, true)).join('');
+    const ueRows = _erBodyEditorState.urlencoded.map((row) => renderRetryBodyRow(row, false)).join('');
+    root.innerHTML = `
+        <div class="body-mode-selector">
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="none" onclick="switchRetryBodyMode('none')">none</button>
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="formdata" onclick="switchRetryBodyMode('formdata')">form-data</button>
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="urlencoded" onclick="switchRetryBodyMode('urlencoded')">x-www-form-urlencoded</button>
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="raw" onclick="switchRetryBodyMode('raw')">raw</button>
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="binary" onclick="switchRetryBodyMode('binary')">binary</button>
+            <button type="button" class="er-body-mode-btn body-mode-btn" data-mode="graphql" onclick="switchRetryBodyMode('graphql')">GraphQL</button>
+        </div>
+        <div id="er-body-none" class="er-body-panel body-panel"><div class="body-mini-hint">当前请求不发送 Body。</div></div>
+        <div id="er-body-formdata" class="er-body-panel body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:30%;">Key</th><th style="width:34%;">Value/File</th><th style="width:14%;">Type</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="er-formdata-rows">${fdRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools">
+                <button type="button" class="btn-compact" onclick="addRetryFormDataRow('text')">新增 text</button>
+                <button type="button" class="btn-compact" onclick="addRetryFormDataRow('file')">新增 file</button>
+            </div>
+        </div>
+        <div id="er-body-urlencoded" class="er-body-panel body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:38%;">Key</th><th style="width:46%;">Value</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="er-urlencoded-rows">${ueRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools"><button type="button" class="btn-compact" onclick="addRetryUrlEncodedRow()">新增字段</button></div>
+        </div>
+        <div id="er-body-raw" class="er-body-panel body-panel">
+            <div class="body-raw-wrap">
+                <div class="edit-row" style="margin:0;">
+                    <label style="min-width:96px;">Raw 类型</label>
+                    <select id="er-raw-language" onchange="onRetryRawInput()">
+                        <option value="text">Text</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="json">JSON</option>
+                        <option value="html">HTML</option>
+                        <option value="xml">XML</option>
+                    </select>
+                </div>
+                <textarea id="er-raw-content" placeholder="输入 Raw 内容" oninput="onRetryRawInput()"></textarea>
+                <div class="body-raw-tools">
+                    <button type="button" class="btn-compact" onclick="formatRetryRawContent()">格式化</button>
+                    <button type="button" class="btn-compact" onclick="validateRetryRawContent(true)">校验</button>
+                </div>
+                <div id="er-raw-status" class="raw-status-line"></div>
+                <pre id="er-raw-highlight" class="raw-highlight-box"></pre>
+            </div>
+        </div>
+        <div id="er-body-binary" class="er-body-panel body-panel">
+            <div class="binary-upload-box">
+                <input id="er-binary-file" type="file" />
+                <span id="er-binary-file-name" class="file-name-tag"></span>
+            </div>
+            <div class="body-mini-hint">binary 模式发送时将真实上传所选文件。</div>
+        </div>
+        <div id="er-body-graphql" class="er-body-panel body-panel">
+            <div class="graphql-split">
+                <div>
+                    <div class="graphql-col-title">QUERY</div>
+                    <textarea id="er-graphql-query" placeholder="query {\n  ping\n}"></textarea>
+                </div>
+                <div>
+                    <div class="graphql-col-title">GRAPHQL VARIABLES</div>
+                    <textarea id="er-graphql-variables" placeholder="{}" oninput="validateRetryGraphqlVariables()"></textarea>
+                </div>
+            </div>
+            <div id="er-graphql-status" class="raw-status-line"></div>
+        </div>
+    `;
+    // Populate dynamic content after innerHTML (avoids template literal escaping issues)
+    const rawContent = document.getElementById('er-raw-content');
+    if (rawContent) rawContent.value = _erBodyEditorState.raw_content || '';
+    const rawLanguage = document.getElementById('er-raw-language');
+    if (rawLanguage) rawLanguage.value = String(_erBodyEditorState.raw_language || 'json');
+    const binaryFileName = document.getElementById('er-binary-file-name');
+    if (binaryFileName) binaryFileName.textContent = (_erBodyEditorState.binary && _erBodyEditorState.binary.file_name) || '';
+    const gqlQuery = document.getElementById('er-graphql-query');
+    if (gqlQuery) gqlQuery.value = (_erBodyEditorState.graphql && _erBodyEditorState.graphql.query) || '';
+    const gqlVars = document.getElementById('er-graphql-variables');
+    if (gqlVars) gqlVars.value = (_erBodyEditorState.graphql && _erBodyEditorState.graphql.variables) || '{}';
+    const binaryInput = document.getElementById('er-binary-file');
+    if (binaryInput) {
+        binaryInput.addEventListener('change', () => {
+            const f = binaryInput.files && binaryInput.files[0] ? binaryInput.files[0] : null;
+            const nameEl = document.getElementById('er-binary-file-name');
+            if (nameEl) nameEl.textContent = f ? f.name : '';
+        });
+    }
+    bindRetryFormDataFileChange();
+    switchRetryBodyMode(_erBodyEditorState.mode || 'none');
+    onRetryRawInput();
+    validateRetryGraphqlVariables();
+}
+
+function buildRetryBodyFromEditor(forSend) {
+    const mode = (_erBodyEditorState && _erBodyEditorState.mode) || 'none';
+    if (mode === 'none') {
+        return { ok: true, mode, request: { body_mode: 'none', body_data: null }, multipart: null };
+    }
+    if (mode === 'raw') {
+        const lang = (document.getElementById('er-raw-language')?.value || 'json').toLowerCase();
+        if (forSend && !validateRetryRawContent(false)) return { ok: false, error: 'Raw 内容校验失败，请修正后再发送' };
+        const content = document.getElementById('er-raw-content')?.value || '';
+        const contentType = getRawContentTypeByLanguage(lang);
+        return { ok: true, mode, request: { body_mode: 'raw', body_data: { raw_language: lang, raw_content_type: contentType, raw_content: content } }, multipart: null };
+    }
+    if (mode === 'urlencoded') {
+        const rows = parseBodyTableRows('er-urlencoded-rows', false);
+        return { ok: true, mode, request: { body_mode: 'urlencoded', body_data: { urlencoded: rows } }, multipart: null };
+    }
+    if (mode === 'graphql') {
+        const query = document.getElementById('er-graphql-query')?.value || '';
+        const variablesText = document.getElementById('er-graphql-variables')?.value || '{}';
+        if (forSend && !validateRetryGraphqlVariables()) return { ok: false, error: 'GraphQL Variables 不是有效 JSON' };
+        return { ok: true, mode, request: { body_mode: 'graphql', body_data: { query, variables: variablesText } }, multipart: null };
+    }
+    if (mode === 'formdata') {
+        const rows = parseBodyTableRows('er-formdata-rows', true);
+        const storageRows = rows.map((row) => row.type === 'file'
+            ? { key: row.key, type: 'file', file_name: row.file_name || '' }
+            : { key: row.key, type: 'text', value: row.value || '' });
+        if (!forSend) {
+            return { ok: true, mode, request: { body_mode: 'formdata', body_data: { formdata: storageRows } }, multipart: null };
+        }
+        const formData = new FormData();
+        const relayRows = [];
+        let fileIndex = 0;
+        rows.forEach((row) => {
+            if (row.type === 'file') {
+                const uploadKey = `upload_${fileIndex++}`;
+                relayRows.push({ key: row.key, type: 'file', upload_key: uploadKey, file_name: row.file_name || '' });
+                if (row.file) formData.append(uploadKey, row.file);
+            } else {
+                relayRows.push({ key: row.key, type: 'text', value: row.value || '' });
+            }
+        });
+        return { ok: true, mode, request: { body_mode: 'formdata', body_data: { formdata: relayRows } }, multipart: formData };
+    }
+    if (mode === 'binary') {
+        const fileInput = document.getElementById('er-binary-file');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (forSend && !file) return { ok: false, error: 'binary 模式请选择要上传的文件' };
+        if (!forSend) return { ok: true, mode, request: { body_mode: 'binary', body_data: { file_name: file ? file.name : '' } }, multipart: null };
+        const formData = new FormData();
+        if (file) formData.append('upload_0', file);
+        return { ok: true, mode, request: { body_mode: 'binary', body_data: { upload_key: 'upload_0', file_name: file ? file.name : '' } }, multipart: formData };
+    }
+    return { ok: false, error: `不支持的 Body 模式: ${mode}` };
+}
+/* ===== 编辑重试面板辅助函数结束 ===== */
+
 function openEditRetry() {
+    _erEditMode = 'json';
+    _erBodyEditorState = null;
     const panel = document.getElementById('editRetryPanel');
     const data = currentDetailData || {};
-
     const reqInfo = data.request_info || {};
     const methodOptions = ['GET','POST','PUT','DELETE','PATCH'].map(m =>
         `<option value="${m}" ${m === (data.method || 'GET') ? 'selected' : ''}>${m}</option>`
     ).join('');
+    const headersJson = (reqInfo.headers && Object.keys(reqInfo.headers).length)
+        ? JSON.stringify(reqInfo.headers, null, 2) : '';
+    const paramsJson = (reqInfo.params && Object.keys(reqInfo.params).length)
+        ? JSON.stringify(reqInfo.params, null, 2) : '';
 
     panel.style.display = '';
     panel.innerHTML = `
@@ -751,27 +1754,43 @@ function openEditRetry() {
             </div>
             <div class="edit-row">
                 <label>URL</label>
-                <input type="text" id="er-url" value="${escapeHtml(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
+                <input type="text" id="er-url" value="${escapeAttr(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
             </div>
             <div class="edit-row">
                 <label>Token</label>
                 <input type="text" id="er-token" placeholder="留空则使用原始 Headers 中的认证" />
             </div>
-            <div class="edit-row">
-                <label>Headers</label>
-                <textarea id="er-headers">${escapeHtml(formatJson(reqInfo.headers || {}))}</textarea>
+            <div class="mc-mode-switcher" style="margin-bottom:4px;">
+                <button type="button" id="er-mode-json" class="mc-mode-btn active" onclick="switchRetryEditMode('json')">JSON 模式</button>
+                <button type="button" id="er-mode-form" class="mc-mode-btn" onclick="switchRetryEditMode('form')">表单模式</button>
             </div>
-            <div class="edit-row">
-                <label>Params</label>
-                <textarea id="er-params">${escapeHtml(formatJson(reqInfo.params || {}))}</textarea>
+            <div class="edit-section-label">Headers</div>
+            <div id="er-headers-json-panel">
+                <textarea id="er-headers" placeholder="{}" style="height:80px;">${escapeHtml(headersJson)}</textarea>
             </div>
-            <div class="edit-row">
-                <label>Body</label>
-                <textarea id="er-body">${escapeHtml(formatJson(reqInfo.body !== undefined ? reqInfo.body : null))}</textarea>
+            <div id="er-headers-form-panel" style="display:none;">
+                <div class="kv-table-wrap">
+                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                    <div id="er-headers-kv-rows"></div>
+                </div>
+                <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-headers')">+ 新增</button>
             </div>
-            <div class="edit-row">
+            <div class="edit-section-label" style="margin-top:8px;">Params</div>
+            <div id="er-params-json-panel">
+                <textarea id="er-params" placeholder="{}" style="height:60px;">${escapeHtml(paramsJson)}</textarea>
+            </div>
+            <div id="er-params-form-panel" style="display:none;">
+                <div class="kv-table-wrap">
+                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                    <div id="er-params-kv-rows"></div>
+                </div>
+                <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-params')">+ 新增</button>
+            </div>
+            <div class="edit-section-label" style="margin-top:8px;">Body</div>
+            <div id="er-body-editor"></div>
+            <div class="edit-row" style="margin-top:8px;">
                 <label>期望状态码</label>
-                <input type="text" id="er-expected-status" value="${escapeHtml(String(data.expected_status || 200))}" style="max-width:80px;" />
+                <input type="text" id="er-expected-status" value="${escapeAttr(String(data.expected_status || 200))}" style="max-width:80px;" />
             </div>
             <div class="edit-row">
                 <label></label>
@@ -784,6 +1803,7 @@ function openEditRetry() {
             <div id="er-result" style="display:none;"></div>
         </div>
     `;
+    renderRetryBodyEditor(reqInfo.body);
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -810,18 +1830,20 @@ async function sendRetry() {
     const data = currentDetailData || {};
     const resultIndex = Number.isInteger(currentDetailIndex) ? currentDetailIndex : -1;
 
-    const url = (document.getElementById('er-url').value || '').trim();
+    const url = (document.getElementById('er-url')?.value || '').trim();
     if (!url) { alert('URL 不能为空'); return; }
 
-    const [hOk, headers] = parseJsonField('er-headers');
-    const [pOk, params]  = parseJsonField('er-params');
-    const [bOk, bodyVal] = parseJsonField('er-body');
-    if (!hOk || !pOk || !bOk) { alert('Headers / Params / Body 中有 JSON 格式错误，请检查红色输入框。'); return; }
+    const [hOk, headers] = getRetryHeaders();
+    const [pOk, params] = getRetryParams();
+    if (!hOk || !pOk) { alert('Headers 或 Params 中有 JSON 格式错误，请检查。'); return; }
+
+    const bodyResult = buildRetryBodyFromEditor(true);
+    if (!bodyResult.ok) { alert(bodyResult.error || 'Body 构建失败'); return; }
 
     const method = document.getElementById('er-method').value;
-    const token = (document.getElementById('er-token').value || '').trim();
-    const expectedStatus = parseInt(document.getElementById('er-expected-status').value, 10) || 200;
-    const saveToReport = document.getElementById('er-save').checked;
+    const token = (document.getElementById('er-token')?.value || '').trim();
+    const expectedStatus = parseInt(document.getElementById('er-expected-status')?.value || '200', 10) || 200;
+    const saveToReport = document.getElementById('er-save')?.checked !== false;
 
     const btn = document.getElementById('er-send-btn');
     btn.disabled = true;
@@ -831,25 +1853,34 @@ async function sendRetry() {
     resultDiv.className = 'retry-result-box';
     resultDiv.textContent = '正在发送请求...';
 
+    const requestMeta = {
+        url, method,
+        headers: headers || {},
+        params: params || {},
+        token,
+        expected_status: expectedStatus,
+        save_to_report: saveToReport,
+        report_name: reportName,
+        result_index: resultIndex,
+        name: data.name || url,
+        folder: data.folder || '',
+        item_path: data.item_path || [],
+        ...bodyResult.request,
+    };
+
     try {
-        const resp = await fetch('/re-request-api', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                url, method,
-                headers: headers || {},
-                params: params || {},
-                body: bodyVal,
-                token,
-                expected_status: expectedStatus,
-                save_to_report: saveToReport,
-                report_name: reportName,
-                result_index: resultIndex,
-                name: data.name || url,
-                folder: data.folder || '',
-                item_path: data.item_path || [],
-            })
-        });
+        let resp;
+        if (bodyResult.multipart) {
+            const formData = bodyResult.multipart;
+            formData.append('request_meta', JSON.stringify(requestMeta));
+            resp = await fetch('/re-request-api', { method: 'POST', body: formData });
+        } else {
+            resp = await fetch('/re-request-api', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestMeta),
+            });
+        }
         const result = await resp.json();
 
         const isPass = result.status === 'PASSED';
@@ -962,12 +1993,109 @@ async function saveCurrentAsManualCase() {
     }
 }
 
+/* ===== Headers/Params JSON↔表单模式切换 ===== */
+function addKvRow(prefix) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'kv-row';
+    row.innerHTML = '<input type="text" placeholder="Key"><input type="text" placeholder="Value"><button type="button" class="kv-row-del" onclick="removeKvRow(this)" title="删除">×</button>';
+    container.appendChild(row);
+}
+
+function removeKvRow(btn) {
+    const row = btn.closest('.kv-row');
+    if (row) row.remove();
+}
+
+function kvTableToObj(prefix) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return {};
+    const result = {};
+    container.querySelectorAll('.kv-row').forEach((row) => {
+        const inputs = row.querySelectorAll('input');
+        const key = (inputs[0] && inputs[0].value.trim()) || '';
+        const val = (inputs[1] && inputs[1].value) || '';
+        if (key) result[key] = val;
+    });
+    return result;
+}
+
+function populateKvTable(prefix, obj) {
+    const container = document.getElementById(prefix + '-kv-rows');
+    if (!container) return;
+    container.innerHTML = '';
+    const entries = (obj && typeof obj === 'object') ? Object.entries(obj) : [];
+    if (!entries.length) {
+        // 空时也保留一行空行方便用户填写
+        addKvRow(prefix);
+        return;
+    }
+    entries.forEach(([k, v]) => {
+        const row = document.createElement('div');
+        row.className = 'kv-row';
+        row.innerHTML = `<input type="text" placeholder="Key" value="${escapeHtml(String(k))}"><input type="text" placeholder="Value" value="${escapeHtml(String(v))}"><button type="button" class="kv-row-del" onclick="removeKvRow(this)" title="删除">×</button>`;
+        container.appendChild(row);
+    });
+}
+
+function switchEditMode(mode) {
+    if (mode === _mcEditMode) return;
+    if (mode === 'form') {
+        // JSON → 表单：解析 JSON 填入 KV 行
+        const [hOk, headers] = parseManualJson('mc-headers');
+        const [pOk, params] = parseManualJson('mc-params');
+        if (!hOk || !pOk) {
+            alert('当前 JSON 格式有误，请修正后再切换到表单模式');
+            return;
+        }
+        populateKvTable('mc-headers', headers || {});
+        populateKvTable('mc-params', params || {});
+    } else {
+        // 表单 → JSON：收集 KV 行写回 textarea
+        const headers = kvTableToObj('mc-headers');
+        const params = kvTableToObj('mc-params');
+        const hEl = document.getElementById('mc-headers');
+        const pEl = document.getElementById('mc-params');
+        if (hEl) hEl.value = Object.keys(headers).length ? JSON.stringify(headers, null, 2) : '';
+        if (pEl) pEl.value = Object.keys(params).length ? JSON.stringify(params, null, 2) : '';
+    }
+    _mcEditMode = mode;
+    // 切换可见面板
+    const jsonPanels = ['mc-headers-json-panel', 'mc-params-json-panel'];
+    const formPanels = ['mc-headers-form-panel', 'mc-params-form-panel'];
+    jsonPanels.forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = mode === 'json' ? '' : 'none'; });
+    formPanels.forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = mode === 'form' ? '' : 'none'; });
+    // 更新按钮激活态
+    const jsonBtn = document.getElementById('mc-mode-json');
+    const formBtn = document.getElementById('mc-mode-form');
+    if (jsonBtn) { jsonBtn.classList.toggle('active', mode === 'json'); }
+    if (formBtn) { formBtn.classList.toggle('active', mode === 'form'); }
+}
+
+// 统一 Headers/Params 读取，兼容两种模式
+function getManualHeaders() {
+    if (_mcEditMode === 'form') {
+        return [true, kvTableToObj('mc-headers')];
+    }
+    return parseManualJson('mc-headers');
+}
+
+function getManualParams() {
+    if (_mcEditMode === 'form') {
+        return [true, kvTableToObj('mc-params')];
+    }
+    return parseManualJson('mc-params');
+}
+/* ===== 模式切换结束 ===== */
+
 function renderManualEditor(existingCase = null) {
     if (!ENABLE_MANUAL_CASES) {
         return;
     }
     _mcLastResponse = null;
     _mcEditingCase = existingCase || null;
+    _mcEditMode = 'json'; // 每次打开编辑器重置为 JSON 模式
     const editor = document.getElementById('manualEditor');
     const isEdit = !!existingCase;
     const reqInfo = getManualCaseRequestInfo(existingCase);
@@ -1059,19 +2187,45 @@ function renderManualEditor(existingCase = null) {
                     <input type="text" id="mc-url" placeholder="例如：https://api.example.com/orders" value="${escapeHtml((existingCase && existingCase.url) || '')}">
                 </div>
                 <div class="manual-group-title wide">请求参数</div>
-                <div class="manual-field">
+                <!-- JSON↔表单模式切换器 -->
+                <div class="mc-mode-switcher wide">
+                    <span>编辑方式：</span>
+                    <button type="button" class="mc-mode-btn active" id="mc-mode-json" onclick="switchEditMode('json')">JSON 编辑</button>
+                    <button type="button" class="mc-mode-btn" id="mc-mode-form" onclick="switchEditMode('form')">表单编辑</button>
+                </div>
+                <!-- JSON 模式：Headers -->
+                <div class="manual-field" id="mc-headers-json-panel">
                     <label for="mc-headers">请求头 Headers（JSON）</label>
                     <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
                     <div class="hint">对象格式，空值可填 {} 或留空</div>
                 </div>
-                <div class="manual-field">
+                <!-- 表单模式：Headers（默认隐藏） -->
+                <div class="manual-field" id="mc-headers-form-panel" style="display:none;">
+                    <label>请求头 Headers</label>
+                    <div class="kv-table-wrap">
+                        <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                        <div id="mc-headers-kv-rows"></div>
+                    </div>
+                    <button type="button" class="kv-add-btn" onclick="addKvRow('mc-headers')">+ 添加</button>
+                </div>
+                <!-- JSON 模式：Params -->
+                <div class="manual-field" id="mc-params-json-panel">
                     <label for="mc-params">查询参数 Params（JSON）</label>
                     <textarea id="mc-params" placeholder='{"page": 1}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
                     <div class="hint">对象格式，空值可填 {} 或留空</div>
                 </div>
+                <!-- 表单模式：Params（默认隐藏） -->
+                <div class="manual-field" id="mc-params-form-panel" style="display:none;">
+                    <label>查询参数 Params</label>
+                    <div class="kv-table-wrap">
+                        <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                        <div id="mc-params-kv-rows"></div>
+                    </div>
+                    <button type="button" class="kv-add-btn" onclick="addKvRow('mc-params')">+ 添加</button>
+                </div>
                 <div class="manual-field wide">
-                    <label for="mc-body">请求体 Body（JSON）</label>
-                    <textarea id="mc-body" placeholder='{"key": "value"}'>${escapeHtml(formatJson(reqInfo.body))}</textarea>
+                    <label>请求体 Body（Postman 风格）</label>
+                    <div id="mc-body-editor"></div>
                 </div>
             </div>
 
@@ -1110,6 +2264,7 @@ function renderManualEditor(existingCase = null) {
             </div>
         </div>
     `;
+    renderManualBodyEditor(reqInfo.body);
 }
 
 function closeManualEditor() {
@@ -1121,11 +2276,15 @@ function closeManualEditor() {
 }
 
 async function sendManualRequest() {
-    const [hOk, headers] = parseManualJson('mc-headers');
-    const [pOk, params] = parseManualJson('mc-params');
-    const [bOk, body] = parseManualJson('mc-body');
-    if (!hOk || !pOk || !bOk) {
+    const [hOk, headers] = getManualHeaders();
+    const [pOk, params] = getManualParams();
+    if (!hOk || !pOk) {
         alert('JSON 格式错误，请检查红色输入框');
+        return;
+    }
+    const bodyResult = buildManualBodyFromEditor(true);
+    if (!bodyResult.ok) {
+        alert(bodyResult.error || 'Body 参数无效');
         return;
     }
     const url = (document.getElementById('mc-url').value || '').trim();
@@ -1142,11 +2301,27 @@ async function sendManualRequest() {
     responsePanel.style.display = 'none';
     saveConfirm.style.display = 'none';
     try {
-        const resp = await fetch('/api/proxy-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ method, url, headers: headers || {}, params: params || {}, body }),
-        });
+        let resp;
+        if (bodyResult.multipart) {
+            const requestMeta = {
+                method,
+                url,
+                headers: headers || {},
+                params: params || {},
+                ...bodyResult.request,
+            };
+            bodyResult.multipart.append('request_meta', JSON.stringify(requestMeta));
+            resp = await fetch('/api/proxy-request', {
+                method: 'POST',
+                body: bodyResult.multipart,
+            });
+        } else {
+            resp = await fetch('/api/proxy-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ method, url, headers: headers || {}, params: params || {}, ...bodyResult.request }),
+            });
+        }
         const data = await resp.json();
         if (!resp.ok) {
             throw new Error(data.error || '请求失败');
@@ -1186,11 +2361,15 @@ async function confirmSaveManualCase(caseId) {
         alert('请先点击「发送请求」获取响应后再保存');
         return;
     }
-    const [hOk, headers] = parseManualJson('mc-headers');
-    const [pOk, params] = parseManualJson('mc-params');
-    const [bOk, body] = parseManualJson('mc-body');
-    if (!hOk || !pOk || !bOk) {
+    const [hOk, headers] = getManualHeaders();
+    const [pOk, params] = getManualParams();
+    if (!hOk || !pOk) {
         alert('JSON 格式错误，请检查请求输入框');
+        return;
+    }
+    const bodyResult = buildManualBodyFromEditor(false);
+    if (!bodyResult.ok) {
+        alert(bodyResult.error || 'Body 参数无效');
         return;
     }
     const selectedRadio = document.querySelector('input[name="mc-result-status"]:checked');
@@ -1203,7 +2382,7 @@ async function confirmSaveManualCase(caseId) {
         status: status,
         status_code: _mcLastResponse.status_code,
         elapsed_ms: _mcLastResponse.elapsed_ms,
-        request_info: { headers: headers || {}, params: params || {}, body: body },
+        request_info: { headers: headers || {}, params: params || {}, body: bodyResult.storage },
         response_info: {
             headers: _mcLastResponse.response_headers || {},
             body: _mcLastResponse.response_body,
@@ -1241,11 +2420,15 @@ async function confirmSaveManualCase(caseId) {
 
 async function directSaveManualCase(caseId) {
     /* 编辑模式下不重发，直接用现有响应数据保存 */
-    const [hOk, headers] = parseManualJson('mc-headers');
-    const [pOk, params] = parseManualJson('mc-params');
-    const [bOk, body] = parseManualJson('mc-body');
-    if (!hOk || !pOk || !bOk) {
+    const [hOk, headers] = getManualHeaders();
+    const [pOk, params] = getManualParams();
+    if (!hOk || !pOk) {
         alert('JSON 格式错误，请检查请求输入框');
+        return;
+    }
+    const bodyResult = buildManualBodyFromEditor(false);
+    if (!bodyResult.ok) {
+        alert(bodyResult.error || 'Body 参数无效');
         return;
     }
     const existingResp = (_mcEditingCase && _mcEditingCase.response_info) || { headers: {}, body: null };
@@ -1258,7 +2441,7 @@ async function directSaveManualCase(caseId) {
         status: existingStatus,
         status_code: (_mcEditingCase && _mcEditingCase.status_code) || null,
         elapsed_ms: (_mcEditingCase && _mcEditingCase.elapsed_ms) || null,
-        request_info: { headers: headers || {}, params: params || {}, body: body },
+        request_info: { headers: headers || {}, params: params || {}, body: bodyResult.storage },
         response_info: existingResp,
     };
     if (!payload.name || !payload.url) {
