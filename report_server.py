@@ -431,7 +431,12 @@ def _remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: L
     return removed
 
 
-def _append_manual_cases_to_collection(collection_data: Dict[str, Any], manual_cases: List[Dict[str, Any]], default_folder: str) -> int:
+def _append_manual_cases_to_collection(
+    collection_data: Dict[str, Any],
+    manual_cases: List[Dict[str, Any]],
+    default_folder: str,
+    include_auth: bool = False,
+) -> int:
     if not manual_cases:
         return 0
 
@@ -467,11 +472,25 @@ def _append_manual_cases_to_collection(collection_data: Dict[str, Any], manual_c
 
         method = case.get("method", "GET")
         url = case.get("url", "")
+        request_info = case.get("request_info") if isinstance(case.get("request_info"), dict) else {}
+        headers = request_info.get("headers") if isinstance(request_info.get("headers"), dict) else {}
+        if not include_auth:
+            headers = _strip_auth_headers(headers)
+        params = request_info.get("params") if isinstance(request_info.get("params"), dict) else {}
+        body = request_info.get("body")
+        body_mode = request_info.get("body_mode")
+        body_data = request_info.get("body_data")
+
         request_obj = {
             "method": method,
             "header": [],
             "url": {"raw": url},
         }
+
+        _set_request_url(request_obj, url, params)
+        _set_request_headers(request_obj, headers)
+        _set_request_body(request_obj, body, body_mode=body_mode, body_data=body_data)
+
         children.append({"name": case.get("name", ""), "request": request_obj, "response": []})
         appended += 1
 
@@ -559,6 +578,7 @@ def export_collection_with_latest_params(
         final_collection,
         manual_cases,
         MANUAL_CASE_FOLDER_NAME,
+        include_auth=include_auth,
     )
     removed_excluded_count = _remove_excluded_items(final_collection, manual_exclusions)
 
