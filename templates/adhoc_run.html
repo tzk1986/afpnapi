@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>新增接口测试</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #eef4fb; color: #1f2937; }
+        .page { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .hero { background: linear-gradient(135deg, #0f172a, #0f4c81 58%, #1d4ed8); color: #fff; border-radius: 18px; padding: 24px 28px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.18); }
+        .hero h1 { margin: 0 0 10px; font-size: 30px; }
+        .hero p { margin: 6px 0; opacity: 0.92; max-width: 760px; }
+        .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+        .hero-actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600; }
+        .hero-actions .primary { background: #fff; color: #0f172a; }
+        .hero-actions .secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.28); }
+        .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 12px; color: #334155; }
+        .field input, .field select, .field textarea, .panel button { padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
+        .field textarea { min-height: 96px; resize: vertical; }
+        .adhoc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .adhoc-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .adhoc-editor { margin-top: 14px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #f8fafc; }
+        .adhoc-editor h4 { margin: 0 0 10px; font-size: 14px; color: #334155; }
+        .adhoc-row { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr 1.6fr 0.8fr; gap: 8px; }
+        .adhoc-kv { display: grid; grid-template-columns: 1fr 1fr 0.9fr; gap: 8px; margin-top: 8px; }
+        .edit-mode-switch { display: flex; gap: 8px; margin-top: 10px; }
+        .edit-mode-switch button { border: 1px solid #bfdbfe; color: #1d4ed8; background: #fff; }
+        .edit-mode-switch button.active { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+        .mode-panel { margin-top: 8px; }
+        .kv-editor { border: 1px solid #dbeafe; border-radius: 10px; padding: 10px; background: #fff; }
+        .kv-editor + .kv-editor { margin-top: 10px; }
+        .kv-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .kv-head strong { color: #334155; font-size: 13px; }
+        .kv-table { width: 100%; border-collapse: collapse; }
+        .kv-table th, .kv-table td { border-bottom: 1px solid #e2e8f0; padding: 6px; font-size: 12px; }
+        .kv-table th { text-align: left; color: #64748b; font-weight: 600; }
+        .kv-table input { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; }
+        .kv-table .kv-op { width: 64px; }
+        .kv-table .kv-op button { width: 100%; padding: 7px 0; }
+        .mode-panel.hidden { display: none; }
+        .adhoc-case-list { margin-top: 12px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; overflow: hidden; }
+        .adhoc-case-list table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .adhoc-case-list th, .adhoc-case-list td { padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; overflow-wrap: anywhere; word-break: break-word; text-align: left; }
+        .adhoc-case-list th { background: #f8fafc; color: #475569; }
+        .adhoc-empty { padding: 16px; text-align: center; color: #94a3b8; }
+        .adhoc-tip { margin-top: 8px; font-size: 12px; color: #64748b; }
+        .btn-mini, .panel button { background: #1d4ed8; color: #fff; border: none; cursor: pointer; }
+        .btn-mini { padding: 8px 12px; }
+        .btn-mini.secondary, .panel button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+        .btn-mini.danger { background: #fff; color: #b91c1c; border: 1px solid #fecaca; }
+        .run-status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; }
+        .run-status.success { background: #ecfdf5; color: #166534; border-color: #86efac; }
+        .run-status.error { background: #fef2f2; color: #991b1b; border-color: #fca5a5; }
+        .summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
+        .mini-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
+        .mini-card .label { font-size: 12px; color: #64748b; }
+        .mini-card .value { margin-top: 6px; font-size: 20px; font-weight: 700; color: #0f172a; }
+        @media (max-width: 768px) {
+            .adhoc-row, .adhoc-kv { grid-template-columns: 1fr; }
+            .hero-actions { flex-direction: column; }
+            .hero-actions a { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <section class="hero">
+            <h1>新增接口测试</h1>
+            <p>这里用于临时录入 1..N 条接口并直接生成标准报告。首页只保留入口按钮，后续编辑、整理待测列表、执行和跳转都在当前页面完成。</p>
+            <div class="hero-actions">
+                <a class="primary" href="/">返回报告中心</a>
+                <a class="secondary" href="/latest">查看最新报告</a>
+            </div>
+            <div class="summary-strip">
+                <div class="mini-card">
+                    <div class="label">单次接口上限</div>
+                    <div class="value">{{ adhoc_max_items }}</div>
+                </div>
+                <div class="mini-card">
+                    <div class="label">默认集合名</div>
+                    <div class="value" style="font-size:16px;">{{ adhoc_default_collection_name }}</div>
+                </div>
+                <div class="mini-card">
+                    <div class="label">分页范围</div>
+                    <div class="value">{{ run_results_per_page_min }} - {{ run_results_per_page_max }}</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h3 style="margin-top:0;">任务参数</h3>
+            <div class="adhoc-grid">
+                <div class="field">
+                    <label for="adhocCollectionName">临时集合名称</label>
+                    <input id="adhocCollectionName" type="text" value="{{ adhoc_default_collection_name }}" placeholder="例如：支付核心链路临时验证">
+                </div>
+                <div class="field">
+                    <label for="adhocBaseUrlInput">基础 URL（相对路径必填）</label>
+                    <input id="adhocBaseUrlInput" type="text" placeholder="例如: https://api.example.com">
+                </div>
+                <div class="field">
+                    <label for="adhocTokenInput">Token（可选）</label>
+                    <input id="adhocTokenInput" type="text" placeholder="可选，填写后优先使用此 token">
+                </div>
+                <div class="field">
+                    <label for="adhocOutputDirInput">报告输出目录（可选）</label>
+                    <input id="adhocOutputDirInput" type="text" placeholder="默认使用服务端配置目录">
+                </div>
+                <div class="field">
+                    <label for="adhocReportNameInput">报告名称（可选）</label>
+                    <input id="adhocReportNameInput" type="text" placeholder="例如：ad-hoc-支付链路.html">
+                </div>
+                <div class="field">
+                    <label for="adhocResultsPerPageInput">报告分页大小（1-100）</label>
+                    <input id="adhocResultsPerPageInput" type="number" min="{{ run_results_per_page_min }}" max="{{ run_results_per_page_max }}" value="{{ run_results_per_page_default }}">
+                </div>
+            </div>
+
+            <div class="adhoc-editor">
+                <h4>新增接口</h4>
+                <div class="adhoc-row">
+                    <div class="field">
+                        <label for="adhocCaseName">接口名称</label>
+                        <input id="adhocCaseName" type="text" placeholder="例如：查询支付单">
+                    </div>
+                    <div class="field">
+                        <label for="adhocCaseFolder">目录（可选）</label>
+                        <input id="adhocCaseFolder" type="text" placeholder="例如：支付/查询">
+                    </div>
+                    <div class="field">
+                        <label for="adhocCaseMethod">方法</label>
+                        <select id="adhocCaseMethod">
+                            <option>GET</option>
+                            <option>POST</option>
+                            <option>PUT</option>
+                            <option>PATCH</option>
+                            <option>DELETE</option>
+                            <option>HEAD</option>
+                            <option>OPTIONS</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="adhocCaseUrl">URL</label>
+                        <input id="adhocCaseUrl" type="text" placeholder="支持绝对 URL 或 {{baseUrl}}/path 或 /path">
+                    </div>
+                    <div class="field">
+                        <label for="adhocCaseExpectedStatus">期望状态码</label>
+                        <input id="adhocCaseExpectedStatus" type="number" value="200" min="100" max="599">
+                    </div>
+                </div>
+                <div class="edit-mode-switch">
+                    <button id="adhocModeFormBtn" type="button" class="btn-mini active" onclick="switchAdhocEditMode('form')">表单模式</button>
+                    <button id="adhocModeJsonBtn" type="button" class="btn-mini secondary" onclick="switchAdhocEditMode('json')">JSON模式</button>
+                </div>
+
+                <div id="adhocFormModePanel" class="mode-panel">
+                    <div class="kv-editor">
+                        <div class="kv-head">
+                            <strong>Headers</strong>
+                            <button type="button" class="btn-mini secondary" onclick="addKvRow('adhocHeadersRows')">新增 Header</button>
+                        </div>
+                        <table class="kv-table">
+                            <thead>
+                                <tr><th>Key</th><th>Value</th><th class="kv-op">操作</th></tr>
+                            </thead>
+                            <tbody id="adhocHeadersRows"></tbody>
+                        </table>
+                    </div>
+                    <div class="kv-editor">
+                        <div class="kv-head">
+                            <strong>Params</strong>
+                            <button type="button" class="btn-mini secondary" onclick="addKvRow('adhocParamsRows')">新增 Param</button>
+                        </div>
+                        <table class="kv-table">
+                            <thead>
+                                <tr><th>Key</th><th>Value</th><th class="kv-op">操作</th></tr>
+                            </thead>
+                            <tbody id="adhocParamsRows"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="adhocJsonModePanel" class="mode-panel hidden">
+                    <div class="adhoc-kv">
+                        <div class="field">
+                            <label for="adhocCaseHeaders">Headers（JSON）</label>
+                            <textarea id="adhocCaseHeaders" placeholder='例如：{"Content-Type":"application/json"}'></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="adhocCaseParams">Params（JSON）</label>
+                            <textarea id="adhocCaseParams" placeholder='例如：{"page":"1"}'></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top:8px;">
+                    <label for="adhocCaseBodyMode">Body 模式</label>
+                    <select id="adhocCaseBodyMode">
+                        <option value="none">none</option>
+                        <option value="raw">raw</option>
+                        <option value="urlencoded">urlencoded</option>
+                        <option value="formdata">formdata</option>
+                        <option value="graphql">graphql</option>
+                        <option value="binary">binary</option>
+                    </select>
+                    <label for="adhocCaseBodyData" style="margin-top:6px;">Body 数据（raw 为文本，其它模式填 JSON）</label>
+                    <textarea id="adhocCaseBodyData" placeholder='raw 示例：{"id":1}；urlencoded 示例：[{"key":"id","value":"1"}]'></textarea>
+                </div>
+                <div class="adhoc-actions">
+                    <button type="button" class="btn-mini" onclick="addAdhocCase()">加入待测列表</button>
+                    <button type="button" class="btn-mini secondary" onclick="clearAdhocEditor()">清空当前输入</button>
+                </div>
+                <div class="adhoc-tip">单次最多 {{ adhoc_max_items }} 条接口。建议先整理一小批接口验证通过后，再追加更大范围。</div>
+            </div>
+
+            <div class="adhoc-case-list" id="adhocCaseList"></div>
+
+            <div class="adhoc-actions">
+                <button id="runAdhocBtn" type="button" onclick="startRunAdhocJob()">执行并生成报告</button>
+                <button class="secondary" type="button" onclick="clearAdhocCases()">清空待测列表</button>
+            </div>
+            <div id="adhocRunStatus" class="run-status">新增接口后点击“执行并生成报告”，执行完成会自动跳转到最新报告。</div>
+        </section>
+    </div>
+
+<script>
+const RUN_STATUS_POLL_INTERVAL_MS = {{ run_status_poll_interval_ms }};
+const ADHOC_MAX_ITEMS = {{ adhoc_max_items }};
+let adhocCases = [];
+let adhocJobTimer = null;
+let adhocEditMode = 'form';
+
+function setAdhocStatus(text, level = '') {
+    const statusEl = document.getElementById('adhocRunStatus');
+    statusEl.textContent = text;
+    statusEl.className = `run-status${level ? ' ' + level : ''}`;
+}
+
+function parseJsonField(text, defaultValue, label) {
+    const source = String(text || '').trim();
+    if (!source) {
+        return defaultValue;
+    }
+    try {
+        return JSON.parse(source);
+    } catch (error) {
+        throw new Error(`${label} 不是合法 JSON: ${error.message || error}`);
+    }
+}
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+function addKvRow(containerId, key = '', value = '') {
+    const body = document.getElementById(containerId);
+    if (!body) {
+        return;
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="kv-key" value="${escapeHtml(String(key || ''))}" placeholder="key"></td>
+        <td><input type="text" class="kv-value" value="${escapeHtml(String(value || ''))}" placeholder="value"></td>
+        <td class="kv-op"><button type="button" class="btn-mini danger" onclick="removeKvRow(this)">删</button></td>
+    `;
+    body.appendChild(tr);
+}
+
+function removeKvRow(buttonEl) {
+    const tr = buttonEl && buttonEl.closest('tr');
+    if (!tr || !tr.parentNode) {
+        return;
+    }
+    const parent = tr.parentNode;
+    parent.removeChild(tr);
+    if (!parent.querySelector('tr')) {
+        addKvRow(parent.id);
+    }
+}
+
+function rowsToObject(containerId) {
+    const body = document.getElementById(containerId);
+    const result = {};
+    if (!body) {
+        return result;
+    }
+    body.querySelectorAll('tr').forEach((row) => {
+        const key = (row.querySelector('.kv-key')?.value || '').trim();
+        const value = row.querySelector('.kv-value')?.value || '';
+        if (key) {
+            result[key] = value;
+        }
+    });
+    return result;
+}
+
+function objectToRows(containerId, value) {
+    const body = document.getElementById(containerId);
+    if (!body) {
+        return;
+    }
+    body.innerHTML = '';
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const keys = Object.keys(source);
+    if (!keys.length) {
+        addKvRow(containerId);
+        return;
+    }
+    keys.forEach((key) => {
+        addKvRow(containerId, key, source[key]);
+    });
+}
+
+function syncFormToJsonEditor() {
+    const headers = rowsToObject('adhocHeadersRows');
+    const params = rowsToObject('adhocParamsRows');
+    document.getElementById('adhocCaseHeaders').value = Object.keys(headers).length ? JSON.stringify(headers, null, 2) : '';
+    document.getElementById('adhocCaseParams').value = Object.keys(params).length ? JSON.stringify(params, null, 2) : '';
+}
+
+function syncJsonToFormEditor() {
+    const headers = parseJsonField(document.getElementById('adhocCaseHeaders').value, {}, 'Headers');
+    const params = parseJsonField(document.getElementById('adhocCaseParams').value, {}, 'Params');
+    if (typeof headers !== 'object' || Array.isArray(headers) || headers === null) {
+        throw new Error('Headers 必须是 JSON 对象');
+    }
+    if (typeof params !== 'object' || Array.isArray(params) || params === null) {
+        throw new Error('Params 必须是 JSON 对象');
+    }
+    objectToRows('adhocHeadersRows', headers);
+    objectToRows('adhocParamsRows', params);
+}
+
+function switchAdhocEditMode(mode) {
+    if (mode !== 'form' && mode !== 'json') {
+        return;
+    }
+    try {
+        if (mode === 'json') {
+            syncFormToJsonEditor();
+        } else {
+            syncJsonToFormEditor();
+        }
+    } catch (error) {
+        setAdhocStatus(`切换编辑模式失败: ${error.message || error}`, 'error');
+        return;
+    }
+
+    adhocEditMode = mode;
+    const isForm = mode === 'form';
+    document.getElementById('adhocFormModePanel').classList.toggle('hidden', !isForm);
+    document.getElementById('adhocJsonModePanel').classList.toggle('hidden', isForm);
+    document.getElementById('adhocModeFormBtn').classList.toggle('active', isForm);
+    document.getElementById('adhocModeJsonBtn').classList.toggle('active', !isForm);
+    document.getElementById('adhocModeFormBtn').classList.toggle('secondary', !isForm);
+    document.getElementById('adhocModeJsonBtn').classList.toggle('secondary', isForm);
+}
+
+function clearAdhocEditor() {
+    const fields = [
+        'adhocCaseName', 'adhocCaseFolder', 'adhocCaseUrl',
+        'adhocCaseHeaders', 'adhocCaseParams', 'adhocCaseBodyData'
+    ];
+    fields.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = '';
+        }
+    });
+    document.getElementById('adhocCaseExpectedStatus').value = '200';
+    document.getElementById('adhocCaseMethod').value = 'GET';
+    document.getElementById('adhocCaseBodyMode').value = 'none';
+    objectToRows('adhocHeadersRows', {});
+    objectToRows('adhocParamsRows', {});
+    switchAdhocEditMode('form');
+}
+
+function renderAdhocCaseList() {
+    const container = document.getElementById('adhocCaseList');
+    if (!adhocCases.length) {
+        container.innerHTML = '<div class="adhoc-empty">暂无待测接口，请先新增接口。</div>';
+        return;
+    }
+    const rows = adhocCases.map((item, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td>${escapeHtml(item.folder || '-')}</td>
+            <td>${escapeHtml(item.method)}</td>
+            <td>${escapeHtml(item.url)}</td>
+            <td>${escapeHtml(item.body_mode || 'none')}</td>
+            <td>${escapeHtml(String(item.expected_status || 200))}</td>
+            <td><button class="btn-mini danger" type="button" onclick="removeAdhocCase(${index})">删除</button></td>
+        </tr>
+    `).join('');
+
+    container.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:44px;">#</th>
+                    <th>名称</th>
+                    <th>目录</th>
+                    <th style="width:70px;">方法</th>
+                    <th>URL</th>
+                    <th style="width:86px;">Body</th>
+                    <th style="width:86px;">期望码</th>
+                    <th style="width:66px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+function removeAdhocCase(index) {
+    adhocCases.splice(index, 1);
+    renderAdhocCaseList();
+    setAdhocStatus(`已移除第 ${index + 1} 条接口，当前共 ${adhocCases.length} 条。`);
+}
+
+function clearAdhocCases() {
+    adhocCases = [];
+    renderAdhocCaseList();
+    setAdhocStatus('待测列表已清空。');
+}
+
+function addAdhocCase() {
+    try {
+        if (adhocCases.length >= ADHOC_MAX_ITEMS) {
+            throw new Error(`单次最多支持 ${ADHOC_MAX_ITEMS} 条接口`);
+        }
+
+        const name = document.getElementById('adhocCaseName').value.trim();
+        const folder = document.getElementById('adhocCaseFolder').value.trim();
+        const method = document.getElementById('adhocCaseMethod').value.trim().toUpperCase();
+        const url = document.getElementById('adhocCaseUrl').value.trim();
+        const bodyMode = document.getElementById('adhocCaseBodyMode').value.trim().toLowerCase();
+        const expectedStatusValue = document.getElementById('adhocCaseExpectedStatus').value.trim();
+        const expectedStatus = Number(expectedStatusValue || '200');
+
+        if (!name) {
+            throw new Error('接口名称不能为空');
+        }
+        if (!url) {
+            throw new Error('URL 不能为空');
+        }
+        if (!Number.isFinite(expectedStatus) || expectedStatus < 100 || expectedStatus > 599) {
+            throw new Error('期望状态码必须在 100-599 之间');
+        }
+
+        let headers;
+        let params;
+        if (adhocEditMode === 'json') {
+            headers = parseJsonField(document.getElementById('adhocCaseHeaders').value, {}, 'Headers');
+            params = parseJsonField(document.getElementById('adhocCaseParams').value, {}, 'Params');
+        } else {
+            headers = rowsToObject('adhocHeadersRows');
+            params = rowsToObject('adhocParamsRows');
+            syncFormToJsonEditor();
+        }
+        if (typeof headers !== 'object' || Array.isArray(headers) || headers === null) {
+            throw new Error('Headers 必须是 JSON 对象');
+        }
+        if (typeof params !== 'object' || Array.isArray(params) || params === null) {
+            throw new Error('Params 必须是 JSON 对象');
+        }
+
+        const bodyDataText = document.getElementById('adhocCaseBodyData').value;
+        let bodyData = null;
+        if (bodyMode === 'raw') {
+            const rawText = String(bodyDataText || '').trim();
+            bodyData = {
+                raw_content: rawText,
+                raw_language: 'json',
+                raw_content_type: 'application/json',
+            };
+            if (rawText) {
+                try {
+                    JSON.parse(rawText);
+                } catch (_e) {
+                    bodyData.raw_language = 'text';
+                    bodyData.raw_content_type = 'text/plain';
+                }
+            }
+        } else if (bodyMode !== 'none') {
+            bodyData = parseJsonField(bodyDataText, null, 'Body 数据');
+        }
+
+        adhocCases.push({
+            name,
+            folder,
+            method,
+            url,
+            headers,
+            params,
+            body_mode: bodyMode,
+            body_data: bodyData,
+            expected_status: Math.trunc(expectedStatus),
+        });
+
+        renderAdhocCaseList();
+        setAdhocStatus(`已加入待测列表，当前共 ${adhocCases.length} 条接口。`);
+        clearAdhocEditor();
+    } catch (error) {
+        setAdhocStatus(`新增接口失败: ${error.message || error}`, 'error');
+    }
+}
+
+async function startRunAdhocJob() {
+    if (!adhocCases.length) {
+        setAdhocStatus('请先新增至少 1 条接口。', 'error');
+        return;
+    }
+    const runButton = document.getElementById('runAdhocBtn');
+    runButton.disabled = true;
+    setAdhocStatus('正在创建 ad-hoc 执行任务，请稍候...');
+
+    const payload = {
+        collection_name: document.getElementById('adhocCollectionName').value.trim(),
+        base_url: document.getElementById('adhocBaseUrlInput').value.trim(),
+        token: document.getElementById('adhocTokenInput').value.trim(),
+        output_dir: document.getElementById('adhocOutputDirInput').value.trim(),
+        report_name: document.getElementById('adhocReportNameInput').value.trim(),
+        results_per_page: document.getElementById('adhocResultsPerPageInput').value.trim(),
+        cases: adhocCases,
+    };
+
+    try {
+        const response = await fetch('/api/run-ad-hoc-tests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '任务创建失败');
+        }
+        setAdhocStatus(`ad-hoc 任务已启动（${data.job_id}），正在执行...`);
+        watchAdhocJob(data.job_id);
+    } catch (error) {
+        runButton.disabled = false;
+        setAdhocStatus(`启动失败: ${error.message || error}`, 'error');
+    }
+}
+
+function watchAdhocJob(jobId) {
+    if (adhocJobTimer) {
+        clearInterval(adhocJobTimer);
+        adhocJobTimer = null;
+    }
+    const runButton = document.getElementById('runAdhocBtn');
+
+    const fetchStatus = async () => {
+        try {
+            const response = await fetch(`/api/run-postman-status/${encodeURIComponent(jobId)}`);
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || '获取任务状态失败');
+            }
+            if (data.status === 'queued') {
+                setAdhocStatus(`任务排队中（${jobId}），请稍候...`);
+                return;
+            }
+            if (data.status === 'running') {
+                const total = Number(data.total || 0);
+                const completed = Number(data.completed || 0);
+                const percent = Number(data.percent || 0);
+                const progressText = total > 0 ? ` ${completed}/${total} (${percent}%)` : '';
+                const currentText = data.current_name ? `，当前接口: ${data.current_name}` : '';
+                setAdhocStatus(`ad-hoc 任务执行中（${jobId}）${progressText}${currentText}`);
+                return;
+            }
+            if (data.status === 'success') {
+                clearInterval(adhocJobTimer);
+                adhocJobTimer = null;
+                runButton.disabled = false;
+                setAdhocStatus('执行完成，正在跳转到最新报告数据页...', 'success');
+                setTimeout(() => {
+                    window.location.href = '/latest';
+                }, 600);
+                return;
+            }
+
+            clearInterval(adhocJobTimer);
+            adhocJobTimer = null;
+            runButton.disabled = false;
+            setAdhocStatus(`执行失败: ${data.message || '未知错误'}`, 'error');
+        } catch (error) {
+            clearInterval(adhocJobTimer);
+            adhocJobTimer = null;
+            runButton.disabled = false;
+            setAdhocStatus(`任务状态查询失败: ${error.message || error}`, 'error');
+        }
+    };
+
+    fetchStatus();
+    adhocJobTimer = setInterval(fetchStatus, RUN_STATUS_POLL_INTERVAL_MS);
+}
+
+objectToRows('adhocHeadersRows', {});
+objectToRows('adhocParamsRows', {});
+switchAdhocEditMode('form');
+renderAdhocCaseList();
+</script>
+</body>
+</html>

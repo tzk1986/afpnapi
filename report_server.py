@@ -81,6 +81,9 @@ REPORT_EXPORT_ALLOW_REPORT_ONLY = _cfg_bool("REPORT_EXPORT_ALLOW_REPORT_ONLY", T
 REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _cfg_bool("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", False)
 ENABLE_MANUAL_CASES = _cfg_bool("ENABLE_MANUAL_CASES", True)
 MANUAL_CASE_FOLDER_NAME = _cfg_str("MANUAL_CASE_FOLDER_NAME", "人工补录") or "人工补录"
+ENABLE_ADHOC_RUN = _cfg_bool("ENABLE_ADHOC_RUN", True)
+ADHOC_MAX_ITEMS = _cfg_int("ADHOC_MAX_ITEMS", 200)
+ADHOC_DEFAULT_COLLECTION_NAME = _cfg_str("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试") or "报告中心临时测试"
 
 
 def resolve_reports_dir() -> Path:
@@ -249,6 +252,186 @@ def _extract_collection_preview_items(collection_data: Dict[str, Any]) -> List[D
 
     walk(root_items, [], [])
     return result
+
+
+def _parse_json_text(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return default
+        try:
+            return json.loads(text)
+        except Exception as exc:
+            raise ValueError(f"JSON 解析失败: {exc}") from exc
+    return value
+
+
+def _normalize_folder_chain(folder: Any) -> List[str]:
+    text = str(folder or "").strip()
+    if not text:
+        return []
+    normalized = text.replace('\\', '/').replace('|', '/').strip('/')
+    return [part.strip() for part in normalized.split('/') if part.strip()]
+
+
+def _get_or_create_folder(items: List[Dict[str, Any]], folder_chain: List[str]) -> List[Dict[str, Any]]:
+    current_items = items
+    for folder_name in folder_chain:
+        target = None
+        for item in current_items:
+            if isinstance(item, dict) and "request" not in item and str(item.get("name") or "") == folder_name:
+                if isinstance(item.get("item"), list):
+                    target = item
+                    break
+        if target is None:
+            target = {"name": folder_name, "item": []}
+            current_items.append(target)
+        child = target.setdefault("item", [])
+        if not isinstance(child, list):
+            child = []
+            target["item"] = child
+        current_items = child
+    return current_items
+
+
+def _is_placeholder_case_name(name: str) -> bool:
+    """Treat all-question-mark names as placeholders caused by bad input/encoding."""
+    text = str(name or "").strip()
+    return bool(text) and bool(re.fullmatch(r"[?？\s_]+", text))
+
+
+def _derive_case_name(raw_name: Any, method: str, url: str, index: int) -> str:
+    text = str(raw_name or "").strip()
+    if text and not _is_placeholder_case_name(text):
+        return text
+
+    raw_url = str(url or "").strip()
+    if raw_url:
+        if raw_url.startswith("{{baseUrl}}"):
+            raw_url = raw_url[len("{{baseUrl}}"):] or "/"
+        elif raw_url.startswith("{{base_url}}"):
+            raw_url = raw_url[len("{{base_url}}"):] or "/"
+
+        parsed = urlsplit(raw_url)
+        if parsed.scheme and parsed.netloc:
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+        else:
+            path = raw_url
+
+        if path:
+            return f"{method} {path}".strip()
+
+    return f"接口{index + 1}"
+
+
+def _normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str]) -> Dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise ValueError(f"第 {index + 1} 条接口配置不是对象")
+
+    method = str(raw.get("method") or "GET").strip().upper() or "GET"
+    if method not in {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}:
+        raise ValueError(f"第 {index + 1} 条接口 method 不支持: {method}")
+
+    url = str(raw.get("url") or "").strip()
+    if not url:
+        raise ValueError(f"第 {index + 1} 条接口缺少 url")
+
+    parsed = urlparse(url)
+    if parsed.scheme:
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(f"第 {index + 1} 条接口 url 仅允许合法 http/https 地址")
+    elif url.startswith("{{"):
+        if not url.startswith("{{baseUrl}}") and not url.startswith("{{base_url}}"):
+            raise ValueError(f"第 {index + 1} 条接口变量 URL 仅支持 {{baseUrl}} 或 {{base_url}}")
+        if not base_url:
+            raise ValueError(f"第 {index + 1} 条接口使用了变量 URL，但未提供 base_url")
+    elif not base_url:
+        raise ValueError(f"第 {index + 1} 条接口使用相对路径时必须提供 base_url")
+
+    name = _derive_case_name(raw.get("name"), method, url, index)
+
+    headers = _parse_json_text(raw.get("headers"), {})
+    if not isinstance(headers, dict):
+        raise ValueError(f"第 {index + 1} 条接口 headers 必须是 JSON 对象")
+
+    params = _parse_json_text(raw.get("params"), {})
+    if not isinstance(params, dict):
+        raise ValueError(f"第 {index + 1} 条接口 params 必须是 JSON 对象")
+
+    body_mode = str(raw.get("body_mode") or "none").strip().lower() or "none"
+    if body_mode not in {"none", "raw", "urlencoded", "formdata", "graphql", "binary"}:
+        raise ValueError(f"第 {index + 1} 条接口 body_mode 不支持: {body_mode}")
+
+    raw_body_data = raw.get("body_data")
+    if body_mode == "raw":
+        body_data = raw_body_data
+    else:
+        body_data = _parse_json_text(raw_body_data, None)
+    body_value = raw.get("body")
+    if body_mode == "raw" and body_data is None and body_value is not None:
+        body_data = body_value
+
+    try:
+        expected_status = int(raw.get("expected_status") or 200)
+    except (TypeError, ValueError):
+        expected_status = 200
+
+    return {
+        "name": name,
+        "folder": str(raw.get("folder") or "").strip(),
+        "method": method,
+        "url": url,
+        "headers": headers,
+        "params": params,
+        "body_mode": body_mode,
+        "body_data": body_data,
+        "expected_status": expected_status,
+    }
+
+
+def _build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, base_url: Optional[str]) -> Dict[str, Any]:
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    collection: Dict[str, Any] = {
+        "info": {
+            "name": collection_name,
+            "description": "Generated by report center ad-hoc run",
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            "_postman_id": uuid.uuid4().hex,
+        },
+        "item": [],
+        "variable": [],
+    }
+    if base_url:
+        collection["variable"] = [{"key": "baseUrl", "value": base_url}]
+
+    root_items = collection["item"]
+    for case in cases:
+        request_obj: Dict[str, Any] = {
+            "method": case["method"],
+            "header": [],
+            "url": {"raw": case["url"]},
+            "x_expected_status": case["expected_status"],
+            "description": f"adhoc_generated_at={now_iso}",
+        }
+        _set_request_url(request_obj, case["url"], case["params"])
+        _set_request_headers(request_obj, case["headers"])
+        _set_request_body(request_obj, case.get("body_data"), body_mode=case.get("body_mode"), body_data=case.get("body_data"))
+
+        item_node = {
+            "name": case["name"],
+            "request": request_obj,
+            "response": [],
+        }
+
+        folder_chain = _normalize_folder_chain(case.get("folder"))
+        parent_items = _get_or_create_folder(root_items, folder_chain)
+        parent_items.append(item_node)
+
+    return collection
 
 def _to_bool(value: Any, default: bool = False) -> bool:
     if value is None:
@@ -1851,6 +2034,24 @@ def index():
         run_status_poll_interval_ms=RUN_STATUS_POLL_INTERVAL_MS,
         enable_selective_run=ENABLE_SELECTIVE_RUN,
         collection_preview_max_items=COLLECTION_PREVIEW_MAX_ITEMS,
+        enable_adhoc_run=ENABLE_ADHOC_RUN,
+        adhoc_max_items=ADHOC_MAX_ITEMS,
+        adhoc_default_collection_name=ADHOC_DEFAULT_COLLECTION_NAME,
+    )
+
+
+@app.route("/adhoc-run")
+def adhoc_run_page():
+    if not ENABLE_ADHOC_RUN:
+        return redirect(url_for("index"))
+    return render_template(
+        "adhoc_run.html",
+        run_results_per_page_default=RUN_RESULTS_PER_PAGE_DEFAULT,
+        run_results_per_page_min=RUN_RESULTS_PER_PAGE_MIN,
+        run_results_per_page_max=RUN_RESULTS_PER_PAGE_MAX,
+        run_status_poll_interval_ms=RUN_STATUS_POLL_INTERVAL_MS,
+        adhoc_max_items=ADHOC_MAX_ITEMS,
+        adhoc_default_collection_name=ADHOC_DEFAULT_COLLECTION_NAME,
     )
 
 
@@ -2529,6 +2730,86 @@ def api_run_postman():
         "job_id": job_id,
         "status": "queued",
         "message": "任务已创建，请轮询状态接口获取执行进度。",
+    })
+
+
+@app.route("/api/run-ad-hoc-tests", methods=["POST"])
+def api_run_ad_hoc_tests():
+    if not ENABLE_ADHOC_RUN:
+        return jsonify({"error": "当前环境未启用直接新增接口测试能力。"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    raw_cases = payload.get("cases")
+    if not isinstance(raw_cases, list) or not raw_cases:
+        return jsonify({"error": "cases 不能为空，且必须是数组。"}), 400
+    if len(raw_cases) > ADHOC_MAX_ITEMS:
+        return jsonify({"error": f"单次最多支持 {ADHOC_MAX_ITEMS} 条接口。"}), 400
+
+    base_url = str(payload.get("base_url", "")).strip() or None
+    if base_url is not None:
+        parsed = urlparse(base_url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return jsonify({"error": "base_url 仅允许合法的 http/https 地址"}), 400
+
+    token = str(payload.get("token", "")).strip() or None
+    output_dir = str(payload.get("output_dir", "")).strip() or str(REPORTS_DIR)
+    report_name = str(payload.get("report_name", "")).strip() or None
+    results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
+    collection_name = str(payload.get("collection_name", "")).strip() or ADHOC_DEFAULT_COLLECTION_NAME
+
+    try:
+        normalized_cases = [_normalize_adhoc_case(item, idx, base_url) for idx, item in enumerate(raw_cases)]
+        collection_data = _build_adhoc_collection(normalized_cases, collection_name, base_url)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    job_id = uuid.uuid4().hex
+    saved_file = UPLOADS_DIR / f"{job_id}.json"
+    with saved_file.open("w", encoding="utf-8") as f:
+        json.dump(collection_data, f, indent=2, ensure_ascii=False)
+
+    source_original_file = _sanitize_export_name(f"{collection_name}.json")
+    set_run_job(
+        job_id,
+        id=job_id,
+        status="queued",
+        message="任务已入队，等待执行。",
+        total=0,
+        completed=0,
+        percent=0,
+        current_name="",
+        file_name=source_original_file,
+        saved_file=str(saved_file),
+        output_dir=output_dir,
+        report_name=report_name or "",
+        run_scope="all",
+        selected_count=0,
+        collection_name=collection_name,
+        adhoc=True,
+    )
+
+    worker = threading.Thread(
+        target=run_postman_job,
+        args=(
+            job_id,
+            str(saved_file),
+            base_url,
+            output_dir,
+            token,
+            report_name,
+            source_original_file,
+            results_per_page,
+            None,
+        ),
+        daemon=True,
+    )
+    worker.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "queued",
+        "message": "ad-hoc 任务已创建，请轮询状态接口获取执行进度。",
     })
 
 

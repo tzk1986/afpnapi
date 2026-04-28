@@ -94,3 +94,15 @@ ENABLE_MANUAL_CASES = str(os.environ.get("ENABLE_MANUAL_CASES", "true")).strip()
 	"1", "true", "yes", "y", "on"
 }
 MANUAL_CASE_FOLDER_NAME = str(os.environ.get("MANUAL_CASE_FOLDER_NAME", "人工补录")).strip() or "人工补录"
+
+# ==============================================================
+# 报告中心直接新增接口测试（ad-hoc）配置
+# ENABLE_ADHOC_RUN: 是否启用“直接新增接口测试并执行”能力
+# ADHOC_MAX_ITEMS: 单次 ad-hoc 任务允许的最大接口数量
+# ADHOC_DEFAULT_COLLECTION_NAME: ad-hoc 任务默认集合名
+# ============================================================== 
+ENABLE_ADHOC_RUN = str(os.environ.get("ENABLE_ADHOC_RUN", "true")).strip().lower() in {
+	"1", "true", "yes", "y", "on"
+}
+ADHOC_MAX_ITEMS = int(os.environ.get("ADHOC_MAX_ITEMS", "200"))
+ADHOC_DEFAULT_COLLECTION_NAME = str(os.environ.get("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试")).strip() or "报告中心临时测试"

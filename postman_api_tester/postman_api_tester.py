@@ -143,7 +143,6 @@ class PostmanApiParser:
         :return: API信息
         """
         request = item.get('request', {})
-        name = item.get('name', 'Unknown')
         
         # 解析URL
         url = request.get('url', '')
@@ -152,6 +151,7 @@ class PostmanApiParser:
         
         # 解析方法
         method = request.get('method', 'GET').upper()
+        name = self._normalize_api_name(item.get('name', ''), method, url)
         
         # 解析请求头
         headers = {}
@@ -187,7 +187,11 @@ class PostmanApiParser:
                 params[query.get('key')] = query.get('value')
         
         # 解析预期响应
-        expected_status = 200
+        # 兼容报告中心 ad-hoc 请求写入的扩展字段 x_expected_status。
+        try:
+            expected_status = int(request.get('x_expected_status', 200))
+        except (TypeError, ValueError):
+            expected_status = 200
         tests = item.get('event', [])
         for event in tests:
             if event.get('listen') == 'test':
@@ -208,6 +212,29 @@ class PostmanApiParser:
             'description': item.get('description', ''),
             'item_path': list(item_path or []),
         }
+
+    def _normalize_api_name(self, name: Any, method: str, url: str) -> str:
+        text = str(name or '').strip()
+        if text and not re.fullmatch(r'[?？\s_]+', text):
+            return text
+
+        url_text = str(url or '').strip()
+        if not url_text:
+            return f"{method} 接口"
+
+        if url_text.startswith('{{baseUrl}}'):
+            url_text = url_text[len('{{baseUrl}}'):] or '/'
+        elif url_text.startswith('{{base_url}}'):
+            url_text = url_text[len('{{base_url}}'):] or '/'
+
+        match = re.match(r'https?://[^/]+(.*)$', url_text)
+        if match:
+            url_text = match.group(1) or '/'
+
+        if not url_text.startswith('/'):
+            url_text = '/' + url_text
+
+        return f"{method} {url_text}"
     
     def _build_url_from_dict(self, url_dict: Dict) -> str:
         """

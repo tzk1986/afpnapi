@@ -1,10 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.1.4
-发布日期：2026-04-27
+版本：v1.1.5
+发布日期：2026-04-28
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点：优化 report_view 编辑界面切换与 Body 类型选择体验（双编辑器切换隔离 + 多 Body 类型支持）、修复“导出后二次导入预览 2 条但仅执行 1 条”的 URL 解析兼容问题、修复人工用例导出参数丢失问题（导出时保留 headers/params/body）、补齐重试接口 SSRF 校验、统一请求体构建逻辑并补充可复用冒烟脚本。
+本版新增重点：支持在报告中心首页通过“新增接口测试”按钮进入独立 ad-hoc 页面，并在新页面内录入接口、执行生成报告；同时保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力兼容，并保留既有上传执行入口。
 
 关联文档：
 
@@ -113,6 +113,9 @@ pip install -r requirements.txt
 - `TOKEN`：默认认证 token（可空）
 - `REPORT_OUTPUT_DIR`：报告输出目录（可空，空时默认 `项目根目录/reports`）
 - `ENABLE_SELECTIVE_RUN`：是否启用“导入后仅执行已选接口”能力
+- `ENABLE_ADHOC_RUN`：是否启用首页“新增接口测试”独立页面入口
+- `ADHOC_MAX_ITEMS`：单次 ad-hoc 任务允许录入的最大接口数
+- `ADHOC_DEFAULT_COLLECTION_NAME`：ad-hoc 临时任务默认集合名称
 - `REPORT_EXPORT_DEFAULT_SCOPE`：报告导出默认范围（`full` / `report_only`）
 
 示例：
@@ -198,6 +201,7 @@ python report_server.py
 
 - `报告中心首页`：查看历史报告、删除报告、做差异对比。
 - `上传并执行`：支持先解析集合接口，再选择“全量执行”或“仅执行已选接口”。
+- `新增接口测试`：在首页点击入口按钮后进入独立页面，录入接口（名称/目录/方法/URL/Headers/Params/Body）并执行生成报告，无需先准备完整 Collection 文件。
 - `数据视图`：按接口逐条查看请求头、参数、响应体、错误信息。
 - `人工用例编辑器`：按三段式流程新增/编辑人工用例（先发送请求，再确认 PASSED/FAILED，再保存）。
 - `编辑器切换与 Body 选择`：mc 与 er 双编辑器互相隔离，Body 类型切换互不污染；支持 none/raw/urlencoded/formdata/graphql/binary 切换。
@@ -207,6 +211,13 @@ python report_server.py
 - `原始 HTML`：打开生成时的原始静态报告。
 - `查看元数据`：查看当前报告的结构化摘要与结果索引。
 - `导出最新 JSON`：支持按全量导出或仅导出“本次报告涉及接口”。
+
+ad-hoc 直接新增接口测试补充：
+
+- 无需先上传 Collection 文件，首页点击“打开新增接口测试页”后，在独立页面录入 1..N 条接口即可入队执行。
+- URL 支持绝对 `http/https` 地址、`{{baseUrl}}/...` / `{{base_url}}/...` 变量地址，或配合 `base_url` 的相对路径。
+- 单次任务接口数量上限由 `postman_api_tester/config.py` 的 `ADHOC_MAX_ITEMS` 控制，默认集合名由 `ADHOC_DEFAULT_COLLECTION_NAME` 提供。
+- 后端通过 `/api/run-ad-hoc-tests` 接收 JSON 请求，内部会先生成临时 Collection 文件到 `uploaded_collections/`，再复用既有任务队列与状态轮询链路。
 
 补充说明：
 
