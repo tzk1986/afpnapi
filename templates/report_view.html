@@ -76,18 +76,35 @@
         /* 编辑重试 */
         .retry-btn { background: #f59e0b; color: #fff; border: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; margin-left: 8px; }
         .retry-btn:hover { background: #d97706; }
-        .edit-retry-panel { background: #fffbeb; border: 1px solid #fde68a; border-radius: 14px; padding: 16px; margin-top: 16px; }
+        .edit-retry-panel { background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 16px; margin-top: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35); }
         .edit-retry-panel h4 { margin: 0 0 12px; font-size: 14px; color: #92400e; }
+        .editor-top-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .editor-top-grid .wide { grid-column: 1 / -1; }
+        .editor-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .editor-field label { font-size: 12px; color: #475569; }
+        .editor-field input, .editor-field select, .editor-field textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background: #fff; }
+        .editor-field textarea { min-height: 96px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
+        .editor-field textarea.error { border-color: #ef4444; background: #fff1f2; }
+        .editor-group-title { margin: 12px 0 6px; font-size: 12px; color: #334155; font-weight: 700; }
+        .editor-param-panel { margin-top: 8px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+        .editor-param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+        .editor-param-grid .full { grid-column: 1 / -1; }
+        .editor-field-note { font-size: 11px; color: #64748b; }
+        .manual-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+        .save-manual-panel { margin-top: 12px; }
+        .save-manual-panel .edit-actions { margin-top: 14px; }
         .edit-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
         .edit-row label { min-width: 72px; font-size: 13px; color: #475569; }
         .edit-row input[type=text], .edit-row select { flex: 1; min-width: 160px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; }
         .edit-row textarea { flex: 1; min-width: 200px; height: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-family: Consolas, monospace; resize: vertical; }
         .edit-row textarea.error { border-color: #ef4444; background: #fff1f2; }
-        .edit-actions { display: flex; gap: 10px; margin-top: 4px; }
+        .edit-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
         .edit-actions button { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
         .btn-send { background: #2563eb; color: #fff; }
         .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-cancel { background: #e2e8f0; color: #374151; }
+        .btn-soft { background: #fff; color: #2563eb; border: 1px solid #93c5fd !important; }
+        .btn-soft:hover { background: #eff6ff; }
         .retry-result-box { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
         .retry-result-box.ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
         .retry-result-box.fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
@@ -101,7 +118,7 @@
         .manual-panel { margin-top: 20px; }
         .manual-head { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .manual-head h3 { margin: 0; font-size: 16px; }
-        .manual-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .manual-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
         .manual-field { display: flex; flex-direction: column; gap: 6px; }
         .manual-field label { font-size: 12px; color: #475569; }
         .manual-field .hint { font-size: 11px; color: #64748b; }
@@ -158,15 +175,21 @@
         .mc-mode-switcher span { font-size: 12px; color: #64748b; margin-right: 4px; }
         .mc-mode-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; transition: background 0.15s; }
         .mc-mode-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .mc-mode-btn:not(.active):hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
         /* KV 表格行 */
         .kv-table-wrap { display: flex; flex-direction: column; gap: 4px; }
         .kv-header-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; padding: 0 2px; font-size: 11px; color: #94a3b8; font-weight: 600; }
         .kv-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; align-items: center; }
-        .kv-row input { padding: 5px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; width: 100%; box-sizing: border-box; }
+        .kv-row input { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; width: 100%; box-sizing: border-box; }
         .kv-row input:focus { outline: none; border-color: #94a3b8; }
         .kv-row-del { width: 24px; height: 24px; border: none; background: #fee2e2; color: #991b1b; border-radius: 5px; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-        .kv-add-btn { margin-top: 6px; padding: 4px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .kv-add-btn { margin-top: 6px; padding: 6px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .kv-add-btn:hover { border-color: #475569; color: #334155; }
+        .editor-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .editor-two-col .full { grid-column: 1 / -1; }
+        @media (max-width: 980px) {
+            .editor-param-grid, .editor-two-col { grid-template-columns: 1fr; }
+        }
         /* 基础紧凑按钮 */
         .btn-compact {
             padding: 4px 8px;
@@ -1748,57 +1771,68 @@ function openEditRetry() {
     panel.innerHTML = `
         <div class="edit-retry-panel">
             <h4>编辑重试参数</h4>
-            <div class="edit-row">
-                <label>Method</label>
-                <select id="er-method">${methodOptions}</select>
-            </div>
-            <div class="edit-row">
-                <label>URL</label>
-                <input type="text" id="er-url" value="${escapeAttr(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
-            </div>
-            <div class="edit-row">
-                <label>Token</label>
-                <input type="text" id="er-token" placeholder="留空则使用原始 Headers 中的认证" />
-            </div>
-            <div class="mc-mode-switcher" style="margin-bottom:4px;">
-                <button type="button" id="er-mode-json" class="mc-mode-btn active" onclick="switchRetryEditMode('json')">JSON 模式</button>
-                <button type="button" id="er-mode-form" class="mc-mode-btn" onclick="switchRetryEditMode('form')">表单模式</button>
-            </div>
-            <div class="edit-section-label">Headers</div>
-            <div id="er-headers-json-panel">
-                <textarea id="er-headers" placeholder="{}" style="height:80px;">${escapeHtml(headersJson)}</textarea>
-            </div>
-            <div id="er-headers-form-panel" style="display:none;">
-                <div class="kv-table-wrap">
-                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                    <div id="er-headers-kv-rows"></div>
+            <div class="editor-top-grid">
+                <div class="editor-field">
+                    <label for="er-method">Method</label>
+                    <select id="er-method">${methodOptions}</select>
                 </div>
-                <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-headers')">+ 新增</button>
-            </div>
-            <div class="edit-section-label" style="margin-top:8px;">Params</div>
-            <div id="er-params-json-panel">
-                <textarea id="er-params" placeholder="{}" style="height:60px;">${escapeHtml(paramsJson)}</textarea>
-            </div>
-            <div id="er-params-form-panel" style="display:none;">
-                <div class="kv-table-wrap">
-                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                    <div id="er-params-kv-rows"></div>
+                <div class="editor-field wide">
+                    <label for="er-url">URL</label>
+                    <input type="text" id="er-url" value="${escapeAttr(data.url || '')}" style="font-family:Consolas;font-size:12px;" />
                 </div>
-                <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-params')">+ 新增</button>
+                <div class="editor-field">
+                    <label for="er-token">Token</label>
+                    <input type="text" id="er-token" placeholder="留空则使用原始 Headers 中的认证" />
+                </div>
+                <div class="editor-field">
+                    <label for="er-expected-status">期望状态码</label>
+                    <input type="text" id="er-expected-status" value="${escapeAttr(String(data.expected_status || 200))}" />
+                </div>
             </div>
-            <div class="edit-section-label" style="margin-top:8px;">Body</div>
-            <div id="er-body-editor"></div>
-            <div class="edit-row" style="margin-top:8px;">
-                <label>期望状态码</label>
-                <input type="text" id="er-expected-status" value="${escapeAttr(String(data.expected_status || 200))}" style="max-width:80px;" />
+            <div class="editor-group-title">请求参数</div>
+            <div class="editor-param-panel">
+                <div class="mc-mode-switcher" style="margin-bottom:0;">
+                    <span>编辑方式：</span>
+                    <button type="button" id="er-mode-json" class="mc-mode-btn active" onclick="switchRetryEditMode('json')">JSON 编辑</button>
+                    <button type="button" id="er-mode-form" class="mc-mode-btn" onclick="switchRetryEditMode('form')">表单编辑</button>
+                </div>
+                <div class="editor-param-grid">
+                    <div class="editor-field" id="er-headers-json-panel">
+                        <label for="er-headers">请求头 Headers（JSON）</label>
+                        <textarea id="er-headers" placeholder="{}" style="height:96px;">${escapeHtml(headersJson)}</textarea>
+                    </div>
+                    <div class="editor-field" id="er-params-json-panel">
+                        <label for="er-params">查询参数 Params（JSON）</label>
+                        <textarea id="er-params" placeholder="{}" style="height:96px;">${escapeHtml(paramsJson)}</textarea>
+                    </div>
+                    <div class="editor-field" id="er-headers-form-panel" style="display:none;">
+                        <label>请求头 Headers</label>
+                        <div class="kv-table-wrap">
+                            <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                            <div id="er-headers-kv-rows"></div>
+                        </div>
+                        <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-headers')">+ 添加</button>
+                    </div>
+                    <div class="editor-field" id="er-params-form-panel" style="display:none;">
+                        <label>查询参数 Params</label>
+                        <div class="kv-table-wrap">
+                            <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                            <div id="er-params-kv-rows"></div>
+                        </div>
+                        <button type="button" class="kv-add-btn" onclick="erAddKvRow('er-params')">+ 添加</button>
+                    </div>
+                    <div class="editor-field full">
+                        <label>请求体 Body（Postman 风格）</label>
+                        <div id="er-body-editor"></div>
+                    </div>
+                </div>
             </div>
-            <div class="edit-row">
-                <label></label>
+            <div class="edit-row" style="margin-top:10px; margin-bottom:0;">
                 <label style="min-width:auto;"><input type="checkbox" id="er-save" checked> 回写到报告</label>
             </div>
             <div class="edit-actions">
                 <button class="btn-send" id="er-send-btn" onclick="sendRetry()">发送</button>
-                <button class="btn-cancel" onclick="cancelEditRetry()">取消</button>
+                <button class="btn-cancel btn-soft" onclick="cancelEditRetry()">取消</button>
             </div>
             <div id="er-result" style="display:none;"></div>
         </div>
@@ -1959,14 +1993,57 @@ async function saveCurrentAsManualCase() {
     if (!currentDetailData) {
         return;
     }
-    const suggestedFolder = (currentDetailData.folder || MANUAL_CASE_FOLDER_NAME || '').trim() || MANUAL_CASE_FOLDER_NAME;
-    const folder = window.prompt('请输入人工用例目录名称：', suggestedFolder);
-    if (folder === null) {
+
+    const panel = document.getElementById('editRetryPanel');
+    if (!panel) {
         return;
     }
+
+    const suggestedFolder = (currentDetailData.folder || MANUAL_CASE_FOLDER_NAME || '').trim() || MANUAL_CASE_FOLDER_NAME;
+    panel.style.display = '';
+    panel.innerHTML = `
+        <div class="edit-retry-panel save-manual-panel">
+            <h4>保存为人工用例</h4>
+            <div class="editor-top-grid">
+                <div class="editor-field">
+                    <label for="sm-name">接口名称 *</label>
+                    <input id="sm-name" type="text" value="${escapeAttr(currentDetailData.name || '未命名接口')}">
+                </div>
+                <div class="editor-field">
+                    <label for="sm-folder">目录</label>
+                    <input id="sm-folder" type="text" value="${escapeAttr(suggestedFolder)}" placeholder="默认：${escapeAttr(MANUAL_CASE_FOLDER_NAME)}">
+                </div>
+                <div class="editor-field">
+                    <label for="sm-method">请求方法</label>
+                    <input id="sm-method" type="text" value="${escapeAttr(currentDetailData.method || 'GET')}" readonly>
+                </div>
+                <div class="editor-field wide">
+                    <label for="sm-url">URL</label>
+                    <input id="sm-url" type="text" value="${escapeAttr(currentDetailData.url || '')}" readonly style="font-family:Consolas;font-size:12px;">
+                </div>
+            </div>
+            <div class="editor-field-note" style="margin-top:10px;">保存后可在“人工用例管理”中继续编辑、重发、排除或删除。</div>
+            <div class="edit-actions">
+                <button class="btn-send" onclick="confirmSaveCurrentAsManualCase()">保存</button>
+                <button class="btn-cancel btn-soft" onclick="cancelEditRetry()">取消</button>
+            </div>
+        </div>
+    `;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function confirmSaveCurrentAsManualCase() {
+    if (!currentDetailData) {
+        return;
+    }
+
+    const name = (document.getElementById('sm-name')?.value || '').trim() || '未命名接口';
+    const folderInput = (document.getElementById('sm-folder')?.value || '').trim();
+    const folder = folderInput || MANUAL_CASE_FOLDER_NAME;
+
     const casePayload = {
-        name: currentDetailData.name || '未命名接口',
-        folder: (folder || '').trim() || MANUAL_CASE_FOLDER_NAME,
+        name,
+        folder,
         method: currentDetailData.method || 'GET',
         url: currentDetailData.url || '',
         expected_status: currentDetailData.expected_status || 200,
@@ -1987,6 +2064,7 @@ async function saveCurrentAsManualCase() {
             throw new Error(data.error || '保存人工用例失败');
         }
         await reloadManualCases();
+        cancelEditRetry();
         alert('已保存为人工用例');
     } catch (error) {
         alert('保存失败: ' + (error.message || error));
@@ -2187,52 +2265,53 @@ function renderManualEditor(existingCase = null) {
                     <input type="text" id="mc-url" placeholder="例如：https://api.example.com/orders" value="${escapeHtml((existingCase && existingCase.url) || '')}">
                 </div>
                 <div class="manual-group-title wide">请求参数</div>
-                <!-- JSON↔表单模式切换器 -->
-                <div class="mc-mode-switcher wide">
-                    <span>编辑方式：</span>
-                    <button type="button" class="mc-mode-btn active" id="mc-mode-json" onclick="switchEditMode('json')">JSON 编辑</button>
-                    <button type="button" class="mc-mode-btn" id="mc-mode-form" onclick="switchEditMode('form')">表单编辑</button>
-                </div>
-                <!-- JSON 模式：Headers -->
-                <div class="manual-field" id="mc-headers-json-panel">
-                    <label for="mc-headers">请求头 Headers（JSON）</label>
-                    <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
-                    <div class="hint">对象格式，空值可填 {} 或留空</div>
-                </div>
-                <!-- 表单模式：Headers（默认隐藏） -->
-                <div class="manual-field" id="mc-headers-form-panel" style="display:none;">
-                    <label>请求头 Headers</label>
-                    <div class="kv-table-wrap">
-                        <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                        <div id="mc-headers-kv-rows"></div>
-                    </div>
-                    <button type="button" class="kv-add-btn" onclick="addKvRow('mc-headers')">+ 添加</button>
-                </div>
-                <!-- JSON 模式：Params -->
-                <div class="manual-field" id="mc-params-json-panel">
-                    <label for="mc-params">查询参数 Params（JSON）</label>
-                    <textarea id="mc-params" placeholder='{"page": 1}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
-                    <div class="hint">对象格式，空值可填 {} 或留空</div>
-                </div>
-                <!-- 表单模式：Params（默认隐藏） -->
-                <div class="manual-field" id="mc-params-form-panel" style="display:none;">
-                    <label>查询参数 Params</label>
-                    <div class="kv-table-wrap">
-                        <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                        <div id="mc-params-kv-rows"></div>
-                    </div>
-                    <button type="button" class="kv-add-btn" onclick="addKvRow('mc-params')">+ 添加</button>
-                </div>
                 <div class="manual-field wide">
-                    <label>请求体 Body（Postman 风格）</label>
-                    <div id="mc-body-editor"></div>
+                    <div class="editor-param-panel">
+                        <div class="mc-mode-switcher" style="margin-bottom:0;">
+                            <span>编辑方式：</span>
+                            <button type="button" class="mc-mode-btn active" id="mc-mode-json" onclick="switchEditMode('json')">JSON 编辑</button>
+                            <button type="button" class="mc-mode-btn" id="mc-mode-form" onclick="switchEditMode('form')">表单编辑</button>
+                        </div>
+                        <div class="editor-param-grid">
+                            <div class="manual-field" id="mc-headers-json-panel">
+                                <label for="mc-headers">请求头 Headers（JSON）</label>
+                                <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
+                                <div class="hint">对象格式，空值可填 {} 或留空</div>
+                            </div>
+                            <div class="manual-field" id="mc-params-json-panel">
+                                <label for="mc-params">查询参数 Params（JSON）</label>
+                                <textarea id="mc-params" placeholder='{"page": 1}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
+                                <div class="hint">对象格式，空值可填 {} 或留空</div>
+                            </div>
+                            <div class="manual-field" id="mc-headers-form-panel" style="display:none;">
+                                <label>请求头 Headers</label>
+                                <div class="kv-table-wrap">
+                                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                                    <div id="mc-headers-kv-rows"></div>
+                                </div>
+                                <button type="button" class="kv-add-btn" onclick="addKvRow('mc-headers')">+ 添加</button>
+                            </div>
+                            <div class="manual-field" id="mc-params-form-panel" style="display:none;">
+                                <label>查询参数 Params</label>
+                                <div class="kv-table-wrap">
+                                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                                    <div id="mc-params-kv-rows"></div>
+                                </div>
+                                <button type="button" class="kv-add-btn" onclick="addKvRow('mc-params')">+ 添加</button>
+                            </div>
+                            <div class="manual-field full">
+                                <label>请求体 Body（Postman 风格）</label>
+                                <div id="mc-body-editor"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="edit-actions" style="margin-top:12px;">
                 <button class="btn-send" id="mc-send-btn" onclick="sendManualRequest()">发送请求</button>
-                ${isEdit ? `<button class="btn-cancel" id="mc-direct-save-btn" onclick="directSaveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">直接保存（不重发）</button>` : ''}
-                <button class="btn-cancel" onclick="closeManualEditor()">取消</button>
+                ${isEdit ? `<button class="btn-cancel btn-soft" id="mc-direct-save-btn" onclick="directSaveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">直接保存（不重发）</button>` : ''}
+                <button class="btn-cancel btn-soft" onclick="closeManualEditor()">取消</button>
             </div>
 
             <!-- 段二：响应面板（发送后显示） -->
@@ -2259,7 +2338,7 @@ function renderManualEditor(existingCase = null) {
                 </div>
                 <div class="edit-actions">
                     <button class="btn-send" onclick="confirmSaveManualCase('${escapeHtml((existingCase && existingCase.id) || '')}')">保存</button>
-                    <button class="btn-cancel" onclick="closeManualEditor()">取消</button>
+                    <button class="btn-cancel btn-soft" onclick="closeManualEditor()">取消</button>
                 </div>
             </div>
         </div>
@@ -2762,11 +2841,19 @@ async function openManualCaseDetail(index) {
     currentDetailData = caseData;
     currentDetailIndex = null;
 
-    title.innerHTML = `${escapeHtml(caseData.name || '接口详情')} <span style="font-size:12px;color:#64748b;">(人工用例)</span>`;
+    title.innerHTML = `${escapeHtml(caseData.name || '接口详情')} <span class="manual-tag">人工用例</span>`;
     const actualRequestUrl = buildActualRequestUrl(caseData) || caseData.url || '-';
+    const configuredUrl = caseData.url || '-';
+    const statusText = String(caseData.status || '-').toUpperCase();
+    const statusClass = statusText === 'PASSED' ? 'status-passed' : (statusText === 'FAILED' ? 'status-failed' : 'status-error');
     meta.innerHTML = `
-        <div class="detail-meta-row">${escapeHtml(caseData.method || '-')} | 状态 ${escapeHtml(String(caseData.status || '-'))} | 状态码 ${caseData.status_code ?? '-'}</div>
-        <div class="detail-meta-row detail-meta-url">URL: ${escapeHtml(actualRequestUrl)}</div>
+        <div class="detail-meta-row">
+            ${escapeHtml(caseData.method || '-')} |
+            <span class="status ${statusClass}">${escapeHtml(statusText)}</span>
+            | 状态码 ${caseData.status_code ?? '-'}
+        </div>
+        <div class="detail-meta-row detail-meta-url">配置 URL: ${escapeHtml(configuredUrl)}</div>
+        <div class="detail-meta-row detail-meta-url">实际请求 URL: ${escapeHtml(actualRequestUrl)}</div>
     `;
 
     if (editPanel) {
