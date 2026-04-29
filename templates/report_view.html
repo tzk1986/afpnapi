@@ -3140,25 +3140,60 @@ function renderManualCaseDetailPanels(caseData) {
     body.innerHTML = `
         <div class="detail-grid">
             <div class="detail-card">
-                <h4>请求头</h4>
-                <pre>${escapeHtml(formatJson(reqInfo.headers || {}))}</pre>
+                <div class="detail-card-head">
+                    <h4>请求头</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqHeadersView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqHeadersView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqHeadersView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqHeadersView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>查询参数</h4>
-                <pre>${escapeHtml(formatJson(reqInfo.params || {}))}</pre>
+                <div class="detail-card-head">
+                    <h4>查询参数</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqParamsView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqParamsView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqParamsView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqParamsView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>请求体</h4>
-                <pre>${escapeHtml(formatJson(reqInfo.body))}</pre>
+                <div class="detail-card-head">
+                    <h4>请求体</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqBodyView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqBodyView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqBodyView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqBodyView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>响应头</h4>
-                <pre>${escapeHtml(formatJson(respInfo.headers || {}))}</pre>
+                <div class="detail-card-head">
+                    <h4>响应头</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('respHeadersView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('respHeadersView', false)">收起</button>
+                        <button onclick="copyJsonViewer('respHeadersView')">复制</button>
+                    </div>
+                </div>
+                <div id="respHeadersView" class="json-viewer"></div>
             </div>
             <div class="detail-card" style="grid-column: 1 / -1;">
-                <h4>响应体</h4>
+                <div class="detail-card-head">
+                    <h4>响应体</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('responseBodyView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('responseBodyView', false)">收起</button>
+                        <button onclick="copyJsonViewer('responseBodyView')">复制</button>
+                    </div>
+                </div>
                 <div id="responseBodyMeta" class="muted response-meta"></div>
-                <pre id="responseBodyPre"></pre>
+                <div id="responseBodyView" class="json-viewer"></div>
                 <div id="responseBodyActions" class="response-actions"></div>
             </div>
         </div>
@@ -3168,6 +3203,7 @@ function renderManualCaseDetailPanels(caseData) {
         request_info: reqInfo,
         response_info: respInfo,
     };
+    renderDetailPanels(currentDetailData);
     renderResponseBody(respInfo.body, 'preview');
 }
 
