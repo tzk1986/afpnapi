@@ -20,11 +20,12 @@
         .field textarea { min-height: 96px; resize: vertical; }
         .adhoc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
         .adhoc-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-        .adhoc-editor { margin-top: 14px; border: 1px solid #fde68a; border-radius: 14px; padding: 16px; background: #fffbeb; }
+        .adhoc-editor { margin-top: 14px; border: 1px solid #fde68a; border-radius: 16px; padding: 16px; background: #fffbeb; box-shadow: inset 0 1px 0 rgba(255,255,255,0.35); }
         .adhoc-editor h4 { margin: 0 0 12px; font-size: 14px; color: #92400e; }
-        .adhoc-row { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr 1.6fr 0.8fr; gap: 8px; }
+        .adhoc-row { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr 1.6fr 0.8fr; gap: 12px; }
         .adhoc-kv { display: grid; grid-template-columns: 1fr 1fr 0.9fr; gap: 8px; margin-top: 8px; }
         .manual-group-title { margin: 12px 0 6px; font-size: 12px; color: #334155; font-weight: 700; }
+        .editor-param-panel { margin-top: 8px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
         .mc-mode-switcher { display: flex; gap: 6px; align-items: center; margin: 10px 0; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
         .mc-mode-switcher span { font-size: 12px; color: #64748b; margin-right: 4px; }
         .mc-mode-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; }
@@ -42,6 +43,45 @@
         .kv-add-btn { margin-top: 6px; padding: 6px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 8px; cursor: pointer; font-size: 12px; align-self: flex-start; }
         .kv-add-btn:hover { border-color: #475569; color: #334155; }
         .mode-panel.hidden { display: none; }
+        .body-mode-selector { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+        .body-mode-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; }
+        .body-mode-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .body-panel { display: none; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff; }
+        .body-panel.active { display: block; }
+        .body-mini-hint { font-size: 11px; color: #64748b; margin-top: 6px; }
+        .body-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 680px; }
+        .body-table th, .body-table td { border-bottom: 1px solid #e2e8f0; padding: 6px; white-space: normal; overflow: visible; text-overflow: clip; }
+        .body-table th { background: #f8fafc; font-size: 12px; color: #475569; }
+        .body-table input[type='text'], .body-table select { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+        .body-row-op { display: flex; gap: 6px; }
+        .body-raw-tools { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .body-raw-wrap { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        .body-raw-wrap textarea { min-height: 180px; font-family: Consolas, monospace; font-size: 12px; }
+        .raw-highlight-box { background: #0b1220; color: #dbeafe; border-radius: 8px; padding: 8px; max-height: 180px; overflow: auto; font-family: Consolas, monospace; font-size: 12px; }
+        .raw-highlight-box .k { color: #93c5fd; }
+        .raw-highlight-box .s { color: #86efac; }
+        .raw-highlight-box .n { color: #fcd34d; }
+        .raw-highlight-box .b { color: #c4b5fd; }
+        .raw-highlight-box .null { color: #f9a8d4; }
+        .raw-status-line { font-size: 12px; color: #475569; display: flex; gap: 12px; flex-wrap: wrap; }
+        .raw-status-line.ok { color: #166534; }
+        .raw-status-line.err { color: #991b1b; }
+        .graphql-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .graphql-col-title { font-size: 12px; color: #334155; margin-bottom: 6px; font-weight: 700; }
+        .graphql-split textarea { min-height: 200px; font-family: Consolas, monospace; font-size: 12px; }
+        .binary-upload-box { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .file-name-tag { font-size: 12px; color: #334155; }
+        .btn-compact {
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-compact:hover { background: #e2e8f0; border-color: #94a3b8; }
         .adhoc-case-list { margin-top: 12px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; overflow: hidden; }
         .adhoc-case-list table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .adhoc-case-list th, .adhoc-case-list td { padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 12px; overflow-wrap: anywhere; word-break: break-word; text-align: left; }
@@ -59,6 +99,9 @@
         .mini-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; }
         .mini-card .label { font-size: 12px; color: #64748b; }
         .mini-card .value { margin-top: 6px; font-size: 20px; font-weight: 700; color: #0f172a; }
+        @media (max-width: 980px) {
+            .graphql-split { grid-template-columns: 1fr; }
+        }
         @media (max-width: 768px) {
             .adhoc-row, .adhoc-kv, .adhoc-mode-grid { grid-template-columns: 1fr; }
             .hero-actions { flex-direction: column; }
@@ -153,58 +196,51 @@
                     </div>
                 </div>
                 <div class="manual-group-title">请求参数</div>
-                <div class="mc-mode-switcher">
-                    <span>编辑方式：</span>
-                    <button id="adhocModeFormBtn" type="button" class="mc-mode-btn active" onclick="switchAdhocEditMode('form')">表单编辑</button>
-                    <button id="adhocModeJsonBtn" type="button" class="mc-mode-btn" onclick="switchAdhocEditMode('json')">JSON 编辑</button>
-                </div>
+                <div class="editor-param-panel">
+                    <div class="mc-mode-switcher" style="margin-bottom:0;">
+                        <span>编辑方式：</span>
+                        <button id="adhocModeFormBtn" type="button" class="mc-mode-btn active" onclick="switchAdhocEditMode('form')">表单编辑</button>
+                        <button id="adhocModeJsonBtn" type="button" class="mc-mode-btn" onclick="switchAdhocEditMode('json')">JSON 编辑</button>
+                    </div>
 
-                <div id="adhocFormModePanel" class="mode-panel">
-                    <div class="adhoc-mode-grid">
-                        <div class="field">
-                            <label>请求头 Headers</label>
-                            <div class="kv-table-wrap">
-                                <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                                <div id="adhocHeadersRows" class="kv-rows"></div>
+                    <div id="adhocFormModePanel" class="mode-panel">
+                        <div class="adhoc-mode-grid">
+                            <div class="field">
+                                <label>请求头 Headers</label>
+                                <div class="kv-table-wrap">
+                                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                                    <div id="adhocHeadersRows" class="kv-rows"></div>
+                                </div>
+                                <button type="button" class="kv-add-btn" onclick="addKvRow('adhocHeadersRows')">+ 添加</button>
                             </div>
-                            <button type="button" class="kv-add-btn" onclick="addKvRow('adhocHeadersRows')">+ 添加</button>
-                        </div>
-                        <div class="field">
-                            <label>查询参数 Params</label>
-                            <div class="kv-table-wrap">
-                                <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
-                                <div id="adhocParamsRows" class="kv-rows"></div>
+                            <div class="field">
+                                <label>查询参数 Params</label>
+                                <div class="kv-table-wrap">
+                                    <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
+                                    <div id="adhocParamsRows" class="kv-rows"></div>
+                                </div>
+                                <button type="button" class="kv-add-btn" onclick="addKvRow('adhocParamsRows')">+ 添加</button>
                             </div>
-                            <button type="button" class="kv-add-btn" onclick="addKvRow('adhocParamsRows')">+ 添加</button>
                         </div>
                     </div>
-                </div>
 
-                <div id="adhocJsonModePanel" class="mode-panel hidden">
-                    <div class="adhoc-mode-grid">
-                        <div class="field">
-                            <label for="adhocCaseHeaders">Headers（JSON）</label>
-                            <textarea id="adhocCaseHeaders" placeholder='例如：{"Content-Type":"application/json"}'></textarea>
-                        </div>
-                        <div class="field">
-                            <label for="adhocCaseParams">Params（JSON）</label>
-                            <textarea id="adhocCaseParams" placeholder='例如：{"page":"1"}'></textarea>
+                    <div id="adhocJsonModePanel" class="mode-panel hidden">
+                        <div class="adhoc-mode-grid">
+                            <div class="field">
+                                <label for="adhocCaseHeaders">Headers（JSON）</label>
+                                <textarea id="adhocCaseHeaders" placeholder='例如：{"Content-Type":"application/json"}'></textarea>
+                            </div>
+                            <div class="field">
+                                <label for="adhocCaseParams">Params（JSON）</label>
+                                <textarea id="adhocCaseParams" placeholder='例如：{"page":"1"}'></textarea>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="field" style="margin-top:8px;">
-                    <label for="adhocCaseBodyMode">Body 模式</label>
-                    <select id="adhocCaseBodyMode">
-                        <option value="none">none</option>
-                        <option value="raw">raw</option>
-                        <option value="urlencoded">urlencoded</option>
-                        <option value="formdata">formdata</option>
-                        <option value="graphql">graphql</option>
-                        <option value="binary">binary</option>
-                    </select>
-                    <label for="adhocCaseBodyData" style="margin-top:6px;">Body 数据（raw 为文本，其它模式填 JSON）</label>
-                    <textarea id="adhocCaseBodyData" placeholder='raw 示例：{"id":1}；urlencoded 示例：[{"key":"id","value":"1"}]'></textarea>
+                    <div class="field" style="margin-top:8px;">
+                        <label>请求体 Body（Postman 风格）</label>
+                        <div id="adhoc-body-editor"></div>
+                    </div>
                 </div>
                 <div class="adhoc-actions">
                     <button type="button" class="btn-mini" onclick="addAdhocCase()">加入待测列表</button>
@@ -229,6 +265,8 @@ const ADHOC_MAX_ITEMS = {{ adhoc_max_items }};
 let adhocCases = [];
 let adhocJobTimer = null;
 let adhocEditMode = 'form';
+let adhocBodyEditorState = null;
+let adhocBodySeq = 1;
 
 function setAdhocStatus(text, level = '') {
     const statusEl = document.getElementById('adhocRunStatus');
@@ -250,6 +288,370 @@ function parseJsonField(text, defaultValue, label) {
 
 function escapeHtml(value) {
     return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+function escapeAttr(value) {
+    return String(value || '').replace(/"/g, '&quot;');
+}
+
+function nextAdhocBodyId(prefix = 'ab') {
+    adhocBodySeq += 1;
+    return `${prefix}-${Date.now()}-${adhocBodySeq}`;
+}
+
+function toAdhocBodyRows(source) {
+    if (!Array.isArray(source)) {
+        return [];
+    }
+    return source.map((row) => ({
+        id: row.id || nextAdhocBodyId('row'),
+        key: String(row.key || ''),
+        type: row.type === 'file' ? 'file' : 'text',
+        value: row.value === undefined || row.value === null ? '' : String(row.value),
+        file_name: row.file_name ? String(row.file_name) : '',
+    }));
+}
+
+function normalizeAdhocBodyState(body) {
+    const fallback = {
+        mode: 'none',
+        raw_language: 'json',
+        raw_content: '',
+        raw_content_type: 'application/json',
+        urlencoded: [],
+        formdata: [],
+        graphql: { query: '', variables: '{}' },
+        binary: { file_name: '' },
+    };
+    if (!body || body === '无') {
+        return fallback;
+    }
+    if (typeof body === 'object' && body.__manual_body_mode) {
+        return {
+            mode: String(body.__manual_body_mode || 'none'),
+            raw_language: String(body.raw_language || 'json'),
+            raw_content: String(body.raw_content || ''),
+            raw_content_type: String(body.raw_content_type || 'application/json'),
+            urlencoded: toAdhocBodyRows(body.urlencoded),
+            formdata: toAdhocBodyRows(body.formdata),
+            graphql: {
+                query: String((body.graphql && body.graphql.query) || ''),
+                variables: String((body.graphql && body.graphql.variables) || '{}'),
+            },
+            binary: {
+                file_name: String((body.binary && body.binary.file_name) || ''),
+            },
+        };
+    }
+    if (typeof body === 'string') {
+        return {
+            ...fallback,
+            mode: 'raw',
+            raw_language: 'text',
+            raw_content_type: 'text/plain',
+            raw_content: body,
+        };
+    }
+    return {
+        ...fallback,
+        mode: 'raw',
+        raw_language: 'json',
+        raw_content_type: 'application/json',
+        raw_content: JSON.stringify(body, null, 2),
+    };
+}
+
+function renderAdhocBodyRow(row, isFormData) {
+    const rid = row.id || nextAdhocBodyId('row');
+    const isFile = isFormData && row.type === 'file';
+    const valueCell = isFile
+        ? `<div class="binary-upload-box"><input type="file" /><span class="file-name-tag">${escapeHtml(row.file_name || '')}</span></div>`
+        : `<input type="text" value="${escapeAttr(row.value || '')}" />`;
+    const typeCell = isFormData
+        ? `<select onchange="onAdhocFormDataTypeChange(this)"><option value="text" ${isFile ? '' : 'selected'}>text</option><option value="file" ${isFile ? 'selected' : ''}>file</option></select>`
+        : '';
+    return `
+        <tr data-row-id="${escapeAttr(rid)}" data-formdata="${isFormData ? '1' : '0'}">
+            <td><input type="text" value="${escapeAttr(row.key || '')}" placeholder="支持 address.city" /></td>
+            <td>${valueCell}</td>
+            ${isFormData ? `<td>${typeCell}</td>` : ''}
+            <td><div class="body-row-op"><button type="button" class="btn-compact" onclick="removeAdhocBodyRow(this)">删除</button></div></td>
+        </tr>
+    `;
+}
+
+function renderAdhocBodyEditor(bodyValue) {
+    adhocBodyEditorState = normalizeAdhocBodyState(bodyValue);
+    if (!adhocBodyEditorState.formdata.length) {
+        adhocBodyEditorState.formdata.push({ id: nextAdhocBodyId('fd'), key: '', type: 'text', value: '', file_name: '' });
+    }
+    if (!adhocBodyEditorState.urlencoded.length) {
+        adhocBodyEditorState.urlencoded.push({ id: nextAdhocBodyId('ue'), key: '', value: '' });
+    }
+    const root = document.getElementById('adhoc-body-editor');
+    if (!root) {
+        return;
+    }
+    const fdRows = adhocBodyEditorState.formdata.map((row) => renderAdhocBodyRow(row, true)).join('');
+    const ueRows = adhocBodyEditorState.urlencoded.map((row) => renderAdhocBodyRow(row, false)).join('');
+    root.innerHTML = `
+        <div class="body-mode-selector">
+            <button type="button" class="body-mode-btn" data-mode="none" onclick="switchAdhocBodyMode('none')">none</button>
+            <button type="button" class="body-mode-btn" data-mode="formdata" onclick="switchAdhocBodyMode('formdata')">form-data</button>
+            <button type="button" class="body-mode-btn" data-mode="urlencoded" onclick="switchAdhocBodyMode('urlencoded')">x-www-form-urlencoded</button>
+            <button type="button" class="body-mode-btn" data-mode="raw" onclick="switchAdhocBodyMode('raw')">raw</button>
+            <button type="button" class="body-mode-btn" data-mode="binary" onclick="switchAdhocBodyMode('binary')">binary</button>
+            <button type="button" class="body-mode-btn" data-mode="graphql" onclick="switchAdhocBodyMode('graphql')">GraphQL</button>
+        </div>
+
+        <div id="adhoc-body-none" class="body-panel"><div class="body-mini-hint">当前请求不发送 Body。</div></div>
+
+        <div id="adhoc-body-formdata" class="body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:30%;">Key</th><th style="width:34%;">Value/File</th><th style="width:14%;">Type</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="adhoc-formdata-rows">${fdRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools">
+                <button type="button" class="btn-compact" onclick="addAdhocFormDataRow('text')">新增 text</button>
+                <button type="button" class="btn-compact" onclick="addAdhocFormDataRow('file')">新增 file</button>
+            </div>
+        </div>
+
+        <div id="adhoc-body-urlencoded" class="body-panel">
+            <div class="table-scroll">
+                <table class="body-table">
+                    <thead><tr><th style="width:38%;">Key</th><th style="width:46%;">Value</th><th style="width:14%;">操作</th></tr></thead>
+                    <tbody id="adhoc-urlencoded-rows">${ueRows}</tbody>
+                </table>
+            </div>
+            <div class="body-raw-tools"><button type="button" class="btn-compact" onclick="addAdhocUrlEncodedRow()">新增字段</button></div>
+        </div>
+
+        <div id="adhoc-body-raw" class="body-panel">
+            <div class="body-raw-wrap">
+                <div class="edit-row" style="margin:0;">
+                    <label style="min-width:96px;">Raw 类型</label>
+                    <select id="adhoc-raw-language" onchange="onAdhocRawInput()">
+                        <option value="text">Text</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="json">JSON</option>
+                        <option value="html">HTML</option>
+                        <option value="xml">XML</option>
+                    </select>
+                </div>
+                <textarea id="adhoc-raw-content" placeholder="输入 Raw 内容" oninput="onAdhocRawInput()">${escapeHtml(adhocBodyEditorState.raw_content || '')}</textarea>
+                <div id="adhoc-raw-status" class="raw-status-line"></div>
+                <pre id="adhoc-raw-highlight" class="raw-highlight-box"></pre>
+            </div>
+        </div>
+
+        <div id="adhoc-body-binary" class="body-panel">
+            <div class="binary-upload-box">
+                <input id="adhoc-binary-file" type="file" />
+                <span id="adhoc-binary-file-name" class="file-name-tag">${escapeHtml((adhocBodyEditorState.binary && adhocBodyEditorState.binary.file_name) || '')}</span>
+            </div>
+            <div class="body-mini-hint">binary 模式记录文件名用于回放配置，不会立即上传文件。</div>
+        </div>
+
+        <div id="adhoc-body-graphql" class="body-panel">
+            <div class="graphql-split">
+                <div>
+                    <div class="graphql-col-title">QUERY</div>
+                    <textarea id="adhoc-graphql-query" placeholder="query {\n  ping\n}">${escapeHtml((adhocBodyEditorState.graphql && adhocBodyEditorState.graphql.query) || '')}</textarea>
+                </div>
+                <div>
+                    <div class="graphql-col-title">GRAPHQL VARIABLES</div>
+                    <textarea id="adhoc-graphql-variables" placeholder="{}">${escapeHtml((adhocBodyEditorState.graphql && adhocBodyEditorState.graphql.variables) || '{}')}</textarea>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const rawLanguage = document.getElementById('adhoc-raw-language');
+    if (rawLanguage) {
+        rawLanguage.value = String(adhocBodyEditorState.raw_language || 'json');
+    }
+    const binaryInput = document.getElementById('adhoc-binary-file');
+    if (binaryInput) {
+        binaryInput.addEventListener('change', () => {
+            const f = binaryInput.files && binaryInput.files[0] ? binaryInput.files[0] : null;
+            document.getElementById('adhoc-binary-file-name').textContent = f ? f.name : '';
+        });
+    }
+    switchAdhocBodyMode(adhocBodyEditorState.mode || 'none');
+    onAdhocRawInput();
+}
+
+function switchAdhocBodyMode(mode) {
+    adhocBodyEditorState = adhocBodyEditorState || {};
+    adhocBodyEditorState.mode = mode;
+    const container = document.getElementById('adhoc-body-editor');
+    if (!container) {
+        return;
+    }
+    container.querySelectorAll('.body-mode-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+    });
+    container.querySelectorAll('.body-panel').forEach((panel) => panel.classList.remove('active'));
+    const panel = document.getElementById(`adhoc-body-${mode}`);
+    if (panel) {
+        panel.classList.add('active');
+    }
+}
+
+function onAdhocFormDataTypeChange(selectEl) {
+    const tr = selectEl.closest('tr');
+    if (!tr) {
+        return;
+    }
+    const type = String(selectEl.value || 'text').toLowerCase();
+    const valueCell = tr.querySelector('td:nth-child(2)');
+    if (!valueCell) {
+        return;
+    }
+    if (type === 'file') {
+        valueCell.innerHTML = '<div class="binary-upload-box"><input type="file" /><span class="file-name-tag"></span></div>';
+    } else {
+        valueCell.innerHTML = '<input type="text" value="" />';
+    }
+}
+
+function removeAdhocBodyRow(btn) {
+    const tr = btn.closest('tr');
+    if (tr) {
+        tr.remove();
+    }
+}
+
+function addAdhocFormDataRow(type) {
+    const tbody = document.getElementById('adhoc-formdata-rows');
+    if (!tbody) {
+        return;
+    }
+    const row = renderAdhocBodyRow({ id: nextAdhocBodyId('fd'), key: '', type: type === 'file' ? 'file' : 'text', value: '', file_name: '' }, true);
+    tbody.insertAdjacentHTML('beforeend', row);
+}
+
+function addAdhocUrlEncodedRow() {
+    const tbody = document.getElementById('adhoc-urlencoded-rows');
+    if (!tbody) {
+        return;
+    }
+    const row = renderAdhocBodyRow({ id: nextAdhocBodyId('ue'), key: '', value: '' }, false);
+    tbody.insertAdjacentHTML('beforeend', row);
+}
+
+function parseAdhocBodyTableRows(tbodyId, isFormData) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) {
+        return [];
+    }
+    const rows = [];
+    tbody.querySelectorAll('tr').forEach((tr) => {
+        const keyInput = tr.querySelector('td:nth-child(1) input[type="text"]');
+        const key = (keyInput && keyInput.value ? keyInput.value : '').trim();
+        if (!key) {
+            return;
+        }
+        if (!isFormData) {
+            const valueInput = tr.querySelector('td:nth-child(2) input[type="text"]');
+            rows.push({ key, value: valueInput ? valueInput.value : '' });
+            return;
+        }
+        const typeSelect = tr.querySelector('td:nth-child(3) select');
+        const rowType = typeSelect ? typeSelect.value : 'text';
+        if (rowType === 'file') {
+            const fInput = tr.querySelector('input[type="file"]');
+            const file = fInput && fInput.files && fInput.files[0] ? fInput.files[0] : null;
+            const nameTag = tr.querySelector('.file-name-tag');
+            rows.push({ key, type: 'file', file_name: file ? file.name : (nameTag ? nameTag.textContent : '') || '' });
+        } else {
+            const valueInput = tr.querySelector('td:nth-child(2) input[type="text"]');
+            rows.push({ key, type: 'text', value: valueInput ? valueInput.value : '' });
+        }
+    });
+    return rows;
+}
+
+function highlightAdhocRawContent(text, language) {
+    const escaped = escapeHtml(text || '');
+    if (language !== 'json' && language !== 'javascript') {
+        return escaped;
+    }
+    return escaped
+        .replace(/("(?:\\.|[^"\\])*"\s*:)/g, '<span class="k">$1</span>')
+        .replace(/(:\s*)("(?:\\.|[^"\\])*")/g, '$1<span class="s">$2</span>')
+        .replace(/(:\s*)(-?\d+(?:\.\d+)?)/g, '$1<span class="n">$2</span>')
+        .replace(/(:\s*)(true|false)/g, '$1<span class="b">$2</span>')
+        .replace(/(:\s*)(null)/g, '$1<span class="null">$2</span>');
+}
+
+function onAdhocRawInput() {
+    const rawText = document.getElementById('adhoc-raw-content')?.value || '';
+    const lang = (document.getElementById('adhoc-raw-language')?.value || 'json').toLowerCase();
+    const pre = document.getElementById('adhoc-raw-highlight');
+    if (pre) {
+        pre.innerHTML = highlightAdhocRawContent(rawText, lang);
+    }
+    const status = document.getElementById('adhoc-raw-status');
+    if (status) {
+        status.textContent = `字数 ${rawText.length}`;
+        status.classList.remove('ok');
+        status.classList.remove('err');
+    }
+}
+
+function getAdhocRawContentTypeByLanguage(language) {
+    const lang = String(language || 'json').toLowerCase();
+    if (lang === 'json') return 'application/json';
+    if (lang === 'xml') return 'application/xml';
+    if (lang === 'html') return 'text/html';
+    if (lang === 'javascript') return 'application/javascript';
+    return 'text/plain';
+}
+
+function buildAdhocBodyFromEditor() {
+    const mode = (adhocBodyEditorState && adhocBodyEditorState.mode) || 'none';
+    if (mode === 'none') {
+        return { body_mode: 'none', body_data: null };
+    }
+    if (mode === 'raw') {
+        const lang = (document.getElementById('adhoc-raw-language')?.value || 'json').toLowerCase();
+        const rawContent = document.getElementById('adhoc-raw-content')?.value || '';
+        return {
+            body_mode: 'raw',
+            body_data: {
+                raw_language: lang,
+                raw_content_type: getAdhocRawContentTypeByLanguage(lang),
+                raw_content: rawContent,
+            },
+        };
+    }
+    if (mode === 'urlencoded') {
+        return { body_mode: 'urlencoded', body_data: { urlencoded: parseAdhocBodyTableRows('adhoc-urlencoded-rows', false) } };
+    }
+    if (mode === 'formdata') {
+        return { body_mode: 'formdata', body_data: { formdata: parseAdhocBodyTableRows('adhoc-formdata-rows', true) } };
+    }
+    if (mode === 'graphql') {
+        const query = document.getElementById('adhoc-graphql-query')?.value || '';
+        const variables = document.getElementById('adhoc-graphql-variables')?.value || '{}';
+        try {
+            JSON.parse(variables || '{}');
+        } catch (error) {
+            throw new Error(`GraphQL Variables 不是有效 JSON: ${error.message || error}`);
+        }
+        return { body_mode: 'graphql', body_data: { query, variables } };
+    }
+    if (mode === 'binary') {
+        const fileInput = document.getElementById('adhoc-binary-file');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        const fileName = file ? file.name : (document.getElementById('adhoc-binary-file-name')?.textContent || '');
+        return { body_mode: 'binary', body_data: { file_name: fileName } };
+    }
+    throw new Error(`不支持的 Body 模式: ${mode}`);
 }
 
 function addKvRow(containerId, key = '', value = '') {
@@ -358,7 +760,7 @@ function switchAdhocEditMode(mode) {
 function clearAdhocEditor() {
     const fields = [
         'adhocCaseName', 'adhocCaseFolder', 'adhocCaseUrl',
-        'adhocCaseHeaders', 'adhocCaseParams', 'adhocCaseBodyData'
+        'adhocCaseHeaders', 'adhocCaseParams'
     ];
     fields.forEach((id) => {
         const el = document.getElementById(id);
@@ -368,9 +770,9 @@ function clearAdhocEditor() {
     });
     document.getElementById('adhocCaseExpectedStatus').value = '200';
     document.getElementById('adhocCaseMethod').value = 'GET';
-    document.getElementById('adhocCaseBodyMode').value = 'none';
     objectToRows('adhocHeadersRows', {});
     objectToRows('adhocParamsRows', {});
+    renderAdhocBodyEditor(null);
     switchAdhocEditMode('form');
 }
 
@@ -434,7 +836,6 @@ function addAdhocCase() {
         const folder = document.getElementById('adhocCaseFolder').value.trim();
         const method = document.getElementById('adhocCaseMethod').value.trim().toUpperCase();
         const url = document.getElementById('adhocCaseUrl').value.trim();
-        const bodyMode = document.getElementById('adhocCaseBodyMode').value.trim().toLowerCase();
         const expectedStatusValue = document.getElementById('adhocCaseExpectedStatus').value.trim();
         const expectedStatus = Number(expectedStatusValue || '200');
 
@@ -465,26 +866,7 @@ function addAdhocCase() {
             throw new Error('Params 必须是 JSON 对象');
         }
 
-        const bodyDataText = document.getElementById('adhocCaseBodyData').value;
-        let bodyData = null;
-        if (bodyMode === 'raw') {
-            const rawText = String(bodyDataText || '').trim();
-            bodyData = {
-                raw_content: rawText,
-                raw_language: 'json',
-                raw_content_type: 'application/json',
-            };
-            if (rawText) {
-                try {
-                    JSON.parse(rawText);
-                } catch (_e) {
-                    bodyData.raw_language = 'text';
-                    bodyData.raw_content_type = 'text/plain';
-                }
-            }
-        } else if (bodyMode !== 'none') {
-            bodyData = parseJsonField(bodyDataText, null, 'Body 数据');
-        }
+        const bodyPayload = buildAdhocBodyFromEditor();
 
         adhocCases.push({
             name,
@@ -493,8 +875,8 @@ function addAdhocCase() {
             url,
             headers,
             params,
-            body_mode: bodyMode,
-            body_data: bodyData,
+            body_mode: bodyPayload.body_mode,
+            body_data: bodyPayload.body_data,
             expected_status: Math.trunc(expectedStatus),
         });
 
@@ -599,6 +981,7 @@ function watchAdhocJob(jobId) {
 
 objectToRows('adhocHeadersRows', {});
 objectToRows('adhocParamsRows', {});
+renderAdhocBodyEditor(null);
 switchAdhocEditMode('form');
 renderAdhocCaseList();
 </script>

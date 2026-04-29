@@ -28,7 +28,17 @@
         .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
         .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
         .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
-        .toolbar button.secondary { background: #fff; color: #2563eb; border: 1px solid #93c5fd; }
+        .toolbar button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+        button.secondary {
+            background: #fff;
+            color: #1d4ed8;
+            border: 1px solid #93c5fd;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button.secondary:hover { background: #eff6ff; }
         .toolbar .hint { color: #64748b; font-size: 13px; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1100px; }
         .table-scroll { width: 100%; overflow-x: auto; }
@@ -151,11 +161,11 @@
         .edit-row textarea { flex: 1; min-width: 200px; height: 80px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 12px; font-family: Consolas, monospace; resize: vertical; }
         .edit-row textarea.error { border-color: #ef4444; background: #fff1f2; }
         .edit-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-        .edit-actions button { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
-        .btn-send { background: #2563eb; color: #fff; }
+        .edit-actions button { padding: 10px 12px; border-radius: 10px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-send { background: #1d4ed8; color: #fff; }
         .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-cancel { background: #e2e8f0; color: #374151; }
-        .btn-soft { background: #fff; color: #2563eb; border: 1px solid #93c5fd !important; }
+        .btn-cancel { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd !important; }
+        .btn-soft { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd !important; }
         .btn-soft:hover { background: #eff6ff; }
         .retry-result-box { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
         .retry-result-box.ok { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
@@ -223,11 +233,10 @@
         .mc-status-badge.s5xx { background: #ffedd5; color: #9a3412; }
         .mc-status-badge.serr { background: #f1f5f9; color: #475569; }
         /* JSON↔表单模式切换器 */
-        .mc-mode-switcher { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .mc-mode-switcher { display: flex; gap: 6px; align-items: center; margin: 10px 0; padding: 6px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; }
         .mc-mode-switcher span { font-size: 12px; color: #64748b; margin-right: 4px; }
-        .mc-mode-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; transition: background 0.15s; }
+        .mc-mode-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #fff; color: #334155; cursor: pointer; font-size: 12px; }
         .mc-mode-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
-        .mc-mode-btn:not(.active):hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
         /* KV 表格行 */
         .kv-table-wrap { display: flex; flex-direction: column; gap: 4px; }
         .kv-header-row { display: grid; grid-template-columns: 1fr 1fr 28px; gap: 6px; padding: 0 2px; font-size: 11px; color: #94a3b8; font-weight: 600; }
@@ -235,8 +244,53 @@
         .kv-row input { padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; width: 100%; box-sizing: border-box; }
         .kv-row input:focus { outline: none; border-color: #94a3b8; }
         .kv-row-del { width: 24px; height: 24px; border: none; background: #fee2e2; color: #991b1b; border-radius: 5px; cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
-        .kv-add-btn { margin-top: 6px; padding: 6px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 8px; cursor: pointer; font-size: 12px; }
+        .kv-add-btn { margin-top: 6px; padding: 6px 12px; border: 1px dashed #94a3b8; background: transparent; color: #64748b; border-radius: 8px; cursor: pointer; font-size: 12px; align-self: flex-start; }
         .kv-add-btn:hover { border-color: #475569; color: #334155; }
+        /* 人工用例编辑区按钮统一到新增接口测试页风格 */
+        #manualEditor .mc-mode-btn {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: none;
+            background: #1d4ed8;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #manualEditor .mc-mode-btn.active {
+            background: #0f172a;
+            color: #fff;
+            border: none;
+        }
+        #manualEditor .body-mode-btn {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: none;
+            background: #1d4ed8;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #manualEditor .body-mode-btn.active {
+            background: #0f172a;
+            color: #fff;
+            border: none;
+        }
+        #manualEditor .kv-add-btn {
+            margin-top: 6px;
+            padding: 10px 12px;
+            border: none;
+            background: #1d4ed8;
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            align-self: flex-start;
+        }
+        #manualEditor .kv-add-btn:hover {
+            background: #1e40af;
+            color: #fff;
+            border: none;
+        }
         .editor-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .editor-two-col .full { grid-column: 1 / -1; }
         @media (max-width: 980px) {
@@ -391,7 +445,7 @@ let manualExclusions = new Set();
 let _mcLastResponse = null;
 let _mcEditingCase = null;
 let _mcBodyEditorState = null;
-let _mcEditMode = 'json'; // 'json' | 'form'
+let _mcEditMode = 'form'; // 'json' | 'form'
 let _mcBodySeq = 1;
 let _erBodyEditorState = null;
 let _erEditMode = 'json'; // 'json' | 'form' — for edit-retry panel
@@ -2422,7 +2476,7 @@ function renderManualEditor(existingCase = null) {
     }
     _mcLastResponse = null;
     _mcEditingCase = existingCase || null;
-    _mcEditMode = 'json'; // 每次打开编辑器重置为 JSON 模式
+    _mcEditMode = 'form'; // 每次打开编辑器默认表单模式
     const editor = document.getElementById('manualEditor');
     const isEdit = !!existingCase;
     const reqInfo = getManualCaseRequestInfo(existingCase);
@@ -2518,21 +2572,21 @@ function renderManualEditor(existingCase = null) {
                     <div class="editor-param-panel">
                         <div class="mc-mode-switcher" style="margin-bottom:0;">
                             <span>编辑方式：</span>
-                            <button type="button" class="mc-mode-btn active" id="mc-mode-json" onclick="switchEditMode('json')">JSON 编辑</button>
-                            <button type="button" class="mc-mode-btn" id="mc-mode-form" onclick="switchEditMode('form')">表单编辑</button>
+                            <button type="button" class="mc-mode-btn active" id="mc-mode-form" onclick="switchEditMode('form')">表单编辑</button>
+                            <button type="button" class="mc-mode-btn" id="mc-mode-json" onclick="switchEditMode('json')">JSON 编辑</button>
                         </div>
                         <div class="editor-param-grid">
-                            <div class="manual-field" id="mc-headers-json-panel">
+                            <div class="manual-field" id="mc-headers-json-panel" style="display:none;">
                                 <label for="mc-headers">请求头 Headers（JSON）</label>
                                 <textarea id="mc-headers" placeholder='{"Content-Type": "application/json"}'>${escapeHtml(formatJson(reqInfo.headers))}</textarea>
                                 <div class="hint">对象格式，空值可填 {} 或留空</div>
                             </div>
-                            <div class="manual-field" id="mc-params-json-panel">
+                            <div class="manual-field" id="mc-params-json-panel" style="display:none;">
                                 <label for="mc-params">查询参数 Params（JSON）</label>
                                 <textarea id="mc-params" placeholder='{"page": 1}'>${escapeHtml(formatJson(reqInfo.params))}</textarea>
                                 <div class="hint">对象格式，空值可填 {} 或留空</div>
                             </div>
-                            <div class="manual-field" id="mc-headers-form-panel" style="display:none;">
+                            <div class="manual-field" id="mc-headers-form-panel">
                                 <label>请求头 Headers</label>
                                 <div class="kv-table-wrap">
                                     <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
@@ -2540,7 +2594,7 @@ function renderManualEditor(existingCase = null) {
                                 </div>
                                 <button type="button" class="kv-add-btn" onclick="addKvRow('mc-headers')">+ 添加</button>
                             </div>
-                            <div class="manual-field" id="mc-params-form-panel" style="display:none;">
+                            <div class="manual-field" id="mc-params-form-panel">
                                 <label>查询参数 Params</label>
                                 <div class="kv-table-wrap">
                                     <div class="kv-header-row"><span>Key</span><span>Value</span><span></span></div>
@@ -2592,6 +2646,8 @@ function renderManualEditor(existingCase = null) {
             </div>
         </div>
     `;
+    populateKvTable('mc-headers', reqInfo.headers || {});
+    populateKvTable('mc-params', reqInfo.params || {});
     renderManualBodyEditor(reqInfo.body);
 }
 
