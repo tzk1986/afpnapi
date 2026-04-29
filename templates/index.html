@@ -298,6 +298,8 @@ function escapeHtml(value) {
 
 let tooltipTarget = null;
 let tooltipHideTimer = null;
+let tooltipMouseX = null;
+let tooltipMouseY = null;
 
 function getTooltipHost() {
     return document.getElementById('appTooltip');
@@ -325,25 +327,35 @@ function scheduleTooltipHide(delay = 80) {
     tooltipHideTimer = setTimeout(hideTooltip, delay);
 }
 
-function positionTooltip(host, target) {
+function positionTooltip(host, target, mouseX = null, mouseY = null) {
     const margin = 10;
-    const rect = target.getBoundingClientRect();
     host.style.left = '0px';
     host.style.top = '0px';
     const hostWidth = host.offsetWidth;
     const hostHeight = host.offsetHeight;
 
-    let left = rect.left;
+    let left;
+    let top;
+    if (Number.isFinite(mouseX) && Number.isFinite(mouseY)) {
+        left = Number(mouseX) + 16;
+        top = Number(mouseY) + 18;
+    } else {
+        const rect = target.getBoundingClientRect();
+        left = rect.left;
+        top = rect.bottom + 8;
+        if (top + hostHeight + margin > window.innerHeight) {
+            top = rect.top - hostHeight - 8;
+        }
+    }
+
     if (left + hostWidth + margin > window.innerWidth) {
         left = window.innerWidth - hostWidth - margin;
     }
     if (left < margin) {
         left = margin;
     }
-
-    let top = rect.bottom + 8;
     if (top + hostHeight + margin > window.innerHeight) {
-        top = rect.top - hostHeight - 8;
+        top = window.innerHeight - hostHeight - margin;
     }
     if (top < margin) {
         top = margin;
@@ -368,7 +380,7 @@ function showTooltip(target) {
     host.textContent = text;
     host.classList.add('show');
     host.setAttribute('aria-hidden', 'false');
-    positionTooltip(host, target);
+    positionTooltip(host, target, tooltipMouseX, tooltipMouseY);
 }
 
 function initCustomTooltip() {
@@ -389,7 +401,19 @@ function initCustomTooltip() {
         if (!target) {
             return;
         }
+        tooltipMouseX = event.clientX;
+        tooltipMouseY = event.clientY;
         showTooltip(target);
+    });
+
+    document.addEventListener('mousemove', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        tooltipMouseX = event.clientX;
+        tooltipMouseY = event.clientY;
+        positionTooltip(host, target, tooltipMouseX, tooltipMouseY);
     });
 
     document.addEventListener('focusin', (event) => {
@@ -424,7 +448,7 @@ function initCustomTooltip() {
         if (tooltipTarget) {
             const currentHost = getTooltipHost();
             if (currentHost && currentHost.classList.contains('show')) {
-                positionTooltip(currentHost, tooltipTarget);
+                positionTooltip(currentHost, tooltipTarget, tooltipMouseX, tooltipMouseY);
             }
         }
     }, true);
@@ -433,7 +457,7 @@ function initCustomTooltip() {
         if (tooltipTarget) {
             const currentHost = getTooltipHost();
             if (currentHost && currentHost.classList.contains('show')) {
-                positionTooltip(currentHost, tooltipTarget);
+                positionTooltip(currentHost, tooltipTarget, tooltipMouseX, tooltipMouseY);
                 return;
             }
         }
@@ -529,8 +553,8 @@ function renderPreviewApis(list) {
     list.forEach((item) => {
         const pathKey = getItemPathKey(item);
         const label = document.createElement('label');
-        label.className = `preview-api-row${selectedApis.has(pathKey) ? ' checked' : ''}`;
-        label.title = `[${item.method}] ${item.name} -> ${item.url}`;
+        label.className = `preview-api-row tooltip-target${selectedApis.has(pathKey) ? ' checked' : ''}`;
+        label.setAttribute('data-tooltip', `[${item.method}] ${item.name} -> ${item.url}`);
 
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';

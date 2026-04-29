@@ -508,6 +508,8 @@ function escapeHtml(value) {
 
 let tooltipTarget = null;
 let tooltipHideTimer = null;
+let tooltipMouseX = null;
+let tooltipMouseY = null;
 
 function getTooltipHost() {
     return document.getElementById('appTooltip');
@@ -518,6 +520,42 @@ function tooltipNodeFrom(node) {
         return null;
     }
     return node.closest('[data-tooltip]');
+}
+
+function isTooltipVisible() {
+    const host = getTooltipHost();
+    return !!(host && host.classList.contains('show') && tooltipTarget);
+}
+
+function getTooltipText() {
+    const host = getTooltipHost();
+    if (!host || !host.classList.contains('show')) {
+        return '';
+    }
+    return host.textContent || '';
+}
+
+function isEditableElement(node) {
+    if (!(node instanceof Element)) {
+        return false;
+    }
+    if (node.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable]')) {
+        return true;
+    }
+    return false;
+}
+
+async function copyTooltipText() {
+    const text = getTooltipText().trim();
+    if (!text) {
+        return false;
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        return true;
+    } catch (error) {
+        return false;
+    }
 }
 
 function hideTooltip() {
@@ -535,25 +573,35 @@ function scheduleTooltipHide(delay = 80) {
     tooltipHideTimer = setTimeout(hideTooltip, delay);
 }
 
-function positionTooltip(host, target) {
+function positionTooltip(host, target, mouseX = null, mouseY = null) {
     const margin = 10;
-    const rect = target.getBoundingClientRect();
     host.style.left = '0px';
     host.style.top = '0px';
     const hostWidth = host.offsetWidth;
     const hostHeight = host.offsetHeight;
 
-    let left = rect.left;
+    let left;
+    let top;
+    if (Number.isFinite(mouseX) && Number.isFinite(mouseY)) {
+        left = Number(mouseX) + 16;
+        top = Number(mouseY) + 18;
+    } else {
+        const rect = target.getBoundingClientRect();
+        left = rect.left;
+        top = rect.bottom + 8;
+        if (top + hostHeight + margin > window.innerHeight) {
+            top = rect.top - hostHeight - 8;
+        }
+    }
+
     if (left + hostWidth + margin > window.innerWidth) {
         left = window.innerWidth - hostWidth - margin;
     }
     if (left < margin) {
         left = margin;
     }
-
-    let top = rect.bottom + 8;
     if (top + hostHeight + margin > window.innerHeight) {
-        top = rect.top - hostHeight - 8;
+        top = window.innerHeight - hostHeight - margin;
     }
     if (top < margin) {
         top = margin;
@@ -578,7 +626,7 @@ function showTooltip(target) {
     host.textContent = text;
     host.classList.add('show');
     host.setAttribute('aria-hidden', 'false');
-    positionTooltip(host, target);
+    positionTooltip(host, target, tooltipMouseX, tooltipMouseY);
 }
 
 function initCustomTooltip() {
@@ -599,7 +647,19 @@ function initCustomTooltip() {
         if (!target) {
             return;
         }
+        tooltipMouseX = event.clientX;
+        tooltipMouseY = event.clientY;
         showTooltip(target);
+    });
+
+    document.addEventListener('mousemove', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        tooltipMouseX = event.clientX;
+        tooltipMouseY = event.clientY;
+        positionTooltip(host, target, tooltipMouseX, tooltipMouseY);
     });
 
     document.addEventListener('focusin', (event) => {
@@ -630,11 +690,38 @@ function initCustomTooltip() {
         scheduleTooltipHide();
     });
 
+    document.addEventListener('keydown', async (event) => {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || String(event.key || '').toLowerCase() !== 'c') {
+            return;
+        }
+        if (!isTooltipVisible()) {
+            return;
+        }
+        if (isEditableElement(event.target) || isEditableElement(document.activeElement)) {
+            return;
+        }
+        const selection = window.getSelection ? window.getSelection() : null;
+        if (selection && !selection.isCollapsed) {
+            const anchorNode = selection.anchorNode;
+            const focusNode = selection.focusNode;
+            const host = getTooltipHost();
+            const anchorInsideTooltip = !!(host && anchorNode && host.contains(anchorNode));
+            const focusInsideTooltip = !!(host && focusNode && host.contains(focusNode));
+            if (!anchorInsideTooltip || !focusInsideTooltip) {
+                return;
+            }
+        }
+        const copied = await copyTooltipText();
+        if (copied) {
+            event.preventDefault();
+        }
+    });
+
     window.addEventListener('scroll', () => {
         if (tooltipTarget) {
             const currentHost = getTooltipHost();
             if (currentHost && currentHost.classList.contains('show')) {
-                positionTooltip(currentHost, tooltipTarget);
+                positionTooltip(currentHost, tooltipTarget, tooltipMouseX, tooltipMouseY);
             }
         }
     }, true);
@@ -643,7 +730,7 @@ function initCustomTooltip() {
         if (tooltipTarget) {
             const currentHost = getTooltipHost();
             if (currentHost && currentHost.classList.contains('show')) {
-                positionTooltip(currentHost, tooltipTarget);
+                positionTooltip(currentHost, tooltipTarget, tooltipMouseX, tooltipMouseY);
                 return;
             }
         }
@@ -1641,19 +1728,20 @@ function renderResults(data) {
     const rows = data.items.map((item) => {
         const exKey = encodeURIComponent(item.exclusion_key || '');
         const excluded = Boolean(item.excluded);
+        const rowTooltip = excluded ? '已排除（导出时会忽略）' : '';
         const excludeBtn = item.exclusion_key
             ? `<button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" onclick="toggleResultExclusion('${exKey}', ${excluded})" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>`
             : '';
         return `
-        <tr class="${excluded ? 'excluded-row' : ''}" title="${excluded ? '已排除（导出时会忽略）' : ''}">
-            <td title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
-            <td title="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
-            <td>${escapeHtml(item.method)}</td>
-            <td title="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
+        <tr class="${excluded ? 'excluded-row' : ''}" ${rowTooltip ? `data-tooltip="${escapeHtml(rowTooltip)}"` : ''}>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.method)}">${escapeHtml(item.method)}</td>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>
             <td><span class="status status-${item.status.toLowerCase()}">${escapeHtml(item.status)}</span>${excluded ? ' <span class="retried-badge">已排除</span>' : ''}</td>
             <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
-            <td class="msg-td ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" title="点击展开/收起" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
-            <td class="errcode-td">${escapeHtml(item.err_code || '-')}</td>
+            <td class="msg-td tooltip-target ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" data-tooltip="${escapeHtml(item.message || '-') }" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
+            <td class="errcode-td tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
             <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button>${excludeBtn}</td>
         </tr>
     `}).join('');
