@@ -67,6 +67,58 @@
         .detail-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
         .detail-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
         .detail-card h4 { margin: 0 0 10px; font-size: 14px; }
+        .detail-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+        .detail-card-head h4 { margin: 0; }
+        .json-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+        .json-tools button { border: 1px solid #cbd5e1; background: #fff; color: #334155; border-radius: 8px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
+        .json-tools button:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .json-viewer {
+            background: #f8fafc;
+            border: 1px solid #dbe3ee;
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-height: 44px;
+            text-align: left;
+            overflow: auto;
+        }
+        .json-empty { color: #64748b; font-size: 12px; }
+        .json-plain { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: 12px; color: #0f172a; }
+        .json-tree {
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            color: #0f172a;
+            line-height: 1.5;
+            text-align: left;
+            width: max-content;
+            min-width: 100%;
+        }
+        .json-tree details { margin: 0; }
+        .json-tree summary { cursor: pointer; list-style: none; text-align: left; }
+        .json-tree summary::-webkit-details-marker { display: none; }
+        .json-tree summary::before { content: '▸'; color: #64748b; margin-right: 6px; display: inline-block; width: 10px; }
+        .json-tree details[open] > summary::before { content: '▾'; }
+        .json-tree .jv-line {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 0;
+            white-space: pre;
+            padding: 0 2px;
+            border-radius: 4px;
+        }
+        .json-tree .jv-line:hover { background: #eef2f7; }
+        .json-tree .jv-leaf::before { content: ''; display: inline-block; width: 16px; }
+        .json-tree .jv-root > summary::before { margin-right: 4px; }
+        .jv-inline { display: inline; }
+        .jv-k { color: #0f172a; }
+        .jv-idx { color: #475569; }
+        .jv-s { color: #166534; }
+        .jv-n { color: #b45309; }
+        .jv-b { color: #7c3aed; }
+        .jv-null { color: #be185d; }
+        .jv-struct { color: #475569; }
+        .jv-preview { color: #64748b; margin: 0 4px; }
+        .jv-children { margin-left: 18px; padding-left: 10px; border-left: 1px dashed #c9d3e0; }
         pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: Consolas, monospace; font-size: 12px; color: #0f172a; }
         .response-meta { margin-bottom: 8px; font-size: 12px; }
         .response-actions { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -387,6 +439,180 @@ function formatJson(value) {
         return value;
     }
     return JSON.stringify(value, null, 2);
+}
+
+function stringifyForCopy(value) {
+    try {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return JSON.stringify(value, null, 2);
+    } catch (error) {
+        return String(value);
+    }
+}
+
+function parseMaybeJsonString(value) {
+    if (typeof value !== 'string') {
+        return { isJson: false, value };
+    }
+    const trimmed = value.trim();
+    if (!trimmed || !((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+        return { isJson: false, value };
+    }
+    try {
+        return { isJson: true, value: JSON.parse(trimmed) };
+    } catch (error) {
+        return { isJson: false, value };
+    }
+}
+
+function jsonTokenHtml(value) {
+    if (value === null) {
+        return '<span class="jv-null">null</span>';
+    }
+    if (typeof value === 'string') {
+        return `<span class="jv-s">"${escapeHtml(value)}"</span>`;
+    }
+    if (typeof value === 'number') {
+        return `<span class="jv-n">${escapeHtml(String(value))}</span>`;
+    }
+    if (typeof value === 'boolean') {
+        return `<span class="jv-b">${value ? 'true' : 'false'}</span>`;
+    }
+    if (value === undefined) {
+        return '<span class="jv-null">undefined</span>';
+    }
+    return `<span class="jv-s">"${escapeHtml(String(value))}"</span>`;
+}
+
+function jsonKeyHtml(key, isArrayIndex) {
+    if (isArrayIndex) {
+        return `<span class="jv-idx">${escapeHtml(String(key))}</span>`;
+    }
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(key))) {
+        return `<span class="jv-k">${escapeHtml(String(key))}</span>`;
+    }
+    return `<span class="jv-k">"${escapeHtml(String(key))}"</span>`;
+}
+
+function jsonPreviewText(value) {
+    if (value === null) {
+        return 'null';
+    }
+    if (Array.isArray(value)) {
+        if (!value.length) {
+            return '';
+        }
+        const sample = value.slice(0, 3).map((item) => {
+            if (item === null) return 'null';
+            if (typeof item === 'string') return '"' + item + '"';
+            if (typeof item === 'number' || typeof item === 'boolean') return String(item);
+            return Array.isArray(item) ? '[…]' : '{…}';
+        }).join(', ');
+        return value.length > 3 ? `${sample}, …` : sample;
+    }
+    if (typeof value === 'object') {
+        const keys = Object.keys(value);
+        if (!keys.length) {
+            return '';
+        }
+        const sample = keys.slice(0, 3).map((k) => {
+            const v = value[k];
+            if (v === null) return `${k}: null`;
+            if (typeof v === 'string') return `${k}: "${v}"`;
+            if (typeof v === 'number' || typeof v === 'boolean') return `${k}: ${v}`;
+            return `${k}: ${Array.isArray(v) ? '[…]' : '{…}'}`;
+        }).join(', ');
+        return keys.length > 3 ? `${sample}, …` : sample;
+    }
+    return String(value);
+}
+
+function jsonEntryHtml(key, value, isArray, depth, collapsedDepth, isLast) {
+    const comma = isLast ? '' : '<span class="jv-struct">,</span>';
+    const keyPart = key === null
+        ? ''
+        : `${jsonKeyHtml(key, isArray)}<span class="jv-struct">: </span>`;
+
+    if (value === null || typeof value !== 'object') {
+        return `<div class="jv-line jv-leaf">${keyPart}${jsonTokenHtml(value)}${comma}</div>`;
+    }
+
+    const branchIsArray = Array.isArray(value);
+    const entries = branchIsArray
+        ? value.map((item, index) => [String(index), item])
+        : Object.entries(value);
+    const openMark = depth < collapsedDepth ? 'open' : '';
+    const left = branchIsArray ? '[' : '{';
+    const right = branchIsArray ? ']' : '}';
+    const preview = jsonPreviewText(value);
+    const body = entries.length
+        ? entries.map(([childKey, childValue], idx) => jsonEntryHtml(childKey, childValue, branchIsArray, depth + 1, collapsedDepth, idx === entries.length - 1)).join('')
+        : '<div class="jv-line jv-leaf"><span class="jv-struct"></span></div>';
+
+    return `
+        <details class="jv-node" ${openMark}>
+            <summary class="jv-line">${keyPart}<span class="jv-struct">${left}</span>${preview ? `<span class="jv-preview">${escapeHtml(preview)}</span>` : ''}<span class="jv-struct">${right}</span>${comma}</summary>
+            <div class="jv-children">${body}</div>
+        </details>
+    `;
+}
+
+function jsonTreeHtml(value, collapsedDepth = 1) {
+    if (value === null || typeof value !== 'object') {
+        return `<div class="jv-line jv-leaf">${jsonTokenHtml(value)}</div>`;
+    }
+    return jsonEntryHtml(null, value, false, 0, collapsedDepth, true).replace('class="jv-node"', 'class="jv-node jv-root"');
+}
+
+function renderJsonViewer(targetId, rawValue, options = {}) {
+    const host = document.getElementById(targetId);
+    if (!host) {
+        return;
+    }
+
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+        host.removeAttribute('data-copy-text');
+        host.innerHTML = '<div class="json-empty">无</div>';
+        return;
+    }
+
+    const parsed = parseMaybeJsonString(rawValue);
+    const value = parsed.value;
+    const collapsedDepth = Number.isInteger(options.collapsedDepth) ? options.collapsedDepth : 1;
+    host.setAttribute('data-copy-text', stringifyForCopy(value));
+
+    if (value && typeof value === 'object') {
+        host.innerHTML = `<div class="json-tree">${jsonTreeHtml(value, collapsedDepth)}</div>`;
+        return;
+    }
+
+    host.innerHTML = `<pre class="json-plain">${escapeHtml(String(value))}</pre>`;
+}
+
+function setJsonViewerExpand(targetId, expanded) {
+    const host = document.getElementById(targetId);
+    if (!host) {
+        return;
+    }
+    host.querySelectorAll('details').forEach((node) => {
+        node.open = !!expanded;
+    });
+}
+
+async function copyJsonViewer(targetId) {
+    const host = document.getElementById(targetId);
+    if (!host) {
+        return;
+    }
+    const text = host.getAttribute('data-copy-text') || host.textContent || '';
+    try {
+        await navigator.clipboard.writeText(text);
+        alert('已复制 JSON');
+    } catch (error) {
+        alert('复制失败，请手动复制');
+    }
 }
 
 function nextManualBodyId(prefix) {
@@ -1106,38 +1332,25 @@ function renderDetailPanels(data) {
     const reqInfo = data.request_info || {};
     const respInfo = data.response_info || {};
 
-    const reqHeadersPre = document.getElementById('reqHeadersPre');
-    const reqParamsPre = document.getElementById('reqParamsPre');
-    const reqBodyPre = document.getElementById('reqBodyPre');
-    const respHeadersPre = document.getElementById('respHeadersPre');
-
-    if (reqHeadersPre) {
-        reqHeadersPre.textContent = formatJson(reqInfo.headers);
-    }
-    if (reqParamsPre) {
-        reqParamsPre.textContent = formatJson(reqInfo.params);
-    }
-    if (reqBodyPre) {
-        reqBodyPre.textContent = formatJson(reqInfo.body);
-    }
-    if (respHeadersPre) {
-        respHeadersPre.textContent = formatJson(respInfo.headers);
-    }
+    renderJsonViewer('reqHeadersView', reqInfo.headers, { collapsedDepth: 1 });
+    renderJsonViewer('reqParamsView', reqInfo.params, { collapsedDepth: 1 });
+    renderJsonViewer('reqBodyView', reqInfo.body, { collapsedDepth: 1 });
+    renderJsonViewer('respHeadersView', respInfo.headers, { collapsedDepth: 1 });
 
     renderResponseBody(respInfo.body, 'preview');
 }
 
 function renderResponseBody(body, mode = 'preview') {
-    const pre = document.getElementById('responseBodyPre');
+    const viewer = document.getElementById('responseBodyView');
     const meta = document.getElementById('responseBodyMeta');
     const actions = document.getElementById('responseBodyActions');
-    if (!pre || !meta || !actions) {
+    if (!viewer || !meta || !actions) {
         return;
     }
 
     const limits = mode === 'full' ? FULL_RENDER_LIMITS : PREVIEW_RENDER_LIMITS;
     const rendered = formatJsonLimited(body, limits);
-    pre.textContent = rendered.text;
+    renderJsonViewer('responseBodyView', rendered.text, { collapsedDepth: mode === 'full' ? 2 : 1 });
 
     if (mode === 'preview' && rendered.truncated) {
         meta.textContent = '响应体较大，当前为预览模式。';
@@ -1337,25 +1550,60 @@ async function openDetail(index) {
     body.innerHTML = `
         <div class="detail-grid">
             <div class="detail-card">
-                <h4>请求头</h4>
-                <pre id="reqHeadersPre">${escapeHtml(formatJson(data.request_info.headers))}</pre>
+                <div class="detail-card-head">
+                    <h4>请求头</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqHeadersView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqHeadersView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqHeadersView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqHeadersView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>查询参数</h4>
-                <pre id="reqParamsPre">${escapeHtml(formatJson(data.request_info.params))}</pre>
+                <div class="detail-card-head">
+                    <h4>查询参数</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqParamsView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqParamsView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqParamsView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqParamsView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>请求体</h4>
-                <pre id="reqBodyPre">${escapeHtml(formatJson(data.request_info.body))}</pre>
+                <div class="detail-card-head">
+                    <h4>请求体</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('reqBodyView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('reqBodyView', false)">收起</button>
+                        <button onclick="copyJsonViewer('reqBodyView')">复制</button>
+                    </div>
+                </div>
+                <div id="reqBodyView" class="json-viewer"></div>
             </div>
             <div class="detail-card">
-                <h4>响应头</h4>
-                <pre id="respHeadersPre">${escapeHtml(formatJson(data.response_info.headers))}</pre>
+                <div class="detail-card-head">
+                    <h4>响应头</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('respHeadersView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('respHeadersView', false)">收起</button>
+                        <button onclick="copyJsonViewer('respHeadersView')">复制</button>
+                    </div>
+                </div>
+                <div id="respHeadersView" class="json-viewer"></div>
             </div>
             <div class="detail-card" style="grid-column: 1 / -1;">
-                <h4>响应体</h4>
+                <div class="detail-card-head">
+                    <h4>响应体</h4>
+                    <div class="json-tools">
+                        <button onclick="setJsonViewerExpand('responseBodyView', true)">展开</button>
+                        <button onclick="setJsonViewerExpand('responseBodyView', false)">收起</button>
+                        <button onclick="copyJsonViewer('responseBodyView')">复制</button>
+                    </div>
+                </div>
                 <div id="responseBodyMeta" class="muted response-meta"></div>
-                <pre id="responseBodyPre"></pre>
+                <div id="responseBodyView" class="json-viewer"></div>
                 <div id="responseBodyActions" class="response-actions"></div>
             </div>
         </div>
@@ -1363,6 +1611,7 @@ async function openDetail(index) {
     `;
 
     currentDetailData = data;
+    renderDetailPanels(data);
     renderResponseBody((data.response_info || {}).body, 'preview');
 }
 
