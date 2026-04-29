@@ -331,6 +331,26 @@
             justify-content: flex-start;
         }
         .manual-table { table-layout: fixed; }
+        .tooltip-target { cursor: help; }
+        .app-tooltip {
+            position: fixed;
+            z-index: 9999;
+            display: none;
+            max-width: min(560px, calc(100vw - 24px));
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            user-select: text;
+            pointer-events: auto;
+        }
+        .app-tooltip.show { display: block; }
     </style>
 </head>
 <body>
@@ -430,6 +450,7 @@
             <div id="editRetryPanel" style="display:none;"></div>
         </div>
     </div>
+    <div id="appTooltip" class="app-tooltip" role="tooltip" aria-hidden="true"></div>
 
 <script>
 const reportName = {{ report_name_json|safe }};
@@ -483,6 +504,151 @@ const FULL_RENDER_LIMITS = {
 
 function escapeHtml(value) {
     return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+let tooltipTarget = null;
+let tooltipHideTimer = null;
+
+function getTooltipHost() {
+    return document.getElementById('appTooltip');
+}
+
+function tooltipNodeFrom(node) {
+    if (!(node instanceof Element)) {
+        return null;
+    }
+    return node.closest('[data-tooltip]');
+}
+
+function hideTooltip() {
+    const host = getTooltipHost();
+    if (!host) {
+        return;
+    }
+    host.classList.remove('show');
+    host.setAttribute('aria-hidden', 'true');
+    tooltipTarget = null;
+}
+
+function scheduleTooltipHide(delay = 80) {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(hideTooltip, delay);
+}
+
+function positionTooltip(host, target) {
+    const margin = 10;
+    const rect = target.getBoundingClientRect();
+    host.style.left = '0px';
+    host.style.top = '0px';
+    const hostWidth = host.offsetWidth;
+    const hostHeight = host.offsetHeight;
+
+    let left = rect.left;
+    if (left + hostWidth + margin > window.innerWidth) {
+        left = window.innerWidth - hostWidth - margin;
+    }
+    if (left < margin) {
+        left = margin;
+    }
+
+    let top = rect.bottom + 8;
+    if (top + hostHeight + margin > window.innerHeight) {
+        top = rect.top - hostHeight - 8;
+    }
+    if (top < margin) {
+        top = margin;
+    }
+
+    host.style.left = `${Math.round(left)}px`;
+    host.style.top = `${Math.round(top)}px`;
+}
+
+function showTooltip(target) {
+    const host = getTooltipHost();
+    if (!host || !target) {
+        return;
+    }
+    const text = target.getAttribute('data-tooltip');
+    if (!text) {
+        hideTooltip();
+        return;
+    }
+    clearTimeout(tooltipHideTimer);
+    tooltipTarget = target;
+    host.textContent = text;
+    host.classList.add('show');
+    host.setAttribute('aria-hidden', 'false');
+    positionTooltip(host, target);
+}
+
+function initCustomTooltip() {
+    if (window.__customTooltipBound) {
+        return;
+    }
+    window.__customTooltipBound = true;
+    const host = getTooltipHost();
+    if (!host) {
+        return;
+    }
+
+    host.addEventListener('mouseenter', () => clearTimeout(tooltipHideTimer));
+    host.addEventListener('mouseleave', () => scheduleTooltipHide(60));
+
+    document.addEventListener('mouseover', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target) {
+            return;
+        }
+        showTooltip(target);
+    });
+
+    document.addEventListener('focusin', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target) {
+            return;
+        }
+        showTooltip(target);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        const next = event.relatedTarget;
+        if (next instanceof Element && (next === host || host.contains(next) || next.closest('[data-tooltip]') === target)) {
+            return;
+        }
+        scheduleTooltipHide();
+    });
+
+    document.addEventListener('focusout', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        scheduleTooltipHide();
+    });
+
+    window.addEventListener('scroll', () => {
+        if (tooltipTarget) {
+            const currentHost = getTooltipHost();
+            if (currentHost && currentHost.classList.contains('show')) {
+                positionTooltip(currentHost, tooltipTarget);
+            }
+        }
+    }, true);
+
+    window.addEventListener('resize', () => {
+        if (tooltipTarget) {
+            const currentHost = getTooltipHost();
+            if (currentHost && currentHost.classList.contains('show')) {
+                positionTooltip(currentHost, tooltipTarget);
+                return;
+            }
+        }
+        hideTooltip();
+    });
 }
 
 function formatJson(value) {
@@ -3008,14 +3174,14 @@ function renderManualCases() {
         const encodedCaseId = encodeURIComponent(String(item.id || ''));
         return `
             <tr class="${excluded ? 'excluded-row' : ''}">
-                <td>${escapeHtml(item.name || '-')}</td>
-                <td>${escapeHtml(item.folder || '-')}</td>
-                <td>${escapeHtml(item.method || '-')}</td>
-                <td><span class="url">${escapeHtml(item.url || '-')}</span></td>
+                <td class="tooltip-target" data-tooltip="${escapeHtml(item.name || '-')}">${escapeHtml(item.name || '-')}</td>
+                <td class="tooltip-target" data-tooltip="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
+                <td class="tooltip-target" data-tooltip="${escapeHtml(item.method || '-')}">${escapeHtml(item.method || '-')}</td>
+                <td class="tooltip-target" data-tooltip="${escapeHtml(item.url || '-')}"><span class="url">${escapeHtml(item.url || '-')}</span></td>
                 <td>${statusBadge}${excluded ? ' <span class="retried-badge">已排除</span>' : ''}</td>
                 <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
-                <td class="msg-td">${escapeHtml(item.message || '-')}</td>
-                <td>${escapeHtml(item.err_code || '-')}</td>
+                <td class="msg-td tooltip-target" data-tooltip="${escapeHtml(item.message || '-')}">${escapeHtml(item.message || '-')}</td>
+                <td class="tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
                 <td class="td-op">
                     <button class="btn-compact" data-mc-action="detail" data-mc-index="${idx}">详情</button>
                     <button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" data-mc-action="toggle-exclude" data-mc-key="${encodeURIComponent(exclusionKey)}" data-mc-excluded="${excluded ? 'true' : 'false'}" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>
@@ -3399,6 +3565,7 @@ if (document.getElementById('exportScopeSelect')) {
 
 reloadResults(1);
 reloadManualCases();
+initCustomTooltip();
 </script>
 </body>
 </html>

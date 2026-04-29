@@ -38,8 +38,30 @@
         .action-pill.subtle:hover { background: #f8fafc; }
         .action-pill.danger { background: #fff; color: #b91c1c; border-color: #fecaca; }
         .action-pill.danger:hover { background: #fef2f2; }
-        .report-cell, .source-cell { min-width: 0; }
-        .report-cell .report-link, .report-cell .muted, .source-cell, .source-cell .muted { overflow-wrap: anywhere; word-break: break-word; }
+        .report-cell, .source-cell, .generated-cell { min-width: 0; }
+        .ellipsis-line { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+        .ellipsis-line.link { text-decoration: none; }
+        .ellipsis-line.link:hover { text-decoration: underline; }
+        .tooltip-target { cursor: help; }
+        .app-tooltip {
+            position: fixed;
+            z-index: 9999;
+            display: none;
+            max-width: min(560px, calc(100vw - 24px));
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            user-select: text;
+            pointer-events: auto;
+        }
+        .app-tooltip.show { display: block; }
         @media (max-width: 900px) {
             .actions { width: 164px; min-width: 164px; }
             .action-pill { font-size: 11px; padding: 0 4px; }
@@ -248,13 +270,23 @@
             <div id="compareResult" class="empty">选择两份报告后即可查看差异。</div>
         </section>
     </div>
+    <div id="appTooltip" class="app-tooltip" role="tooltip" aria-hidden="true"></div>
+    <script id="indexPageData" type="application/json">
+        {
+            "reports": {{ reports_json|safe }},
+            "enableSelectiveRun": {{ enable_selective_run|tojson }},
+            "runStatusPollIntervalMs": {{ run_status_poll_interval_ms|tojson }},
+            "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }}
+        }
+    </script>
 
 <script>
-let reports = {{ reports_json|safe }};
+const pageData = JSON.parse(document.getElementById('indexPageData').textContent);
+let reports = Array.isArray(pageData.reports) ? pageData.reports : [];
 let runJobTimer = null;
-const ENABLE_SELECTIVE_RUN = {{ 'true' if enable_selective_run else 'false' }};
-const RUN_STATUS_POLL_INTERVAL_MS = {{ run_status_poll_interval_ms }};
-const COLLECTION_PREVIEW_MAX_ITEMS = {{ collection_preview_max_items }};
+const ENABLE_SELECTIVE_RUN = Boolean(pageData.enableSelectiveRun);
+const RUN_STATUS_POLL_INTERVAL_MS = Number(pageData.runStatusPollIntervalMs || 3000);
+const COLLECTION_PREVIEW_MAX_ITEMS = Number(pageData.collectionPreviewMaxItems || 3000);
 let previewApis = [];
 let visiblePreviewApis = [];
 let previewApiByPath = new Map();
@@ -262,6 +294,151 @@ let selectedApis = new Map();
 
 function escapeHtml(value) {
     return String(value || '').replace(/[&<>\"]/g, (s) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+}
+
+let tooltipTarget = null;
+let tooltipHideTimer = null;
+
+function getTooltipHost() {
+    return document.getElementById('appTooltip');
+}
+
+function tooltipNodeFrom(node) {
+    if (!(node instanceof Element)) {
+        return null;
+    }
+    return node.closest('[data-tooltip]');
+}
+
+function hideTooltip() {
+    const host = getTooltipHost();
+    if (!host) {
+        return;
+    }
+    host.classList.remove('show');
+    host.setAttribute('aria-hidden', 'true');
+    tooltipTarget = null;
+}
+
+function scheduleTooltipHide(delay = 80) {
+    clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(hideTooltip, delay);
+}
+
+function positionTooltip(host, target) {
+    const margin = 10;
+    const rect = target.getBoundingClientRect();
+    host.style.left = '0px';
+    host.style.top = '0px';
+    const hostWidth = host.offsetWidth;
+    const hostHeight = host.offsetHeight;
+
+    let left = rect.left;
+    if (left + hostWidth + margin > window.innerWidth) {
+        left = window.innerWidth - hostWidth - margin;
+    }
+    if (left < margin) {
+        left = margin;
+    }
+
+    let top = rect.bottom + 8;
+    if (top + hostHeight + margin > window.innerHeight) {
+        top = rect.top - hostHeight - 8;
+    }
+    if (top < margin) {
+        top = margin;
+    }
+
+    host.style.left = `${Math.round(left)}px`;
+    host.style.top = `${Math.round(top)}px`;
+}
+
+function showTooltip(target) {
+    const host = getTooltipHost();
+    if (!host || !target) {
+        return;
+    }
+    const text = target.getAttribute('data-tooltip');
+    if (!text) {
+        hideTooltip();
+        return;
+    }
+    clearTimeout(tooltipHideTimer);
+    tooltipTarget = target;
+    host.textContent = text;
+    host.classList.add('show');
+    host.setAttribute('aria-hidden', 'false');
+    positionTooltip(host, target);
+}
+
+function initCustomTooltip() {
+    if (window.__customTooltipBound) {
+        return;
+    }
+    window.__customTooltipBound = true;
+    const host = getTooltipHost();
+    if (!host) {
+        return;
+    }
+
+    host.addEventListener('mouseenter', () => clearTimeout(tooltipHideTimer));
+    host.addEventListener('mouseleave', () => scheduleTooltipHide(60));
+
+    document.addEventListener('mouseover', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target) {
+            return;
+        }
+        showTooltip(target);
+    });
+
+    document.addEventListener('focusin', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target) {
+            return;
+        }
+        showTooltip(target);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        const next = event.relatedTarget;
+        if (next instanceof Element && (next === host || host.contains(next) || next.closest('[data-tooltip]') === target)) {
+            return;
+        }
+        scheduleTooltipHide();
+    });
+
+    document.addEventListener('focusout', (event) => {
+        const target = tooltipNodeFrom(event.target);
+        if (!target || target !== tooltipTarget) {
+            return;
+        }
+        scheduleTooltipHide();
+    });
+
+    window.addEventListener('scroll', () => {
+        if (tooltipTarget) {
+            const currentHost = getTooltipHost();
+            if (currentHost && currentHost.classList.contains('show')) {
+                positionTooltip(currentHost, tooltipTarget);
+            }
+        }
+    }, true);
+
+    window.addEventListener('resize', () => {
+        if (tooltipTarget) {
+            const currentHost = getTooltipHost();
+            if (currentHost && currentHost.classList.contains('show')) {
+                positionTooltip(currentHost, tooltipTarget);
+                return;
+            }
+        }
+        hideTooltip();
+    });
 }
 
 function getItemPathKey(item) {
@@ -402,7 +579,7 @@ function updateSelectedList() {
         const label = `[${item.method}] ${folder}${item.name}`;
         const pathKey = getItemPathKey(item);
         return `
-            <div class="selected-api-item" title="${escapeHtml(label)} -> ${escapeHtml(item.url)}">
+            <div class="selected-api-item tooltip-target" data-tooltip="${escapeHtml(`${label}\n${item.url}`)}">
                 <span class="selected-api-text">${escapeHtml(label)}</span>
                 <button class="selected-api-remove" onclick='removeSelectedApi(${JSON.stringify(pathKey)})' type="button">✕</button>
             </div>
@@ -467,10 +644,13 @@ function renderReports() {
         <tr>
             <td><input type="radio" name="reportPick" onclick="pickReport('${report.report_name}')"></td>
             <td class="report-cell">
-                <a class="report-link" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">${escapeHtml(report.report_name)}</a>
-                <div class="muted">主机: ${escapeHtml(report.host_name || '-')}</div>
+                <a class="report-link ellipsis-line link tooltip-target" data-tooltip="${escapeHtml(report.report_name || '-')}" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">${escapeHtml(report.report_name)}</a>
+                <div class="muted ellipsis-line tooltip-target" data-tooltip="${escapeHtml(`主机: ${report.host_name || '-'}`)}">主机: ${escapeHtml(report.host_name || '-')}</div>
             </td>
-            <td class="source-cell">${escapeHtml(report.collection_name || '-')}<div class="muted">${escapeHtml(report.source_file || '-')}</div></td>
+            <td class="source-cell">
+                <span class="ellipsis-line tooltip-target" data-tooltip="${escapeHtml(report.collection_name || '-')}">${escapeHtml(report.collection_name || '-')}</span>
+                <div class="muted ellipsis-line tooltip-target" data-tooltip="${escapeHtml(report.source_file || '-')}">${escapeHtml(report.source_file || '-')}</div>
+            </td>
             <td>
                 <div class="summary">
                     <span class="tag">总计 ${report.summary.total}</span>
@@ -479,7 +659,7 @@ function renderReports() {
                     <span class="tag">错误 ${report.summary.error}</span>
                 </div>
             </td>
-            <td>${escapeHtml(report.generated_at || '-')}</td>
+            <td class="generated-cell"><span class="ellipsis-line tooltip-target" data-tooltip="${escapeHtml(report.generated_at || '-')}">${escapeHtml(report.generated_at || '-')}</span></td>
             <td class="actions">
                 <div class="action-block">
                     <a class="action-pill primary" href="/report-view?name=${encodeURIComponent(report.report_name)}" target="_blank">数据视图</a>
@@ -814,6 +994,7 @@ function watchRunPostmanJob(jobId) {
     runJobTimer = setInterval(fetchStatus, RUN_STATUS_POLL_INTERVAL_MS);
 }
 
+initCustomTooltip();
 renderReports();
 </script>
 </body>
