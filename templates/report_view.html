@@ -401,7 +401,7 @@
                     <option value="report_only" {% if report_export_default_scope == 'report_only' %}selected{% endif %}>导出本次报告接口</option>
                     {% endif %}
                 </select>
-                <button onclick="reloadResults(1)">查询</button>
+                <button onclick="applySearchFilters()">查询</button>
                 <button class="secondary" onclick="resetFilters()">重置</button>
                 <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
                 <label class="hint" style="display:flex;align-items:center;gap:6px;">
@@ -429,6 +429,8 @@
             </div>
             <div id="manualEditor" style="display:none;"></div>
             <div id="manualCasesTable" class="loading">加载人工用例中...</div>
+            <div id="manualPagerInfo" class="pager-info"></div>
+            <div id="manualPagination" class="pagination"></div>
         </section>
     </div>
 
@@ -462,6 +464,7 @@ let currentDetailData = null;
 let currentDetailIndex = null;
 let currentResultsPage = 1;
 let manualCases = [];
+let manualCasesPage = 1;
 let manualExclusions = new Set();
 let _mcLastResponse = null;
 let _mcEditingCase = null;
@@ -3242,17 +3245,178 @@ async function toggleResultExclusion(encodedKey, excluded) {
     }
 }
 
+function getManualCasesPageSize() {
+    const size = Number(document.getElementById('pageSizeSelect')?.value || REPORT_VIEW_PAGE_SIZE_DEFAULT);
+    if (!Number.isFinite(size) || size <= 0) {
+        return REPORT_VIEW_PAGE_SIZE_DEFAULT;
+    }
+    return size;
+}
+
+function parseManualCaseTimestamp(value) {
+    const text = String(value || '').trim();
+    if (!text) {
+        return NaN;
+    }
+    const numeric = Number(text);
+    if (Number.isFinite(numeric) && numeric > 0) {
+        return numeric < 1e12 ? numeric * 1000 : numeric;
+    }
+
+    let parsed = Date.parse(text);
+    if (Number.isFinite(parsed)) {
+        return parsed;
+    }
+
+    const normalized = text
+        .replace(' ', 'T')
+        .replace(/(\.\d{3})\d+/, '$1');
+    parsed = Date.parse(normalized);
+    if (Number.isFinite(parsed)) {
+        return parsed;
+    }
+
+    parsed = Date.parse(normalized.replace(/\.\d+/, ''));
+    return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function getManualCasesSorted() {
+    return manualCases
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+            const leftTs = parseManualCaseTimestamp(left.item?.created_at);
+            const rightTs = parseManualCaseTimestamp(right.item?.created_at);
+            const leftValid = Number.isFinite(leftTs);
+            const rightValid = Number.isFinite(rightTs);
+            if (leftValid && rightValid && leftTs !== rightTs) {
+                return rightTs - leftTs;
+            }
+            if (leftValid && !rightValid) {
+                return -1;
+            }
+            if (!leftValid && rightValid) {
+                return 1;
+            }
+            // 兼容旧数据：没有 created_at 时按原插入顺序倒序展示
+            return right.index - left.index;
+        })
+        .map((entry) => entry.item);
+}
+
+function getFilteredManualCases() {
+    const filters = currentFilters();
+    const query = String(filters.query || '').toLowerCase();
+    const messageQuery = String(filters.messageQuery || '').toLowerCase();
+    const errCodeQuery = String(filters.errCodeQuery || '').toLowerCase();
+    const status = String(filters.status || 'all').toUpperCase();
+    const includeExcluded = Boolean(filters.includeExcluded);
+
+    return getManualCasesSorted().filter((item) => {
+        const excluded = Boolean(item.excluded);
+        if (excluded && !includeExcluded) {
+            return false;
+        }
+
+        const itemStatus = String(item.status || '').toUpperCase();
+        if (status !== 'ALL' && itemStatus !== status) {
+            return false;
+        }
+
+        if (query) {
+            const searchText = [
+                item.name,
+                item.folder,
+                item.method,
+                item.url,
+            ].map((value) => String(value || '')).join(' ').toLowerCase();
+            if (!searchText.includes(query)) {
+                return false;
+            }
+        }
+
+        if (messageQuery && !String(item.message || '').toLowerCase().includes(messageQuery)) {
+            return false;
+        }
+
+        if (errCodeQuery && !String(item.err_code || '').toLowerCase().includes(errCodeQuery)) {
+            return false;
+        }
+
+        return true;
+    });
+}
+
+function renderManualPagination(page, totalPages) {
+    const container = document.getElementById('manualPagination');
+    if (!container) {
+        return;
+    }
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const buttons = [];
+    buttons.push(`<button onclick="goManualCasesPage(${page - 1})" ${page <= 1 ? 'disabled' : ''}>上一页</button>`);
+    const start = Math.max(1, page - 4);
+    const end = Math.min(totalPages, start + 8);
+    for (let index = start; index <= end; index += 1) {
+        buttons.push(`<button class="${index === page ? 'active' : ''}" onclick="goManualCasesPage(${index})">${index}</button>`);
+    }
+    buttons.push(`<button onclick="goManualCasesPage(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>下一页</button>`);
+    container.innerHTML = buttons.join('');
+}
+
+function goManualCasesPage(page) {
+    manualCasesPage = Math.max(1, Number(page) || 1);
+    renderManualCases();
+}
+
 function renderManualCases() {
     const container = document.getElementById('manualCasesTable');
+    const pagerInfo = document.getElementById('manualPagerInfo');
+    const pager = document.getElementById('manualPagination');
     if (!ENABLE_MANUAL_CASES) {
         container.innerHTML = '<div class="empty">当前环境未启用人工用例功能。</div>';
+        if (pagerInfo) {
+            pagerInfo.textContent = '';
+        }
+        if (pager) {
+            pager.innerHTML = '';
+        }
         return;
     }
     if (!manualCases.length) {
         container.innerHTML = '<div class="empty">暂无人工用例。</div>';
+        if (pagerInfo) {
+            pagerInfo.textContent = '第 1 页 / 共 1 页，共 0 条';
+        }
+        if (pager) {
+            pager.innerHTML = '';
+        }
         return;
     }
-    const rows = manualCases.map((item, idx) => {
+
+    const sortedCases = getFilteredManualCases();
+    const pageSize = getManualCasesPageSize();
+    const total = sortedCases.length;
+    if (!total) {
+        container.innerHTML = '<div class="empty">没有匹配的人工用例。</div>';
+        if (pagerInfo) {
+            pagerInfo.textContent = '第 1 页 / 共 1 页，共 0 条';
+        }
+        if (pager) {
+            pager.innerHTML = '';
+        }
+        return;
+    }
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(Math.max(1, manualCasesPage), totalPages);
+    manualCasesPage = currentPage;
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = sortedCases.slice(start, start + pageSize);
+
+    const rows = pageItems.map((item) => {
         const exclusionKey = item.exclusion_key || '';
         const excluded = Boolean(item.excluded);
         const caseStatus = String(item.status || '').toUpperCase();
@@ -3271,9 +3435,9 @@ function renderManualCases() {
                 <td class="msg-td tooltip-target" data-tooltip="${escapeHtml(item.message || '-')}">${escapeHtml(item.message || '-')}</td>
                 <td class="tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
                 <td class="td-op">
-                    <button class="btn-compact" data-mc-action="detail" data-mc-index="${idx}">详情</button>
+                    <button class="btn-compact" data-mc-action="detail" data-mc-id="${encodedCaseId}">详情</button>
                     <button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" data-mc-action="toggle-exclude" data-mc-key="${encodeURIComponent(exclusionKey)}" data-mc-excluded="${excluded ? 'true' : 'false'}" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>
-                    <button class="btn-compact" data-mc-action="edit" data-mc-index="${idx}">编辑</button>
+                    <button class="btn-compact" data-mc-action="edit" data-mc-id="${encodedCaseId}">编辑</button>
                     <button class="btn-compact" data-mc-action="delete" data-mc-id="${encodedCaseId}">删除</button>
                 </td>
             </tr>
@@ -3300,6 +3464,10 @@ function renderManualCases() {
             </table>
         </div>
     `;
+    if (pagerInfo) {
+        pagerInfo.textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页，共 ${total} 条，当前每页 ${pageSize} 条`;
+    }
+    renderManualPagination(currentPage, totalPages);
 }
 
 document.getElementById('manualCasesTable').addEventListener('click', async (event) => {
@@ -3310,17 +3478,17 @@ document.getElementById('manualCasesTable').addEventListener('click', async (eve
 
     const action = btn.getAttribute('data-mc-action');
     if (action === 'detail') {
-        const index = Number(btn.getAttribute('data-mc-index'));
-        if (Number.isFinite(index)) {
-            openManualCaseDetail(index);
+        const caseId = decodeURIComponent(btn.getAttribute('data-mc-id') || '');
+        if (caseId) {
+            openManualCaseDetail(caseId);
         }
         return;
     }
 
     if (action === 'edit') {
-        const index = Number(btn.getAttribute('data-mc-index'));
-        if (Number.isFinite(index)) {
-            editManualCase(index);
+        const caseId = decodeURIComponent(btn.getAttribute('data-mc-id') || '');
+        if (caseId) {
+            editManualCase(caseId);
         }
         return;
     }
@@ -3340,8 +3508,8 @@ document.getElementById('manualCasesTable').addEventListener('click', async (eve
     }
 });
 
-function editManualCase(index) {
-    const row = manualCases[index];
+function editManualCase(caseId) {
+    const row = manualCases.find((item) => String(item.id || '') === String(caseId || ''));
     renderManualEditor(row || null);
 }
 
@@ -3359,9 +3527,18 @@ async function reloadManualCases() {
         }
         manualExclusions = new Set(data.manual_exclusions || []);
         manualCases = (data.manual_cases || []).map((item) => ({ ...item }));
+        manualCasesPage = 1;
         renderManualCases();
     } catch (error) {
         container.innerHTML = `<div class="empty">加载失败: ${escapeHtml(error.message || error)}</div>`;
+        const pagerInfo = document.getElementById('manualPagerInfo');
+        const pager = document.getElementById('manualPagination');
+        if (pagerInfo) {
+            pagerInfo.textContent = '';
+        }
+        if (pager) {
+            pager.innerHTML = '';
+        }
     }
 }
 
@@ -3382,8 +3559,8 @@ function closeDetail(event) {
     if (excludeCaseBtn) { excludeCaseBtn.style.display = 'none'; }
 }
 
-async function openManualCaseDetail(index) {
-    const caseData = manualCases[index];
+async function openManualCaseDetail(caseId) {
+    const caseData = manualCases.find((item) => String(item.id || '') === String(caseId || ''));
     if (!caseData) {
         return;
     }
@@ -3427,13 +3604,13 @@ async function openManualCaseDetail(index) {
         editBtn.textContent = '编辑';
         editBtn.onclick = () => {
             closeDetail();
-            editManualCase(index);
+            editManualCase(caseId);
         };
     }
     if (excludeCaseBtn && caseData.exclusion_key) {
         excludeCaseBtn.style.display = '';
         excludeCaseBtn.textContent = caseData.excluded ? '取消排除' : '排除此用例';
-        excludeCaseBtn.onclick = () => toggleCurrentManualCaseExclusion(index);
+        excludeCaseBtn.onclick = () => toggleCurrentManualCaseExclusion(caseId);
     } else if (excludeCaseBtn) {
         excludeCaseBtn.style.display = 'none';
     }
@@ -3548,8 +3725,8 @@ function getManualCaseResponseInfo(caseData) {
     };
 }
 
-async function toggleCurrentManualCaseExclusion(index) {
-    const caseData = manualCases[index];
+async function toggleCurrentManualCaseExclusion(caseId) {
+    const caseData = manualCases.find((item) => String(item.id || '') === String(caseId || ''));
     if (!caseData || !caseData.exclusion_key) {
         return;
     }
@@ -3568,11 +3745,11 @@ async function toggleCurrentManualCaseExclusion(index) {
         if (!resp.ok) {
             throw new Error(data.error || '排除操作失败');
         }
-        manualCases[index].excluded = nextExcluded;
+        caseData.excluded = nextExcluded;
         await reloadManualCases();
         await reloadResults(currentResultsPage);
         if (document.getElementById('detailMask').classList.contains('show')) {
-            await openManualCaseDetail(index);
+            await openManualCaseDetail(caseId);
         }
     } catch (error) {
         alert('排除操作失败: ' + (error.message || error));
@@ -3587,6 +3764,8 @@ function resetFilters() {
     document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
     document.getElementById('includeExcludedToggle').checked = true;
     reloadResults(1);
+    manualCasesPage = 1;
+    renderManualCases();
 }
 
 async function exportLatestCollection() {
@@ -3626,25 +3805,43 @@ async function exportLatestCollection() {
 
 document.getElementById('queryInput').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-        reloadResults(1);
+        applySearchFilters();
     }
 });
 
 document.getElementById('messageInput').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-        reloadResults(1);
+        applySearchFilters();
     }
 });
 
 document.getElementById('errCodeInput').addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-        reloadResults(1);
+        applySearchFilters();
     }
 });
 
-document.getElementById('statusSelect').addEventListener('change', () => reloadResults(1));
-document.getElementById('pageSizeSelect').addEventListener('change', () => reloadResults(1));
-document.getElementById('includeExcludedToggle').addEventListener('change', () => reloadResults(1));
+function applySearchFilters() {
+    reloadResults(1);
+    manualCasesPage = 1;
+    renderManualCases();
+}
+
+document.getElementById('statusSelect').addEventListener('change', () => {
+    reloadResults(1);
+    manualCasesPage = 1;
+    renderManualCases();
+});
+document.getElementById('pageSizeSelect').addEventListener('change', () => {
+    reloadResults(1);
+    manualCasesPage = 1;
+    renderManualCases();
+});
+document.getElementById('includeExcludedToggle').addEventListener('change', () => {
+    reloadResults(1);
+    manualCasesPage = 1;
+    renderManualCases();
+});
 
 document.getElementById('pageSizeSelect').value = String(REPORT_VIEW_PAGE_SIZE_DEFAULT);
 if (document.getElementById('exportScopeSelect')) {

@@ -496,6 +496,7 @@ def _normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[st
     status = str(case.get("status") or "FAILED").strip().upper() or "FAILED"
     actual_request_url = str(case.get("actual_request_url") or url).strip() or url
     err_code = str(case.get("err_code") or "").strip()
+    created_at = str(case.get("created_at") or "").strip()
 
     try:
         expected_status = int(case.get("expected_status") or 200)
@@ -547,6 +548,7 @@ def _normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[st
 
     return {
         "id": case_id,
+        "created_at": created_at,
         "name": name,
         "folder": folder,
         "method": method,
@@ -1770,6 +1772,8 @@ def add_manual_case(report_name: str, payload: Dict[str, Any]) -> Dict[str, Any]
     case = _normalize_manual_case(payload, str(payload.get("folder") or MANUAL_CASE_FOLDER_NAME))
     if not case.get("id"):
         case["id"] = uuid.uuid4().hex
+    if not case.get("created_at"):
+        case["created_at"] = datetime.now().isoformat()
     if not case.get("name"):
         raise ValueError("name 不能为空")
     if not case.get("url"):
