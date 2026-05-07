@@ -142,6 +142,20 @@
             <p>局域网访问: <a style="color:#bfdbfe;" href="{{ lan_url }}">{{ lan_url }}</a></p>
         </section>
 
+        {% if enable_adhoc_run %}
+        <section class="panel">
+            <div class="feature-card">
+                <div>
+                    <h3>新增接口测试</h3>
+                </div>
+                <div class="feature-actions">
+                    <a class="primary" href="/adhoc-run">打开新增接口测试页</a>
+                    <a class="secondary" href="/latest">查看最新报告</a>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
         <section class="panel">
             <h3 style="margin-top:0;">上传并执行 Postman JSON</h3>
             <div class="upload-grid">
@@ -218,20 +232,7 @@
             <div id="runStatus" class="run-status">上传 JSON 后可直接执行，执行完成后会提示刷新页面查看最新报告。</div>
         </section>
 
-        {% if enable_adhoc_run %}
-        <section class="panel">
-            <div class="feature-card">
-                <div>
-                    <h3>新增接口测试</h3>
-                    <p>临时接口录入、待测列表管理和执行流程已迁移到独立页面，首页只保留入口，减少原有报告中心界面的复杂度。</p>
-                </div>
-                <div class="feature-actions">
-                    <a class="primary" href="/adhoc-run">打开新增接口测试页</a>
-                    <a class="secondary" href="/latest">查看最新报告</a>
-                </div>
-            </div>
-        </section>
-        {% endif %}
+
 
         <section class="panel">
             <div class="toolbar">
