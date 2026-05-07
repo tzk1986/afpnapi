@@ -34,9 +34,30 @@ import sys
 from typing import Dict, List, Any, Optional, Callable, Tuple
 from datetime import datetime
 import re
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_url_and_params(raw_url: str, params: Optional[Dict[str, Any]]) -> Tuple[str, Dict[str, Any]]:
+    """归一化 URL 与 params，避免 URL query 与 params 重复发送。"""
+    url_text = str(raw_url or "").strip()
+    split = urlsplit(url_text)
+
+    merged_params: Dict[str, Any] = {}
+    for key, value in parse_qsl(split.query, keep_blank_values=True):
+        merged_params[str(key)] = value
+
+    if isinstance(params, dict):
+        for key, value in params.items():
+            merged_params[str(key)] = value
+
+    if split.query:
+        clean_url = urlunsplit((split.scheme, split.netloc, split.path, "", split.fragment))
+    else:
+        clean_url = url_text
+
+    return clean_url, merged_params
 
 
 class PostmanApiParser:
@@ -400,9 +421,10 @@ class PostmanTestExecutor:
         """执行单个API测试"""
         api = self.api_config
         method = api['method'].lower()
-        url = api['full_url']  # 使用完整URL
+        raw_url = api['full_url']  # 使用完整URL
         headers = api.get('headers', {}).copy()  # 复制headers避免修改原数据
         params = api.get('params', {})
+        url, params = _normalize_url_and_params(raw_url, params)
         body = api.get('body')
         
         # 自动添加认证token（如果存在则始终覆盖，确保使用最新token）
@@ -425,7 +447,8 @@ class PostmanTestExecutor:
                 return {
                     'name': api['name'],
                     'method': api['method'],
-                    'url': api['full_url'],
+                    'url': raw_url,
+                    'actual_request_url': raw_url,
                     'status': 'FAILED',
                     'message': f'不支持的HTTP方法: {method}',
                     'err_code': '',
@@ -444,6 +467,7 @@ class PostmanTestExecutor:
             
             self.http_response = response
             self.resp_status_code = response.status_code
+            actual_request_url = str(getattr(response.request, 'url', '') or url)
             
             try:
                 self.response_data = response.json()
@@ -475,7 +499,8 @@ class PostmanTestExecutor:
                 return {
                     'name': api['name'],
                     'method': api['method'],
-                    'url': api['full_url'],
+                    'url': raw_url,
+                    'actual_request_url': actual_request_url,
                     'item_path': api.get('item_path', []),
                     'expected_status': expected_status,
                     'status': 'PASSED',
@@ -506,7 +531,8 @@ class PostmanTestExecutor:
                 return {
                     'name': api['name'],
                     'method': api['method'],
-                    'url': api['full_url'],
+                    'url': raw_url,
+                    'actual_request_url': actual_request_url,
                     'item_path': api.get('item_path', []),
                     'expected_status': expected_status,
                     'status': 'FAILED',
@@ -537,7 +563,8 @@ class PostmanTestExecutor:
             return {
                 'name': api['name'],
                 'method': api['method'],
-                'url': api['full_url'],
+                'url': raw_url,
+                'actual_request_url': raw_url,
                 'item_path': api.get('item_path', []),
                 'expected_status': api.get('expected_status', 200),
                 'status': 'ERROR',
@@ -777,6 +804,7 @@ class PostmanTestReport:
                     'folder': result.get('folder', ''),
                     'method': result.get('method', ''),
                     'url': result.get('url', ''),
+                    'actual_request_url': result.get('actual_request_url', ''),
                     'item_path': result.get('item_path', []),
                     'expected_status': result.get('expected_status', 200),
                     'status': result.get('status', ''),
@@ -1844,11 +1872,12 @@ def get_auth_token(apis: List[Dict], base_url: str) -> Optional[str]:
     for login_api in apis:
         if not login_api.get('name', '').lower().find('login') >= 0 and not login_api.get('url', '').lower().find('login') >= 0:
             continue
-        url = login_api.get('full_url', '') or (base_url.rstrip('/') + '/' + login_api.get('url', '').lstrip('/'))
+        raw_url = login_api.get('full_url', '') or (base_url.rstrip('/') + '/' + login_api.get('url', '').lstrip('/'))
         method = login_api.get('method', 'POST').lower()
         headers = login_api.get('headers', {})
         body = login_api.get('body')
         params = login_api.get('params', {})
+        url, params = _normalize_url_and_params(raw_url, params)
         print(f"  尝试登录: {url}")
         try:
             if method == 'post':

@@ -12,7 +12,7 @@ import uuid
 import time as _time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 import requests
@@ -898,6 +898,8 @@ def filter_report_results(
     filtered_items: List[Dict[str, Any]] = []
 
     for index, item in enumerate(report.get("results", [])):
+        manual_judgement = item.get("manual_judgement") if isinstance(item.get("manual_judgement"), dict) else {}
+        judgement_source = "manual" if manual_judgement.get("active") else "auto"
         exclusion_key = _result_exclusion_key(item)
         excluded = exclusion_key in exclusion_set
         if excluded and not include_excluded:
@@ -933,6 +935,7 @@ def filter_report_results(
             "err_code": item.get("err_code", ""),
             "excluded": excluded,
             "exclusion_key": exclusion_key,
+            "judgement_source": judgement_source,
             "detail_available": str(index) in details_map,
         })
     return filtered_items
@@ -1710,18 +1713,31 @@ def _iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[D
     return flattened
 
 def _merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
-    raw_url = str(raw_url or "").strip()
-    if not params:
-        return raw_url
-
-    split = urlsplit(raw_url)
-    existing_pairs = parse_qsl(split.query, keep_blank_values=True)
-    merged = {key: value for key, value in existing_pairs}
-    for key, value in (params or {}).items():
-        merged[str(key)] = "" if value is None else str(value)
-
-    new_query = urlencode(merged, doseq=False)
+    clean_url, merged_params = _normalize_url_and_params(raw_url, params)
+    if not merged_params:
+        return clean_url
+    normalized = {str(key): "" if value is None else str(value) for key, value in merged_params.items()}
+    split = urlsplit(clean_url)
+    new_query = urlencode(normalized, doseq=False)
     return urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
+
+
+def _normalize_url_and_params(raw_url: str, params: Optional[Dict[str, Any]]) -> Tuple[str, Dict[str, Any]]:
+    """归一化 URL 与 params，避免 query 参数重复发送。"""
+    raw_url = str(raw_url or "").strip()
+    split = urlsplit(raw_url)
+
+    merged: Dict[str, Any] = {}
+    for key, value in parse_qsl(split.query, keep_blank_values=True):
+        merged[str(key)] = value
+    for key, value in (params or {}).items():
+        merged[str(key)] = value
+
+    if split.query:
+        clean_url = urlunsplit((split.scheme, split.netloc, split.path, "", split.fragment))
+    else:
+        clean_url = raw_url
+    return clean_url, merged
 
 def _extract_msg_errcode(body: Any) -> tuple:
     """从 JSON body 中提取 message 和 errCode，兼容 data 嵌套结构。"""
@@ -1900,6 +1916,123 @@ def set_case_exclusion(report_name: str, exclusion_key: str, excluded: bool) -> 
     return {"manual_exclusions": updated_meta.get("manual_exclusions", [])}
 
 
+def set_report_result_judgement(
+    report_name: str,
+    result_index: int,
+    action: str,
+    target_status: Optional[str] = None,
+    reason: str = "",
+) -> Dict[str, Any]:
+    """人工判定结果状态（覆盖/恢复），并重算 summary。"""
+    action = str(action or "override").strip().lower()
+    if action not in {"override", "restore"}:
+        raise ValueError("action 仅支持 override 或 restore")
+
+    if action == "override":
+        normalized_status = str(target_status or "").strip().upper()
+        if normalized_status not in {"PASSED", "FAILED"}:
+            raise ValueError("target_status 仅支持 PASSED 或 FAILED")
+    else:
+        normalized_status = ""
+
+    lock = get_report_write_lock(report_name)
+    with lock:
+        report = find_report(report_name)
+        meta_file_name = str(report.get("meta_file") or "").strip()
+        if not meta_file_name:
+            raise ValueError("报告缺少 meta_file，无法更新元数据。")
+        meta_path = REPORTS_DIR / meta_file_name
+        if not meta_path.exists():
+            raise FileNotFoundError(f"元数据文件不存在: {meta_file_name}")
+
+        with meta_path.open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+        results: List[Dict[str, Any]] = meta.get("results", [])
+        if result_index < 0 or result_index >= len(results):
+            raise IndexError(result_index)
+
+        now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        old_result = dict(results[result_index])
+        history = old_result.get("judgement_history")
+        if not isinstance(history, list):
+            history = []
+
+        old_status = str(old_result.get("status") or "")
+        old_message = str(old_result.get("message") or "")
+        manual_judgement = old_result.get("manual_judgement") if isinstance(old_result.get("manual_judgement"), dict) else {}
+
+        if action == "override":
+            updated_result = {
+                **old_result,
+                "status": normalized_status,
+                "manual_judgement": {
+                    "active": True,
+                    "source": "manual",
+                    "action": "override",
+                    "at": now_text,
+                    "from_status": old_status,
+                    "from_message": old_message,
+                    "target_status": normalized_status,
+                    "reason": reason,
+                },
+            }
+            history.append({
+                "action": "override",
+                "at": now_text,
+                "from_status": old_status,
+                "to_status": normalized_status,
+                "reason": reason,
+            })
+        else:
+            if not manual_judgement.get("active"):
+                raise ValueError("当前结果无可恢复的人工判定")
+            restored_status = str(manual_judgement.get("from_status") or old_status).strip().upper() or old_status
+            restored_message = str(manual_judgement.get("from_message") or old_message)
+            updated_result = {
+                **old_result,
+                "status": restored_status,
+                "message": restored_message,
+                "manual_judgement": {
+                    **manual_judgement,
+                    "active": False,
+                    "source": "auto",
+                    "action": "restore",
+                    "restored_at": now_text,
+                },
+            }
+            history.append({
+                "action": "restore",
+                "at": now_text,
+                "from_status": old_status,
+                "to_status": restored_status,
+                "reason": reason,
+            })
+
+        updated_result["judgement_history"] = history
+        results[result_index] = updated_result
+        meta["results"] = results
+
+        old_summary = meta.get("summary", {})
+        new_stats = _compute_summary(results)
+        meta["summary"] = {
+            **old_summary,
+            "total": new_stats["total"],
+            "passed": new_stats["passed"],
+            "failed": new_stats["failed"],
+            "error": new_stats["error"],
+            "success_rate": new_stats["success_rate"],
+        }
+
+        tmp_meta = meta_path.with_suffix(".tmp")
+        with tmp_meta.open("w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2, ensure_ascii=False)
+        os.replace(str(tmp_meta), str(meta_path))
+
+        _invalidate_reports_cache()
+        return {"summary": meta["summary"], "result": updated_result}
+
+
 def patch_report_result(
     report_name: str,
     result_index: int,
@@ -1939,6 +2072,12 @@ def patch_report_result(
         old_result = dict(results[result_index])
         old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
         retry_history = old_history + [old_result]
+        old_judgement = old_result.get("manual_judgement") if isinstance(old_result.get("manual_judgement"), dict) else {}
+        manual_judgement = {
+            **old_judgement,
+            "active": False,
+            "source": "auto",
+        }
 
         # 若结果来自人工补录，则优先使用 meta 中保存的 request_info/response_info
         merged = {
@@ -1951,6 +2090,8 @@ def patch_report_result(
             **new_result_fields,
             "retry_history": retry_history,
             "retried": True,
+            "manual_judgement": manual_judgement,
+            "judgement_history": old_result.get("judgement_history", []),
         }
         merged["key"] = " | ".join([
             merged.get("folder", "") or "-",
@@ -2031,6 +2172,8 @@ def build_result_detail(report: Dict[str, Any], result_index: int) -> Dict[str, 
         "err_code": result.get("err_code", ""),
         "retried": result.get("retried", False),
         "retry_history": result.get("retry_history", []),
+        "manual_judgement": result.get("manual_judgement", {}),
+        "judgement_source": "manual" if isinstance(result.get("manual_judgement"), dict) and result.get("manual_judgement", {}).get("active") else "auto",
         "excluded": exclusion_key in exclusion_set,
         "exclusion_key": exclusion_key,
         "detail_available": bool(detail),
@@ -2352,6 +2495,40 @@ def api_report_case_exclusion():
     })
 
 
+@app.route("/api/report-result-judgement", methods=["POST"])
+def api_report_result_judgement():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name", "")).strip()
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+
+    try:
+        result_index = int(payload.get("result_index"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "result_index 必须是整数"}), 400
+
+    action = str(payload.get("action") or "override").strip().lower()
+    target_status = str(payload.get("target_status") or "").strip().upper() or None
+    reason = str(payload.get("reason") or "").strip()
+
+    try:
+        result = set_report_result_judgement(report_name, result_index, action, target_status=target_status, reason=reason)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+    except IndexError:
+        return jsonify({"error": f"结果索引不存在: {result_index}"}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({
+        "report_name": report_name,
+        "result_index": result_index,
+        "action": action,
+        "summary": result.get("summary", {}),
+        "result": result.get("result", {}),
+    })
+
+
 @app.route("/api/report-delete/<path:report_name>", methods=["DELETE"])
 def api_report_delete(report_name: str):
     try:
@@ -2461,6 +2638,7 @@ def re_request_api():
     method = str(source.get("method", "GET")).upper()
     headers = dict(source.get("headers") or {})
     params = dict(source.get("params") or {})
+    normalized_url, normalized_params = _normalize_url_and_params(url, params)
     body_mode = str(source.get("body_mode") or "legacy").strip().lower()
     body_data = source.get("body_data")
     legacy_body = payload.get("body")
@@ -2523,7 +2701,7 @@ def re_request_api():
 
     try:
         response = requests.request(
-            method=method, url=url, headers=headers_to_send, params=params,
+            method=method, url=normalized_url, headers=headers_to_send, params=normalized_params,
             **request_kwargs, timeout=(connect_timeout, read_timeout)
         )
         try:
@@ -2550,7 +2728,7 @@ def re_request_api():
 
         new_request_info = {
             "headers": headers_to_send,
-            "params": params,
+            "params": normalized_params,
             "body": stored_body,
             "body_mode": stored_body_mode,
             "body_data": stored_body_data,
@@ -2559,7 +2737,7 @@ def re_request_api():
 
         result_fields = {
             "method": method,
-            "url": url,
+            "url": normalized_url,
             "actual_request_url": actual_request_url,
             "item_path": source.get("item_path", []),
             "expected_status": expected_status,
@@ -2577,7 +2755,7 @@ def re_request_api():
             "name": source.get("name", url),
             "folder": source.get("folder", ""),
             "method": method,
-            "url": url,
+            "url": normalized_url,
             "actual_request_url": actual_request_url,
             **result_fields,
             "request_info": new_request_info,
@@ -2590,15 +2768,15 @@ def re_request_api():
             "name": source.get("name", url),
             "folder": source.get("folder", ""),
             "method": method,
-            "url": url,
-            "actual_request_url": url,
+            "url": normalized_url,
+            "actual_request_url": _merge_url_with_params(normalized_url, normalized_params),
             "status": "ERROR",
             "status_code": None,
             "message": str(exc),
             "err_code": "",
             "request_info": {
                 "headers": headers_to_send,
-                "params": params,
+                "params": normalized_params,
                 "body": stored_body,
                 "body_mode": stored_body_mode,
                 "body_data": stored_body_data,
@@ -2626,6 +2804,7 @@ def api_proxy_request():
     method = str(source.get("method") or "GET").upper()
     req_headers = dict(source.get("headers") or {})
     req_params = dict(source.get("params") or {})
+    normalized_url, normalized_params = _normalize_url_and_params(url, req_params)
     body_mode = str(source.get("body_mode") or "legacy").strip().lower()
     body_data = source.get("body_data")
     legacy_body = payload.get("body")
@@ -2661,9 +2840,9 @@ def api_proxy_request():
         t0 = _time.time()
         resp = requests.request(
             method=method,
-            url=url,
+            url=normalized_url,
             headers=headers_to_send,
-            params=req_params,
+            params=normalized_params,
             **request_kwargs,
             timeout=(connect_timeout, read_timeout),
         )

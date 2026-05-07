@@ -443,6 +443,9 @@
                 </div>
                 <div class="detail-actions">
                     <button id="editRetryBtn" class="retry-btn" style="display:none;" onclick="openEditRetry()">编辑重试</button>
+                    <button id="markPassedBtn" class="secondary" style="display:none;" onclick="overrideCurrentResultStatus('PASSED')">标记成功</button>
+                    <button id="markFailedBtn" class="secondary" style="display:none;" onclick="overrideCurrentResultStatus('FAILED')">标记失败</button>
+                    <button id="restoreResultBtn" class="secondary" style="display:none;" onclick="restoreCurrentResultStatus()">恢复自动结果</button>
                     <button id="saveManualBtn" class="secondary" style="display:none;" onclick="saveCurrentAsManualCase()">保存为人工用例</button>
                     <button id="excludeCaseBtn" class="secondary" style="display:none;" onclick="toggleCurrentCaseExclusion()">排除此用例</button>
                     <button onclick="closeDetail()">关闭</button>
@@ -1596,46 +1599,71 @@ function buildActualRequestUrl(data) {
         return rawUrl;
     }
 
-    const pairs = [];
-    const pushPair = (k, v) => {
+    const hashIndex = rawUrl.indexOf('#');
+    const beforeHash = hashIndex >= 0 ? rawUrl.slice(0, hashIndex) : rawUrl;
+    const hashPart = hashIndex >= 0 ? rawUrl.slice(hashIndex) : '';
+    const queryIndex = beforeHash.indexOf('?');
+    const basePart = queryIndex >= 0 ? beforeHash.slice(0, queryIndex) : beforeHash;
+    const queryPart = queryIndex >= 0 ? beforeHash.slice(queryIndex + 1) : '';
+
+    const merged = new URLSearchParams(queryPart);
+    const setParam = (k, v) => {
         if (k === undefined || k === null || k === '') {
             return;
         }
+        const key = String(k);
         if (Array.isArray(v)) {
-            v.forEach((item) => pushPair(k, item));
+            merged.delete(key);
+            v.forEach((item) => merged.append(key, item === undefined || item === null ? '' : String(item)));
             return;
         }
-        const key = encodeURIComponent(String(k));
-        const value = v === undefined || v === null ? '' : encodeURIComponent(String(v));
-        pairs.push(`${key}=${value}`);
+        merged.set(key, v === undefined || v === null ? '' : String(v));
     };
 
     if (Array.isArray(params)) {
         params.forEach((entry) => {
             if (Array.isArray(entry) && entry.length >= 2) {
-                pushPair(entry[0], entry[1]);
+                setParam(entry[0], entry[1]);
             } else if (entry && typeof entry === 'object') {
-                pushPair(entry.key, entry.value);
+                setParam(entry.key, entry.value);
             }
         });
     } else {
-        Object.entries(params).forEach(([k, v]) => pushPair(k, v));
+        Object.entries(params).forEach(([k, v]) => setParam(k, v));
     }
 
-    if (pairs.length === 0) {
-        return rawUrl;
-    }
-    return rawUrl + (rawUrl.includes('?') ? '&' : '?') + pairs.join('&');
+    const mergedQuery = merged.toString();
+    return basePart + (mergedQuery ? `?${mergedQuery}` : '') + hashPart;
 }
 
 function renderDetailMeta(data) {
     const meta = document.getElementById('detailMeta');
     const actualRequestUrl = buildActualRequestUrl(data) || '-';
+    const sourceText = String((data.judgement_source || '')).toLowerCase() === 'manual'
+        ? '<span class="retried-badge">人工判定</span>'
+        : '自动判定';
     meta.innerHTML = `
-        <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'}</div>
+        <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'} | ${sourceText}</div>
         <div class="detail-meta-row detail-meta-url">配置 URL: ${escapeHtml(data.url || '-')}</div>
         <div class="detail-meta-row detail-meta-url">实际请求 URL: ${escapeHtml(actualRequestUrl)}</div>
     `;
+}
+
+function applySummaryToCards(summary) {
+    if (!summary || typeof summary !== 'object') {
+        return;
+    }
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = value ?? '';
+        }
+    };
+    setText('sum-total', summary.total);
+    setText('sum-passed', summary.passed);
+    setText('sum-failed', summary.failed);
+    setText('sum-error', summary.error);
+    setText('sum-rate', summary.success_rate);
 }
 
 function renderDetailPanels(data) {
@@ -1803,12 +1831,20 @@ async function openDetail(index) {
     const body = document.getElementById('detailBody');
     const editPanel = document.getElementById('editRetryPanel');
     const editBtn = document.getElementById('editRetryBtn');
+    const markPassedBtn = document.getElementById('markPassedBtn');
+    const markFailedBtn = document.getElementById('markFailedBtn');
+    const restoreResultBtn = document.getElementById('restoreResultBtn');
     const saveManualBtn = document.getElementById('saveManualBtn');
     const excludeCaseBtn = document.getElementById('excludeCaseBtn');
     body.innerHTML = '<div class="loading">加载详情中...</div>';
     editPanel.style.display = 'none';
     editPanel.innerHTML = '';
     editBtn.style.display = 'none';
+    editBtn.textContent = '编辑重试';
+    editBtn.onclick = openEditRetry;
+    markPassedBtn.style.display = 'none';
+    markFailedBtn.style.display = 'none';
+    restoreResultBtn.style.display = 'none';
     saveManualBtn.style.display = 'none';
     excludeCaseBtn.style.display = 'none';
     mask.classList.add('show');
@@ -1821,6 +1857,13 @@ async function openDetail(index) {
     document.getElementById('detailTitle').innerHTML = escapeHtml(data.name || '接口详情') +
         (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
     renderDetailMeta(data);
+
+    if (Number.isInteger(currentDetailIndex)) {
+        markPassedBtn.style.display = '';
+        markFailedBtn.style.display = '';
+        const manualJudgement = data.manual_judgement || {};
+        restoreResultBtn.style.display = manualJudgement.active ? '' : 'none';
+    }
 
     // 所有有 detail_available 或者只要有 url 的都可以重试
     if (data.url) {
@@ -2489,12 +2532,7 @@ async function sendRetry() {
 
         // 刷新 summary 卡片
         if (result.new_summary && result.new_summary.total !== undefined) {
-            const s = result.new_summary;
-            document.getElementById('sum-total').textContent  = s.total  ?? '';
-            document.getElementById('sum-passed').textContent = s.passed ?? '';
-            document.getElementById('sum-failed').textContent = s.failed ?? '';
-            document.getElementById('sum-error').textContent  = s.error  ?? '';
-            document.getElementById('sum-rate').textContent   = s.success_rate ?? '';
+            applySummaryToCards(result.new_summary);
         }
 
         // 更新列表行（状态、状态码、结果说明）
@@ -2516,6 +2554,106 @@ async function sendRetry() {
     } finally {
         btn.disabled = false;
         btn.textContent = '发送';
+    }
+}
+
+async function overrideCurrentResultStatus(targetStatus) {
+    if (!Number.isInteger(currentDetailIndex) || !currentDetailData) {
+        return;
+    }
+    const normalized = String(targetStatus || '').trim().toUpperCase();
+    if (!['PASSED', 'FAILED'].includes(normalized)) {
+        alert('不支持的目标状态');
+        return;
+    }
+
+    const confirmText = normalized === 'PASSED' ? '确认将该用例标记为成功？' : '确认将该用例标记为失败？';
+    if (!confirm(confirmText)) {
+        return;
+    }
+
+    const reason = (prompt('可选：填写人工判定说明（可留空）', '') || '').trim();
+    try {
+        const resp = await fetch('/api/report-result-judgement', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                result_index: currentDetailIndex,
+                action: 'override',
+                target_status: normalized,
+                reason,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '人工判定失败');
+        }
+
+        applySummaryToCards(data.summary || {});
+        if (data.result && typeof data.result === 'object') {
+            currentDetailData = {
+                ...currentDetailData,
+                ...data.result,
+                detail_available: currentDetailData.detail_available,
+                request_info: currentDetailData.request_info,
+                response_info: currentDetailData.response_info,
+            };
+            renderDetailMeta(currentDetailData);
+            const restoreBtn = document.getElementById('restoreResultBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = (currentDetailData.manual_judgement || {}).active ? '' : 'none';
+            }
+        }
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('人工判定失败: ' + (error.message || error));
+    }
+}
+
+async function restoreCurrentResultStatus() {
+    if (!Number.isInteger(currentDetailIndex) || !currentDetailData) {
+        return;
+    }
+    if (!confirm('确认恢复为自动判定结果？')) {
+        return;
+    }
+
+    const reason = (prompt('可选：填写恢复说明（可留空）', '') || '').trim();
+    try {
+        const resp = await fetch('/api/report-result-judgement', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                report_name: reportName,
+                result_index: currentDetailIndex,
+                action: 'restore',
+                reason,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.error || '恢复失败');
+        }
+
+        applySummaryToCards(data.summary || {});
+        if (data.result && typeof data.result === 'object') {
+            currentDetailData = {
+                ...currentDetailData,
+                ...data.result,
+                detail_available: currentDetailData.detail_available,
+                request_info: currentDetailData.request_info,
+                response_info: currentDetailData.response_info,
+            };
+            renderDetailMeta(currentDetailData);
+            const restoreBtn = document.getElementById('restoreResultBtn');
+            if (restoreBtn) {
+                restoreBtn.style.display = (currentDetailData.manual_judgement || {}).active ? '' : 'none';
+            }
+        }
+        await reloadResults(currentResultsPage);
+    } catch (error) {
+        alert('恢复失败: ' + (error.message || error));
     }
 }
 
@@ -3552,7 +3690,13 @@ function closeDetail(event) {
     const panel = document.getElementById('editRetryPanel');
     if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
     const editBtn = document.getElementById('editRetryBtn');
-    if (editBtn) { editBtn.style.display = 'none'; }
+    if (editBtn) { editBtn.style.display = 'none'; editBtn.onclick = openEditRetry; }
+    const markPassedBtn = document.getElementById('markPassedBtn');
+    if (markPassedBtn) { markPassedBtn.style.display = 'none'; }
+    const markFailedBtn = document.getElementById('markFailedBtn');
+    if (markFailedBtn) { markFailedBtn.style.display = 'none'; }
+    const restoreResultBtn = document.getElementById('restoreResultBtn');
+    if (restoreResultBtn) { restoreResultBtn.style.display = 'none'; }
     const saveManualBtn = document.getElementById('saveManualBtn');
     if (saveManualBtn) { saveManualBtn.style.display = 'none'; }
     const excludeCaseBtn = document.getElementById('excludeCaseBtn');
@@ -3570,6 +3714,9 @@ async function openManualCaseDetail(caseId) {
     const meta = document.getElementById('detailMeta');
     const body = document.getElementById('detailBody');
     const editBtn = document.getElementById('editRetryBtn');
+    const markPassedBtn = document.getElementById('markPassedBtn');
+    const markFailedBtn = document.getElementById('markFailedBtn');
+    const restoreResultBtn = document.getElementById('restoreResultBtn');
     const saveManualBtn = document.getElementById('saveManualBtn');
     const excludeCaseBtn = document.getElementById('excludeCaseBtn');
     const editPanel = document.getElementById('editRetryPanel');
@@ -3598,6 +3745,15 @@ async function openManualCaseDetail(caseId) {
     }
     if (saveManualBtn) {
         saveManualBtn.style.display = 'none';
+    }
+    if (markPassedBtn) {
+        markPassedBtn.style.display = 'none';
+    }
+    if (markFailedBtn) {
+        markFailedBtn.style.display = 'none';
+    }
+    if (restoreResultBtn) {
+        restoreResultBtn.style.display = 'none';
     }
     if (editBtn) {
         editBtn.style.display = '';
