@@ -3788,9 +3788,12 @@ async function exportLatestCollection() {
         const scopeText = data.export_scope === 'report_only'
             ? `仅本次报告接口（${data.report_only_count || 0} 个）`
             : '全量集合';
+        const scopeDiffHint = data.export_scope === 'report_only' && data.scope_effective_same_as_full
+            ? `\n提示: 当前源集合共 ${data.source_total_count || 0} 个接口，与本次报告接口一致，因此 report_only 与 full 导出内容相同。`
+            : '';
         const composeText = `原执行更新 ${data.updated_count} + 人工用例 ${data.manual_case_exported_count || 0}（配置 ${data.manual_case_count || 0}）- 排除 ${data.excluded_count || 0}`;
         alert(
-            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n组成: ${composeText}\n跳过接口: ${data.skipped_count}${warningText}`
+            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n组成: ${composeText}\n跳过接口: ${data.skipped_count}${scopeDiffHint}${warningText}`
         );
         if (data.warnings && data.warnings.length) {
             console.warn('Export warnings:', data.warnings);

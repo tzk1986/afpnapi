@@ -451,7 +451,25 @@ def _build_exclusion_key(folder: Any, name: Any, method: Any, url: Any) -> str:
     name_text = str(name or "").strip()
     method_text = str(method or "").strip().upper()
     url_text = str(url or "").strip()
-    return " | ".join([folder_text, name_text, method_text, url_text])
+    return "|".join([folder_text, name_text, method_text, url_text])
+
+
+def _normalize_exclusion_key(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "|" not in text:
+        return text
+
+    # 兼容旧格式（"a | b | c | d"）与新格式（"a|b|c|d"）。
+    parts = [part.strip() for part in text.split("|")]
+    if len(parts) < 4:
+        return text
+    folder_text = parts[0]
+    name_text = parts[1]
+    method_text = parts[2]
+    url_text = "|".join(parts[3:]).strip()
+    return _build_exclusion_key(folder_text, name_text, method_text, url_text)
 
 
 def _result_exclusion_key(result: Dict[str, Any]) -> str:
@@ -478,7 +496,7 @@ def _normalize_manual_exclusions(values: Any) -> List[str]:
     normalized: List[str] = []
     seen = set()
     for value in values:
-        text = str(value or "").strip()
+        text = _normalize_exclusion_key(value)
         if not text or text in seen:
             continue
         normalized.append(text)
@@ -703,6 +721,9 @@ def export_collection_with_latest_params(
     if scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
         scope = "full"
 
+    source_preview_items = _extract_collection_preview_items(collection_data)
+    source_total_count = len(source_preview_items)
+
     details_map = load_report_details_map(report)
     updated_count = 0
     skipped_count = 0
@@ -744,6 +765,7 @@ def export_collection_with_latest_params(
 
     final_collection = collection_data
     report_only_count = 0
+    scope_effective_same_as_full = False
     if scope == "report_only":
         selected_paths = _collect_report_item_paths(report)
         if not selected_paths:
@@ -751,6 +773,9 @@ def export_collection_with_latest_params(
         final_collection = _prune_collection_to_paths(collection_data, selected_paths)
         pruned_items = _extract_collection_preview_items(final_collection)
         report_only_count = len(pruned_items)
+        scope_effective_same_as_full = report_only_count == source_total_count
+        if scope_effective_same_as_full:
+            warnings.append("当前报告接口与源集合接口一致，report_only 与 full 导出内容相同。")
 
     manual_cases: List[Dict[str, Any]] = []
     if ENABLE_MANUAL_CASES:
@@ -792,6 +817,8 @@ def export_collection_with_latest_params(
         "manual_case_exported_count": appended_manual_count,
         "excluded_count": len(manual_exclusions),
         "removed_excluded_count": removed_excluded_count,
+        "source_total_count": source_total_count,
+        "scope_effective_same_as_full": scope_effective_same_as_full,
         "composition": {
             "updated_requests": updated_count,
             "manual_cases_added": appended_manual_count,
@@ -1855,7 +1882,7 @@ def delete_manual_case(report_name: str, case_id: str) -> Dict[str, Any]:
 
 
 def set_case_exclusion(report_name: str, exclusion_key: str, excluded: bool) -> Dict[str, Any]:
-    exclusion_key = str(exclusion_key or "").strip()
+    exclusion_key = _normalize_exclusion_key(exclusion_key)
     if not exclusion_key:
         raise ValueError("exclusion_key 不能为空")
 
@@ -2188,6 +2215,8 @@ def api_export_collection():
         "manual_case_count": exported.get("manual_case_count", 0),
         "manual_case_exported_count": exported.get("manual_case_exported_count", 0),
         "excluded_count": exported.get("excluded_count", 0),
+        "source_total_count": exported.get("source_total_count", 0),
+        "scope_effective_same_as_full": exported.get("scope_effective_same_as_full", False),
         "include_auth": include_auth,
         "export_scope": exported["export_scope"],
         "report_only_count": exported["report_only_count"],
