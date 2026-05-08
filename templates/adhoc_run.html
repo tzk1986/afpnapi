@@ -203,7 +203,7 @@
                     </div>
                     <div class="field">
                         <label for="adhocCaseUrl">URL</label>
-                        <input id="adhocCaseUrl" type="text" placeholder="支持绝对 URL 或 {{baseUrl}}/path 或 /path">
+                        <input id="adhocCaseUrl" type="text" placeholder="支持绝对 URL 或 {{baseUrl}}/path">
                     </div>
                     <div class="field">
                         <label for="adhocCaseExpectedStatus">期望状态码</label>
@@ -275,8 +275,8 @@
     </div>
 
 <script>
-const RUN_STATUS_POLL_INTERVAL_MS = {{ run_status_poll_interval_ms }};
-const ADHOC_MAX_ITEMS = {{ adhoc_max_items }};
+const RUN_STATUS_POLL_INTERVAL_MS = Number("{{ run_status_poll_interval_ms }}");
+const ADHOC_MAX_ITEMS = Number("{{ adhoc_max_items }}");
 let adhocCases = [];
 let adhocJobTimer = null;
 let adhocEditMode = 'form';
