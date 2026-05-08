@@ -129,7 +129,15 @@ ENABLE_RETRY_FAILURES = str(os.environ.get("ENABLE_RETRY_FAILURES", "true")).str
 # DEFAULT_ENV_NAME: 默认选中的环境名（为空则不预选）
 # ==============================================================
 import json as _json_cfg
-_ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", "{}")
+# _ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", "{}") # 无配置时
+
+_ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", '''
+{
+  "生产环境": {"base_url": "http://10.50.11.130:11000", "token": ""},
+  "测试环境": {"base_url": "http://10.50.11.120:8090", "token": ""},
+  "本地开发": {"base_url": "http://127.0.0.1:8080", "token": ""}
+}
+''')
 try:
     ENVIRONMENTS: dict = _json_cfg.loads(_ENVIRONMENTS_JSON)
     if not isinstance(ENVIRONMENTS, dict):
