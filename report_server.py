@@ -10,6 +10,7 @@ import socket
 import threading
 import uuid
 import time as _time
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -84,6 +85,24 @@ MANUAL_CASE_FOLDER_NAME = _cfg_str("MANUAL_CASE_FOLDER_NAME", "人工补录") or
 ENABLE_ADHOC_RUN = _cfg_bool("ENABLE_ADHOC_RUN", True)
 ADHOC_MAX_ITEMS = _cfg_int("ADHOC_MAX_ITEMS", 200)
 ADHOC_DEFAULT_COLLECTION_NAME = _cfg_str("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试") or "报告中心临时测试"
+ENABLE_RESPONSE_TIME = _cfg_bool("ENABLE_RESPONSE_TIME", True)
+ENABLE_RETRY_FAILURES = _cfg_bool("ENABLE_RETRY_FAILURES", True)
+ENABLE_JUNIT_EXPORT = _cfg_bool("ENABLE_JUNIT_EXPORT", True)
+ENABLE_REPORT_LIST_FILTER = _cfg_bool("ENABLE_REPORT_LIST_FILTER", True)
+ENABLE_ASSERTIONS = _cfg_bool("ENABLE_ASSERTIONS", False)
+
+
+def _cfg_dict(name: str, default: Optional[Dict] = None) -> Dict:
+    if default is None:
+        default = {}
+    if _cfg is None:
+        return default
+    value = getattr(_cfg, name, default)
+    return value if isinstance(value, dict) else default
+
+
+ENVIRONMENTS: Dict[str, Any] = _cfg_dict("ENVIRONMENTS", {})
+DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")
 
 
 def resolve_reports_dir() -> Path:
@@ -933,6 +952,7 @@ def filter_report_results(
             "status_code": item.get("status_code"),
             "message": item.get("message", ""),
             "err_code": item.get("err_code", ""),
+            "response_time_ms": item.get("response_time_ms", 0),
             "excluded": excluded,
             "exclusion_key": exclusion_key,
             "judgement_source": judgement_source,
@@ -2211,6 +2231,12 @@ def index():
         enable_adhoc_run=ENABLE_ADHOC_RUN,
         adhoc_max_items=ADHOC_MAX_ITEMS,
         adhoc_default_collection_name=ADHOC_DEFAULT_COLLECTION_NAME,
+        enable_response_time=ENABLE_RESPONSE_TIME,
+        enable_retry_failures=ENABLE_RETRY_FAILURES,
+        enable_junit_export=ENABLE_JUNIT_EXPORT,
+        enable_report_list_filter=ENABLE_REPORT_LIST_FILTER,
+        environments_json=json.dumps(list(ENVIRONMENTS.keys()), ensure_ascii=False),
+        default_env_name=DEFAULT_ENV_NAME,
     )
 
 
@@ -2226,6 +2252,9 @@ def adhoc_run_page():
         run_status_poll_interval_ms=RUN_STATUS_POLL_INTERVAL_MS,
         adhoc_max_items=ADHOC_MAX_ITEMS,
         adhoc_default_collection_name=ADHOC_DEFAULT_COLLECTION_NAME,
+        enable_assertions=ENABLE_ASSERTIONS,
+        environments_json=json.dumps(list(ENVIRONMENTS.keys()), ensure_ascii=False),
+        default_env_name=DEFAULT_ENV_NAME,
     )
 
 
@@ -2265,6 +2294,9 @@ def report_view():
         enable_manual_cases=ENABLE_MANUAL_CASES,
         manual_case_folder_name=MANUAL_CASE_FOLDER_NAME,
         template_updated_at=template_updated_at,
+        enable_response_time=ENABLE_RESPONSE_TIME,
+        enable_retry_failures=ENABLE_RETRY_FAILURES,
+        enable_junit_export=ENABLE_JUNIT_EXPORT,
     )
     response = make_response(html)
     # 避免浏览器缓存旧版页面，确保模板改动即时生效。
@@ -2526,6 +2558,280 @@ def api_report_result_judgement():
         "action": action,
         "summary": result.get("summary", {}),
         "result": result.get("result", {}),
+    })
+
+
+# ---------------------------------------------------------------
+# 升级二：一键重试失败用例
+# ---------------------------------------------------------------
+@app.route("/api/retry-failures", methods=["POST"])
+def api_retry_failures():
+    if not ENABLE_RETRY_FAILURES:
+        return jsonify({"error": "当前环境未启用重试失败接口能力。"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name", "")).strip()
+    if not report_name:
+        return jsonify({"error": "缺少 report_name"}), 400
+
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    # 收集 FAILED / ERROR 的 item_path
+    failed_paths: List[List[int]] = []
+    for item in report.get("results", []):
+        if item.get("status") in ("FAILED", "ERROR"):
+            item_path = item.get("item_path")
+            if isinstance(item_path, list) and item_path:
+                failed_paths.append(item_path)
+
+    if not failed_paths:
+        return jsonify({"error": "当前报告无失败或错误接口，无需重试。"}), 400
+
+    # 复用已上传的原始集合文件（source_file 字段存储上传文件路径）
+    saved_file = str(report.get("source_file", "")).strip()
+    if not saved_file or not Path(saved_file).exists():
+        return jsonify({"error": "找不到原始集合文件，无法重试。请确认报告对应的集合文件仍然存在。"}), 400
+
+    base_url = str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
+    if base_url:
+        _p = urlparse(base_url)
+        if _p.scheme not in ("http", "https") or not _p.netloc:
+            return jsonify({"error": "base_url 仅允许合法的 http/https 地址"}), 400
+
+    token = str(payload.get("token", "")).strip() or None
+    output_dir = str(REPORTS_DIR)
+    results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
+
+    job_id = uuid.uuid4().hex
+    set_run_job(
+        job_id,
+        id=job_id,
+        status="queued",
+        message="重试任务已入队，等待执行。",
+        total=0,
+        completed=0,
+        percent=0,
+        current_name="",
+        file_name=Path(saved_file).name,
+        saved_file=saved_file,
+        output_dir=output_dir,
+        report_name="",
+        run_scope="selected",
+        selected_count=len(failed_paths),
+    )
+
+    worker = threading.Thread(
+        target=run_postman_job,
+        args=(
+            job_id,
+            saved_file,
+            base_url,
+            output_dir,
+            token,
+            None,
+            Path(saved_file).name,
+            results_per_page,
+            failed_paths,
+        ),
+        daemon=True,
+    )
+    worker.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "queued",
+        "retry_count": len(failed_paths),
+        "message": f"已创建重试任务，共 {len(failed_paths)} 个失败接口，请轮询状态接口获取进度。",
+    })
+
+
+@app.route("/api/retry-all", methods=["POST"])
+def api_retry_all():
+    if not ENABLE_RETRY_FAILURES:
+        return jsonify({"error": "当前环境未启用重试接口能力。"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name", "")).strip()
+    if not report_name:
+        return jsonify({"error": "缺少 report_name"}), 400
+
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    # 收集所有接口的 item_path（不过滤状态）
+    all_paths: List[List[int]] = []
+    for item in report.get("results", []):
+        item_path = item.get("item_path")
+        if isinstance(item_path, list) and item_path:
+            all_paths.append(item_path)
+
+    if not all_paths:
+        return jsonify({"error": "当前报告没有可重试的接口。"}), 400
+
+    saved_file = str(report.get("source_file", "")).strip()
+    if not saved_file or not Path(saved_file).exists():
+        return jsonify({"error": "找不到原始集合文件，无法重试。请确认报告对应的集合文件仍然存在。"}), 400
+
+    base_url = str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
+    if base_url:
+        _p = urlparse(base_url)
+        if _p.scheme not in ("http", "https") or not _p.netloc:
+            return jsonify({"error": "base_url 仅允许合法的 http/https 地址"}), 400
+
+    token = str(payload.get("token", "")).strip() or None
+    output_dir = str(REPORTS_DIR)
+    results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
+
+    job_id = uuid.uuid4().hex
+    set_run_job(
+        job_id,
+        id=job_id,
+        status="queued",
+        message="全量重试任务已入队，等待执行。",
+        total=0,
+        completed=0,
+        percent=0,
+        current_name="",
+        file_name=Path(saved_file).name,
+        saved_file=saved_file,
+        output_dir=output_dir,
+        report_name="",
+        run_scope="selected",
+        selected_count=len(all_paths),
+    )
+
+    worker = threading.Thread(
+        target=run_postman_job,
+        args=(
+            job_id,
+            saved_file,
+            base_url,
+            output_dir,
+            token,
+            None,
+            Path(saved_file).name,
+            results_per_page,
+            all_paths,
+        ),
+        daemon=True,
+    )
+    worker.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "queued",
+        "retry_count": len(all_paths),
+        "message": f"已创建全量重试任务，共 {len(all_paths)} 个接口，请轮询状态接口获取进度。",
+    })
+
+
+# ---------------------------------------------------------------
+# 升级七：JUnit XML 报告导出
+# ---------------------------------------------------------------
+def _parse_duration_to_seconds(duration_str: str) -> float:
+    """将 '1.23s' 格式的耗时字符串转换为秒数。"""
+    text = str(duration_str or "").strip().rstrip("s").strip()
+    try:
+        return float(text)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _build_junit_xml(report: Dict[str, Any]) -> str:
+    """将报告元数据构建为 JUnit XML 字符串。"""
+    summary = report.get("summary") or {}
+    results = report.get("results") or []
+    report_name = report.get("report_name", "postman_tests")
+    total = int(summary.get("total", 0))
+    failures = int(summary.get("failed", 0))
+    errors = int(summary.get("error", 0))
+    duration_sec = _parse_duration_to_seconds(summary.get("duration", "0s"))
+
+    suite = ET.Element("testsuite")
+    suite.set("name", report_name)
+    suite.set("tests", str(total))
+    suite.set("failures", str(failures))
+    suite.set("errors", str(errors))
+    suite.set("time", f"{duration_sec:.3f}")
+    suite.set("timestamp", str(summary.get("start_time", "")))
+
+    for item in results:
+        folder = item.get("folder", "") or ""
+        name = item.get("name", "") or "unknown"
+        classname = f"{folder}.{name}".strip(".") if folder else name
+        tc = ET.SubElement(suite, "testcase")
+        tc.set("name", name)
+        tc.set("classname", classname)
+        tc.set("time", str(round(item.get("response_time_ms", 0) / 1000, 3)))
+
+        status = item.get("status", "")
+        if status == "FAILED":
+            failure = ET.SubElement(tc, "failure")
+            failure.set("message", str(item.get("message", "")))
+            failure.text = str(item.get("message", ""))
+        elif status == "ERROR":
+            error_el = ET.SubElement(tc, "error")
+            error_el.set("message", str(item.get("message", "")))
+            error_el.text = str(item.get("message", ""))
+
+    try:
+        ET.indent(suite, space="  ")
+    except AttributeError:
+        pass  # Python < 3.9 没有 ET.indent，跳过美化
+
+    import io as _io
+    buf = _io.StringIO()
+    ET.ElementTree(suite).write(buf, encoding="unicode", xml_declaration=True)
+    return buf.getvalue()
+
+
+@app.route("/api/export-junit/<path:report_name>")
+def api_export_junit(report_name: str):
+    if not ENABLE_JUNIT_EXPORT:
+        return jsonify({"error": "当前环境未启用 JUnit XML 导出能力。"}), 403
+
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    try:
+        xml_content = _build_junit_xml(report)
+    except Exception as exc:
+        logger.exception("JUnit XML 生成失败: %s", exc)
+        return jsonify({"error": "JUnit XML 生成失败"}), 500
+
+    safe_stem = re.sub(r'[^\w\u4e00-\u9fff\-.]', '_', Path(report_name).stem)[:80]
+    filename = f"{safe_stem}_junit.xml"
+    resp = make_response(xml_content)
+    resp.headers["Content-Type"] = "application/xml; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
+# ---------------------------------------------------------------
+# 升级四：多环境配置查询
+# ---------------------------------------------------------------
+@app.route("/api/environments")
+def api_environments():
+    """返回可用环境列表（不含 token 值）。"""
+    env_list = []
+    for env_name, env_cfg in ENVIRONMENTS.items():
+        if not isinstance(env_cfg, dict):
+            continue
+        env_list.append({
+            "name": str(env_name),
+            "base_url": str(env_cfg.get("base_url", "")),
+            "has_token": bool(env_cfg.get("token", "").strip()),
+        })
+    return jsonify({
+        "environments": env_list,
+        "default": DEFAULT_ENV_NAME,
     })
 
 
@@ -2884,6 +3190,19 @@ def api_run_postman():
         if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
             return jsonify({"error": "base_url 仅允许合法的 http/https 地址"}), 400
     token = str(request.form.get("token", "")).strip() or None
+    # 升级四：如果传入 env_name 且环境存在，用环境配置填充未指定的 base_url / token
+    env_name = str(request.form.get("env_name", "")).strip()
+    if env_name and env_name in ENVIRONMENTS:
+        env_cfg = ENVIRONMENTS[env_name]
+        if isinstance(env_cfg, dict):
+            if not base_url and env_cfg.get("base_url", "").strip():
+                env_base = env_cfg["base_url"].strip()
+                from urllib.parse import urlparse as _urlparse2
+                _ep = _urlparse2(env_base)
+                if _ep.scheme in ("http", "https") and _ep.netloc:
+                    base_url = env_base
+            if not token and env_cfg.get("token", "").strip():
+                token = env_cfg["token"].strip()
     output_dir = str(request.form.get("output_dir", "")).strip() or str(REPORTS_DIR)
     report_name = str(request.form.get("report_name", "")).strip() or None
     results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))

@@ -136,7 +136,7 @@
 <body>
     <div class="page">
         <section class="hero">
-            <h1>Postman 报告中心 1.0.2</h1>
+            <h1>Postman 报告中心</h1>
             <p>当前主机: {{ host_name }}</p>
             <p>本机访问: <a style="color:#bfdbfe;" href="{{ self_url }}">{{ self_url }}</a></p>
             <p>局域网访问: <a style="color:#bfdbfe;" href="{{ lan_url }}">{{ lan_url }}</a></p>
@@ -167,6 +167,14 @@
                     <label for="baseUrlInput">基础 URL（可选）</label>
                     <input id="baseUrlInput" type="text" placeholder="例如: https://api.example.com">
                 </div>
+                {% if environments_json != '[]' %}
+                <div class="field">
+                    <label for="envSelect">环境（可选）</label>
+                    <select id="envSelect">
+                        <option value="">-- 不使用预设环境 --</option>
+                    </select>
+                </div>
+                {% endif %}
                 <div class="field">
                     <label for="tokenInput">Token（可选）</label>
                     <input id="tokenInput" type="text" placeholder="手动 token，填写后跳过自动登录">
@@ -239,6 +247,28 @@
                 <input id="searchInput" type="text" placeholder="搜索报告名、集合名、源文件" oninput="renderReports()">
                 <button class="secondary" onclick="window.location.href='/'">刷新列表</button>
             </div>
+            {% if enable_report_list_filter %}
+            <div class="toolbar" id="filterPanel" style="flex-wrap:wrap;gap:8px;margin-top:6px;">
+                <select id="filterStatus" onchange="renderReports()">
+                    <option value="">全部状态</option>
+                    <option value="pass">100% 通过</option>
+                    <option value="fail">有失败/错误</option>
+                </select>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                    最低通过率
+                    <input id="filterMinRate" type="number" min="0" max="100" placeholder="%" style="width:60px;" oninput="renderReports()">%
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                    日期从
+                    <input id="filterDateFrom" type="date" onchange="renderReports()">
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;font-size:13px;">
+                    至
+                    <input id="filterDateTo" type="date" onchange="renderReports()">
+                </label>
+                <button class="secondary" onclick="resetListFilter()">重置筛选</button>
+            </div>
+            {% endif %}
             <table class="report-table">
                 <colgroup>
                     <col class="col-pick">
@@ -653,11 +683,44 @@ function renderSelects(filtered = reports) {
     }
 }
 
+function resetListFilter() {
+    const el = (id) => document.getElementById(id);
+    if (el('filterStatus')) el('filterStatus').value = '';
+    if (el('filterMinRate')) el('filterMinRate').value = '';
+    if (el('filterDateFrom')) el('filterDateFrom').value = '';
+    if (el('filterDateTo')) el('filterDateTo').value = '';
+    renderReports();
+}
+
 function renderReports() {
     const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    // 升级八：附加筛选参数
+    const filterStatus = (document.getElementById('filterStatus')?.value || '').trim();
+    const filterMinRate = parseFloat(document.getElementById('filterMinRate')?.value || '') || 0;
+    const filterDateFrom = document.getElementById('filterDateFrom')?.value || '';
+    const filterDateTo = document.getElementById('filterDateTo')?.value || '';
+
     const filtered = reports.filter((report) => {
         const text = [report.report_name, report.collection_name, report.source_file].join(' ').toLowerCase();
-        return text.includes(query);
+        if (!text.includes(query)) return false;
+
+        const summary = report.summary || {};
+        const total = summary.total || 0;
+        const passed = summary.passed || 0;
+        const failed = (summary.failed || 0) + (summary.error || 0);
+        const rate = total > 0 ? (passed / total) * 100 : 0;
+
+        if (filterStatus === 'pass' && failed > 0) return false;
+        if (filterStatus === 'fail' && failed === 0) return false;
+        if (filterMinRate > 0 && rate < filterMinRate) return false;
+
+        if (filterDateFrom || filterDateTo) {
+            const dateStr = (report.generated_at || '').slice(0, 10);
+            if (filterDateFrom && dateStr < filterDateFrom) return false;
+            if (filterDateTo && dateStr > filterDateTo) return false;
+        }
+
+        return true;
     });
     const tbody = document.getElementById('reportTable');
     if (!filtered.length) {
@@ -916,6 +979,9 @@ async function startRunPostmanJob() {
     formData.append('collection_file', file);
     formData.append('base_url', document.getElementById('baseUrlInput').value.trim());
     formData.append('token', document.getElementById('tokenInput').value.trim());
+    // 升级四：附加环境名称
+    const envSel = document.getElementById('envSelect');
+    if (envSel && envSel.value) formData.append('env_name', envSel.value);
     formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
     formData.append('report_name', document.getElementById('reportNameInput').value.trim());
     formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
@@ -1021,6 +1087,26 @@ function watchRunPostmanJob(jobId) {
 
 initCustomTooltip();
 renderReports();
+
+// 升级四：加载环境列表填充 envSelect
+(async function loadEnvironments() {
+    const sel = document.getElementById('envSelect');
+    if (!sel) return;
+    try {
+        const resp = await fetch('/api/environments');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const envs = data.environments || [];
+        const defaultEnv = data.default || '';
+        envs.forEach(env => {
+            const opt = document.createElement('option');
+            opt.value = env.name;
+            opt.textContent = env.name + (env.base_url ? ` (${env.base_url})` : '') + (env.has_token ? ' 🔑' : '');
+            if (env.name === defaultEnv) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    } catch (_) {}
+})();
 </script>
 </body>
 </html>

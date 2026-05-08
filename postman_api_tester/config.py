@@ -106,3 +106,60 @@ ENABLE_ADHOC_RUN = str(os.environ.get("ENABLE_ADHOC_RUN", "true")).strip().lower
 }
 ADHOC_MAX_ITEMS = int(os.environ.get("ADHOC_MAX_ITEMS", "200"))
 ADHOC_DEFAULT_COLLECTION_NAME = str(os.environ.get("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试")).strip() or "报告中心临时测试"
+
+# ==============================================================
+# 升级三：响应时间记录与展示
+# ENABLE_RESPONSE_TIME: 是否在执行结果中记录并展示接口响应时间
+# ==============================================================
+ENABLE_RESPONSE_TIME = str(os.environ.get("ENABLE_RESPONSE_TIME", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+
+# ==============================================================
+# 升级二：一键重试全部失败用例
+# ENABLE_RETRY_FAILURES: 是否在报告详情页显示"重试失败接口"按钮
+# ==============================================================
+ENABLE_RETRY_FAILURES = str(os.environ.get("ENABLE_RETRY_FAILURES", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+
+# ==============================================================
+# 升级四：多环境配置切换
+# ENVIRONMENTS_JSON: JSON 字符串，格式 {"env_name": {"base_url": "...", "token": ""}}
+# DEFAULT_ENV_NAME: 默认选中的环境名（为空则不预选）
+# ==============================================================
+import json as _json_cfg
+_ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", "{}")
+try:
+    ENVIRONMENTS: dict = _json_cfg.loads(_ENVIRONMENTS_JSON)
+    if not isinstance(ENVIRONMENTS, dict):
+        ENVIRONMENTS = {}
+except Exception:
+    ENVIRONMENTS = {}
+DEFAULT_ENV_NAME: str = os.environ.get("DEFAULT_ENV_NAME", "")
+
+# ==============================================================
+# 升级五：断言规则增强（JSONPath 校验）
+# ENABLE_ASSERTIONS: 是否启用 JSONPath 断言校验（默认 false，需要安装 jsonpath-ng）
+# ASSERTIONS_ENGINE: 断言引擎，目前仅支持 'jsonpath'
+# ==============================================================
+ENABLE_ASSERTIONS = str(os.environ.get("ENABLE_ASSERTIONS", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+ASSERTIONS_ENGINE = str(os.environ.get("ASSERTIONS_ENGINE", "jsonpath")).strip() or "jsonpath"
+
+# ==============================================================
+# 升级七：JUnit XML 报告导出
+# ENABLE_JUNIT_EXPORT: 是否启用 JUnit XML 导出接口
+# ==============================================================
+ENABLE_JUNIT_EXPORT = str(os.environ.get("ENABLE_JUNIT_EXPORT", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+
+# ==============================================================
+# 升级八：首页历史列表搜索与筛选
+# ENABLE_REPORT_LIST_FILTER: 是否在首页显示高级筛选栏
+# ==============================================================
+ENABLE_REPORT_LIST_FILTER = str(os.environ.get("ENABLE_REPORT_LIST_FILTER", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}

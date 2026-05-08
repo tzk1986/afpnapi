@@ -31,10 +31,17 @@ import logging
 import os
 import socket
 import sys
+import time as _time_mod
 from typing import Dict, List, Any, Optional, Callable, Tuple
 from datetime import datetime
 import re
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
+
+try:
+    from postman_api_tester.assertions import evaluate_assertions as _evaluate_assertions
+    _ASSERTIONS_AVAILABLE = True
+except ImportError:
+    _ASSERTIONS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -443,6 +450,7 @@ class PostmanTestExecutor:
 
         try:
             import requests as _requests
+            response_time_ms: int = 0
             if method not in {'get', 'post', 'put', 'delete', 'patch'}:
                 return {
                     'name': api['name'],
@@ -452,7 +460,8 @@ class PostmanTestExecutor:
                     'status': 'FAILED',
                     'message': f'不支持的HTTP方法: {method}',
                     'err_code': '',
-                    'status_code': None
+                    'status_code': None,
+                    'response_time_ms': 0,
                 }
 
             request_kwargs = {
@@ -463,7 +472,9 @@ class PostmanTestExecutor:
             if method in {'post', 'put', 'patch'}:
                 request_kwargs['json'] = body
 
+            _t0 = _time_mod.monotonic()
             response = getattr(self.session, method)(url, **request_kwargs)
+            response_time_ms = round((_time_mod.monotonic() - _t0) * 1000)
             
             self.http_response = response
             self.resp_status_code = response.status_code
@@ -496,6 +507,14 @@ class PostmanTestExecutor:
             message_ok = (normalized_message == "") or (normalized_message == "success")
 
             if status_code_ok and message_ok:
+                # 升级五：断言校验
+                assertion_results: List[Dict] = []
+                assertion_failed = False
+                assertions_rules = api.get('x_assertions') or []
+                if assertions_rules and _ASSERTIONS_AVAILABLE:
+                    assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
+                    assertion_failed = any(not a.get('passed') for a in assertion_results)
+
                 return {
                     'name': api['name'],
                     'method': api['method'],
@@ -503,13 +522,15 @@ class PostmanTestExecutor:
                     'actual_request_url': actual_request_url,
                     'item_path': api.get('item_path', []),
                     'expected_status': expected_status,
-                    'status': 'PASSED',
-                    'message': response_message,
+                    'status': 'FAILED' if assertion_failed else 'PASSED',
+                    'message': ('断言失败: ' + '; '.join(a['message'] for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
                     'err_code': err_code,
                     'status_code': self.resp_status_code,
                     'folder': api.get('folder', ''),
                     'request_info': request_info,
-                    'response_info': response_info
+                    'response_info': response_info,
+                    'response_time_ms': response_time_ms,
+                    'assertion_results': assertion_results,
                 }
             else:
                 if not status_code_ok:
@@ -542,7 +563,8 @@ class PostmanTestExecutor:
                     'folder': api.get('folder', ''),
                     'db_feedback': db_feedback,
                     'request_info': request_info,
-                    'response_info': response_info
+                    'response_info': response_info,
+                    'response_time_ms': response_time_ms,
                 }
         
         except Exception as e:
@@ -573,6 +595,7 @@ class PostmanTestExecutor:
                 'status_code': None,
                 'folder': api.get('folder', ''),
                 'db_feedback': db_feedback,
+                'response_time_ms': 0,
                 'request_info': {
                     'headers': headers,
                     'params': params,
@@ -713,6 +736,14 @@ class PostmanTestReport:
         
         duration = (self.end_time - self.start_time).total_seconds()
 
+        # 响应时间统计（升级三）
+        times = [r.get('response_time_ms', 0) for r in self.results if r.get('response_time_ms', 0) > 0]
+        avg_response_ms = round(sum(times) / len(times)) if times else 0
+        max_response_ms = max(times) if times else 0
+        times_sorted = sorted(times)
+        p95_idx = max(0, int(len(times_sorted) * 0.95) - 1)
+        p95_response_ms = times_sorted[p95_idx] if times_sorted else 0
+
         summary = {
             'total': total,
             'passed': passed,
@@ -721,7 +752,10 @@ class PostmanTestReport:
             'success_rate': f"{(passed/total*100):.2f}%" if total > 0 else "0%",
             'duration': f"{duration:.2f}s",
             'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S')
+            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'avg_response_ms': avg_response_ms,
+            'max_response_ms': max_response_ms,
+            'p95_response_ms': p95_response_ms,
         }
         self._summary_cache = summary
         return dict(summary)
@@ -811,6 +845,7 @@ class PostmanTestReport:
                     'status_code': result.get('status_code'),
                     'message': result.get('message', ''),
                     'err_code': result.get('err_code', ''),
+                    'response_time_ms': result.get('response_time_ms', 0),
                 }
                 for result in self.results
             ]

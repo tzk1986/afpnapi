@@ -145,6 +145,21 @@
                     <label for="adhocBaseUrlInput">基础 URL（相对路径必填）</label>
                     <input id="adhocBaseUrlInput" type="text" placeholder="例如: https://api.example.com">
                 </div>
+                {% if environments_json != '[]' %}
+                <div class="field">
+                    <label for="adhocEnvSelect">环境（可选）</label>
+                    <select id="adhocEnvSelect" name="env_name">
+                        <option value="">-- 不使用预设环境 --</option>
+                    </select>
+                </div>
+                {% endif %}
+                {% if enable_assertions %}
+                <div class="field">
+                    <label for="adhocAssertionsInput">断言规则 JSON（可选）</label>
+                    <textarea id="adhocAssertionsInput" rows="5" placeholder='[{"path":"$.code","op":"eq","expected":0}]' style="font-family:monospace;font-size:12px;width:100%;box-sizing:border-box;"></textarea>
+                    <small>op 支持: eq / ne / gt / lt / gte / lte / exists / not_exists / contains</small>
+                </div>
+                {% endif %}
                 <div class="field">
                     <label for="adhocTokenInput">Token（可选）</label>
                     <input id="adhocTokenInput" type="text" placeholder="可选，填写后优先使用此 token">
@@ -906,6 +921,14 @@ async function startRunAdhocJob() {
         results_per_page: document.getElementById('adhocResultsPerPageInput').value.trim(),
         cases: adhocCases,
     };
+    // 升级四：附加环境名称
+    const adhocEnvSel = document.getElementById('adhocEnvSelect');
+    if (adhocEnvSel && adhocEnvSel.value) payload.env_name = adhocEnvSel.value;
+    // 升级五：附加断言规则
+    const adhocAssertionsEl = document.getElementById('adhocAssertionsInput');
+    if (adhocAssertionsEl && adhocAssertionsEl.value.trim()) {
+        try { payload.assertions_json = JSON.parse(adhocAssertionsEl.value.trim()); } catch (_) {}
+    }
 
     try {
         const response = await fetch('/api/run-ad-hoc-tests', {
@@ -984,6 +1007,26 @@ objectToRows('adhocParamsRows', {});
 renderAdhocBodyEditor(null);
 switchAdhocEditMode('form');
 renderAdhocCaseList();
+
+// 升级四：加载环境列表
+(async function loadAdhocEnvironments() {
+    const sel = document.getElementById('adhocEnvSelect');
+    if (!sel) return;
+    try {
+        const resp = await fetch('/api/environments');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const envs = data.environments || [];
+        const defaultEnv = data.default || '';
+        envs.forEach(env => {
+            const opt = document.createElement('option');
+            opt.value = env.name;
+            opt.textContent = env.name + (env.base_url ? ` (${env.base_url})` : '') + (env.has_token ? ' 🔑' : '');
+            if (env.name === defaultEnv) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    } catch (_) {}
+})();
 </script>
 </body>
 </html>

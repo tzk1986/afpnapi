@@ -29,6 +29,10 @@
         .toolbar input, .toolbar select, .toolbar button { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; }
         .toolbar button { border: none; cursor: pointer; background: #2563eb; color: #fff; }
         .toolbar button.secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+        a.btn-link { display:inline-block; text-decoration:none; cursor:pointer; border-radius:8px; padding:6px 12px; font-size:13px; }
+        a.btn-link.secondary { background:#fff; color:#1d4ed8; border:1px solid #93c5fd; }
+        a.btn-link.secondary:hover { background:#eff6ff; }
+        td.num-td { text-align:right; font-variant-numeric:tabular-nums; }
         button.secondary {
             background: #fff;
             color: #1d4ed8;
@@ -375,6 +379,11 @@
                 <div class="summary-card"><div class="label">错误</div><div class="value" id="sum-error">{{ summary.error }}</div></div>
                 <div class="summary-card"><div class="label">成功率</div><div class="value" id="sum-rate">{{ summary.success_rate }}</div></div>
                 <div class="summary-card"><div class="label">耗时</div><div class="value">{{ summary.duration }}</div></div>
+                {% if enable_response_time %}
+                <div class="summary-card"><div class="label">平均响应(ms)</div><div class="value" id="sum-avg-ms">{{ summary.avg_response_ms | default('-') }}</div></div>
+                <div class="summary-card"><div class="label">最大响应(ms)</div><div class="value" id="sum-max-ms">{{ summary.max_response_ms | default('-') }}</div></div>
+                <div class="summary-card"><div class="label">P95响应(ms)</div><div class="value" id="sum-p95-ms">{{ summary.p95_response_ms | default('-') }}</div></div>
+                {% endif %}
             </div>
         </section>
 
@@ -404,6 +413,13 @@
                 <button onclick="applySearchFilters()">查询</button>
                 <button class="secondary" onclick="resetFilters()">重置</button>
                 <button class="secondary" onclick="exportLatestCollection()">导出最新 JSON</button>
+                {% if enable_retry_failures %}
+                <button class="secondary" id="retryFailuresBtn" onclick="retryFailures()" style="display:none">🔄 重试失败接口</button>
+                <button class="secondary" id="retryAllBtn" onclick="retryAll()">🔁 重试全部接口</button>
+                {% endif %}
+                {% if enable_junit_export %}
+                <a id="junitExportLink" class="btn-link secondary" href="/api/export-junit/{{ report_name }}" download>导出 JUnit XML</a>
+                {% endif %}
                 <label class="hint" style="display:flex;align-items:center;gap:6px;">
                     <input id="includeAuthExport" type="checkbox" style="width:14px;height:14px;" {% if report_export_include_auth_default %}checked{% endif %}>
                     导出包含 token/authorization
@@ -463,6 +479,9 @@ const REPORT_VIEW_PAGE_SIZE_DEFAULT = {{ report_view_page_size_default }};
 const REPORT_EXPORT_DEFAULT_SCOPE = {{ report_export_default_scope|tojson }};
 const ENABLE_MANUAL_CASES = {{ enable_manual_cases|tojson }};
 const MANUAL_CASE_FOLDER_NAME = {{ manual_case_folder_name|tojson }};
+const ENABLE_RETRY_FAILURES = {{ enable_retry_failures|tojson }};
+const ENABLE_JUNIT_EXPORT = {{ enable_junit_export|tojson }};
+const ENABLE_RESPONSE_TIME = {{ enable_response_time|tojson }};
 let currentDetailData = null;
 let currentDetailIndex = null;
 let currentResultsPage = 1;
@@ -487,6 +506,7 @@ const REPORT_TABLE_COLGROUP = `
         <col style="width:60px">
         <col>
         <col style="width:120px">
+        {% if enable_response_time %}<col style="width:70px">{% endif %}
         <col style="width:180px">
     </colgroup>
 `;
@@ -1773,6 +1793,7 @@ function renderResults(data) {
             <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
             <td class="msg-td tooltip-target ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" data-tooltip="${escapeHtml(item.message || '-') }" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
             <td class="errcode-td tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
+            {% if enable_response_time %}<td class="num-td">${item.response_time_ms > 0 ? item.response_time_ms : '-'}</td>{% endif %}
             <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button>${excludeBtn}</td>
         </tr>
     `}).join('');
@@ -1791,6 +1812,7 @@ function renderResults(data) {
                         <th>状态码</th>
                         <th>结果说明</th>
                         <th>errCode</th>
+                        {% if enable_response_time %}<th>耗时(ms)</th>{% endif %}
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -3572,6 +3594,7 @@ function renderManualCases() {
                 <td>${item.status_code === null || item.status_code === undefined ? '-' : escapeHtml(String(item.status_code))}</td>
                 <td class="msg-td tooltip-target" data-tooltip="${escapeHtml(item.message || '-')}">${escapeHtml(item.message || '-')}</td>
                 <td class="tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
+                {% if enable_response_time %}<td class="num-td">${item.response_time_ms > 0 ? item.response_time_ms : '-'}</td>{% endif %}
                 <td class="td-op">
                     <button class="btn-compact" data-mc-action="detail" data-mc-id="${encodedCaseId}">详情</button>
                     <button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" data-mc-action="toggle-exclude" data-mc-key="${encodeURIComponent(exclusionKey)}" data-mc-excluded="${excluded ? 'true' : 'false'}" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>
@@ -3595,6 +3618,7 @@ function renderManualCases() {
                         <th>状态码</th>
                         <th>结果说明</th>
                         <th>errCode</th>
+                        {% if enable_response_time %}<th>耗时(ms)</th>{% endif %}
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -3924,6 +3948,71 @@ function resetFilters() {
     renderManualCases();
 }
 
+// 升级二：重试失败接口
+async function retryFailures() {
+    const btn = document.getElementById('retryFailuresBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 提交中…'; }
+    try {
+        const resp = await fetch('/api/retry-failures', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            alert('重试失败：' + (data.error || resp.status));
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 重试失败接口'; }
+            return;
+        }
+        if (confirm(`已创建重试任务（共 ${data.retry_count} 个接口），job_id: ${data.job_id}。\n点击确定前往首页查看进度。`)) {
+            window.location.href = '/';
+        } else {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 重试失败接口'; }
+        }
+    } catch (err) {
+        alert('请求出错：' + err);
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 重试失败接口'; }
+    }
+}
+
+// 升级二：根据失败/错误数量显示重试按钮
+function updateRetryBtn(failedCount) {
+    const btn = document.getElementById('retryFailuresBtn');
+    if (!btn) return;
+    if (failedCount > 0) {
+        btn.style.display = '';
+        btn.textContent = `🔄 重试失败接口 (${failedCount})`;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+async function retryAll() {
+    const btn = document.getElementById('retryAllBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 提交中…'; }
+    try {
+        const resp = await fetch('/api/retry-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_name: reportName }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            alert('全量重试失败：' + (data.error || resp.status));
+            if (btn) { btn.disabled = false; btn.textContent = '🔁 重试全部接口'; }
+            return;
+        }
+        if (confirm(`已创建全量重试任务（共 ${data.retry_count} 个接口），job_id: ${data.job_id}。\n点击确定前往首页查看进度。`)) {
+            window.location.href = '/';
+        } else {
+            if (btn) { btn.disabled = false; btn.textContent = '🔁 重试全部接口'; }
+        }
+    } catch (err) {
+        alert('请求出错：' + err);
+        if (btn) { btn.disabled = false; btn.textContent = '🔁 重试全部接口'; }
+    }
+}
+
 async function exportLatestCollection() {
     try {
         const includeAuth = document.getElementById('includeAuthExport').checked;
@@ -4010,6 +4099,8 @@ if (document.getElementById('exportScopeSelect')) {
 reloadResults(1);
 reloadManualCases();
 initCustomTooltip();
+// 升级二：根据初始摘要数据显示重试按钮
+updateRetryBtn({{ (summary.failed | default(0)) + (summary.error | default(0)) }});
 </script>
 </body>
 </html>
