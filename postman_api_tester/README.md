@@ -1,10 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.2.0
-发布日期：2026-05-08
+版本：v1.2.1
+发布日期：2026-05-09
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
 本版新增重点：响应时间记录与展示（每接口耗时 + avg/max/p95 统计）、一键重试全部失败用例、多环境配置切换、JSONPath 断言规则（需 `ENABLE_ASSERTIONS=true`）、JUnit XML 报告导出（CI/CD 集成）、首页报告列表筛选增强（状态/通过率/日期范围）；并保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力完全兼容。
+
+v1.2.1 实施补充：已落地 1.1（断点恢复/部分成功报告/断言严格模式）与 1.3（报告列表摘要懒加载/结果分块渲染/流式导出接口）；同时新增导出通道三态策略（`auto` / `legacy` / `stream`）与阈值自动分流，默认配置下保持旧行为兼容。
 
 关联文档：
 
@@ -117,7 +119,10 @@ pip install -r requirements.txt
 - `ENABLE_ADHOC_RUN`：是否启用首页“新增接口测试”独立页面入口
 - `ADHOC_MAX_ITEMS`：单次 ad-hoc 任务允许录入的最大接口数
 - `ADHOC_DEFAULT_COLLECTION_NAME`：ad-hoc 临时任务默认集合名称
-- `REPORT_EXPORT_DEFAULT_SCOPE`：报告导出默认范围（`full` / `report_only`）- `ENABLE_RESPONSE_TIME`：是否记录并展示每接口响应时间（默认 `True`）
+- `REPORT_EXPORT_DEFAULT_SCOPE`：报告导出默认范围（`full` / `report_only`）
+- `REPORT_EXPORT_CHANNEL_MODE`：导出通道模式（`auto` / `legacy` / `stream`）
+- `REPORT_EXPORT_STREAM_THRESHOLD`：自动分流阈值（总接口数 >= 阈值时优先走流式）
+- `ENABLE_RESPONSE_TIME`：是否记录并展示每接口响应时间（默认 `True`）
 - `ENABLE_RETRY_FAILURES`：是否在报告页启用"一键重试失败用例"按钮（默认 `True`）
 - `ENABLE_JUNIT_EXPORT`：是否启用 JUnit XML 导出链接（默认 `True`）
 - `ENABLE_REPORT_LIST_FILTER`：是否启用首页报告列表筛选面板（默认 `True`）
@@ -125,6 +130,10 @@ pip install -r requirements.txt
 - `ASSERTIONS_ENGINE`：断言引擎类型（默认 `jsonpath`）
 - `ENVIRONMENTS`：多环境配置字典（键为环境名，值为 `{base_url, token}`），通过环境变量 `ENVIRONMENTS_JSON` 注入 JSON
 - `DEFAULT_ENV_NAME`：默认激活的环境名称
+- `ENABLE_CHECKPOINT_RECOVERY`：是否启用断点恢复（默认 `False`）
+- `CHECKPOINT_FLUSH_EVERY_N`：每执行 N 条写入一次 checkpoint（默认 `1`）
+- `CHECKPOINT_DIR`：checkpoint 目录（空则默认 `reports/checkpoints`）
+- `ENABLE_ASSERTION_STRICT_MODE`：断言引擎异常是否严格判定为失败（默认 `False`）
 示例：
 
 ```python
@@ -220,7 +229,10 @@ python report_server.py
 - `原始 HTML`：打开生成时的原始静态报告。
 - `查看元数据`：查看当前报告的结构化摘要与结果索引。
 - `导出最新 JSON`：支持按全量导出或仅导出“本次报告涉及接口”。
-- `导出范围选择`：`full` 适合完整回归；`report_only` 适合最小复现。本次报告已覆盖全量时，两者导出内容可能一致，页面会提示“范围等价”。- `一键重试失败用例`：报告页工具栏点击"重试失败用例"，后端自动重跑所有 FAILED/ERROR 接口并生成新报告，无需手动重新上传集合。
+- `导出范围选择`：`full` 适合完整回归；`report_only` 适合最小复现。本次报告已覆盖全量时，两者导出内容可能一致，页面会提示“范围等价”。
+- `一键重试失败用例`：报告页工具栏点击"重试失败用例"，后端自动重跑所有 FAILED/ERROR 接口并生成新报告，无需手动重新上传集合。
+- `导出通道策略`：支持 `auto` / `legacy` / `stream` 三态。`auto` 按阈值自动分流（大报告优先流式），流式失败会自动回退旧接口；`legacy` 强制旧接口；`stream` 强制流式接口。
+- `一键重试失败用例`：报告页工具栏点击"重试失败用例"，后端自动重跑所有 FAILED/ERROR 接口并生成新报告，无需手动重新上传集合。
 - `JUnit XML 导出`：报告页工具栏提供"导出 JUnit XML"链接，下载 JUnit 格式报告，可接入 Jenkins/GitLab CI 等 CI/CD 管线展示测试结果。
 - `响应时间展示`：数据视图结果列表新增"耗时(ms)"列，底部汇总区显示 avg/max/p95 响应时间。
 - `首页列表筛选`：首页报告列表支持按通过状态、最低通过率、日期范围快速筛选，一键重置。

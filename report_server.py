@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 import requests
-from flask import Flask, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, Response, jsonify, make_response, redirect, render_template, request, send_from_directory, stream_with_context, url_for
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,6 +80,10 @@ if REPORT_EXPORT_DEFAULT_SCOPE not in {"full", "report_only"}:
     REPORT_EXPORT_DEFAULT_SCOPE = "full"
 REPORT_EXPORT_ALLOW_REPORT_ONLY = _cfg_bool("REPORT_EXPORT_ALLOW_REPORT_ONLY", True)
 REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _cfg_bool("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", False)
+REPORT_EXPORT_CHANNEL_MODE = _cfg_str("REPORT_EXPORT_CHANNEL_MODE", "auto").lower() or "auto"
+if REPORT_EXPORT_CHANNEL_MODE not in {"auto", "legacy", "stream"}:
+    REPORT_EXPORT_CHANNEL_MODE = "auto"
+REPORT_EXPORT_STREAM_THRESHOLD = max(1, _cfg_int("REPORT_EXPORT_STREAM_THRESHOLD", 800))
 ENABLE_MANUAL_CASES = _cfg_bool("ENABLE_MANUAL_CASES", True)
 MANUAL_CASE_FOLDER_NAME = _cfg_str("MANUAL_CASE_FOLDER_NAME", "人工补录") or "人工补录"
 ENABLE_ADHOC_RUN = _cfg_bool("ENABLE_ADHOC_RUN", True)
@@ -165,7 +169,23 @@ def find_report(report_name: str) -> Dict[str, Any]:
         list_reports()
         reports_by_name = _REPORTS_CACHE.get("by_name")
     if reports_by_name and report_name in reports_by_name:
-        return reports_by_name[report_name]
+        report = reports_by_name[report_name]
+        if bool(report.get("_summary_only")):
+            meta_file = str(report.get("meta_file") or "").strip()
+            if not meta_file:
+                raise FileNotFoundError(report_name)
+            meta_path = REPORTS_DIR / meta_file
+            full_report = load_report_meta(meta_path, include_results=True)
+            full_report["meta_file"] = meta_file
+            _REPORTS_CACHE["by_name"][report_name] = full_report
+            cached_data = _REPORTS_CACHE.get("data") or []
+            for index, item in enumerate(cached_data):
+                if str(item.get("report_name") or "") == report_name:
+                    cached_data[index] = full_report
+                    break
+            _REPORTS_CACHE["data"] = cached_data
+            return full_report
+        return report
     raise FileNotFoundError(report_name)
 
 def _invalidate_reports_cache() -> None:
@@ -201,7 +221,7 @@ def list_reports() -> List[Dict[str, Any]]:
 
     for meta_path in report_meta_files():
         try:
-            report = load_report_meta(meta_path)
+            report = load_report_meta(meta_path, include_results=False)
             report["meta_file"] = meta_path.name
             reports.append(report)
             seen_report_names.add(report.get("report_name"))
@@ -215,6 +235,7 @@ def list_reports() -> List[Dict[str, Any]]:
                 "summary": {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"},
                 "load_error": str(exc),
                 "results": [],
+                "_summary_only": True,
             })
 
     for html_path in legacy_postman_html_files():
@@ -1161,12 +1182,89 @@ def report_meta_files() -> List[Path]:
         return []
     return [path for path in sorted(REPORTS_DIR.glob("*_meta.json"), reverse=True) if is_total_report_file(path)]
 
-def load_report_meta(meta_path: Path) -> Dict[str, Any]:
+def _extract_json_value(text: str) -> Any:
+    text = text.strip().rstrip(",")
+    return json.loads(text)
+
+
+def _load_report_meta_summary(meta_path: Path) -> Dict[str, Any]:
+    data: Dict[str, Any] = {
+        "report_name": meta_path.name.replace("_meta.json", ".html"),
+        "generated_at": "",
+        "host_name": "",
+        "collection_name": "",
+        "source_file": "",
+        "source_original_file": "",
+        "summary": {},
+        "results": [],
+        "_summary_only": True,
+    }
+    summary: Dict[str, Any] = {}
+    in_summary = False
+    summary_keys = {
+        "total", "passed", "failed", "error", "success_rate", "duration", "start_time", "end_time",
+        "avg_response_ms", "max_response_ms", "p95_response_ms",
+    }
+
     with meta_path.open("r", encoding="utf-8") as file:
-        data = json.load(file)
-    if "summary" not in data:
-        data["summary"] = {}
+        for raw_line in file:
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith('"results"'):
+                break
+            if not in_summary and line.startswith('"summary"') and line.endswith("{"):
+                in_summary = True
+                continue
+            if in_summary and line.startswith("}"):
+                in_summary = False
+                continue
+
+            match = re.match(r'^"(?P<key>[^"]+)"\s*:\s*(?P<value>.+)$', line)
+            if not match:
+                continue
+            key = str(match.group("key") or "")
+            value_text = str(match.group("value") or "")
+
+            try:
+                value = _extract_json_value(value_text)
+            except Exception:
+                continue
+
+            if in_summary:
+                if key in summary_keys:
+                    summary[key] = value
+                continue
+
+            if key in {"report_name", "generated_at", "host_name", "collection_name", "source_file", "source_original_file", "details_file", "base_url", "execution_mode", "interrupted", "interrupt_reason", "assertion_strict_mode"}:
+                data[key] = value
+
+    if not summary:
+        summary = {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"}
+    data["summary"] = summary
     return data
+
+
+def load_report_meta(meta_path: Path, include_results: bool = True) -> Dict[str, Any]:
+    if include_results:
+        with meta_path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+        if "summary" not in data:
+            data["summary"] = {}
+        data["_summary_only"] = False
+        return data
+
+    try:
+        return _load_report_meta_summary(meta_path)
+    except Exception:
+        # 兜底：若轻量解析失败，退回标准解析并丢弃 results，保持接口可用。
+        with meta_path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+        if "summary" not in data:
+            data["summary"] = {}
+        data["results"] = []
+        data["_summary_only"] = True
+        return data
 
 def legacy_postman_html_files() -> List[Path]:
     if not REPORTS_DIR.exists():
@@ -2291,6 +2389,8 @@ def report_view():
         report_export_default_scope=REPORT_EXPORT_DEFAULT_SCOPE,
         report_export_allow_report_only=REPORT_EXPORT_ALLOW_REPORT_ONLY,
         report_export_include_auth_default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT,
+        report_export_channel_mode=REPORT_EXPORT_CHANNEL_MODE,
+        report_export_stream_threshold=REPORT_EXPORT_STREAM_THRESHOLD,
         enable_manual_cases=ENABLE_MANUAL_CASES,
         manual_case_folder_name=MANUAL_CASE_FOLDER_NAME,
         template_updated_at=template_updated_at,
@@ -2397,6 +2497,51 @@ def api_export_collection():
         "report_only_count": exported["report_only_count"],
         "warnings": exported["warnings"],
     })
+
+
+@app.route("/api/export-collection-stream", methods=["POST"])
+def api_export_collection_stream():
+    payload = request.get_json(silent=True) or {}
+    report_name = str(payload.get("report_name", "")).strip()
+    include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
+    export_scope = str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower() or REPORT_EXPORT_DEFAULT_SCOPE
+    if export_scope not in {"full", "report_only"}:
+        export_scope = REPORT_EXPORT_DEFAULT_SCOPE
+    if export_scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
+        export_scope = "full"
+    if not report_name:
+        return jsonify({"error": "report_name 不能为空"}), 400
+
+    try:
+        report = find_report(report_name)
+    except FileNotFoundError:
+        return jsonify({"error": f"报告不存在: {report_name}"}), 404
+
+    try:
+        exported = export_collection_with_latest_params(
+            report,
+            include_auth=include_auth,
+            export_scope=export_scope,
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    export_path = Path(str(exported.get("file_path") or ""))
+    if not export_path.exists():
+        return jsonify({"error": "导出文件不存在，无法进行流式下载"}), 500
+
+    def generate_chunks():
+        with export_path.open("rb") as file:
+            while True:
+                chunk = file.read(64 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+
+    response = Response(stream_with_context(generate_chunks()), mimetype="application/json")
+    response.headers["Content-Disposition"] = f"attachment; filename={exported['file_name']}"
+    response.headers["X-Export-Scope"] = str(exported.get("export_scope") or "full")
+    return response
 
 
 @app.route("/api/report-meta/<path:report_name>")

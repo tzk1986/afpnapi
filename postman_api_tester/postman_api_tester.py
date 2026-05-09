@@ -32,6 +32,7 @@ import os
 import socket
 import sys
 import time as _time_mod
+import hashlib
 from typing import Dict, List, Any, Optional, Callable, Tuple
 from datetime import datetime
 import re
@@ -65,6 +66,62 @@ def _normalize_url_and_params(raw_url: str, params: Optional[Dict[str, Any]]) ->
         clean_url = url_text
 
     return clean_url, merged_params
+
+
+def _item_path_text(path: Any) -> str:
+    if not isinstance(path, list):
+        return ""
+    if not all(isinstance(index, int) and index >= 0 for index in path):
+        return ""
+    return ".".join(str(index) for index in path)
+
+
+def _compute_collection_fingerprint(postman_file: str, base_url: str, selected_item_paths: Optional[List[List[int]]]) -> str:
+    hasher = hashlib.sha256()
+    with open(postman_file, "rb") as file:
+        while True:
+            chunk = file.read(1024 * 1024)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    hasher.update((base_url or "").encode("utf-8"))
+    hasher.update(json.dumps(selected_item_paths or [], ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    return hasher.hexdigest()
+
+
+def _checkpoint_file_path(output_dir: str, postman_file: str, fingerprint: str, checkpoint_dir: str = "") -> str:
+    if checkpoint_dir:
+        base_dir = checkpoint_dir
+    else:
+        base_dir = os.path.join(output_dir, "checkpoints")
+    os.makedirs(base_dir, exist_ok=True)
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(postman_file))[0]).strip("._") or "collection"
+    return os.path.join(base_dir, f"{stem}_{fingerprint[:16]}.checkpoint.json")
+
+
+def _load_checkpoint(path: str) -> Optional[Dict[str, Any]]:
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    executed = data.get("executed_item_paths")
+    if not isinstance(executed, list):
+        return None
+    if not all(isinstance(item, str) for item in executed):
+        return None
+    return data
+
+
+def _save_checkpoint_atomic(path: str, data: Dict[str, Any]) -> None:
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)
 
 
 class PostmanApiParser:
@@ -391,7 +448,14 @@ class PostmanTestExecutor:
         ),
     ]
 
-    def __init__(self, api_config: Dict, auth_token: str = None, session=None, request_timeout: Optional[Tuple[int, int]] = None):
+    def __init__(
+        self,
+        api_config: Dict,
+        auth_token: str = None,
+        session=None,
+        request_timeout: Optional[Tuple[int, int]] = None,
+        assertion_strict_mode: bool = False,
+    ):
         """
         初始化执行器
         :param api_config: API配置信息
@@ -411,6 +475,7 @@ class PostmanTestExecutor:
         # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
         self._auth_token: Optional[str] = auth_token or None
         self.request_timeout: Tuple[int, int] = request_timeout or (10, 30)
+        self.assertion_strict_mode = bool(assertion_strict_mode)
 
     def start(self):
         """测试前准备"""
@@ -510,10 +575,21 @@ class PostmanTestExecutor:
                 # 升级五：断言校验
                 assertion_results: List[Dict] = []
                 assertion_failed = False
+                assertion_engine_error = ""
                 assertions_rules = api.get('x_assertions') or []
                 if assertions_rules and _ASSERTIONS_AVAILABLE:
-                    assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
-                    assertion_failed = any(not a.get('passed') for a in assertion_results)
+                    try:
+                        assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
+                        assertion_failed = any(not a.get('passed') for a in assertion_results)
+                    except Exception as assertion_exc:
+                        assertion_engine_error = str(assertion_exc)
+                        logger.exception("断言引擎执行异常: %s", assertion_exc)
+                        if self.assertion_strict_mode:
+                            assertion_failed = True
+                            assertion_results = [{
+                                'passed': False,
+                                'message': f'断言引擎异常: {assertion_engine_error}',
+                            }]
 
                 return {
                     'name': api['name'],
@@ -531,6 +607,7 @@ class PostmanTestExecutor:
                     'response_info': response_info,
                     'response_time_ms': response_time_ms,
                     'assertion_results': assertion_results,
+                    'assertion_engine_error': assertion_engine_error,
                 }
             else:
                 if not status_code_ok:
@@ -565,6 +642,7 @@ class PostmanTestExecutor:
                     'request_info': request_info,
                     'response_info': response_info,
                     'response_time_ms': response_time_ms,
+                    'assertion_engine_error': '',
                 }
         
         except Exception as e:
@@ -604,7 +682,8 @@ class PostmanTestExecutor:
                 'response_info': {
                     'headers': {},
                     'body': str(e)
-                }
+                },
+                'assertion_engine_error': '',
             }
         finally:
             # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
@@ -701,6 +780,10 @@ class PostmanTestReport:
         self.generated_report_file = ""
         self.generated_details_file = ""
         self.generated_meta_file = ""
+        self.execution_mode = "full"
+        self.interrupted = False
+        self.interrupt_reason = ""
+        self.assertion_strict_mode = False
         self._summary_cache: Optional[Dict[str, Any]] = None
     
     def add_result(self, result: Dict):
@@ -824,6 +907,10 @@ class PostmanTestReport:
             'source_file': self.source_file,
             'source_original_file': self.source_original_file,
             'base_url': self.base_url,
+            'execution_mode': self.execution_mode,
+            'interrupted': bool(self.interrupted),
+            'interrupt_reason': self.interrupt_reason,
+            'assertion_strict_mode': bool(self.assertion_strict_mode),
             'summary': summary,
             'details_file': os.path.basename(details_file),
             'results': [
@@ -1733,6 +1820,11 @@ def run_postman_tests(
     :return: 测试报告对象
     """
     
+    enable_checkpoint_recovery = False
+    checkpoint_flush_every_n = 1
+    checkpoint_dir = ""
+    assertion_strict_mode = False
+
     # 从配置文件读取默认值
     try:
         from postman_api_tester import config as _cfg
@@ -1742,6 +1834,10 @@ def run_postman_tests(
             base_url = _cfg.BASE_URL.strip() or None
         if output_dir is None and getattr(_cfg, 'REPORT_OUTPUT_DIR', ''):
             output_dir = _cfg.REPORT_OUTPUT_DIR.strip() or None
+        enable_checkpoint_recovery = bool(getattr(_cfg, 'ENABLE_CHECKPOINT_RECOVERY', False))
+        checkpoint_flush_every_n = max(1, int(getattr(_cfg, 'CHECKPOINT_FLUSH_EVERY_N', 1)))
+        checkpoint_dir = str(getattr(_cfg, 'CHECKPOINT_DIR', '') or '').strip()
+        assertion_strict_mode = bool(getattr(_cfg, 'ENABLE_ASSERTION_STRICT_MODE', False))
     except Exception:
         pass
 
@@ -1787,9 +1883,41 @@ def run_postman_tests(
         for api in apis:
             api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
     
+    selected_total_count = len(apis)
+    apis_before_recovery = list(apis)
     logger.info("成功加载 %d 个API接口，基础URL: %s", len(apis), parser.base_url)
     if selected_path_set is not None:
         logger.info("本次执行范围：已选接口 %d / 全量 %d", len(apis), total_apis_count)
+
+    checkpoint_path = ""
+    collection_fingerprint = ""
+    executed_item_paths: set = set()
+    if enable_checkpoint_recovery:
+        try:
+            collection_fingerprint = _compute_collection_fingerprint(postman_file, parser.base_url, selected_item_paths)
+            checkpoint_path = _checkpoint_file_path(output_dir, postman_file, collection_fingerprint, checkpoint_dir=checkpoint_dir)
+            checkpoint = _load_checkpoint(checkpoint_path)
+            if checkpoint:
+                fingerprint_match = str(checkpoint.get("collection_fingerprint") or "") == collection_fingerprint
+                base_url_match = str(checkpoint.get("base_url") or "") == str(parser.base_url or "")
+                if fingerprint_match and base_url_match:
+                    executed_item_paths = set(checkpoint.get("executed_item_paths") or [])
+                    if executed_item_paths:
+                        original_count = len(apis)
+                        apis = [
+                            api for api in apis
+                            if _item_path_text(api.get("item_path")) not in executed_item_paths
+                        ]
+                        logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
+                        if not apis:
+                            # 防止生成空报告：若 checkpoint 覆盖全部接口，则回退为全量执行。
+                            logger.info("checkpoint 覆盖全部接口，本次回退为全量执行以保持报告可读性。")
+                            apis = list(apis_before_recovery)
+                            executed_item_paths = set()
+                else:
+                    logger.warning("检测到 checkpoint 与当前集合不匹配，已忽略恢复数据。")
+        except Exception as exc:
+            logger.warning("初始化 checkpoint 失败，已降级为普通执行: %s", exc)
 
     if progress_callback:
         try:
@@ -1825,6 +1953,7 @@ def run_postman_tests(
     report.source_file = os.path.abspath(postman_file)
     report.source_original_file = str(source_original_file or '').strip()
     report.base_url = parser.base_url
+    report.assertion_strict_mode = assertion_strict_mode
     
     # 执行测试 —— 所有 API 共享同一 Session，避免每次建立新 TCP 连接
     import requests as _requests_mod
@@ -1835,14 +1964,45 @@ def run_postman_tests(
         request_timeout = (int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', 10)), int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', 30)))
     except Exception:
         request_timeout = (10, 30)
+
+    execution_error: Optional[Exception] = None
+    completed_count = 0
+
+    def _flush_checkpoint(completed: bool, last_error: str = "") -> None:
+        if not (enable_checkpoint_recovery and checkpoint_path):
+            return
+        payload = {
+            "collection_fingerprint": collection_fingerprint,
+            "base_url": str(parser.base_url or ""),
+            "selected_total_count": selected_total_count,
+            "executed_item_paths": sorted(executed_item_paths),
+            "completed": bool(completed),
+            "last_error": str(last_error or ""),
+            "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        }
+        _save_checkpoint_atomic(checkpoint_path, payload)
+
     try:
         for idx, api in enumerate(apis, 1):
             logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
             
-            executor = PostmanTestExecutor(api, auth_token=resolved_token, session=_shared_session, request_timeout=request_timeout)
+            executor = PostmanTestExecutor(
+                api,
+                auth_token=resolved_token,
+                session=_shared_session,
+                request_timeout=request_timeout,
+                assertion_strict_mode=assertion_strict_mode,
+            )
             executor.start()
             result = executor.execute_test()
             report.add_result(result)
+            completed_count = idx
+
+            item_path_key = _item_path_text(api.get("item_path"))
+            if item_path_key:
+                executed_item_paths.add(item_path_key)
+            if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
+                _flush_checkpoint(completed=False)
             
             _log = logger.info if result['status'] == 'PASSED' else logger.warning
             _log("[%d/%d] %s %s → %s", idx, len(apis), api['method'], api['name'], result['status'])
@@ -1862,8 +2022,35 @@ def run_postman_tests(
                     })
                 except Exception:
                     pass
+    except Exception as exc:
+        execution_error = exc
+        logger.exception("执行过程中发生中断异常，将输出部分成功报告: %s", exc)
     finally:
         _shared_session.close()
+
+    if enable_checkpoint_recovery:
+        try:
+            _flush_checkpoint(completed=(execution_error is None), last_error=str(execution_error or ""))
+        except Exception as exc:
+            logger.warning("写入 checkpoint 失败: %s", exc)
+
+    report.execution_mode = 'partial' if execution_error is not None else 'full'
+    report.interrupted = execution_error is not None
+    report.interrupt_reason = str(execution_error or '')
+
+    if progress_callback:
+        try:
+            progress_callback({
+                'stage': 'finished' if execution_error is None else 'partial',
+                'total': len(apis),
+                'total_all': total_apis_count,
+                'completed': completed_count,
+                'percent': int(completed_count * 100 / len(apis)) if len(apis) > 0 else 100,
+                'message': '执行完成' if execution_error is None else f'执行中断，已生成部分报告: {execution_error}',
+            })
+        except Exception:
+            pass
+
     print("\n生成测试报告...")
     summary = report.generate_summary()
     
@@ -1888,6 +2075,8 @@ def run_postman_tests(
     report.generate_html_report(report_file, results_per_page=results_per_page)
     logger.info("HTML报告已保存: %s", report_file)
     logger.info("报告元数据已保存: %s", report.generated_meta_file)
+    if execution_error is not None:
+        logger.warning("本次报告为部分成功报告，原因: %s", execution_error)
     
     # 打印控制台报告
     report.print_console_report()

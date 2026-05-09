@@ -477,6 +477,8 @@
 const reportName = {{ report_name_json|safe }};
 const REPORT_VIEW_PAGE_SIZE_DEFAULT = {{ report_view_page_size_default }};
 const REPORT_EXPORT_DEFAULT_SCOPE = {{ report_export_default_scope|tojson }};
+const REPORT_EXPORT_CHANNEL_MODE = {{ report_export_channel_mode | default('auto') | tojson }};
+const REPORT_EXPORT_STREAM_THRESHOLD = {{ report_export_stream_threshold | default(800) }};
 const ENABLE_MANUAL_CASES = {{ enable_manual_cases|tojson }};
 const MANUAL_CASE_FOLDER_NAME = {{ manual_case_folder_name|tojson }};
 const ENABLE_RETRY_FAILURES = {{ enable_retry_failures|tojson }};
@@ -1776,7 +1778,10 @@ function renderResults(data) {
         return;
     }
 
-    const rows = data.items.map((item) => {
+    const VIRTUAL_RENDER_THRESHOLD = 80;
+    const RENDER_CHUNK_SIZE = 30;
+
+    function buildResultRow(item) {
         const exKey = encodeURIComponent(item.exclusion_key || '');
         const excluded = Boolean(item.excluded);
         const rowTooltip = excluded ? '已排除（导出时会忽略）' : '';
@@ -1796,7 +1801,8 @@ function renderResults(data) {
             {% if enable_response_time %}<td class="num-td">${item.response_time_ms > 0 ? item.response_time_ms : '-'}</td>{% endif %}
             <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button>${excludeBtn}</td>
         </tr>
-    `}).join('');
+    `;
+    }
 
     document.getElementById('resultTableContainer').innerHTML = `
         <div class="table-scroll">
@@ -1816,10 +1822,28 @@ function renderResults(data) {
                         <th>操作</th>
                     </tr>
                 </thead>
-                <tbody>${rows}</tbody>
+                <tbody id="resultRowsBody"></tbody>
             </table>
         </div>
     `;
+
+    const rowsBody = document.getElementById('resultRowsBody');
+    if (data.items.length <= VIRTUAL_RENDER_THRESHOLD) {
+        rowsBody.innerHTML = data.items.map((item) => buildResultRow(item)).join('');
+    } else {
+        const queue = data.items.slice();
+        const appendChunk = () => {
+            if (!queue.length) {
+                return;
+            }
+            const chunk = queue.splice(0, RENDER_CHUNK_SIZE);
+            rowsBody.insertAdjacentHTML('beforeend', chunk.map((item) => buildResultRow(item)).join(''));
+            if (queue.length) {
+                window.requestAnimationFrame(appendChunk);
+            }
+        };
+        appendChunk();
+    }
 
     document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条，当前每页 ${data.page_size} 条`;
     renderPagination(data.page, data.total_pages);
@@ -4014,13 +4038,48 @@ async function retryAll() {
 }
 
 async function exportLatestCollection() {
+    const includeAuth = document.getElementById('includeAuthExport').checked;
+    const exportScope = (document.getElementById('exportScopeSelect')?.value || REPORT_EXPORT_DEFAULT_SCOPE || 'full');
+    const payload = { report_name: reportName, include_auth: includeAuth, export_scope: exportScope };
+    const totalText = document.getElementById('sum-total')?.textContent || '0';
+    const summaryTotal = Number.parseInt(String(totalText).replace(/[^\d]/g, ''), 10) || 0;
+    const threshold = Number(REPORT_EXPORT_STREAM_THRESHOLD || 800);
+    const channelMode = String(REPORT_EXPORT_CHANNEL_MODE || 'auto').toLowerCase();
+
+    if (channelMode === 'legacy') {
+        await exportLatestCollectionLegacy(payload, summaryTotal, threshold, false, channelMode);
+        return;
+    }
+
+    if (channelMode === 'stream') {
+        try {
+            await exportLatestCollectionStream(payload, summaryTotal, threshold, channelMode);
+        } catch (streamErr) {
+            alert('导出失败: ' + (streamErr.message || streamErr));
+        }
+        return;
+    }
+
+    const shouldUseStream = summaryTotal >= threshold;
+
+    if (shouldUseStream) {
+        try {
+            await exportLatestCollectionStream(payload, summaryTotal, threshold, channelMode);
+            return;
+        } catch (streamErr) {
+            console.warn('Stream export failed, fallback to legacy endpoint:', streamErr);
+        }
+    }
+
+    await exportLatestCollectionLegacy(payload, summaryTotal, threshold, shouldUseStream, channelMode);
+}
+
+async function exportLatestCollectionLegacy(payload, summaryTotal, threshold, streamAttempted, channelMode) {
     try {
-        const includeAuth = document.getElementById('includeAuthExport').checked;
-        const exportScope = (document.getElementById('exportScopeSelect')?.value || REPORT_EXPORT_DEFAULT_SCOPE || 'full');
         const response = await fetch('/api/export-collection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ report_name: reportName, include_auth: includeAuth, export_scope: exportScope })
+            body: JSON.stringify(payload)
         });
         const data = await response.json();
         if (!response.ok) {
@@ -4037,8 +4096,12 @@ async function exportLatestCollection() {
             ? `\n提示: 当前源集合共 ${data.source_total_count || 0} 个接口，与本次报告接口一致，因此 report_only 与 full 导出内容相同。`
             : '';
         const composeText = `原执行更新 ${data.updated_count} + 人工用例 ${data.manual_case_exported_count || 0}（配置 ${data.manual_case_count || 0}）- 排除 ${data.excluded_count || 0}`;
+        let routeHint = `\n导出通道: 旧接口（模式 ${channelMode}，阈值 ${threshold}，当前总数 ${summaryTotal}）`;
+        if (channelMode === 'auto' && streamAttempted) {
+            routeHint = `\n导出通道: 流式失败后自动回退旧接口（模式 auto，阈值 ${threshold}，当前总数 ${summaryTotal}）`;
+        }
         alert(
-            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n组成: ${composeText}\n跳过接口: ${data.skipped_count}${scopeDiffHint}${warningText}`
+            `导出完成！\n文件: ${data.file_name}\n导出范围: ${scopeText}\n包含认证头: ${data.include_auth ? '是' : '否'}\n组成: ${composeText}\n跳过接口: ${data.skipped_count}${routeHint}${scopeDiffHint}${warningText}`
         );
         if (data.warnings && data.warnings.length) {
             console.warn('Export warnings:', data.warnings);
@@ -4049,6 +4112,55 @@ async function exportLatestCollection() {
     } catch (error) {
         alert('导出失败: ' + (error.message || error));
     }
+}
+
+function getDownloadFileNameFromDisposition(disposition, fallbackName = 'export_collection.json') {
+    if (!disposition) {
+        return fallbackName;
+    }
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match && utf8Match[1]) {
+        return decodeURIComponent(utf8Match[1]);
+    }
+    const asciiMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    if (asciiMatch && asciiMatch[1]) {
+        return asciiMatch[1];
+    }
+    return fallbackName;
+}
+
+async function exportLatestCollectionStream(payload, summaryTotal, threshold, channelMode) {
+    const response = await fetch('/api/export-collection-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        let msg = `流式导出失败: HTTP ${response.status}`;
+        try {
+            const errData = await response.json();
+            msg = errData.error || msg;
+        } catch (_err) {
+            // ignore json parse error and keep default message
+        }
+        throw new Error(msg);
+    }
+
+    const contentDisposition = response.headers.get('Content-Disposition') || '';
+    const fileName = getDownloadFileNameFromDisposition(contentDisposition, `${reportName || 'export'}_latest.json`);
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    const scopeText = payload.export_scope === 'report_only' ? '仅本次报告接口' : '全量集合';
+    alert(`导出完成！\n文件: ${fileName}\n导出范围: ${scopeText}\n包含认证头: ${payload.include_auth ? '是' : '否'}\n导出通道: 流式接口（模式 ${channelMode}，阈值 ${threshold}，当前总数 ${summaryTotal}）`);
 }
 
 document.getElementById('queryInput').addEventListener('keydown', (event) => {

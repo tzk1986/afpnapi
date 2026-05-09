@@ -76,6 +76,20 @@ COLLECTION_PREVIEW_MAX_ITEMS = int(os.environ.get("COLLECTION_PREVIEW_MAX_ITEMS"
 # REPORT_EXPORT_DEFAULT_SCOPE: full | report_only
 # REPORT_EXPORT_ALLOW_REPORT_ONLY: 是否允许“仅导出本次报告接口”
 # REPORT_EXPORT_INCLUDE_AUTH_DEFAULT: 导出时是否默认包含认证头
+# REPORT_EXPORT_CHANNEL_MODE: 导出通道模式（auto | legacy | stream）
+# REPORT_EXPORT_STREAM_THRESHOLD: 导出自动分流阈值（按报告总接口数判断，>= 阈值走流式导出）
+# 示例（保持当前推荐默认）：
+# REPORT_EXPORT_DEFAULT_SCOPE = "full"
+# REPORT_EXPORT_ALLOW_REPORT_ONLY = True
+# REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = False
+# REPORT_EXPORT_CHANNEL_MODE = "auto"
+# REPORT_EXPORT_STREAM_THRESHOLD = 800
+# 示例（仅用于排障临时策略）：
+# REPORT_EXPORT_DEFAULT_SCOPE = "report_only"
+# REPORT_EXPORT_ALLOW_REPORT_ONLY = True
+# REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = True
+# REPORT_EXPORT_CHANNEL_MODE = "stream"
+# REPORT_EXPORT_STREAM_THRESHOLD = 300
 # ============================================================== 
 REPORT_EXPORT_DEFAULT_SCOPE = str(os.environ.get("REPORT_EXPORT_DEFAULT_SCOPE", "full")).strip().lower() or "full"
 REPORT_EXPORT_ALLOW_REPORT_ONLY = str(os.environ.get("REPORT_EXPORT_ALLOW_REPORT_ONLY", "true")).strip().lower() in {
@@ -84,6 +98,10 @@ REPORT_EXPORT_ALLOW_REPORT_ONLY = str(os.environ.get("REPORT_EXPORT_ALLOW_REPORT
 REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = str(os.environ.get("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", "false")).strip().lower() in {
 	"1", "true", "yes", "y", "on"
 }
+REPORT_EXPORT_CHANNEL_MODE = str(os.environ.get("REPORT_EXPORT_CHANNEL_MODE", "auto")).strip().lower() or "auto"
+if REPORT_EXPORT_CHANNEL_MODE not in {"auto", "legacy", "stream"}:
+    REPORT_EXPORT_CHANNEL_MODE = "auto"
+REPORT_EXPORT_STREAM_THRESHOLD = max(1, int(os.environ.get("REPORT_EXPORT_STREAM_THRESHOLD", "800")))
 
 # ==============================================================
 # 人工用例管理配置
@@ -155,6 +173,32 @@ ENABLE_ASSERTIONS = str(os.environ.get("ENABLE_ASSERTIONS", "false")).strip().lo
     "1", "true", "yes", "y", "on"
 }
 ASSERTIONS_ENGINE = str(os.environ.get("ASSERTIONS_ENGINE", "jsonpath")).strip() or "jsonpath"
+
+# ==============================================================
+# 1.1 错误恢复与容错
+# ENABLE_CHECKPOINT_RECOVERY: 是否启用断点恢复（默认 false，保持 v1.2.0 行为）
+# CHECKPOINT_FLUSH_EVERY_N: 每执行多少条接口写一次 checkpoint（最小 1）
+# CHECKPOINT_DIR: checkpoint 文件目录（为空则默认 reports/checkpoints）
+# ENABLE_ASSERTION_STRICT_MODE: 断言引擎异常是否按 FAILED 处理
+# 示例（保持兼容模式）：
+# ENABLE_CHECKPOINT_RECOVERY = False
+# CHECKPOINT_FLUSH_EVERY_N = 1
+# CHECKPOINT_DIR = ""
+# ENABLE_ASSERTION_STRICT_MODE = False
+# 示例（大集合长跑任务推荐）：
+# ENABLE_CHECKPOINT_RECOVERY = True
+# CHECKPOINT_FLUSH_EVERY_N = 5
+# CHECKPOINT_DIR = r"D:\\api-test-reports\\checkpoints"
+# ENABLE_ASSERTION_STRICT_MODE = True
+# ============================================================== 
+ENABLE_CHECKPOINT_RECOVERY = str(os.environ.get("ENABLE_CHECKPOINT_RECOVERY", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+CHECKPOINT_FLUSH_EVERY_N = max(1, int(os.environ.get("CHECKPOINT_FLUSH_EVERY_N", "1")))
+CHECKPOINT_DIR = str(os.environ.get("CHECKPOINT_DIR", "")).strip()
+ENABLE_ASSERTION_STRICT_MODE = str(os.environ.get("ENABLE_ASSERTION_STRICT_MODE", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
 
 # ==============================================================
 # 升级七：JUnit XML 报告导出
