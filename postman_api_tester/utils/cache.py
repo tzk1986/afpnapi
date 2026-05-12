@@ -1,17 +1,8 @@
-"""Cache utility implementations."""
+"""Compatibility cache helpers.
 
-from typing import Any, MutableMapping, Optional
+Real cache invalidation logic is centralized in report_repository.
+"""
 
-
-def reset_reports_cache(cache: MutableMapping[str, Any]) -> None:
-	cache["data"] = None
-	cache["by_name"] = None
-	cache["ts"] = 0.0
-
-
-def invalidate_reports_cache(cache: Optional[MutableMapping[str, Any]] = None) -> None:
-	if cache is None:
-		return
-	reset_reports_cache(cache)
+from postman_api_tester.report_repository import invalidate_reports_cache  # noqa: F401
 
 __all__ = ["invalidate_reports_cache"]

@@ -1,51 +1,14 @@
-from seldom.utils import cache
+"""Compatibility config hook module.
 
+Legacy implementation moved to tools/legacy_scripts/confrun_legacy.py.
+"""
 
-def start_run():
-    """
-    Test the hook function before running
-    """
-    cache.clear()
-
-
-def base_url():
-    """
-    http test
-    api base url
-    """
-    return "https://httpbin.org"
-
-
-def title():
-    """
-    setting report title
-    """
-    return "seldom接口自动化测试演示用例"
-
-
-def tester():
-    """
-    setting report tester
-    """
-    return "虫师"
-
-
-def description():
-    """
-    setting report description
-    """
-    return ["windows 11"]
-
-
-def debug():
-    """
-    debug mod
-    """
-    return False
-
-
-def rerun():
-    """
-    error/failure rerun times
-    """
-    return 2
+from tools.legacy_scripts.confrun_legacy import (  # noqa: F401
+    base_url,
+    debug,
+    description,
+    rerun,
+    start_run,
+    tester,
+    title,
+)
