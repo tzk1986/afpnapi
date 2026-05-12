@@ -54,7 +54,8 @@ def set_report_result_judgement(
 
         old_status = str(old_result.get("status") or "")
         old_message = str(old_result.get("message") or "")
-        manual_judgement = old_result.get("manual_judgement") if isinstance(old_result.get("manual_judgement"), dict) else {}
+        manual_judgement_value = old_result.get("manual_judgement")
+        manual_judgement: Dict[str, Any] = manual_judgement_value if isinstance(manual_judgement_value, dict) else {}
 
         if action == "override":
             updated_result = {

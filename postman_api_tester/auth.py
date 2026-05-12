@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, Optional, Sequence, TypedDict
 
 import requests
 
@@ -44,7 +44,7 @@ def _extract_token_from_payload(response_data: Any) -> Optional[str]:
 
 
 def get_auth_token(
-    apis: List[ApiLoginCandidate],
+    apis: Sequence[ApiLoginCandidate],
     base_url: str,
     *,
     session: Optional[SessionLike] = None,

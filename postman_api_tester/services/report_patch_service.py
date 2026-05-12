@@ -43,7 +43,8 @@ def patch_report_result(
         old_result = dict(results[result_index])
         old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
         retry_history = old_history + [old_result]
-        old_judgement = old_result.get("manual_judgement") if isinstance(old_result.get("manual_judgement"), dict) else {}
+        old_judgement_value = old_result.get("manual_judgement")
+        old_judgement: Dict[str, Any] = old_judgement_value if isinstance(old_judgement_value, dict) else {}
         manual_judgement = {
             **old_judgement,
             "active": False,

@@ -2,3 +2,4 @@ seldom==3.10.0
 flask==2.3.3
 requests==2.31.0
 jsonpath-ng>=1.5.3
+mypy>=1.10.0,<2.0.0

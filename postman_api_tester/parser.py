@@ -49,18 +49,18 @@ class ApiConfig(TypedDict, total=False):
 class PostmanApiParser:
     """Postman接口文件解析器"""
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str) -> None:
         """
         初始化解析器
         :param file_path: Postman导出的JSON文件路径
         """
         self.file_path = file_path
-        self.data = None
+        self.data: Dict[str, Any] = {}
         self.base_url = ""
-        self.collections = []
+        self.collections: List[ApiConfig] = []
         self.load_file()
 
-    def load_file(self):
+    def load_file(self) -> None:
         """加载并解析Postman文件"""
         if not os.path.exists(self.file_path):
             raise ParseError(f"文件不存在: {self.file_path}")

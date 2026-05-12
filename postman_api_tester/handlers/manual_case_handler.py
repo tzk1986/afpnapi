@@ -12,7 +12,12 @@ from postman_api_tester.services.report_manual_case_service import (
 )
 
 
-def list_manual_cases(report_name, report, default_folder, enabled):
+def list_manual_cases(
+    report_name: str,
+    report: Dict[str, Any],
+    default_folder: str,
+    enabled: bool,
+) -> Dict[str, Any]:
     return build_manual_cases_payload(
         report_name=report_name,
         report=report,

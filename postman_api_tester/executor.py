@@ -19,7 +19,8 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, TypedDict, Union
+from postman_api_tester.session import RequestTimeout
 
 try:
     from postman_api_tester.assertions import evaluate_assertions as _evaluate_assertions
@@ -60,7 +61,7 @@ class RequestInfo(TypedDict, total=False):
     """请求信息记录"""
     headers: Dict[str, str]
     params: Dict[str, Any]
-    body: Optional[Union[str, Dict]]
+    body: Optional[Union[str, Dict[str, Any]]]
 
 
 class ResponseInfo(TypedDict, total=False):
@@ -74,12 +75,12 @@ class PostmanTestExecutor:
 
     def __init__(
         self,
-        api_config: Dict,
-        auth_token: str = None,
-        session=None,
-        request_timeout: Optional[Tuple[int, int]] = None,
+        api_config: Mapping[str, Any],
+        auth_token: Optional[str] = None,
+        session: Any = None,
+        request_timeout: Optional[RequestTimeout] = None,
         assertion_strict_mode: bool = False,
-    ):
+    ) -> None:
         """
         初始化执行器
         :param api_config: API配置信息
@@ -89,7 +90,7 @@ class PostmanTestExecutor:
         :param request_timeout: 请求超时配置（connect_timeout, read_timeout）
         """
         import requests as _requests_mod
-        self.api_config = api_config
+        self.api_config = dict(api_config)
         self.http_response = None
         self.resp_status_code = None
         self.response_data = None
@@ -212,13 +213,13 @@ class PostmanTestExecutor:
             expected_status = api.get('expected_status', 200)
 
             # 准备请求和响应详情
-            request_info = {
+            request_info: RequestInfo = {
                 'headers': headers,
                 'params': params,
                 'body': body
             }
 
-            response_info = {
+            response_info: ResponseInfo = {
                 'headers': dict(response.headers),
                 'body': self.response_data
             }
@@ -229,7 +230,7 @@ class PostmanTestExecutor:
 
             if status_code_ok and message_ok:
                 # 升级五：断言校验
-                assertion_results: List[Dict] = []
+                assertion_results: List[Dict[str, Any]] = []
                 assertion_failed = False
                 assertion_engine_error = ""
                 assertions_rules = api.get('x_assertions') or []

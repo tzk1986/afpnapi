@@ -10,6 +10,7 @@ import socket
 import sys
 import webbrowser
 from pathlib import Path
+from typing import Optional
 
 # 获取项目根目录（脚本所在目录的父目录）
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -32,7 +33,7 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
-def main():
+def main() -> None:
     """主函数"""
     print("\n" + "="*80)
     print("Postman API 快速测试工具".center(80))
@@ -66,7 +67,7 @@ def main():
             print("✗ 请输入有效的数字")
     
     # 可选：输入基础URL
-    base_url = input("\n请输入基础URL (可选，按回车跳过): ").strip()
+    base_url: Optional[str] = input("\n请输入基础URL (可选，按回车跳过): ").strip()
     if not base_url:
         base_url = None
 

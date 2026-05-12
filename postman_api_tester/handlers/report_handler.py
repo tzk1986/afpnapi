@@ -162,7 +162,7 @@ def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str
     }
 
 
-def build_report_results_payload(*args, **kwargs):
+def build_report_results_payload(*args: Any, **kwargs: Any) -> Dict[str, Any]:
     return _build_report_results_payload(*args, **kwargs)
 
 __all__ = [

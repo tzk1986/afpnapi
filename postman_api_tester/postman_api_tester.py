@@ -23,8 +23,8 @@ from postman_api_tester.runtime_utils import (
 )
 from postman_api_tester.exceptions import ValidationError
 from postman_api_tester.auth import get_auth_token
-from postman_api_tester.parser import PostmanApiParser
-from postman_api_tester.executor import PostmanTestExecutor
+from postman_api_tester.parser import ApiConfig, PostmanApiParser
+from postman_api_tester.executor import PostmanTestExecutor, TestResultRecord
 from postman_api_tester.utils.security import sanitize_headers
 from postman_api_tester.session import SessionLike, RequestTimeout, create_shared_session, close_session, normalize_timeout, resolve_request_timeout
 
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 class PostmanTestReport:
     """Postman 测试报告生成器。"""
     
-    def __init__(self):
-        self.results = []
+    def __init__(self) -> None:
+        self.results: List[TestResultRecord] = []
         self.start_time = datetime.now()
-        self.end_time = None
+        self.end_time: Optional[datetime] = None
         self.collection_name = ""
         self.source_file = ""
         self.source_original_file = ""
@@ -50,17 +50,17 @@ class PostmanTestReport:
         self.assertion_strict_mode = False
         self._summary_cache: Optional[Dict[str, Any]] = None
     
-    def add_result(self, result: Dict):
+    def add_result(self, result: TestResultRecord) -> None:
         """添加单条测试结果。"""
         self.results.append(result)
         self._summary_cache = None
     
-    def add_results(self, results: List[Dict]):
+    def add_results(self, results: List[TestResultRecord]) -> None:
         """批量添加测试结果。"""
         self.results.extend(results)
         self._summary_cache = None
     
-    def generate_summary(self) -> Dict:
+    def generate_summary(self) -> Dict[str, Any]:
         """生成测试摘要。"""
         if self._summary_cache is not None:
             return dict(self._summary_cache)
@@ -173,14 +173,14 @@ class PostmanTestReport:
             options.append(f'<option value="{value}"{selected}>{value}鏉?/option>')
         return '\n                    '.join(options)
 
-    def _get_page_window(self, page: int, results_per_page: int) -> Tuple[int, int, List[Dict[str, Any]]]:
+    def _get_page_window(self, page: int, results_per_page: int) -> Tuple[int, int, List[TestResultRecord]]:
         """返回分页窗口和当前页结果。"""
         start_idx = (page - 1) * results_per_page
         end_idx = min(page * results_per_page, len(self.results))
         page_results = self.results[start_idx:end_idx]
         return start_idx, end_idx, page_results
 
-    def _build_page_table_rows(self, page_results: List[Dict[str, Any]], start_idx: int) -> str:
+    def _build_page_table_rows(self, page_results: List[TestResultRecord], start_idx: int) -> str:
         """构建分页报告表格行。"""
         table_rows = ""
         for idx, result in enumerate(page_results):
@@ -210,7 +210,7 @@ class PostmanTestReport:
 """
         return table_rows
     
-    def generate_html_report(self, output_path: str, results_per_page: int = 30):
+    def generate_html_report(self, output_path: str, results_per_page: int = 30) -> None:
         """生成 HTML 报告。"""
         summary = self.generate_summary()
         output_dir = os.path.dirname(output_path) if os.path.dirname(output_path) else '.'
@@ -246,7 +246,7 @@ class PostmanTestReport:
         self.generated_details_file = details_file
         self.generated_meta_file = meta_file
 
-    def _build_report_metadata(self, summary: Dict, output_path: str, details_file: str) -> Dict[str, Any]:
+    def _build_report_metadata(self, summary: Dict[str, Any], output_path: str, details_file: str) -> Dict[str, Any]:
         """鏋勫缓鍘嗗彶鎶ュ憡鍜屽樊寮傛瘮瀵规墍闇€鐨勭粨鏋勫寲鍏冩暟鎹€"""
         return {
             'report_name': os.path.basename(output_path),
@@ -1090,7 +1090,7 @@ class PostmanTestReport:
 </html>
 """
     
-    def print_console_report(self):
+    def print_console_report(self) -> None:
         """鍦ㄦ帶鍒跺彴杈撳嚭娴嬭瘯鎶ュ憡"""
         summary = self.generate_summary()
         
@@ -1125,17 +1125,25 @@ def _resolve_runtime_config(
     assertion_strict_mode = False
 
     try:
-        from postman_api_tester import config as _cfg
-        if token is None and getattr(_cfg, 'TOKEN', ''):
-            token = _cfg.TOKEN.strip() or None
-        if base_url is None and getattr(_cfg, 'BASE_URL', ''):
-            base_url = _cfg.BASE_URL.strip() or None
-        if output_dir is None and getattr(_cfg, 'REPORT_OUTPUT_DIR', ''):
-            output_dir = _cfg.REPORT_OUTPUT_DIR.strip() or None
-        enable_checkpoint_recovery = bool(getattr(_cfg, 'ENABLE_CHECKPOINT_RECOVERY', False))
-        checkpoint_flush_every_n = max(1, int(getattr(_cfg, 'CHECKPOINT_FLUSH_EVERY_N', 1)))
-        checkpoint_dir = str(getattr(_cfg, 'CHECKPOINT_DIR', '') or '').strip()
-        assertion_strict_mode = bool(getattr(_cfg, 'ENABLE_ASSERTION_STRICT_MODE', False))
+        from postman_api_tester import config as _cfg_module
+        cfg: Any = _cfg_module
+
+        cfg_token = str(getattr(cfg, 'TOKEN', '') or '').strip()
+        if token is None and cfg_token:
+            token = cfg_token
+
+        cfg_base_url = str(getattr(cfg, 'BASE_URL', '') or '').strip()
+        if base_url is None and cfg_base_url:
+            base_url = cfg_base_url
+
+        cfg_output_dir = str(getattr(cfg, 'REPORT_OUTPUT_DIR', '') or '').strip()
+        if output_dir is None and cfg_output_dir:
+            output_dir = cfg_output_dir
+
+        enable_checkpoint_recovery = bool(getattr(cfg, 'ENABLE_CHECKPOINT_RECOVERY', False))
+        checkpoint_flush_every_n = max(1, int(getattr(cfg, 'CHECKPOINT_FLUSH_EVERY_N', 1)))
+        checkpoint_dir = str(getattr(cfg, 'CHECKPOINT_DIR', '') or '').strip()
+        assertion_strict_mode = bool(getattr(cfg, 'ENABLE_ASSERTION_STRICT_MODE', False))
     except Exception:
         pass
 
@@ -1166,9 +1174,9 @@ def _validate_base_url(base_url: Optional[str]) -> None:
 
 
 def _filter_selected_apis(
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     selected_item_paths: Optional[List[List[int]]],
-) -> Tuple[List[Dict[str, Any]], Optional[set]]:
+) -> Tuple[List[ApiConfig], Optional[set[tuple[int, ...]]]]:
     selected_path_set: Optional[set] = None
     if selected_item_paths:
         normalized_paths = []
@@ -1197,9 +1205,9 @@ def _prepare_checkpoint_recovery(
     postman_file: str,
     parser_base_url: str,
     selected_item_paths: Optional[List[List[int]]],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     checkpoint_dir: str,
-) -> Tuple[str, str, set, List[Dict[str, Any]]]:
+) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path = ""
     collection_fingerprint = ""
     executed_item_paths: set = set()
@@ -1231,7 +1239,7 @@ def _prepare_checkpoint_recovery(
     return checkpoint_path, collection_fingerprint, executed_item_paths, apis
 
 
-def _parse_collection_apis(postman_file: str) -> Tuple[PostmanApiParser, List[Dict[str, Any]], int]:
+def _parse_collection_apis(postman_file: str) -> Tuple[PostmanApiParser, List[ApiConfig], int]:
     logger.info("开始加载 Postman 文件: %s", postman_file)
     parser = PostmanApiParser(postman_file)
     apis = parser.extract_apis()
@@ -1244,7 +1252,7 @@ def _log_execution_scope(
     current_count: int,
     total_apis_count: int,
     parser_base_url: str,
-    selected_path_set: Optional[set],
+    selected_path_set: Optional[set[tuple[int, ...]]],
 ) -> None:
     logger.info("成功加载 %d 个 API 接口，基础 URL: %s", current_count, parser_base_url)
     if selected_path_set is not None:
@@ -1258,9 +1266,9 @@ def _resolve_checkpoint_execution_apis(
     postman_file: str,
     parser_base_url: str,
     selected_item_paths: Optional[List[List[int]]],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     checkpoint_dir: str,
-) -> Tuple[str, str, set, List[Dict[str, Any]]]:
+) -> Tuple[str, str, set[str], List[ApiConfig]]:
     apis_before_recovery = list(apis)
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_recovery(
         enable_checkpoint_recovery=enable_checkpoint_recovery,
@@ -1281,7 +1289,7 @@ def _resolve_checkpoint_execution_apis(
 
 def _apply_base_url_override(
     parser: PostmanApiParser,
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     base_url: Optional[str],
 ) -> None:
     if not base_url:
@@ -1321,7 +1329,7 @@ def _emit_start_progress(
 
 def _resolve_auth_token(
     token: Optional[str],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     base_url: str,
     *,
     auth_session: SessionLike,
@@ -1340,7 +1348,7 @@ def _resolve_auth_token(
 
 def _build_runtime_context(
     token: Optional[str],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     base_url: str,
 ) -> Tuple[Optional[str], RequestTimeout, SessionLike]:
     """Build runtime context with unified timeout and shared session lifecycle."""
@@ -1383,7 +1391,7 @@ def _flush_checkpoint_state(
     collection_fingerprint: str,
     parser_base_url: str,
     selected_total_count: int,
-    executed_item_paths: set,
+    executed_item_paths: set[str],
     completed: bool,
     last_error: str = "",
 ) -> None:
@@ -1408,7 +1416,7 @@ def _finalize_checkpoint_state(
     collection_fingerprint: str,
     parser_base_url: str,
     selected_total_count: int,
-    executed_item_paths: set,
+    executed_item_paths: set[str],
     execution_error: Optional[Exception],
 ) -> None:
     if not enable_checkpoint_recovery:
@@ -1430,7 +1438,7 @@ def _finalize_checkpoint_state(
 
 def _execute_api_suite(
     *,
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     total_apis_count: int,
     report: PostmanTestReport,
     resolved_token: Optional[str],
@@ -1443,7 +1451,7 @@ def _execute_api_suite(
     collection_fingerprint: str,
     parser_base_url: str,
     selected_total_count: int,
-    executed_item_paths: set,
+    executed_item_paths: set[str],
     shared_session: SessionLike,
 ) -> Tuple[int, Optional[Exception]]:
     execution_error: Optional[Exception] = None
@@ -1461,7 +1469,7 @@ def _execute_api_suite(
                 assertion_strict_mode=assertion_strict_mode,
             )
             executor.start()
-            result = executor.execute_test()
+            result: TestResultRecord = executor.execute_test()
             report.add_result(result)
             completed_count = idx
 
@@ -1502,7 +1510,7 @@ def _execute_api_suite(
 
 def _execute_and_finalize_suite(
     *,
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     total_apis_count: int,
     report: PostmanTestReport,
     resolved_token: Optional[str],
@@ -1515,7 +1523,7 @@ def _execute_and_finalize_suite(
     collection_fingerprint: str,
     parser_base_url: str,
     selected_total_count: int,
-    executed_item_paths: set,
+    executed_item_paths: set[str],
     shared_session: SessionLike,
 ) -> Tuple[int, Optional[Exception]]:
     completed_count = 0
@@ -1555,7 +1563,7 @@ def _execute_and_finalize_suite(
 def _prepare_execution_context(
     *,
     token: Optional[str],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     parser: PostmanApiParser,
     postman_file: str,
     source_original_file: Optional[str],
@@ -1582,7 +1590,7 @@ def _prepare_execution_apis(
     postman_file: str,
     selected_item_paths: Optional[List[List[int]]],
     base_url: Optional[str],
-) -> Tuple[PostmanApiParser, List[Dict[str, Any]], int, int]:
+) -> Tuple[PostmanApiParser, List[ApiConfig], int, int]:
     parser, apis, total_apis_count = _parse_collection_apis(postman_file)
 
     apis, selected_path_set = _filter_selected_apis(apis, selected_item_paths)
@@ -1642,11 +1650,11 @@ def _prepare_checkpoint_and_progress(
     postman_file: str,
     parser_base_url: str,
     selected_item_paths: Optional[List[List[int]]],
-    apis: List[Dict[str, Any]],
+    apis: List[ApiConfig],
     checkpoint_dir: str,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]],
     total_apis_count: int,
-) -> Tuple[str, str, set, List[Dict[str, Any]]]:
+) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _resolve_checkpoint_execution_apis(
         enable_checkpoint_recovery=enable_checkpoint_recovery,
         output_dir=output_dir,
@@ -1756,11 +1764,11 @@ def _complete_report_output(
 
 def run_postman_tests(
     postman_file: str,
-    base_url: str = None,
-    output_dir: str = None,
-    token: str = None,
-    report_name: str = None,
-    source_original_file: str = None,
+    base_url: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    token: Optional[str] = None,
+    report_name: Optional[str] = None,
+    source_original_file: Optional[str] = None,
     results_per_page: int = 30,
     selected_item_paths: Optional[List[List[int]]] = None,
     progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,

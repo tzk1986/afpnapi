@@ -1,7 +1,7 @@
 import json
 import time as _time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, TypedDict
 
 from postman_api_tester.report_meta_repository import (
     legacy_postman_html_files,
@@ -14,7 +14,15 @@ from postman_api_tester.utils.file_utils import safe_report_artifact
 
 _REPORTS_DIR: Path = Path("reports").resolve()
 _REPORTS_CACHE_TTL = 30.0
-_REPORTS_CACHE = {"data": None, "by_name": None, "ts": 0.0}
+
+
+class _ReportsCache(TypedDict):
+    data: Optional[List[Dict[str, Any]]]
+    by_name: Optional[Dict[str, Dict[str, Any]]]
+    ts: float
+
+
+_REPORTS_CACHE: _ReportsCache = {"data": None, "by_name": None, "ts": 0.0}
 
 
 def configure_report_repository(reports_dir: Path, cache_ttl: float = 30.0) -> None:
@@ -112,7 +120,11 @@ def find_report(report_name: str) -> Dict[str, Any]:
             meta_path = _REPORTS_DIR / meta_file
             full_report = load_report_meta(meta_path, include_results=True)
             full_report["meta_file"] = meta_file
-            _REPORTS_CACHE["by_name"][report_name] = full_report
+            cache_by_name = _REPORTS_CACHE.get("by_name")
+            if cache_by_name is None:
+                cache_by_name = {}
+                _REPORTS_CACHE["by_name"] = cache_by_name
+            cache_by_name[report_name] = full_report
             cached_data = _REPORTS_CACHE.get("data") or []
             for index, item in enumerate(cached_data):
                 if str(item.get("report_name") or "") == report_name:
