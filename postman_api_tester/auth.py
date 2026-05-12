@@ -1,11 +1,55 @@
-from typing import Dict, List, Optional
+import logging
+from typing import Any, Dict, List, Optional, TypedDict
 
 import requests
 
 from postman_api_tester.runtime_utils import normalize_url_and_params
+from postman_api_tester.session import RequestTimeout, SessionLike, normalize_timeout
+
+logger = logging.getLogger(__name__)
 
 
-def get_auth_token(apis: List[Dict], base_url: str) -> Optional[str]:
+class ApiLoginCandidate(TypedDict, total=False):
+    name: str
+    url: str
+    full_url: str
+    method: str
+    headers: Dict[str, Any]
+    body: Any
+    params: Dict[str, Any]
+
+
+def _is_login_candidate(api: ApiLoginCandidate) -> bool:
+    name = str(api.get("name", "")).lower()
+    url = str(api.get("url", "")).lower()
+    return ("login" in name) or ("login" in url)
+
+
+def _extract_token_from_payload(response_data: Any) -> Optional[str]:
+    token_fields = ["token", "access_token", "accessToken", "auth_token", "authorization"]
+    if not isinstance(response_data, dict):
+        return None
+
+    for field in token_fields:
+        if field in response_data:
+            return response_data.get(field)
+
+    data = response_data.get("data", {})
+    if isinstance(data, dict):
+        for field in token_fields:
+            if field in data:
+                return data.get(field)
+
+    return None
+
+
+def get_auth_token(
+    apis: List[ApiLoginCandidate],
+    base_url: str,
+    *,
+    session: Optional[SessionLike] = None,
+    request_timeout: Optional[RequestTimeout] = None,
+) -> Optional[str]:
     """
     从API列表中获取认证token
 
@@ -13,55 +57,56 @@ def get_auth_token(apis: List[Dict], base_url: str) -> Optional[str]:
     :param base_url: 基础URL
     :return: 认证token，如果获取失败则返回None
     """
-    for login_api in apis:
-        if not login_api.get('name', '').lower().find('login') >= 0 and not login_api.get('url', '').lower().find('login') >= 0:
-            continue
-        raw_url = login_api.get('full_url', '') or (base_url.rstrip('/') + '/' + login_api.get('url', '').lstrip('/'))
-        method = login_api.get('method', 'POST').lower()
-        headers = login_api.get('headers', {})
-        body = login_api.get('body')
-        params = login_api.get('params', {})
-        url, params = normalize_url_and_params(raw_url, params)
-        print(f"  尝试登录: {url}")
-        try:
-            if method == 'post':
-                response = requests.post(url, json=body, params=params, headers=headers, timeout=30)
-            else:
-                response = requests.get(url, params=params, headers=headers, timeout=30)
-            if response.status_code == 200:
+    timeout = normalize_timeout(request_timeout, default=(10, 30))
+    timeout_value: Any
+    timeout_value = timeout
+    local_session = session or requests.Session()
+    owns_session = session is None
+
+    try:
+        for login_api in apis:
+            if not _is_login_candidate(login_api):
+                continue
+
+            raw_url = login_api.get('full_url', '') or (base_url.rstrip('/') + '/' + login_api.get('url', '').lstrip('/'))
+            method = str(login_api.get('method', 'POST')).lower()
+            headers = login_api.get('headers', {})
+            body = login_api.get('body')
+            params = login_api.get('params', {})
+            url, params = normalize_url_and_params(raw_url, params)
+
+            logger.info("尝试登录获取 token: %s", url)
+            try:
+                if method == 'post':
+                    response = local_session.post(url, json=body, params=params, headers=headers, timeout=timeout_value)
+                else:
+                    response = local_session.get(url, params=params, headers=headers, timeout=timeout_value)
+
+                if response.status_code != 200:
+                    logger.warning("登录请求失败，状态码: %s, url=%s", response.status_code, url)
+                    continue
+
                 try:
                     response_data = response.json()
-                    token = None
-                    token_fields = ['token', 'access_token', 'accessToken', 'auth_token', 'authorization']
+                except Exception as exc:
+                    logger.warning("解析登录响应失败: %s, url=%s", exc, url)
+                    continue
 
-                    if isinstance(response_data, dict):
-                        for field in token_fields:
-                            if field in response_data:
-                                token = response_data[field]
-                                break
+                token = _extract_token_from_payload(response_data)
+                if token:
+                    token_text = str(token)
+                    logger.info("成功获取 token: %s...", token_text[:20])
+                    return token_text
 
-                        if not token:
-                            data = response_data.get('data', {})
-                            if isinstance(data, dict):
-                                for field in token_fields:
-                                    if field in data:
-                                        token = data[field]
-                                        break
+                logger.warning("登录成功但未找到 token 字段, url=%s", url)
+            except Exception as exc:
+                logger.warning("执行登录请求失败: %s, url=%s", exc, url)
 
-                    if token:
-                        print(f"  ✓ 成功获取token: {token[:20]}...")
-                        return token
-                    else:
-                        print("  ✗ 登录成功但未找到token字段")
-                        return None
+    finally:
+        if owns_session:
+            try:
+                local_session.close()
+            except Exception:
+                pass
 
-                except Exception as e:
-                    print(f"  ✗ 解析登录响应失败: {e}")
-                    return None
-            else:
-                print(f"  ✗ 登录失败，状态码: {response.status_code}")
-                return None
-
-        except Exception as e:
-            print(f"  ✗ 执行登录请求失败: {e}")
-            return None
+    return None

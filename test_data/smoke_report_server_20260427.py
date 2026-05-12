@@ -134,6 +134,15 @@ def main() -> None:
         f"{base}/api/proxy-request", json={"url": "file:///etc/passwd", "method": "GET"}, timeout=20
     ).status_code
 
+    if out["re_request_invalid_scheme_status"] != 400:
+        raise RuntimeError(
+            f"re-request-api invalid scheme should be 400, got {out['re_request_invalid_scheme_status']}"
+        )
+    if out["proxy_invalid_scheme_status"] != 400:
+        raise RuntimeError(
+            f"api/proxy-request invalid scheme should be 400, got {out['proxy_invalid_scheme_status']}"
+        )
+
     print(json.dumps(out, ensure_ascii=False, indent=2))
 
 

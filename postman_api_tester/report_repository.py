@@ -9,7 +9,7 @@ from postman_api_tester.report_meta_repository import (
     load_report_meta,
     report_meta_files,
 )
-from postman_api_tester.report_server_utils import safe_report_artifact
+from postman_api_tester.utils.file_utils import safe_report_artifact
 
 
 _REPORTS_DIR: Path = Path("reports").resolve()
@@ -152,3 +152,4 @@ def collect_report_artifacts(report: Dict[str, Any]) -> List[Path]:
                 seen.add(resolved.name)
 
     return artifacts
+

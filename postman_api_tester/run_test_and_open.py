@@ -127,7 +127,7 @@ def main():
             import time
             
             # 启动Flask服务器
-            server_cmd = [sys.executable, str(PROJECT_ROOT / 'report_server.py')]
+            server_cmd = [sys.executable, '-m', 'postman_api_tester.report_server']
             server_process = subprocess.Popen(server_cmd, cwd=PROJECT_ROOT)
             
             # 等待服务器启动

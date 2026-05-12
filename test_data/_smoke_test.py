@@ -296,7 +296,7 @@ def test_original_name_sanitize():
 def test_run_jobs_eviction():
     print("\n── T9  RUN_JOBS 超上限清理 ──")
     import importlib
-    import report_server as srv
+    from postman_api_tester import report_job_store as srv
     importlib.reload(srv)          # 重置全局 RUN_JOBS 状态
 
     # 先填入 200 条已完成任务
@@ -304,6 +304,7 @@ def test_run_jobs_eviction():
         srv.RUN_JOBS[f"done_{i}"] = {"status": "success"}
 
     # 再写入第 201 条，应触发清理
+    srv.configure_run_jobs(200)
     srv.set_run_job("trigger_evict", status="running")
 
     _check("RUN_JOBS 长度 ≤ 200 条（已清理旧任务）",

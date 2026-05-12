@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from postman_api_tester.report_query_service import compare_report_data, filter_report_results, paginate_items
+from postman_api_tester.models import compare_report_data, filter_report_results, paginate_items
 from postman_api_tester.report_repository import load_report_details_map
 from postman_api_tester.report_server_utils import (
     manual_case_exclusion_key,

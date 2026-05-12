@@ -1,6 +1,9 @@
+﻿"""Report handler real implementations for filtering/comparison/result payloads."""
+
 from typing import Any, Dict, List, Optional
 
 from postman_api_tester.report_repository import load_report_details_map
+from postman_api_tester.services.report_results_service import build_report_results_payload as _build_report_results_payload
 from postman_api_tester.report_server_utils import (
     normalize_manual_exclusions as _normalize_manual_exclusions,
     result_exclusion_key as _result_exclusion_key,
@@ -45,12 +48,14 @@ def filter_report_results(
         if status_filter and item.get("status") != status_filter:
             continue
         if lowered_keyword:
-            search_text = " ".join([
-                str(item.get("name", "")),
-                str(item.get("url", "")),
-                str(item.get("folder", "")),
-                str(item.get("key", "")),
-            ]).lower()
+            search_text = " ".join(
+                [
+                    str(item.get("name", "")),
+                    str(item.get("url", "")),
+                    str(item.get("folder", "")),
+                    str(item.get("key", "")),
+                ]
+            ).lower()
             if lowered_keyword not in search_text:
                 continue
         if lowered_message_keyword:
@@ -61,22 +66,24 @@ def filter_report_results(
             err_code_text = str(item.get("err_code", "")).lower()
             if lowered_err_code_keyword not in err_code_text:
                 continue
-        filtered_items.append({
-            "index": index,
-            "name": item.get("name", ""),
-            "folder": item.get("folder", ""),
-            "method": item.get("method", ""),
-            "url": item.get("url", ""),
-            "status": item.get("status", ""),
-            "status_code": item.get("status_code"),
-            "message": item.get("message", ""),
-            "err_code": item.get("err_code", ""),
-            "response_time_ms": item.get("response_time_ms", 0),
-            "excluded": excluded,
-            "exclusion_key": exclusion_key,
-            "judgement_source": judgement_source,
-            "detail_available": str(index) in details_map,
-        })
+        filtered_items.append(
+            {
+                "index": index,
+                "name": item.get("name", ""),
+                "folder": item.get("folder", ""),
+                "method": item.get("method", ""),
+                "url": item.get("url", ""),
+                "status": item.get("status", ""),
+                "status_code": item.get("status_code"),
+                "message": item.get("message", ""),
+                "err_code": item.get("err_code", ""),
+                "response_time_ms": item.get("response_time_ms", 0),
+                "excluded": excluded,
+                "exclusion_key": exclusion_key,
+                "judgement_source": judgement_source,
+                "detail_available": str(index) in details_map,
+            }
+        )
     return filtered_items
 
 
@@ -95,7 +102,7 @@ def paginate_items(items: List[Dict[str, Any]], page: int, page_size: int) -> Di
     }
 
 
-def map_results(report: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+def _map_results(report: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return {item["key"]: item for item in report.get("results", [])}
 
 
@@ -107,8 +114,8 @@ def _to_rate(value: str) -> float:
 
 
 def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
-    left_map = map_results(left)
-    right_map = map_results(right)
+    left_map = _map_results(left)
+    right_map = _map_results(right)
     left_keys = set(left_map.keys())
     right_keys = set(right_map.keys())
 
@@ -121,17 +128,19 @@ def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str
         before = left_map[key]
         after = right_map[key]
         if before.get("status") != after.get("status") or before.get("status_code") != after.get("status_code"):
-            changed.append({
-                "key": key,
-                "name": after.get("name") or before.get("name"),
-                "folder": after.get("folder") or before.get("folder"),
-                "method": after.get("method") or before.get("method"),
-                "url": after.get("url") or before.get("url"),
-                "before_status": before.get("status"),
-                "after_status": after.get("status"),
-                "before_status_code": before.get("status_code"),
-                "after_status_code": after.get("status_code"),
-            })
+            changed.append(
+                {
+                    "key": key,
+                    "name": after.get("name") or before.get("name"),
+                    "folder": after.get("folder") or before.get("folder"),
+                    "method": after.get("method") or before.get("method"),
+                    "url": after.get("url") or before.get("url"),
+                    "before_status": before.get("status"),
+                    "after_status": after.get("status"),
+                    "before_status_code": before.get("status_code"),
+                    "after_status_code": after.get("status_code"),
+                }
+            )
 
     left_rate = _to_rate(left.get("summary", {}).get("success_rate", "0%"))
     right_rate = _to_rate(right.get("summary", {}).get("success_rate", "0%"))
@@ -151,3 +160,16 @@ def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str
         "removed": [left_map[key] for key in removed_keys],
         "changed": changed,
     }
+
+
+def build_report_results_payload(*args, **kwargs):
+    return _build_report_results_payload(*args, **kwargs)
+
+__all__ = [
+    "normalize_status_filter",
+    "filter_report_results",
+    "paginate_items",
+    "compare_report_data",
+    "build_report_results_payload",
+]
+

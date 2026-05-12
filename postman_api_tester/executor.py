@@ -1,7 +1,25 @@
+"""
+Postman API 测试执行模块 - 单接口执行与结果收集
+
+### 职责划分（async/sync）
+
+**同步优先（SYNC-ONLY）**：
+  - PostmanTestExecutor.execute_test() - 单接口执行（基于 requests.Session.method()）
+  - PostmanTestExecutor.set_auth_token() / get_auth_token() - 认证令牌管理
+  - PostmanTestExecutor._extract_message_and_err_code() - 响应解析
+
+**说明**：
+  所有导出接口均为**同步阻塞**操作。
+  - HTTP 请求通过 requests 库完成（同步）
+  - 断言评估与数据库反馈在同步上下文执行
+  - 支持传入外部 requests.Session 以实现连接复用与并发（由上层管理 asyncio.gather 等）
+  - 不提供原生 async/await 版本，保持简洁性
+"""
+
 import json
 import logging
 import time as _time_mod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
 
 try:
     from postman_api_tester.assertions import evaluate_assertions as _evaluate_assertions
@@ -11,8 +29,44 @@ except ImportError:
 
 from postman_api_tester.runtime_utils import normalize_url_and_params as _normalize_url_and_params
 from postman_api_tester.db_feedback import build_db_feedback
+from postman_api_tester.session import normalize_timeout
 
 logger = logging.getLogger(__name__)
+
+
+# === 类型定义 ===
+class TestResultRecord(TypedDict, total=False):
+    """单个API测试结果记录（TypedDict 便于外部消费）"""
+    name: str
+    method: str
+    url: str
+    actual_request_url: str
+    item_path: List[int]
+    folder: str
+    status: str  # 'PASSED', 'FAILED', 'ERROR'
+    message: str
+    err_code: str
+    status_code: Optional[int]
+    expected_status: int
+    response_time_ms: int
+    request_info: Dict[str, Any]
+    response_info: Dict[str, Any]
+    assertion_results: List[Dict[str, Any]]
+    assertion_engine_error: str
+    db_feedback: Dict[str, Any]
+
+
+class RequestInfo(TypedDict, total=False):
+    """请求信息记录"""
+    headers: Dict[str, str]
+    params: Dict[str, Any]
+    body: Optional[Union[str, Dict]]
+
+
+class ResponseInfo(TypedDict, total=False):
+    """响应信息记录"""
+    headers: Dict[str, str]
+    body: Union[str, Dict, Any]
 
 
 class PostmanTestExecutor:
@@ -44,14 +98,14 @@ class PostmanTestExecutor:
         self.session = session if session is not None else _requests_mod.Session()
         # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
         self._auth_token: Optional[str] = auth_token or None
-        self.request_timeout: Tuple[int, int] = request_timeout or (10, 30)
+        self.request_timeout: Tuple[int, int] = normalize_timeout(request_timeout, default=(10, 30))
         self.assertion_strict_mode = bool(assertion_strict_mode)
 
-    def start(self):
+    def start(self) -> None:
         """测试前准备"""
         pass
 
-    def set_auth_token(self, token: str):
+    def set_auth_token(self, token: str) -> None:
         """设置本实例的认证token（兼容旧调用）"""
         self._auth_token = token
 
@@ -59,8 +113,41 @@ class PostmanTestExecutor:
         """获取本实例的认证token"""
         return self._auth_token
 
-    def execute_test(self):
-        """执行单个API测试"""
+    def _build_result_base(
+        self,
+        *,
+        actual_request_url: str,
+        status: str,
+        message: str,
+        err_code: str,
+        status_code: Optional[int],
+        response_time_ms: int,
+        request_info: Optional[RequestInfo] = None,
+        response_info: Optional[ResponseInfo] = None,
+    ) -> TestResultRecord:
+        """构建统一结果边界，避免不同分支字段漂移。"""
+        api = self.api_config
+        return {
+            'name': api['name'],
+            'method': api['method'],
+            'url': api['full_url'],
+            'actual_request_url': actual_request_url,
+            'item_path': api.get('item_path', []),
+            'expected_status': api.get('expected_status', 200),
+            'status': status,
+            'message': message,
+            'err_code': err_code,
+            'status_code': status_code,
+            'folder': api.get('folder', ''),
+            'response_time_ms': response_time_ms,
+            'request_info': dict(request_info or {'headers': {}, 'params': {}, 'body': None}),
+            'response_info': dict(response_info or {'headers': {}, 'body': ''}),
+            'assertion_results': [],
+            'assertion_engine_error': '',
+        }
+
+    def execute_test(self) -> TestResultRecord:
+        """执行单个API测试，返回标准化结果记录"""
         api = self.api_config
         method = api['method'].lower()
         raw_url = api['full_url']  # 使用完整URL
@@ -87,17 +174,16 @@ class PostmanTestExecutor:
             import requests as _requests
             response_time_ms: int = 0
             if method not in {'get', 'post', 'put', 'delete', 'patch'}:
-                return {
-                    'name': api['name'],
-                    'method': api['method'],
-                    'url': raw_url,
-                    'actual_request_url': raw_url,
-                    'status': 'FAILED',
-                    'message': f'不支持的HTTP方法: {method}',
-                    'err_code': '',
-                    'status_code': None,
-                    'response_time_ms': 0,
-                }
+                return self._build_result_base(
+                    actual_request_url=raw_url,
+                    status='FAILED',
+                    message=f'不支持的HTTP方法: {method}',
+                    err_code='',
+                    status_code=None,
+                    response_time_ms=0,
+                    request_info={'headers': headers, 'params': params, 'body': body},
+                    response_info={'headers': {}, 'body': ''},
+                )
 
             request_kwargs = {
                 'params': params,
@@ -160,25 +246,19 @@ class PostmanTestExecutor:
                                 'passed': False,
                                 'message': f'断言引擎异常: {assertion_engine_error}',
                             }]
-
-                return {
-                    'name': api['name'],
-                    'method': api['method'],
-                    'url': raw_url,
-                    'actual_request_url': actual_request_url,
-                    'item_path': api.get('item_path', []),
-                    'expected_status': expected_status,
-                    'status': 'FAILED' if assertion_failed else 'PASSED',
-                    'message': ('断言失败: ' + '; '.join(a['message'] for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
-                    'err_code': err_code,
-                    'status_code': self.resp_status_code,
-                    'folder': api.get('folder', ''),
-                    'request_info': request_info,
-                    'response_info': response_info,
-                    'response_time_ms': response_time_ms,
-                    'assertion_results': assertion_results,
-                    'assertion_engine_error': assertion_engine_error,
-                }
+                result = self._build_result_base(
+                    actual_request_url=actual_request_url,
+                    status='FAILED' if assertion_failed else 'PASSED',
+                    message=('断言失败: ' + '; '.join(a['message'] for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
+                    err_code=err_code,
+                    status_code=self.resp_status_code,
+                    response_time_ms=response_time_ms,
+                    request_info=request_info,
+                    response_info=response_info,
+                )
+                result['assertion_results'] = assertion_results
+                result['assertion_engine_error'] = assertion_engine_error
+                return result
             else:
                 if not status_code_ok:
                     fail_message = f'期望状态码: {expected_status}, 实际: {self.resp_status_code}; message: {response_message}'
@@ -196,24 +276,18 @@ class PostmanTestExecutor:
                 if db_feedback.get('is_db_related'):
                     fail_message_with_hint = f"{fail_message} | 数据库反馈: {db_feedback.get('title')}"
 
-                return {
-                    'name': api['name'],
-                    'method': api['method'],
-                    'url': raw_url,
-                    'actual_request_url': actual_request_url,
-                    'item_path': api.get('item_path', []),
-                    'expected_status': expected_status,
-                    'status': 'FAILED',
-                    'message': fail_message_with_hint,
-                    'err_code': err_code,
-                    'status_code': self.resp_status_code,
-                    'folder': api.get('folder', ''),
-                    'db_feedback': db_feedback,
-                    'request_info': request_info,
-                    'response_info': response_info,
-                    'response_time_ms': response_time_ms,
-                    'assertion_engine_error': '',
-                }
+                result = self._build_result_base(
+                    actual_request_url=actual_request_url,
+                    status='FAILED',
+                    message=fail_message_with_hint,
+                    err_code=err_code,
+                    status_code=self.resp_status_code,
+                    response_time_ms=response_time_ms,
+                    request_info=request_info,
+                    response_info=response_info,
+                )
+                result['db_feedback'] = db_feedback
+                return result
 
         except Exception as e:
             import requests as _requests
@@ -230,31 +304,18 @@ class PostmanTestExecutor:
             if db_feedback.get('is_db_related'):
                 error_message = f"{error_message} | 数据库反馈: {db_feedback.get('title')}"
 
-            return {
-                'name': api['name'],
-                'method': api['method'],
-                'url': raw_url,
-                'actual_request_url': raw_url,
-                'item_path': api.get('item_path', []),
-                'expected_status': api.get('expected_status', 200),
-                'status': 'ERROR',
-                'message': error_message,
-                'err_code': '',
-                'status_code': None,
-                'folder': api.get('folder', ''),
-                'db_feedback': db_feedback,
-                'response_time_ms': 0,
-                'request_info': {
-                    'headers': headers,
-                    'params': params,
-                    'body': body
-                },
-                'response_info': {
-                    'headers': {},
-                    'body': str(e)
-                },
-                'assertion_engine_error': '',
-            }
+            result = self._build_result_base(
+                actual_request_url=raw_url,
+                status='ERROR',
+                message=error_message,
+                err_code='',
+                status_code=None,
+                response_time_ms=0,
+                request_info={'headers': headers, 'params': params, 'body': body},
+                response_info={'headers': {}, 'body': str(e)},
+            )
+            result['db_feedback'] = db_feedback
+            return result
         finally:
             # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
             if self._owns_session:

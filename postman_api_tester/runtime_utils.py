@@ -1,3 +1,24 @@
+"""
+运行时工具模块 - 提供 URL、参数、checkpoint 等工具函数
+
+### 职责划分（async/sync）
+
+**同步优先（SYNC-ONLY）**：
+  - normalize_url_and_params() - URL 与参数合并
+  - merge_url_with_params() - URL 与参数拼接
+  - item_path_text() - 项路径序列化
+  - compute_collection_fingerprint() - 集合指纹计算
+  - checkpoint_file_path() - checkpoint 路径生成
+  - load_checkpoint() - checkpoint 读取
+  - save_checkpoint() - checkpoint 保存
+
+**说明**：
+  所有导出函数均为**同步阻塞**操作。
+  - 磁盘 I/O（checkpoint 读写）采用同步模式，适合小文件场景
+  - 如需支持并发大量 checkpoint 操作，建议在上层使用 asyncio.to_thread 或线程池
+  - 不提供原生 async 版本，以保持代码简洁与一致性
+"""
+
 import hashlib
 import json
 import os

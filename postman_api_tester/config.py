@@ -215,3 +215,34 @@ ENABLE_JUNIT_EXPORT = str(os.environ.get("ENABLE_JUNIT_EXPORT", "true")).strip()
 ENABLE_REPORT_LIST_FILTER = str(os.environ.get("ENABLE_REPORT_LIST_FILTER", "true")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
+
+# ==============================================================
+# 安全脱敏配置（请求头）
+# SENSITIVE_HEADERS: 逗号分隔的敏感头列表（可扩展）
+# 说明：运行时会与内置默认值合并，避免误删关键脱敏项。
+# ==============================================================
+_DEFAULT_SENSITIVE_HEADERS = (
+    "authorization",
+    "token",
+    "access_token",
+    "auth_token",
+    "x-token",
+    "x-access-token",
+    "access-token",
+    "cookie",
+    "set-cookie",
+    "session",
+    "x-csrf-token",
+    "api-key",
+    "apikey",
+    "secret",
+)
+_SENSITIVE_HEADERS_TEXT = str(os.environ.get("SENSITIVE_HEADERS", "")).strip()
+if _SENSITIVE_HEADERS_TEXT:
+    SENSITIVE_HEADERS = tuple(
+        item.strip().lower()
+        for item in _SENSITIVE_HEADERS_TEXT.split(",")
+        if item.strip()
+    )
+else:
+    SENSITIVE_HEADERS = _DEFAULT_SENSITIVE_HEADERS

@@ -1,29 +1,6 @@
-"""
-Postman API 文件测试模块
-用于读取从APIFox/Postman导出的接口文件，动态生成并执行测试用例
+"""Postman API 测试主模块。
 
-版本: 1.0.2
-更新日志:
-- 1.0.2 (2026-04-20): 增强报告管理能力，支持历史报告索引、结构化对比与局域网访问
-    * 生成报告时同步输出 meta.json，便于历史追踪和差异比对
-    * 为报告服务端提供标准化数据源，避免只能解析 HTML
-    * 修复分页详情页对详情 JSON 的固定文件名引用
-- 1.0.1 (2026-04-16): 文档与代码整理版本
-    * 去除冗余文档与测试脚本，保留中文主文档
-    * 保持token注入兼容逻辑，修复大小写重复键风险
-    * 统一对外版本号，便于发布与追踪
-- 1.2.0 (2026-04-16): 新增自动token预获取功能，支持测试前自动登录获取认证token
-  * 自动识别登录接口（包含login关键词的POST请求）
-  * 执行登录获取token并自动添加到后续需要认证的请求中
-  * 支持常见的token字段名：token, access_token, accessToken, auth_token, authorization
-  * 避免重复执行登录测试，提高测试效率
-- 1.1.0 (2026-04-16): 优化HTML报告性能，支持分页和懒加载详情，解决大量API导致浏览器卡顿的问题
-  * 实现分页显示，每页默认30个结果，显著减少初始加载时间
-  * 详情数据存储在单独JSON文件中，通过AJAX懒加载，避免内联大量数据
-  * 索引页面仅包含分页导航，文件大小从几MB降至几KB
-  * 支持1649+个API的流畅浏览和详情查看
-  * 保持向后兼容性，可通过results_per_page参数调整分页大小
-- 1.0.0: 初始版本
+用于读取 APIFox/Postman 导出的接口文件，执行测试并生成报告。
 """
 
 import json
@@ -48,12 +25,13 @@ from postman_api_tester.exceptions import ValidationError
 from postman_api_tester.auth import get_auth_token
 from postman_api_tester.parser import PostmanApiParser
 from postman_api_tester.executor import PostmanTestExecutor
-from postman_api_tester.session import create_shared_session, close_session, resolve_request_timeout
+from postman_api_tester.utils.security import sanitize_headers
+from postman_api_tester.session import SessionLike, RequestTimeout, create_shared_session, close_session, normalize_timeout, resolve_request_timeout
 
 logger = logging.getLogger(__name__)
 
 class PostmanTestReport:
-    """Postman测试报告生成器"""
+    """Postman 测试报告生成器。"""
     
     def __init__(self):
         self.results = []
@@ -73,17 +51,17 @@ class PostmanTestReport:
         self._summary_cache: Optional[Dict[str, Any]] = None
     
     def add_result(self, result: Dict):
-        """添加测试结果"""
+        """添加单条测试结果。"""
         self.results.append(result)
         self._summary_cache = None
     
     def add_results(self, results: List[Dict]):
-        """批量添加测试结果"""
+        """批量添加测试结果。"""
         self.results.extend(results)
         self._summary_cache = None
     
     def generate_summary(self) -> Dict:
-        """生成测试摘要"""
+        """生成测试摘要。"""
         if self._summary_cache is not None:
             return dict(self._summary_cache)
 
@@ -105,7 +83,7 @@ class PostmanTestReport:
         
         duration = (self.end_time - self.start_time).total_seconds()
 
-        # 响应时间统计（升级三）
+        # 响应时间统计
         times = [r.get('response_time_ms', 0) for r in self.results if r.get('response_time_ms', 0) > 0]
         avg_response_ms = round(sum(times) / len(times)) if times else 0
         max_response_ms = max(times) if times else 0
@@ -128,63 +106,148 @@ class PostmanTestReport:
         }
         self._summary_cache = summary
         return dict(summary)
+
+    def _build_details_data(self) -> Dict[str, Dict[str, Any]]:
+        """构建详情数据并执行请求头脱敏。"""
+        details_data: Dict[str, Dict[str, Any]] = {}
+        for idx, result in enumerate(self.results):
+            req_info = result.get('request_info', {})
+            raw_req_headers = req_info.get('headers', {}) or {}
+            sanitized_headers = sanitize_headers(raw_req_headers, mask='***')
+            details_data[str(idx)] = {
+                'request_info': {**req_info, 'headers': sanitized_headers},
+                'response_info': result.get('response_info', {}),
+            }
+        return details_data
+
+    def _write_json_file(self, file_path: str, payload: Any) -> None:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+
+    def _write_text_file(self, file_path: str, content: str) -> None:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    def _write_report_pages(
+        self,
+        *,
+        base_name: str,
+        total_pages: int,
+        results_per_page: int,
+        summary: Dict,
+        details_file_name: str,
+    ) -> None:
+        for page in range(1, total_pages + 1):
+            page_content = self._generate_page_html(page, results_per_page, summary, details_file_name)
+            page_path = f"{base_name}_page_{page}.html"
+            self._write_text_file(page_path, page_content)
+
+    def _build_index_results_data(self) -> List[Dict[str, Any]]:
+        """构建首页报告表格数据（包含详情字段）。"""
+        results_data: List[Dict[str, Any]] = []
+        for result in self.results:
+            results_data.append({
+                'name': result.get('name', ''),
+                'folder': result.get('folder', ''),
+                'method': result.get('method', ''),
+                'url': result.get('url', ''),
+                'status': result.get('status', ''),
+                'status_code': result.get('status_code', ''),
+                'message': result.get('message', ''),
+                'err_code': result.get('err_code', ''),
+                'request_info': result.get('request_info', {}),
+                'response_info': result.get('response_info', {}),
+            })
+        return results_data
+
+    def _normalize_index_page_size(self, results_per_page: int) -> int:
+        """规范首页每页数量，确保与下拉选项一致。"""
+        page_size_options = {20, 30, 50, 100, 200}
+        return results_per_page if results_per_page in page_size_options else 20
+
+    def _render_page_size_options(self, selected_page_size: int) -> str:
+        option_values = [20, 30, 50, 100, 200]
+        options: List[str] = []
+        for value in option_values:
+            selected = ' selected' if value == selected_page_size else ''
+            options.append(f'<option value="{value}"{selected}>{value}鏉?/option>')
+        return '\n                    '.join(options)
+
+    def _get_page_window(self, page: int, results_per_page: int) -> Tuple[int, int, List[Dict[str, Any]]]:
+        """返回分页窗口和当前页结果。"""
+        start_idx = (page - 1) * results_per_page
+        end_idx = min(page * results_per_page, len(self.results))
+        page_results = self.results[start_idx:end_idx]
+        return start_idx, end_idx, page_results
+
+    def _build_page_table_rows(self, page_results: List[Dict[str, Any]], start_idx: int) -> str:
+        """构建分页报告表格行。"""
+        table_rows = ""
+        for idx, result in enumerate(page_results):
+            global_idx = start_idx + idx
+            status_class = f"status-{result['status'].lower()}"
+            status_lower = result['status'].lower()
+            detail_id = f"detail-{global_idx}"
+
+            table_rows += f"""
+            <tr class="result-row result-{status_lower}" data-status="{status_lower}">
+                <td><span class="expand-btn" onclick="toggleDetail('{detail_id}', {global_idx})">详情</span></td>
+                <td>{result['name']}</td>
+                <td>{result.get('folder', '-')}</td>
+                <td>{result['method']}</td>
+                <td><span class="url">{result['url']}</span></td>
+                <td><span class="{status_class}">{result['status']}</span></td>
+                <td>{result['status_code'] or '-'}</td>
+                <td><span class="detail">{result['message']}</span></td>
+            </tr>
+            <tr class="detail-row" id="{detail_id}">
+                <td colspan="8">
+                    <div class="detail-content" id="detail-content-{global_idx}">
+                        <div class="loading">加载中...</div>
+                    </div>
+                </td>
+            </tr>
+"""
+        return table_rows
     
     def generate_html_report(self, output_path: str, results_per_page: int = 30):
-        """生成HTML报告"""
+        """生成 HTML 报告。"""
         summary = self.generate_summary()
         output_dir = os.path.dirname(output_path) if os.path.dirname(output_path) else '.'
         os.makedirs(output_dir, exist_ok=True)
         
-        # 计算分页
+        # 璁＄畻鍒嗛〉
         total_results = len(self.results)
         total_pages = (total_results + results_per_page - 1) // results_per_page
+        details_data = self._build_details_data()
         
-        # 准备详情数据，过滤请求头中的敏感凭据字段
-        _SENSITIVE_HEADERS = frozenset({
-            'authorization', 'token', 'x-token', 'x-access-token', 'access-token',
-        })
-        details_data = {}
-        for idx, result in enumerate(self.results):
-            req_info = result.get('request_info', {})
-            raw_req_headers = req_info.get('headers', {}) or {}
-            sanitized_headers = {
-                k: ('***' if k.lower() in _SENSITIVE_HEADERS else v)
-                for k, v in raw_req_headers.items()
-            }
-            details_data[str(idx)] = {
-                'request_info': {**req_info, 'headers': sanitized_headers},
-                'response_info': result.get('response_info', {})
-            }
-        
-        # 保存详情JSON文件
+        # 保存详情 JSON 文件
         base_name = os.path.splitext(output_path)[0]
         details_file = f"{base_name}_details.json"
-        with open(details_file, 'w', encoding='utf-8') as f:
-            json.dump(details_data, f, indent=2, ensure_ascii=False)
+        self._write_json_file(details_file, details_data)
 
         meta_file = f"{base_name}_meta.json"
-        with open(meta_file, 'w', encoding='utf-8') as f:
-            json.dump(self._build_report_metadata(summary, output_path, details_file), f, indent=2, ensure_ascii=False)
+        self._write_json_file(meta_file, self._build_report_metadata(summary, output_path, details_file))
         
         # 生成索引页面
         index_content = self._generate_index_html(summary, total_pages, results_per_page, total_results)
-        index_path = output_path
-        with open(index_path, 'w', encoding='utf-8') as f:
-            f.write(index_content)
+        self._write_text_file(output_path, index_content)
         
         # 生成分页页面
-        for page in range(1, total_pages + 1):
-            page_content = self._generate_page_html(page, results_per_page, summary, os.path.basename(details_file))
-            page_path = f"{base_name}_page_{page}.html"
-            with open(page_path, 'w', encoding='utf-8') as f:
-                f.write(page_content)
+        self._write_report_pages(
+            base_name=base_name,
+            total_pages=total_pages,
+            results_per_page=results_per_page,
+            summary=summary,
+            details_file_name=os.path.basename(details_file),
+        )
 
         self.generated_report_file = output_path
         self.generated_details_file = details_file
         self.generated_meta_file = meta_file
 
     def _build_report_metadata(self, summary: Dict, output_path: str, details_file: str) -> Dict[str, Any]:
-        """构建历史报告和差异比对所需的结构化元数据。"""
+        """鏋勫缓鍘嗗彶鎶ュ憡鍜屽樊寮傛瘮瀵规墍闇€鐨勭粨鏋勫寲鍏冩暟鎹€"""
         return {
             'report_name': os.path.basename(output_path),
             'generated_at': summary['end_time'],
@@ -225,31 +288,19 @@ class PostmanTestReport:
         }
     
     def _generate_index_html(self, summary: Dict, total_pages: int, results_per_page: int, total_results: int) -> str:
-        """生成索引页面HTML - 支持客户端分页和每页显示条数自定义"""
-        # 准备结果数据JSON（包含详情信息）
-        results_data = []
-        for result in self.results:
-            results_data.append({
-                'name': result.get('name', ''),
-                'folder': result.get('folder', ''),
-                'method': result.get('method', ''),
-                'url': result.get('url', ''),
-                'status': result.get('status', ''),
-                'status_code': result.get('status_code', ''),
-                'message': result.get('message', ''),
-                'err_code': result.get('err_code', ''),
-                'request_info': result.get('request_info', {}),
-                'response_info': result.get('response_info', {})
-            })
-        
+        """生成索引页面 HTML，支持客户端分页与每页条数切换。"""
+        # 准备结果数据 JSON（包含详情信息）
+        results_data = self._build_index_results_data()
         results_json = json.dumps(results_data, ensure_ascii=False)
+        selected_page_size = self._normalize_index_page_size(results_per_page)
+        page_size_options_html = self._render_page_size_options(selected_page_size)
         
         return f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Postman API 测试报告</title>
+    <title>Postman API 娴嬭瘯鎶ュ憡</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }}
@@ -323,22 +374,22 @@ class PostmanTestReport:
 </head>
 <body>
     <div class="header">
-        <h1>Postman API 测试报告</h1>
-        <p>自动化接口测试结果汇总 - 优化版</p>
+        <h1>Postman API 娴嬭瘯鎶ュ憡</h1>
+        <p>鑷姩鍖栨帴鍙ｆ祴璇曠粨鏋滄眹鎬?- 浼樺寲鐗?/p>
     </div>
     
     <div class="summary">
         <div class="summary-grid">
             <div class="summary-item">
-                <label>总计</label>
+                <label>鎬昏</label>
                 <span>{summary['total']}</span>
             </div>
             <div class="summary-item passed">
-                <label>✓ 通过</label>
+                <label>√ 通过</label>
                 <span>{summary['passed']}</span>
             </div>
             <div class="summary-item failed">
-                <label>✗ 失败</label>
+                <label>× 失败</label>
                 <span>{summary['failed']}</span>
             </div>
             <div class="summary-item error">
@@ -350,7 +401,7 @@ class PostmanTestReport:
                 <span>{summary['success_rate']}</span>
             </div>
             <div class="summary-item">
-                <label>耗时</label>
+                <label>鑰楁椂</label>
                 <span>{summary['duration']}</span>
             </div>
         </div>
@@ -362,35 +413,31 @@ class PostmanTestReport:
     <div class="controls">
         <div class="control-row">
             <div class="search-item">
-                <label for="search-input">🔍 搜索:</label>
-                <input type="text" id="search-input" placeholder="输入API名称、路径、文件夹进行搜索..." onkeyup="performSearch()">
-                <button onclick="clearSearch()">清空</button>
+                <label for="search-input">搜索:</label>
+                <input type="text" id="search-input" placeholder="杈撳叆API鍚嶇О銆佽矾寰勩€佹枃浠跺す杩涜鎼滅储..." onkeyup="performSearch()">
+                <button onclick="clearSearch()">娓呯┖</button>
             </div>
         </div>
         <div class="control-row">
             <div class="token-item">
-                <label for="token-input">🔑 Token:</label>
-                <input type="text" id="token-input" placeholder="输入认证token (可选，用于重新请求接口)">
-                <button id="test-token-btn" onclick="testToken()">测试Token</button>
+                <label for="token-input">Token:</label>
+                <input type="text" id="token-input" placeholder="输入认证 token（可选，用于重新请求接口）">
+                <button id="test-token-btn" onclick="testToken()">娴嬭瘯Token</button>
             </div>
         </div>
         <div class="control-row">
             <div class="control-item">
-                <label for="page-size">每页显示:</label>
+                <label for="page-size">姣忛〉鏄剧ず:</label>
                 <select id="page-size" onchange="changePageSize()">
-                    <option value="20" selected>20条</option>
-                    <option value="30">30条</option>
-                    <option value="50">50条</option>
-                    <option value="100">100条</option>
-                    <option value="200">200条</option>
+                    {page_size_options_html}
                 </select>
             </div>
             <div class="control-item">
-                <label>状态筛选:</label>
-                <button class="filter-btn active" onclick="filterResults('all')">全部</button>
-                <button class="filter-btn" onclick="filterResults('PASSED')">✓ 成功</button>
-                <button class="filter-btn" onclick="filterResults('FAILED')">✗ 失败</button>
-                <button class="filter-btn" onclick="filterResults('ERROR')">! 错误</button>
+                <label>鐘舵€佺瓫閫?</label>
+                <button class="filter-btn active" onclick="filterResults('all', this)">全部</button>
+                <button class="filter-btn" onclick="filterResults('PASSED', this)">√ 成功</button>
+                <button class="filter-btn" onclick="filterResults('FAILED', this)">× 失败</button>
+                <button class="filter-btn" onclick="filterResults('ERROR', this)">! 错误</button>
             </div>
         </div>
     </div>
@@ -402,147 +449,105 @@ class PostmanTestReport:
     </div>
     
     <div class="pagination-section">
-        <div class="pagination-info" id="pagination-info">第 1 页 | 共 0 页 | 共 0 条数据</div>
+        <div class="pagination-info" id="pagination-info">绗?1 椤?| 鍏?{total_pages} 椤?| 鍏?{total_results} 鏉℃暟鎹?/div>
         <div class="page-buttons" id="pagination-buttons"></div>
     </div>
     
     <script>
         let allResults = {results_json};
         let filteredResults = allResults;
-        let searchResults = allResults;
         let currentPage = 1;
-        let pageSize = 20;
+        let pageSize = {selected_page_size};
         let currentFilter = 'all';
         let searchQuery = '';
         let detailCache = {{}};
         let currentToken = '';
         
-        // 初始化
+        // 鍒濆鍖?
         function init() {{
             changePageSize();
             renderTable();
         }}
         
-        // 测试Token
-        function testToken() {{
-            currentToken = document.getElementById('token-input').value.trim();
-            if (!currentToken) {{
-                alert('请输入Token');
-                return;
-            }}
-            
-            // 测试token是否有效（发送一个简单的请求）
-            alert('Token已设置: ' + currentToken.substring(0, 10) + '...\\n\\n现在可以点击"重新请求"按钮来使用此Token测试接口。');
-        }}
-        
-        // 执行搜索
+        // 鎵ц鎼滅储
         function performSearch() {{
             searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
             currentPage = 1;
             applyFilters();
         }}
         
-        // 清空搜索
+        // 娓呯┖鎼滅储
         function clearSearch() {{
             document.getElementById('search-input').value = '';
             searchQuery = '';
             currentPage = 1;
             applyFilters();
         }}
+
+        function applyStatusFilter(results) {{
+            if (currentFilter === 'all') {{
+                return results;
+            }}
+            return results.filter(r => r.status === currentFilter);
+        }}
+
+        function applySearchFilter(results) {{
+            if (!searchQuery) {{
+                return results;
+            }}
+            return results.filter(r => {{
+                const searchFields = [
+                    r.name,
+                    r.url,
+                    r.folder || '',
+                    r.method
+                ].map(f => (f || '').toLowerCase());
+                return searchFields.some(field => field.includes(searchQuery));
+            }});
+        }}
         
-        // 应用所有过滤条件
+        // 搴旂敤鎵€鏈夎繃婊ゆ潯浠?
         function applyFilters() {{
-            let results = allResults;
-            
-            // 应用状态筛选
-            if (currentFilter !== 'all') {{
-                results = results.filter(r => r.status === currentFilter);
-            }}
-            
-            // 应用搜索
-            if (searchQuery) {{
-                results = results.filter(r => {{
-                    const searchFields = [
-                        r.name,
-                        r.url,
-                        r.folder || '',
-                        r.method
-                    ].map(f => (f || '').toLowerCase());
-                    return searchFields.some(field => field.includes(searchQuery));
-                }});
-            }}
-            
-            filteredResults = results;
+            const statusFiltered = applyStatusFilter(allResults);
+            filteredResults = applySearchFilter(statusFiltered);
             renderTable();
         }}
         
-        // 改变每页显示数量
+        // 鏀瑰彉姣忛〉鏄剧ず鏁伴噺
         function changePageSize() {{
             pageSize = parseInt(document.getElementById('page-size').value);
             currentPage = 1;
             renderTable();
         }}
-        
-        // 筛选结果
-        function filterResults(status) {{
-            currentFilter = status;
-            currentPage = 1;
-            
-            // 更新按钮状态
+
+        function setActiveFilterButton(activeButton) {{
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            
-            applyFilters();
+            if (activeButton) {{
+                activeButton.classList.add('active');
+            }}
         }}
-        
-        // 渲染表格
-        function renderTable() {{
-            const totalPages = Math.ceil(filteredResults.length / pageSize);
+
+        function getCurrentPageData() {{
+            const totalPages = getTotalPages();
             const start = (currentPage - 1) * pageSize;
             const end = start + pageSize;
-            const pageData = filteredResults.slice(start, end);
-            
-            if (filteredResults.length === 0) {{
-                document.getElementById('table-container').innerHTML = '<div class="no-data">没有符合条件的数据</div>';
-                updatePagination(0, 0);
-                return;
-            }}
-            
-            let html = `
-                <table>
-                    <colgroup>
-                        <col style="width: 60px;">
-                        <col style="width: 12%;">
-                        <col style="width: 10%;">
-                        <col style="width: 60px;">
-                        <col style="width: 22%;">
-                        <col style="width: 70px;">
-                        <col style="width: 60px;">
-                        <col>
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>操作</th>
-                            <th>API名称</th>
-                            <th>文件夹</th>
-                            <th>方法</th>
-                            <th>URL</th>
-                            <th>状态</th>
-                            <th>状态码</th>
-                            <th>详情</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
+            return {{
+                totalPages,
+                start,
+                pageData: filteredResults.slice(start, end),
+            }};
+        }}
+
+        function buildResultRows(pageData, startIndex) {{
+            let html = '';
             pageData.forEach((result, idx) => {{
-                const globalIdx = allResults.indexOf(result);
+                const globalIdx = startIndex + idx;
                 const statusClass = `status-${{result.status.toLowerCase()}}`;
                 const detailId = `detail-${{globalIdx}}`;
-                
+
                 html += `
                     <tr data-result-idx="${{globalIdx}}">
-                        <td><span class="expand-btn" onclick="toggleDetail('${{detailId}}', ${{globalIdx}})">▶ 展开</span></td>
+                        <td><span class="expand-btn" onclick="toggleDetail('${{detailId}}', ${{globalIdx}}, this)">鈻?灞曞紑</span></td>
                         <td title="${{result.name}}">${{result.name}}</td>
                         <td title="${{result.folder || '-'}}">${{result.folder || '-'}}</td>
                         <td><strong>${{result.method}}</strong></td>
@@ -560,52 +565,110 @@ class PostmanTestReport:
                     </tr>
                 `;
             }});
-            
-            html += `
+            return html;
+        }}
+
+        function buildResultsTable(pageData, startIndex) {{
+            return `
+                <table>
+                    <colgroup>
+                        <col style="width: 60px;">
+                        <col style="width: 12%;">
+                        <col style="width: 10%;">
+                        <col style="width: 60px;">
+                        <col style="width: 22%;">
+                        <col style="width: 70px;">
+                        <col style="width: 60px;">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>操作</th>
+                            <th>API鍚嶇О</th>
+                            <th>鏂囦欢澶?/th>
+                            <th>鏂规硶</th>
+                            <th>URL</th>
+                            <th>鐘舵€?/th>
+                            <th>鐘舵€佺爜</th>
+                            <th>详情</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${{buildResultRows(pageData, startIndex)}}
                     </tbody>
                 </table>
             `;
+        }}
+        
+        // 绛涢€夌粨鏋?
+        function filterResults(status, activeButton) {{
+            currentFilter = status;
+            currentPage = 1;
+            setActiveFilterButton(activeButton || null);
             
-            document.getElementById('table-container').innerHTML = html;
+            applyFilters();
+        }}
+
+        function getTotalPages() {{
+            return Math.ceil(filteredResults.length / pageSize);
+        }}
+        
+        // 娓叉煋琛ㄦ牸
+        function renderTable() {{
+            const pageState = getCurrentPageData();
+            const totalPages = pageState.totalPages;
+            const startIndex = pageState.start;
+            const pageData = pageState.pageData;
+            
+            if (filteredResults.length === 0) {{
+                document.getElementById('table-container').innerHTML = '<div class="no-data">娌℃湁绗﹀悎鏉′欢鐨勬暟鎹?/div>';
+                updatePagination(0, 0);
+                return;
+            }}
+            
+            document.getElementById('table-container').innerHTML = buildResultsTable(pageData, startIndex);
             updatePagination(totalPages, filteredResults.length);
         }}
         
-        // 更新分页信息和按钮
-        function updatePagination(totalPages, totalItems) {{
-            document.getElementById('pagination-info').textContent = 
-                `第 ${{currentPage}} 页 | 共 ${{totalPages}} 页 | 共 ${{totalItems}} 条数据`;
-            
+        function buildPaginationButtons(totalPages) {{
             let buttons = '';
-            
-            // 上一页
-            buttons += `<button class="page-btn" onclick="goPage(${{currentPage - 1}})" ${{currentPage === 1 ? 'disabled' : ''}}>« 上一页</button>`;
-            
-            // 页码
+
+            // 涓婁竴椤?
+            buttons += `<button class="page-btn" onclick="goPage(${{currentPage - 1}})" ${{currentPage === 1 ? 'disabled' : ''}}>芦 涓婁竴椤?/button>`;
+
+            // 椤电爜
             const maxPages = 10;
             let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
             let endPage = Math.min(totalPages, startPage + maxPages - 1);
             startPage = Math.max(1, endPage - maxPages + 1);
-            
+
             if (startPage > 1) buttons += '<button class="page-btn" onclick="goPage(1)">1</button>';
             if (startPage > 2) buttons += '<span style="padding: 8px 5px;">...</span>';
-            
+
             for (let i = startPage; i <= endPage; i++) {{
                 const active = i === currentPage ? 'active' : '';
                 buttons += `<button class="page-btn ${{active}}" onclick="goPage(${{i}})">${{i}}</button>`;
             }}
-            
+
             if (endPage < totalPages - 1) buttons += '<span style="padding: 8px 5px;">...</span>';
             if (endPage < totalPages) buttons += `<button class="page-btn" onclick="goPage(${{totalPages}})">${{totalPages}}</button>`;
-            
-            // 下一页
-            buttons += `<button class="page-btn" onclick="goPage(${{currentPage + 1}})" ${{currentPage === totalPages ? 'disabled' : ''}}>下一页 »</button>`;
-            
-            document.getElementById('pagination-buttons').innerHTML = buttons;
+
+            // 涓嬩竴椤?
+            buttons += `<button class="page-btn" onclick="goPage(${{currentPage + 1}})" ${{currentPage === totalPages ? 'disabled' : ''}}>涓嬩竴椤?禄</button>`;
+            return buttons;
+        }}
+
+        // 鏇存柊鍒嗛〉淇℃伅鍜屾寜閽?
+        function updatePagination(totalPages, totalItems) {{
+            document.getElementById('pagination-info').textContent = 
+                `绗?${{currentPage}} 椤?| 鍏?${{totalPages}} 椤?| 鍏?${{totalItems}} 鏉℃暟鎹甡;
+
+            document.getElementById('pagination-buttons').innerHTML = buildPaginationButtons(totalPages);
         }}
         
-        // 转到指定页
+        // 杞埌鎸囧畾椤?
         function goPage(page) {{
-            const totalPages = Math.ceil(filteredResults.length / pageSize);
+            const totalPages = getTotalPages();
             if (page >= 1 && page <= totalPages) {{
                 currentPage = page;
                 renderTable();
@@ -620,32 +683,32 @@ class PostmanTestReport:
         }}
         
         // 切换详情显示
-        function toggleDetail(detailId, resultIdx) {{
+        function toggleDetail(detailId, resultIdx, triggerEl) {{
             const detailRow = document.getElementById(detailId);
-            const btn = event.target;
+            const btn = triggerEl;
             const isExpanded = detailRow.classList.contains('expanded');
             
             if (isExpanded) {{
                 detailRow.classList.remove('expanded');
-                btn.textContent = '▶ 展开';
+                btn.textContent = '鈻?灞曞紑';
             }} else {{
                 detailRow.classList.add('expanded');
-                btn.textContent = '▼ 收起';
+                btn.textContent = '鈻?鏀惰捣';
                 loadDetail(resultIdx);
             }}
         }}
         
-        // 加载详情数据（从内存中直接加载，无需AJAX）
+        // 加载详情数据（从内存直接加载，无需 AJAX）
         function loadDetail(resultIdx) {{
             const detailContent = document.getElementById(`detail-content-${{resultIdx}}`);
             
-            // 检查缓存
+            // 妫€鏌ョ紦瀛?
             if (detailCache[resultIdx]) {{
                 detailContent.innerHTML = detailCache[resultIdx];
                 return;
             }}
             
-            // 从全局结果中查找结果
+            // 从全局结果中查找目标项
             const result = allResults[resultIdx];
             if (!result) {{
                 const html = '<div class="loading">详情数据未找到</div>';
@@ -658,19 +721,19 @@ class PostmanTestReport:
                 const requestInfo = result.request_info || {{}};
                 const responseInfo = result.response_info || {{}};
                 
-                const requestHeaders = JSON.stringify(requestInfo.headers || {{}}, null, 2) || '无';
-                const requestParams = JSON.stringify(requestInfo.params || {{}}, null, 2) || '无';
-                const requestBody = typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body, null, 2) : (requestInfo.body || '无');
-                const responseBody = typeof responseInfo.body === 'object' ? JSON.stringify(responseInfo.body, null, 2) : (responseInfo.body || '无');
-                const responseHeaders = JSON.stringify(responseInfo.headers || {{}}, null, 2) || '无';
+                const requestHeaders = JSON.stringify(requestInfo.headers || {{}}, null, 2) || '鏃?;
+                const requestParams = JSON.stringify(requestInfo.params || {{}}, null, 2) || '鏃?;
+                const requestBody = typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body, null, 2) : (requestInfo.body || '鏃?);
+                const responseBody = typeof responseInfo.body === 'object' ? JSON.stringify(responseInfo.body, null, 2) : (responseInfo.body || '鏃?);
+                const responseHeaders = JSON.stringify(responseInfo.headers || {{}}, null, 2) || '鏃?;
                 
                 const html = `
                     <div style="margin-bottom: 15px; padding: 10px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;">
-                        <strong>💡 提示：</strong>如果看到"session 已经过期"错误，可以输入Token后点击"重新请求"按钮来重新测试此接口。
-                        <button onclick="reRequestApi(` + resultIdx + `)" style="margin-left: 10px; padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">🔄 重新请求</button>
+                        <strong>提示：</strong>如果看到 "session 已经过期" 错误，可输入 token 后点击“重新请求”重试该接口。
+                        <button onclick="reRequestApi(` + resultIdx + `)" style="margin-left: 10px; padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">重新请求</button>
                     </div>
                     
-                    <div class="detail-header">📤 请求信息</div>
+                    <div class="detail-header">请求信息</div>
                     <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 8px;">请求头：</div>
                     <pre>${{requestHeaders}}</pre>
                     <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 8px;">查询参数：</div>
@@ -678,7 +741,7 @@ class PostmanTestReport:
                     <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 8px;">请求体：</div>
                     <pre>${{requestBody}}</pre>
                     
-                    <div class="detail-header" style="margin-top: 15px;">📥 响应信息</div>
+                    <div class="detail-header" style="margin-top: 15px;">响应信息</div>
                     <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 8px;">响应头：</div>
                     <pre>${{responseHeaders}}</pre>
                     <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 8px;">响应体：</div>
@@ -694,22 +757,22 @@ class PostmanTestReport:
             }}
         }}
         
-        // 测试Token有效性
+        // 娴嬭瘯Token鏈夋晥鎬?
         async function testToken() {{
             const token = document.getElementById('token-input').value.trim();
             if (!token) {{
-                alert('请先输入Token！');
+                alert('璇峰厛杈撳叆Token锛?);
                 document.getElementById('token-input').focus();
                 return;
             }}
             
             const testBtn = document.getElementById('test-token-btn');
             const originalText = testBtn.textContent;
-            testBtn.textContent = '测试中...';
+            testBtn.textContent = '娴嬭瘯涓?..';
             testBtn.disabled = true;
             
             try {{
-                // 发送测试请求
+                // 鍙戦€佹祴璇曡姹?
                 const response = await fetch('/test-token', {{
                     method: 'POST',
                     headers: {{
@@ -721,18 +784,18 @@ class PostmanTestReport:
                 const result = await response.json();
                 
                 if (result.success) {{
-                    alert('✅ Token有效！');
-                    testBtn.textContent = '✅ Token有效';
+                    alert('Token 有效');
+                    testBtn.textContent = 'Token 有效';
                     testBtn.style.backgroundColor = '#28a745';
                 }} else {{
-                    alert('❌ Token无效：' + (result.message || '未知错误'));
-                    testBtn.textContent = '❌ Token无效';
+                    alert('Token 无效: ' + (result.message || '未知错误'));
+                    testBtn.textContent = '鉂?Token鏃犳晥';
                     testBtn.style.backgroundColor = '#dc3545';
                 }}
                 
             }} catch (error) {{
-                alert('❌ Token测试失败：' + error.message);
-                testBtn.textContent = '❌ 测试失败';
+                alert('Token 测试失败: ' + error.message);
+                testBtn.textContent = '测试失败';
                 testBtn.style.backgroundColor = '#dc3545';
                 console.error('Token test error:', error);
             }} finally {{
@@ -744,11 +807,11 @@ class PostmanTestReport:
             }}
         }}
         
-        // 重新请求API
+        // 重新请求 API
         async function reRequestApi(resultIdx) {{
             const token = document.getElementById('token-input').value.trim();
             if (!token) {{
-                alert('请先输入Token！');
+                alert('璇峰厛杈撳叆Token锛?);
                 document.getElementById('token-input').focus();
                 return;
             }}
@@ -761,7 +824,7 @@ class PostmanTestReport:
             
             // 显示加载状态
             const detailContent = document.getElementById(`detail-content-${{resultIdx}}`);
-            detailContent.innerHTML = '<div class="loading">🔄 正在重新请求...</div>';
+            detailContent.innerHTML = '<div class="loading">正在重新请求...</div>';
             
             try {{
                 // 准备请求数据
@@ -774,7 +837,7 @@ class PostmanTestReport:
                     token: token
                 }};
                 
-                // 发送请求到后端重新测试
+                // 鍙戦€佽姹傚埌鍚庣閲嶆柊娴嬭瘯
                 const response = await fetch('/re-request-api', {{
                     method: 'POST',
                     headers: {{
@@ -792,11 +855,11 @@ class PostmanTestReport:
                 // 更新结果数据
                 allResults[resultIdx] = newResult;
                 
-                // 清除缓存，重新加载详情
+                // 娓呴櫎缂撳瓨锛岄噸鏂板姞杞借鎯?
                 delete detailCache[resultIdx];
                 loadDetail(resultIdx);
                 
-                // 更新表格中的状态
+                // 鏇存柊琛ㄦ牸涓殑鐘舵€?
                 const row = document.querySelector(`tr[data-result-idx="${{resultIdx}}"]`);
                 if (row) {{
                     const statusCell = row.querySelector('td:nth-child(6) span');
@@ -814,12 +877,12 @@ class PostmanTestReport:
                         messageCell.textContent = newResult.message;
                     }}
                     
-                    // 更新行样式
+                    // 鏇存柊琛屾牱寮?
                     row.className = `result-row result-${{newResult.status.toLowerCase()}}`;
                     row.setAttribute('data-status', newResult.status.toLowerCase());
                 }}
                 
-                alert('重新请求完成！');
+                alert('重新请求完成');
                 
             }} catch (error) {{
                 detailContent.innerHTML = `<div class="loading" style="color: red;">重新请求失败: ${{error.message}}</div>`;
@@ -835,45 +898,16 @@ class PostmanTestReport:
 """
     
     def _generate_page_html(self, page: int, results_per_page: int, summary: Dict, details_filename: str) -> str:
-        """生成分页页面HTML"""
-        start_idx = (page - 1) * results_per_page
-        end_idx = min(page * results_per_page, len(self.results))
-        page_results = self.results[start_idx:end_idx]
-        
-        # 生成表格内容
-        table_rows = ""
-        for idx, result in enumerate(page_results):
-            global_idx = start_idx + idx
-            status_class = f"status-{result['status'].lower()}"
-            status_lower = result['status'].lower()
-            detail_id = f"detail-{global_idx}"
-            
-            table_rows += f"""
-            <tr class="result-row result-{status_lower}" data-status="{status_lower}">
-                <td><span class="expand-btn" onclick="toggleDetail('{detail_id}', {global_idx})">▶ 详情</span></td>
-                <td>{result['name']}</td>
-                <td>{result.get('folder', '-')}</td>
-                <td>{result['method']}</td>
-                <td><span class="url">{result['url']}</span></td>
-                <td><span class="{status_class}">{result['status']}</span></td>
-                <td>{result['status_code'] or '-'}</td>
-                <td><span class="detail">{result['message']}</span></td>
-            </tr>
-            <tr class="detail-row" id="{detail_id}">
-                <td colspan="8">
-                    <div class="detail-content" id="detail-content-{global_idx}">
-                        <div class="loading">加载中...</div>
-                    </div>
-                </td>
-            </tr>
-"""
+        """生成分页页面 HTML。"""
+        start_idx, end_idx, page_results = self._get_page_window(page, results_per_page)
+        table_rows = self._build_page_table_rows(page_results, start_idx)
         
         return f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Postman API 测试报告 - 第{page}页</title>
+    <title>Postman API Test Report - Page {page}</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }}
         .header {{ background-color: #333; color: white; padding: 20px; border-radius: 5px; margin-bottom: 20px; }}
@@ -906,17 +940,17 @@ class PostmanTestReport:
 </head>
 <body>
     <div class="header">
-        <h1>Postman API 测试报告 - 第{page}页</h1>
-        <p>第{page}页详细结果 (显示 {start_idx + 1}-{end_idx} / {len(self.results)})</p>
+        <h1>Postman API Test Report - Page {page}</h1>
+        <p>Page {page} details ({start_idx + 1}-{end_idx} / {len(self.results)})</p>
     </div>
     
     <div class="summary">
         <div class="summary-item">
-            <label>总计:</label>
+            <label>鎬昏:</label>
             <span>{summary['total']}</span>
         </div>
         <div class="summary-item">
-            <label style="color: green;">通过:</label>
+            <label style="color: green;">閫氳繃:</label>
             <span style="color: green;">{summary['passed']}</span>
         </div>
         <div class="summary-item">
@@ -928,11 +962,11 @@ class PostmanTestReport:
             <span style="color: orange;">{summary['error']}</span>
         </div>
         <div class="summary-item">
-            <label>成功率:</label>
+            <label>成功率</label>
             <span>{summary['success_rate']}</span>
         </div>
         <div class="summary-item">
-            <label>耗时:</label>
+            <label>鑰楁椂:</label>
             <span>{summary['duration']}</span>
         </div>
     </div>
@@ -940,8 +974,8 @@ class PostmanTestReport:
     <h2>详细结果</h2>
     <div class="filter-section">
         <button class="filter-btn active" onclick="filterResults('all')">全部</button>
-        <button class="filter-btn" onclick="filterResults('PASSED')">✓ 成功</button>
-        <button class="filter-btn" onclick="filterResults('FAILED')">✗ 失败</button>
+        <button class="filter-btn" onclick="filterResults('PASSED')">√ 成功</button>
+        <button class="filter-btn" onclick="filterResults('FAILED')">× 失败</button>
         <button class="filter-btn" onclick="filterResults('ERROR')">! 错误</button>
     </div>
     
@@ -949,12 +983,12 @@ class PostmanTestReport:
         <thead>
             <tr>
                 <th>操作</th>
-                <th>API名称</th>
-                <th>文件夹</th>
-                <th>方法</th>
+                <th>API鍚嶇О</th>
+                <th>鏂囦欢澶?/th>
+                <th>鏂规硶</th>
                 <th>URL</th>
-                <th>状态</th>
-                <th>状态码</th>
+                <th>鐘舵€?/th>
+                <th>鐘舵€佺爜</th>
                 <th>详情</th>
             </tr>
         </thead>
@@ -973,10 +1007,10 @@ class PostmanTestReport:
             
             if (isExpanded) {{
                 detailRow.classList.remove('expanded');
-                btn.textContent = '▶ 详情';
+                btn.textContent = '展开详情';
             }} else {{
                 detailRow.classList.add('expanded');
-                btn.textContent = '▼ 详情';
+                btn.textContent = '收起详情';
                 loadDetail(resultIdx);
             }}
         }}
@@ -1005,7 +1039,7 @@ class PostmanTestReport:
                         const responseHeaders = JSON.stringify(responseInfo.headers || {{}}, null, 2);
                         
                         const html = `
-                            <div class="detail-header">📤 请求信息</div>
+                            <div class="detail-header">请求信息</div>
                             <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 5px;">请求头：</div>
                             <pre>${{requestHeaders}}</pre>
                             <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 5px;">查询参数：</div>
@@ -1013,7 +1047,7 @@ class PostmanTestReport:
                             <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 5px;">请求体：</div>
                             <pre>${{requestBody}}</pre>
                             
-                            <div class="detail-header" style="margin-top: 15px;">📥 响应信息</div>
+                            <div class="detail-header" style="margin-top: 15px;">响应信息</div>
                             <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 5px;">响应头：</div>
                             <pre>${{responseHeaders}}</pre>
                             <div class="detail-header" style="font-size: 11px; font-weight: normal; margin-top: 5px;">响应体：</div>
@@ -1046,7 +1080,7 @@ class PostmanTestReport:
                 }}
             }});
             
-            // 更新按钮状态
+            // 鏇存柊鎸夐挳鐘舵€?
             const buttons = document.querySelectorAll('.filter-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -1057,11 +1091,11 @@ class PostmanTestReport:
 """
     
     def print_console_report(self):
-        """在控制台输出测试报告"""
+        """鍦ㄦ帶鍒跺彴杈撳嚭娴嬭瘯鎶ュ憡"""
         summary = self.generate_summary()
         
         print("\n" + "="*80)
-        print("Postman API 测试报告".center(80))
+        print("Postman API 娴嬭瘯鎶ュ憡".center(80))
         print("="*80)
         print(f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}")
         print(f"成功率: {summary['success_rate']} | 耗时: {summary['duration']}")
@@ -1072,7 +1106,7 @@ class PostmanTestReport:
         print("-"*80)
         
         for result in self.results:
-            status_symbol = "✓" if result['status'] == 'PASSED' else "✗" if result['status'] == 'FAILED' else "!"
+            status_symbol = "PASS" if result['status'] == 'PASSED' else "FAIL" if result['status'] == 'FAILED' else "ERR"
             print(f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}")
             print(f"    URL: {result['url']}")
             print(f"    {result['message']}")
@@ -1080,38 +1114,16 @@ class PostmanTestReport:
         print("="*80 + "\n")
 
 
-def run_postman_tests(
-    postman_file: str,
-    base_url: str = None,
-    output_dir: str = None,
-    token: str = None,
-    report_name: str = None,
-    source_original_file: str = None,
-    results_per_page: int = 30,
-    selected_item_paths: Optional[List[List[int]]] = None,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
-) -> PostmanTestReport:
-    """
-    运行Postman接口测试
-    
-    :param postman_file: Postman JSON文件路径
-    :param base_url: 基础URL（可选，覆盖Postman文件中的配置；为None时读取config.py中的BASE_URL）
-    :param output_dir: 报告输出目录（默认：优先读config.py中的REPORT_OUTPUT_DIR，否则../reports）
-    :param token: 手动指定认证token（可选，指定后跳过自动登录；为None时读取config.py中的TOKEN）
-    :param report_name: 报告名称（可选，支持 .html 文件名；留空则自动命名）
-    :param source_original_file: 原始上传文件名（可选，用于报告追溯与导出命名）
-    :param results_per_page: 报告分页大小（默认30）
-    :param selected_item_paths: 仅执行指定 item_path 的接口（可选）；为空则全量执行
-    :param progress_callback: 进度回调（可选），用于上层展示执行进度
-    :return: 测试报告对象
-    """
-    
+def _resolve_runtime_config(
+    token: Optional[str],
+    base_url: Optional[str],
+    output_dir: Optional[str],
+) -> Tuple[Optional[str], Optional[str], Optional[str], bool, int, str, bool]:
     enable_checkpoint_recovery = False
     checkpoint_flush_every_n = 1
     checkpoint_dir = ""
     assertion_strict_mode = False
 
-    # 从配置文件读取默认值
     try:
         from postman_api_tester import config as _cfg
         if token is None and getattr(_cfg, 'TOKEN', ''):
@@ -1127,24 +1139,36 @@ def run_postman_tests(
     except Exception:
         pass
 
-    if output_dir is None:
-        # 报告输出到上级目录的reports文件夹
-        output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
+    return (
+        token,
+        base_url,
+        output_dir,
+        enable_checkpoint_recovery,
+        checkpoint_flush_every_n,
+        checkpoint_dir,
+        assertion_strict_mode,
+    )
 
-    # 校验 base_url 格式，防止 SSRF：仅允许 http/https 协议
-    if base_url is not None:
-        from urllib.parse import urlparse as _urlparse
-        _parsed = _urlparse(base_url)
-        if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
-            raise ValidationError(f"base_url 格式无效（仅支持 http/https）: {base_url!r}")
 
-    logger.info("开始加载Postman文件: %s", postman_file)
-    
-    # 解析Postman文件
-    parser = PostmanApiParser(postman_file)
-    apis = parser.extract_apis()
-    total_apis_count = len(apis)
+def _resolve_output_dir(output_dir: Optional[str]) -> str:
+    if output_dir is not None:
+        return output_dir
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
 
+
+def _validate_base_url(base_url: Optional[str]) -> None:
+    if base_url is None:
+        return
+    from urllib.parse import urlparse as _urlparse
+    _parsed = _urlparse(base_url)
+    if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
+        raise ValidationError(f"base_url 鏍煎紡鏃犳晥锛堜粎鏀寔 http/https锛? {base_url!r}")
+
+
+def _filter_selected_apis(
+    apis: List[Dict[str, Any]],
+    selected_item_paths: Optional[List[List[int]]],
+) -> Tuple[List[Dict[str, Any]], Optional[set]]:
     selected_path_set: Optional[set] = None
     if selected_item_paths:
         normalized_paths = []
@@ -1163,179 +1187,176 @@ def run_postman_tests(
         ]
         if not apis:
             raise ValidationError("未匹配到可执行接口，请确认所选接口是否仍存在于当前集合。")
-    
-    if base_url:
-        parser.base_url = base_url
-        for api in apis:
-            api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
-    
-    selected_total_count = len(apis)
-    apis_before_recovery = list(apis)
-    logger.info("成功加载 %d 个API接口，基础URL: %s", len(apis), parser.base_url)
-    if selected_path_set is not None:
-        logger.info("本次执行范围：已选接口 %d / 全量 %d", len(apis), total_apis_count)
+    return apis, selected_path_set
 
+
+def _prepare_checkpoint_recovery(
+    *,
+    enable_checkpoint_recovery: bool,
+    output_dir: str,
+    postman_file: str,
+    parser_base_url: str,
+    selected_item_paths: Optional[List[List[int]]],
+    apis: List[Dict[str, Any]],
+    checkpoint_dir: str,
+) -> Tuple[str, str, set, List[Dict[str, Any]]]:
     checkpoint_path = ""
     collection_fingerprint = ""
     executed_item_paths: set = set()
-    if enable_checkpoint_recovery:
-        try:
-            collection_fingerprint = _compute_collection_fingerprint(postman_file, parser.base_url, selected_item_paths)
-            checkpoint_path = _checkpoint_file_path(output_dir, postman_file, collection_fingerprint, checkpoint_dir=checkpoint_dir)
-            checkpoint = _load_checkpoint(checkpoint_path)
-            if checkpoint:
-                fingerprint_match = str(checkpoint.get("collection_fingerprint") or "") == collection_fingerprint
-                base_url_match = str(checkpoint.get("base_url") or "") == str(parser.base_url or "")
-                if fingerprint_match and base_url_match:
-                    executed_item_paths = set(checkpoint.get("executed_item_paths") or [])
-                    if executed_item_paths:
-                        original_count = len(apis)
-                        apis = [
-                            api for api in apis
-                            if _item_path_text(api.get("item_path")) not in executed_item_paths
-                        ]
-                        logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
-                        if not apis:
-                            # 防止生成空报告：若 checkpoint 覆盖全部接口，则回退为全量执行。
-                            logger.info("checkpoint 覆盖全部接口，本次回退为全量执行以保持报告可读性。")
-                            apis = list(apis_before_recovery)
-                            executed_item_paths = set()
-                else:
-                    logger.warning("检测到 checkpoint 与当前集合不匹配，已忽略恢复数据。")
-        except Exception as exc:
-            logger.warning("初始化 checkpoint 失败，已降级为普通执行: %s", exc)
 
-    if progress_callback:
-        try:
-            progress_callback({
-                'stage': 'running',
-                'total': len(apis),
-                'total_all': total_apis_count,
-                'completed': 0,
-                'percent': 0,
-                'current_name': '',
-                'current_method': '',
-                'current_url': '',
-                'message': '开始执行测试',
-            })
-        except Exception:
-            pass
-    
-    # 预获取认证token，保存为局部变量，通过实例传递，不使用类变量
-    resolved_token: Optional[str] = None
-    if token:
-        # 使用手动指定的token（来自参数或配置文件），跳过自动登录
-        resolved_token = token
-        logger.info("使用手动指定的token: %s...", token[:20])
-    else:
-        auth_token = get_auth_token(apis, parser.base_url)
-        if auth_token:
-            resolved_token = auth_token
-            logger.info("已获取认证token: %s...", auth_token[:20])
-    
-    # 创建报告对象
-    report = PostmanTestReport()
-    report.collection_name = parser.data.get('info', {}).get('name', '') if isinstance(parser.data, dict) else ''
-    report.source_file = os.path.abspath(postman_file)
-    report.source_original_file = str(source_original_file or '').strip()
-    report.base_url = parser.base_url
-    report.assertion_strict_mode = assertion_strict_mode
-    
-    # 执行测试 —— 所有 API 共享同一 Session，避免每次建立新 TCP 连接
-    logger.info("开始执行测试，共 %d 个接口", len(apis))
-    _shared_session = create_shared_session()
-    request_timeout = resolve_request_timeout(default=(10, 30))
-
-    execution_error: Optional[Exception] = None
-    completed_count = 0
-
-    def _flush_checkpoint(completed: bool, last_error: str = "") -> None:
-        if not (enable_checkpoint_recovery and checkpoint_path):
-            return
-        payload = {
-            "collection_fingerprint": collection_fingerprint,
-            "base_url": str(parser.base_url or ""),
-            "selected_total_count": selected_total_count,
-            "executed_item_paths": sorted(executed_item_paths),
-            "completed": bool(completed),
-            "last_error": str(last_error or ""),
-            "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        }
-        _save_checkpoint_atomic(checkpoint_path, payload)
+    if not enable_checkpoint_recovery:
+        return checkpoint_path, collection_fingerprint, executed_item_paths, apis
 
     try:
-        for idx, api in enumerate(apis, 1):
-            logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
-            
-            executor = PostmanTestExecutor(
-                api,
-                auth_token=resolved_token,
-                session=_shared_session,
-                request_timeout=request_timeout,
-                assertion_strict_mode=assertion_strict_mode,
-            )
-            executor.start()
-            result = executor.execute_test()
-            report.add_result(result)
-            completed_count = idx
-
-            item_path_key = _item_path_text(api.get("item_path"))
-            if item_path_key:
-                executed_item_paths.add(item_path_key)
-            if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
-                _flush_checkpoint(completed=False)
-            
-            _log = logger.info if result['status'] == 'PASSED' else logger.warning
-            _log("[%d/%d] %s %s → %s", idx, len(apis), api['method'], api['name'], result['status'])
-
-            if progress_callback:
-                try:
-                    progress_callback({
-                        'stage': 'running',
-                        'total': len(apis),
-                        'total_all': total_apis_count,
-                        'completed': idx,
-                        'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
-                        'current_name': str(api.get('name', '')),
-                        'current_method': str(api.get('method', '')),
-                        'current_url': str(api.get('url', '')),
-                        'last_status': str(result.get('status', '')),
-                    })
-                except Exception:
-                    pass
+        collection_fingerprint = _compute_collection_fingerprint(postman_file, parser_base_url, selected_item_paths)
+        checkpoint_path = _checkpoint_file_path(output_dir, postman_file, collection_fingerprint, checkpoint_dir=checkpoint_dir)
+        checkpoint = _load_checkpoint(checkpoint_path)
+        if checkpoint:
+            fingerprint_match = str(checkpoint.get("collection_fingerprint") or "") == collection_fingerprint
+            base_url_match = str(checkpoint.get("base_url") or "") == str(parser_base_url or "")
+            if fingerprint_match and base_url_match:
+                executed_item_paths = set(checkpoint.get("executed_item_paths") or [])
+                if executed_item_paths:
+                    original_count = len(apis)
+                    apis = [
+                        api for api in apis
+                        if _item_path_text(api.get("item_path")) not in executed_item_paths
+                    ]
+                    logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
+            else:
+                logger.warning("检测到 checkpoint 与当前集合不匹配，已忽略恢复数据。")
     except Exception as exc:
-        execution_error = exc
-        logger.exception("执行过程中发生中断异常，将输出部分成功报告: %s", exc)
-    finally:
-        close_session(_shared_session)
+        logger.warning("初始化 checkpoint 失败，已降级为普通执行: %s", exc)
 
-    if enable_checkpoint_recovery:
-        try:
-            _flush_checkpoint(completed=(execution_error is None), last_error=str(execution_error or ""))
-        except Exception as exc:
-            logger.warning("写入 checkpoint 失败: %s", exc)
+    return checkpoint_path, collection_fingerprint, executed_item_paths, apis
 
-    report.execution_mode = 'partial' if execution_error is not None else 'full'
-    report.interrupted = execution_error is not None
-    report.interrupt_reason = str(execution_error or '')
 
-    if progress_callback:
-        try:
-            progress_callback({
-                'stage': 'finished' if execution_error is None else 'partial',
-                'total': len(apis),
-                'total_all': total_apis_count,
-                'completed': completed_count,
-                'percent': int(completed_count * 100 / len(apis)) if len(apis) > 0 else 100,
-                'message': '执行完成' if execution_error is None else f'执行中断，已生成部分报告: {execution_error}',
-            })
-        except Exception:
-            pass
+def _parse_collection_apis(postman_file: str) -> Tuple[PostmanApiParser, List[Dict[str, Any]], int]:
+    logger.info("开始加载 Postman 文件: %s", postman_file)
+    parser = PostmanApiParser(postman_file)
+    apis = parser.extract_apis()
+    total_apis_count = len(apis)
+    return parser, apis, total_apis_count
 
-    print("\n生成测试报告...")
-    summary = report.generate_summary()
-    
-    # 保存HTML报告
+
+def _log_execution_scope(
+    *,
+    current_count: int,
+    total_apis_count: int,
+    parser_base_url: str,
+    selected_path_set: Optional[set],
+) -> None:
+    logger.info("成功加载 %d 个 API 接口，基础 URL: %s", current_count, parser_base_url)
+    if selected_path_set is not None:
+        logger.info("鏈鎵ц鑼冨洿锛氬凡閫夋帴鍙?%d / 鍏ㄩ噺 %d", current_count, total_apis_count)
+
+
+def _resolve_checkpoint_execution_apis(
+    *,
+    enable_checkpoint_recovery: bool,
+    output_dir: str,
+    postman_file: str,
+    parser_base_url: str,
+    selected_item_paths: Optional[List[List[int]]],
+    apis: List[Dict[str, Any]],
+    checkpoint_dir: str,
+) -> Tuple[str, str, set, List[Dict[str, Any]]]:
+    apis_before_recovery = list(apis)
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_recovery(
+        enable_checkpoint_recovery=enable_checkpoint_recovery,
+        output_dir=output_dir,
+        postman_file=postman_file,
+        parser_base_url=parser_base_url,
+        selected_item_paths=selected_item_paths,
+        apis=apis,
+        checkpoint_dir=checkpoint_dir,
+    )
+    if enable_checkpoint_recovery and not apis:
+        # 防止生成空报告：若 checkpoint 覆盖全部接口，则回退为全量执行。
+        logger.info("checkpoint 覆盖全部接口，本次回退为全量执行以保持报告可读性。")
+        apis = apis_before_recovery
+        executed_item_paths = set()
+    return checkpoint_path, collection_fingerprint, executed_item_paths, apis
+
+
+def _apply_base_url_override(
+    parser: PostmanApiParser,
+    apis: List[Dict[str, Any]],
+    base_url: Optional[str],
+) -> None:
+    if not base_url:
+        return
+    parser.base_url = base_url
+    for api in apis:
+        api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
+
+
+def _emit_progress(progress_callback: Optional[Callable[[Dict[str, Any]], None]], payload: Dict[str, Any]) -> None:
+    if not progress_callback:
+        return
+    try:
+        progress_callback(payload)
+    except Exception:
+        pass
+
+
+def _emit_start_progress(
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    *,
+    current_total: int,
+    total_apis_count: int,
+) -> None:
+    _emit_progress(progress_callback, {
+        'stage': 'running',
+        'total': current_total,
+        'total_all': total_apis_count,
+        'completed': 0,
+        'percent': 0,
+        'current_name': '',
+        'current_method': '',
+        'current_url': '',
+        'message': '开始执行测试',
+    })
+
+
+def _resolve_auth_token(
+    token: Optional[str],
+    apis: List[Dict[str, Any]],
+    base_url: str,
+    *,
+    auth_session: SessionLike,
+    request_timeout: RequestTimeout,
+) -> Optional[str]:
+    if token:
+        logger.info("浣跨敤鎵嬪姩鎸囧畾鐨則oken: %s...", token[:20])
+        return token
+
+    auth_token = get_auth_token(apis, base_url, session=auth_session, request_timeout=request_timeout)
+
+    if auth_token:
+        logger.info("宸茶幏鍙栬璇乼oken: %s...", auth_token[:20])
+    return auth_token
+
+
+def _build_runtime_context(
+    token: Optional[str],
+    apis: List[Dict[str, Any]],
+    base_url: str,
+) -> Tuple[Optional[str], RequestTimeout, SessionLike]:
+    """Build runtime context with unified timeout and shared session lifecycle."""
+    shared_session = create_shared_session()
+    request_timeout = normalize_timeout(resolve_request_timeout(default=(10, 30)), default=(10, 30))
+    resolved_token = _resolve_auth_token(
+        token,
+        apis,
+        base_url,
+        auth_session=shared_session,
+        request_timeout=request_timeout,
+    )
+    return resolved_token, request_timeout, shared_session
+
+
+def _resolve_report_file_path(output_dir: str, report_name: Optional[str]) -> str:
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     default_report_name = f'postman_report_{timestamp}.html'
     selected_report_name = str(report_name or '').strip()
@@ -1352,23 +1373,487 @@ def run_postman_tests(
     if os.path.exists(report_file):
         name_no_ext, ext = os.path.splitext(report_file_name)
         report_file = os.path.join(output_dir, f'{name_no_ext}_{timestamp}{ext or ".html"}')
+    return report_file
 
+
+def _flush_checkpoint_state(
+    *,
+    enable_checkpoint_recovery: bool,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set,
+    completed: bool,
+    last_error: str = "",
+) -> None:
+    if not (enable_checkpoint_recovery and checkpoint_path):
+        return
+    payload = {
+        "collection_fingerprint": collection_fingerprint,
+        "base_url": str(parser_base_url or ""),
+        "selected_total_count": selected_total_count,
+        "executed_item_paths": sorted(executed_item_paths),
+        "completed": bool(completed),
+        "last_error": str(last_error or ""),
+        "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    _save_checkpoint_atomic(checkpoint_path, payload)
+
+
+def _finalize_checkpoint_state(
+    *,
+    enable_checkpoint_recovery: bool,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set,
+    execution_error: Optional[Exception],
+) -> None:
+    if not enable_checkpoint_recovery:
+        return
+    try:
+        _flush_checkpoint_state(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            checkpoint_path=checkpoint_path,
+            collection_fingerprint=collection_fingerprint,
+            parser_base_url=parser_base_url,
+            selected_total_count=selected_total_count,
+            executed_item_paths=executed_item_paths,
+            completed=(execution_error is None),
+            last_error=str(execution_error or ""),
+        )
+    except Exception as exc:
+        logger.warning("写入 checkpoint 失败: %s", exc)
+
+
+def _execute_api_suite(
+    *,
+    apis: List[Dict[str, Any]],
+    total_apis_count: int,
+    report: PostmanTestReport,
+    resolved_token: Optional[str],
+    request_timeout: RequestTimeout,
+    assertion_strict_mode: bool,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    enable_checkpoint_recovery: bool,
+    checkpoint_flush_every_n: int,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set,
+    shared_session: SessionLike,
+) -> Tuple[int, Optional[Exception]]:
+    execution_error: Optional[Exception] = None
+    completed_count = 0
+
+    try:
+        for idx, api in enumerate(apis, 1):
+            logger.debug("[%d/%d] 娴嬭瘯: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
+
+            executor = PostmanTestExecutor(
+                api,
+                auth_token=resolved_token,
+                session=shared_session,
+                request_timeout=request_timeout,
+                assertion_strict_mode=assertion_strict_mode,
+            )
+            executor.start()
+            result = executor.execute_test()
+            report.add_result(result)
+            completed_count = idx
+
+            item_path_key = _item_path_text(api.get("item_path"))
+            if item_path_key:
+                executed_item_paths.add(item_path_key)
+            if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
+                _flush_checkpoint_state(
+                    enable_checkpoint_recovery=enable_checkpoint_recovery,
+                    checkpoint_path=checkpoint_path,
+                    collection_fingerprint=collection_fingerprint,
+                    parser_base_url=parser_base_url,
+                    selected_total_count=selected_total_count,
+                    executed_item_paths=executed_item_paths,
+                    completed=False,
+                )
+
+            _log = logger.info if result['status'] == 'PASSED' else logger.warning
+            _log("[%d/%d] %s %s 鈫?%s", idx, len(apis), api['method'], api['name'], result['status'])
+
+            _emit_progress(progress_callback, {
+                'stage': 'running',
+                'total': len(apis),
+                'total_all': total_apis_count,
+                'completed': idx,
+                'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
+                'current_name': str(api.get('name', '')),
+                'current_method': str(api.get('method', '')),
+                'current_url': str(api.get('url', '')),
+                'last_status': str(result.get('status', '')),
+            })
+    except Exception as exc:
+        execution_error = exc
+        logger.exception("鎵ц杩囩▼涓彂鐢熶腑鏂紓甯革紝灏嗚緭鍑洪儴鍒嗘垚鍔熸姤鍛? %s", exc)
+
+    return completed_count, execution_error
+
+
+def _execute_and_finalize_suite(
+    *,
+    apis: List[Dict[str, Any]],
+    total_apis_count: int,
+    report: PostmanTestReport,
+    resolved_token: Optional[str],
+    request_timeout: RequestTimeout,
+    assertion_strict_mode: bool,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    enable_checkpoint_recovery: bool,
+    checkpoint_flush_every_n: int,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set,
+    shared_session: SessionLike,
+) -> Tuple[int, Optional[Exception]]:
+    completed_count = 0
+    execution_error: Optional[Exception] = None
+    try:
+        completed_count, execution_error = _execute_api_suite(
+            apis=apis,
+            total_apis_count=total_apis_count,
+            report=report,
+            resolved_token=resolved_token,
+            request_timeout=request_timeout,
+            assertion_strict_mode=assertion_strict_mode,
+            progress_callback=progress_callback,
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            checkpoint_flush_every_n=checkpoint_flush_every_n,
+            checkpoint_path=checkpoint_path,
+            collection_fingerprint=collection_fingerprint,
+            parser_base_url=parser_base_url,
+            selected_total_count=selected_total_count,
+            executed_item_paths=executed_item_paths,
+            shared_session=shared_session,
+        )
+    finally:
+        close_session(shared_session)
+        _finalize_checkpoint_state(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            checkpoint_path=checkpoint_path,
+            collection_fingerprint=collection_fingerprint,
+            parser_base_url=parser_base_url,
+            selected_total_count=selected_total_count,
+            executed_item_paths=executed_item_paths,
+            execution_error=execution_error,
+        )
+    return completed_count, execution_error
+
+
+def _prepare_execution_context(
+    *,
+    token: Optional[str],
+    apis: List[Dict[str, Any]],
+    parser: PostmanApiParser,
+    postman_file: str,
+    source_original_file: Optional[str],
+    assertion_strict_mode: bool,
+) -> Tuple[Optional[str], PostmanTestReport, RequestTimeout, SessionLike]:
+    # 棰勮幏鍙栬璇?token锛屼娇鐢ㄧ粺涓€ runtime context锛坰hared_session + timeout锛?
+    resolved_token, request_timeout, shared_session = _build_runtime_context(token, apis, parser.base_url)
+
+    # 鍒涘缓鎶ュ憡瀵硅薄
+    report = _build_report_context(
+        parser=parser,
+        postman_file=postman_file,
+        source_original_file=source_original_file,
+        assertion_strict_mode=assertion_strict_mode,
+    )
+
+    # 鎵ц娴嬭瘯 鈥斺€?鎵€鏈?API 鍏变韩鍚屼竴 Session锛岄伩鍏嶆瘡娆″缓绔嬫柊 TCP 杩炴帴
+    logger.info("开始执行测试，共 %d 个接口", len(apis))
+    return resolved_token, report, request_timeout, shared_session
+
+
+def _prepare_execution_apis(
+    *,
+    postman_file: str,
+    selected_item_paths: Optional[List[List[int]]],
+    base_url: Optional[str],
+) -> Tuple[PostmanApiParser, List[Dict[str, Any]], int, int]:
+    parser, apis, total_apis_count = _parse_collection_apis(postman_file)
+
+    apis, selected_path_set = _filter_selected_apis(apis, selected_item_paths)
+    _apply_base_url_override(parser, apis, base_url)
+
+    selected_total_count = len(apis)
+    _log_execution_scope(
+        current_count=selected_total_count,
+        total_apis_count=total_apis_count,
+        parser_base_url=parser.base_url,
+        selected_path_set=selected_path_set,
+    )
+    return parser, apis, total_apis_count, selected_total_count
+
+
+def _prepare_runtime_settings(
+    token: Optional[str],
+    base_url: Optional[str],
+    output_dir: Optional[str],
+) -> Tuple[
+    Optional[str],
+    Optional[str],
+    str,
+    bool,
+    int,
+    str,
+    bool,
+]:
+    (
+        token,
+        base_url,
+        output_dir,
+        enable_checkpoint_recovery,
+        checkpoint_flush_every_n,
+        checkpoint_dir,
+        assertion_strict_mode,
+    ) = _resolve_runtime_config(token, base_url, output_dir)
+
+    output_dir = _resolve_output_dir(output_dir)
+    _validate_base_url(base_url)
+
+    return (
+        token,
+        base_url,
+        output_dir,
+        enable_checkpoint_recovery,
+        checkpoint_flush_every_n,
+        checkpoint_dir,
+        assertion_strict_mode,
+    )
+
+
+def _prepare_checkpoint_and_progress(
+    *,
+    enable_checkpoint_recovery: bool,
+    output_dir: str,
+    postman_file: str,
+    parser_base_url: str,
+    selected_item_paths: Optional[List[List[int]]],
+    apis: List[Dict[str, Any]],
+    checkpoint_dir: str,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    total_apis_count: int,
+) -> Tuple[str, str, set, List[Dict[str, Any]]]:
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _resolve_checkpoint_execution_apis(
+        enable_checkpoint_recovery=enable_checkpoint_recovery,
+        output_dir=output_dir,
+        postman_file=postman_file,
+        parser_base_url=parser_base_url,
+        selected_item_paths=selected_item_paths,
+        apis=apis,
+        checkpoint_dir=checkpoint_dir,
+    )
+
+    _emit_start_progress(
+        progress_callback,
+        current_total=len(apis),
+        total_apis_count=total_apis_count,
+    )
+    return checkpoint_path, collection_fingerprint, executed_item_paths, apis
+
+
+def _build_report_context(
+    parser: PostmanApiParser,
+    postman_file: str,
+    source_original_file: Optional[str],
+    assertion_strict_mode: bool,
+) -> PostmanTestReport:
+    report = PostmanTestReport()
+    report.collection_name = parser.data.get('info', {}).get('name', '') if isinstance(parser.data, dict) else ''
+    report.source_file = os.path.abspath(postman_file)
+    report.source_original_file = str(source_original_file or '').strip()
+    report.base_url = parser.base_url
+    report.assertion_strict_mode = assertion_strict_mode
+    return report
+
+
+def _set_report_execution_outcome(report: PostmanTestReport, execution_error: Optional[Exception]) -> None:
+    report.execution_mode = 'partial' if execution_error is not None else 'full'
+    report.interrupted = execution_error is not None
+    report.interrupt_reason = str(execution_error or '')
+
+
+def _emit_finish_progress(
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    *,
+    execution_error: Optional[Exception],
+    completed_count: int,
+    current_total: int,
+    total_apis_count: int,
+) -> None:
+    _emit_progress(progress_callback, {
+        'stage': 'finished' if execution_error is None else 'partial',
+        'total': current_total,
+        'total_all': total_apis_count,
+        'completed': completed_count,
+        'percent': int(completed_count * 100 / current_total) if current_total > 0 else 100,
+        'message': '执行完成' if execution_error is None else f'执行中断，已生成部分报告: {execution_error}',
+    })
+
+
+def _generate_and_log_report(
+    report: PostmanTestReport,
+    *,
+    output_dir: str,
+    report_name: Optional[str],
+    results_per_page: int,
+    execution_error: Optional[Exception],
+) -> str:
+    print("\n生成测试报告...")
+    report.generate_summary()
+
+    report_file = _resolve_report_file_path(output_dir, report_name)
     report.generate_html_report(report_file, results_per_page=results_per_page)
-    logger.info("HTML报告已保存: %s", report_file)
-    logger.info("报告元数据已保存: %s", report.generated_meta_file)
+    logger.info("HTML鎶ュ憡宸蹭繚瀛? %s", report_file)
+    logger.info("鎶ュ憡鍏冩暟鎹凡淇濆瓨: %s", report.generated_meta_file)
     if execution_error is not None:
-        logger.warning("本次报告为部分成功报告，原因: %s", execution_error)
-    
-    # 打印控制台报告
+        logger.warning("鏈鎶ュ憡涓洪儴鍒嗘垚鍔熸姤鍛婏紝鍘熷洜: %s", execution_error)
+    return report_file
+
+
+def _complete_report_output(
+    report: PostmanTestReport,
+    *,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    execution_error: Optional[Exception],
+    completed_count: int,
+    current_total: int,
+    total_apis_count: int,
+    output_dir: str,
+    report_name: Optional[str],
+    results_per_page: int,
+) -> None:
+    _set_report_execution_outcome(report, execution_error)
+    _emit_finish_progress(
+        progress_callback,
+        execution_error=execution_error,
+        completed_count=completed_count,
+        current_total=current_total,
+        total_apis_count=total_apis_count,
+    )
+    _generate_and_log_report(
+        report,
+        output_dir=output_dir,
+        report_name=report_name,
+        results_per_page=results_per_page,
+        execution_error=execution_error,
+    )
     report.print_console_report()
+
+
+def run_postman_tests(
+    postman_file: str,
+    base_url: str = None,
+    output_dir: str = None,
+    token: str = None,
+    report_name: str = None,
+    source_original_file: str = None,
+    results_per_page: int = 30,
+    selected_item_paths: Optional[List[List[int]]] = None,
+    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+) -> PostmanTestReport:
+    """
+    运行 Postman 接口测试。
+
+    :param postman_file: Postman JSON 文件路径。
+    :param base_url: 基础 URL（可选，覆盖集合中的配置）。
+    :param output_dir: 报告输出目录。
+    :param token: 手动指定认证 token（可选）。
+    :param report_name: 报告名称（可选，支持 .html）。
+    :param source_original_file: 原始上传文件名（可选）。
+    :param results_per_page: 报告分页大小。
+    :param selected_item_paths: 仅执行指定 item_path 的接口（可选）。
+    :param progress_callback: 进度回调（可选）。
+    :return: 测试报告对象。
+    """
+    
+    (
+        token,
+        base_url,
+        output_dir,
+        enable_checkpoint_recovery,
+        checkpoint_flush_every_n,
+        checkpoint_dir,
+        assertion_strict_mode,
+    ) = _prepare_runtime_settings(token, base_url, output_dir)
+
+    parser, apis, total_apis_count, selected_total_count = _prepare_execution_apis(
+        postman_file=postman_file,
+        selected_item_paths=selected_item_paths,
+        base_url=base_url,
+    )
+
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_and_progress(
+        enable_checkpoint_recovery=enable_checkpoint_recovery,
+        output_dir=output_dir,
+        postman_file=postman_file,
+        parser_base_url=parser.base_url,
+        selected_item_paths=selected_item_paths,
+        apis=apis,
+        checkpoint_dir=checkpoint_dir,
+        progress_callback=progress_callback,
+        total_apis_count=total_apis_count,
+    )
+    
+    resolved_token, report, request_timeout, shared_session = _prepare_execution_context(
+        token=token,
+        apis=apis,
+        parser=parser,
+        postman_file=postman_file,
+        source_original_file=source_original_file,
+        assertion_strict_mode=assertion_strict_mode,
+    )
+
+    completed_count, execution_error = _execute_and_finalize_suite(
+        apis=apis,
+        total_apis_count=total_apis_count,
+        report=report,
+        resolved_token=resolved_token,
+        request_timeout=request_timeout,
+        assertion_strict_mode=assertion_strict_mode,
+        progress_callback=progress_callback,
+        enable_checkpoint_recovery=enable_checkpoint_recovery,
+        checkpoint_flush_every_n=checkpoint_flush_every_n,
+        checkpoint_path=checkpoint_path,
+        collection_fingerprint=collection_fingerprint,
+        parser_base_url=parser.base_url,
+        selected_total_count=selected_total_count,
+        executed_item_paths=executed_item_paths,
+        shared_session=shared_session,
+    )
+
+    _complete_report_output(
+        report,
+        progress_callback=progress_callback,
+        execution_error=execution_error,
+        completed_count=completed_count,
+        current_total=len(apis),
+        total_apis_count=total_apis_count,
+        output_dir=output_dir,
+        report_name=report_name,
+        results_per_page=results_per_page,
+    )
     
     return report
 
 if __name__ == '__main__':
     """
-    使用示例:
-    1. 将Postman导出的JSON文件放在项目目录
-    2. 在命令行执行: python -m postman_api_tester.postman_api_tester <postman_file_path> [base_url] [output_dir]
+    浣跨敤绀轰緥:
+    1. 灏哖ostman瀵煎嚭鐨凧SON鏂囦欢鏀惧湪椤圭洰鐩綍
+    2. 鍦ㄥ懡浠よ鎵ц: python -m postman_api_tester.postman_api_tester <postman_file_path> [base_url] [output_dir]
     """
     
     if len(sys.argv) > 1:
@@ -1380,7 +1865,7 @@ if __name__ == '__main__':
 
         if len(sys.argv) > 4:
             arg4 = str(sys.argv[4]).strip()
-            # 兼容直接把第4个参数当分页大小的用法
+            # 鍏煎鐩存帴鎶婄4涓弬鏁板綋鍒嗛〉澶у皬鐨勭敤娉?
             if arg4.isdigit() and len(sys.argv) == 5:
                 results_per_page = int(arg4)
             else:
@@ -1397,10 +1882,11 @@ if __name__ == '__main__':
             results_per_page=results_per_page,
         )
     else:
-        print("使用方法:")
+        print("浣跨敤鏂规硶:")
         print("  python postman_api_tester.py <postman_file_path> [base_url] [output_dir] [token] [results_per_page]")
-        print("\n参数说明:")
+        print("\n鍙傛暟璇存槑:")
         print("  postman_file_path: Postman导出的JSON文件路径（必需）")
         print("  base_url: 基础URL（可选，将覆盖Postman文件中的配置）")
         print("  output_dir: 报告输出目录（可选，默认：../reports）")
         print("  token: 手动指定认证token（可选，指定后跳过自动登录，直接用于测试）")
+

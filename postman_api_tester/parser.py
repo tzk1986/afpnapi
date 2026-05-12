@@ -1,13 +1,49 @@
+"""
+Postman Collection 解析模块 - 集合解析与 API 配置提取
+
+### 职责划分（async/sync）
+
+**同步优先（SYNC-ONLY）**：
+  - PostmanApiParser.extract_apis() - 集合解析与 API 提取
+  - PostmanApiParser.extract_base_url() - 基础 URL 提取
+  - PostmanApiParser._parse_item() - 递归项解析
+  - PostmanApiParser._parse_request() - 请求解析
+
+**说明**：
+  所有导出接口均为**同步阻塞**操作。
+  - JSON 文件 I/O 使用同步模式（load_file()）
+  - 集合递归解析在同步上下文完成
+  - 不提供原生 async 版本
+"""
+
 import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict, Union
 from urllib.parse import urljoin
 
 from postman_api_tester.exceptions import ParseError
 
 logger = logging.getLogger(__name__)
+
+
+# === 类型定义 ===
+class ApiConfig(TypedDict, total=False):
+    """单个 API 配置信息（TypedDict 便于外部消费）"""
+    name: str
+    folder: str
+    method: str
+    url: str
+    full_url: str
+    headers: Dict[str, str]
+    body: Optional[Union[str, Dict[str, Any]]]
+    params: Dict[str, Any]
+    expected_status: int
+    description: str
+    item_path: List[int]
+    x_assertions: Optional[List[Dict[str, Any]]]
+    x_expected_status: Optional[int]
 
 
 class PostmanApiParser:
@@ -60,7 +96,7 @@ class PostmanApiParser:
 
         return self.base_url
 
-    def extract_apis(self) -> List[Dict[str, Any]]:
+    def extract_apis(self) -> List[ApiConfig]:
         """
         提取所有API接口信息
         :return: API列表
@@ -76,7 +112,7 @@ class PostmanApiParser:
         self.collections = apis
         return apis
 
-    def _parse_item(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> List[Dict]:
+    def _parse_item(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> List[ApiConfig]:
         """
         递归解析item（可能是文件夹或请求）
         :param item: item对象
@@ -106,7 +142,7 @@ class PostmanApiParser:
 
         return apis
 
-    def _parse_request(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> Dict:
+    def _parse_request(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> ApiConfig:
         """
         解析单个请求
         :param item: item对象

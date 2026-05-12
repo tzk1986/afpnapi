@@ -1,6 +1,8 @@
-import re
+﻿import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from postman_api_tester.utils.security import strip_sensitive_headers
 
 
 def build_exclusion_key(folder: Any, name: Any, method: Any, url: Any) -> str:
@@ -61,21 +63,7 @@ def normalize_manual_exclusions(values: Any) -> List[str]:
 
 
 def strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
-    cleaned: Dict[str, Any] = {}
-    for key, value in (headers or {}).items():
-        lower_key = str(key).lower()
-        if lower_key in {
-            "authorization",
-            "token",
-            "access_token",
-            "auth_token",
-            "x-token",
-            "x-access-token",
-            "access-token",
-        }:
-            continue
-        cleaned[key] = value
-    return cleaned
+    return strip_sensitive_headers(headers)
 
 
 def normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str, Any]:
