@@ -8,11 +8,13 @@ import os
 import re
 import socket
 import uuid
+from types import ModuleType
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Iterator, List, Optional, SupportsInt
 from flask import Flask, Response, jsonify, make_response, redirect, render_template, request, send_from_directory, stream_with_context, url_for
+from flask.typing import ResponseReturnValue
 from postman_api_tester.utils.url_utils import (
     merge_url_with_params as _merge_url_with_params,
     normalize_url_and_params as _normalize_url_and_params,
@@ -117,6 +119,7 @@ logger = logging.getLogger(__name__)
 MODULE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = MODULE_DIR.parent
 
+_cfg: Optional[ModuleType]
 try:
     from postman_api_tester import config as _cfg
 except Exception:
@@ -186,7 +189,7 @@ ENABLE_REPORT_LIST_FILTER = _cfg_bool("ENABLE_REPORT_LIST_FILTER", True)
 ENABLE_ASSERTIONS = _cfg_bool("ENABLE_ASSERTIONS", False)
 
 
-def _cfg_dict(name: str, default: Optional[Dict] = None) -> Dict:
+def _cfg_dict(name: str, default: Optional[Dict[str, object]] = None) -> Dict[str, object]:
     if default is None:
         default = {}
     if _cfg is None:
@@ -195,7 +198,27 @@ def _cfg_dict(name: str, default: Optional[Dict] = None) -> Dict:
     return value if isinstance(value, dict) else default
 
 
-ENVIRONMENTS: Dict[str, Any] = _cfg_dict("ENVIRONMENTS", {})
+EnvironmentConfig = Dict[str, str]
+JobParams = Dict[str, object]
+SummaryPayload = Dict[str, object]
+
+
+def _normalize_environments(raw_environments: object) -> Dict[str, EnvironmentConfig]:
+    if not isinstance(raw_environments, dict):
+        return {}
+
+    normalized: Dict[str, EnvironmentConfig] = {}
+    for env_name, env_value in raw_environments.items():
+        if not isinstance(env_value, dict):
+            continue
+        normalized[str(env_name)] = {
+            "base_url": str(env_value.get("base_url", "") or "").strip(),
+            "token": str(env_value.get("token", "") or "").strip(),
+        }
+    return normalized
+
+
+ENVIRONMENTS: Dict[str, EnvironmentConfig] = _normalize_environments(_cfg_dict("ENVIRONMENTS", {}))
 DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")
 
 
@@ -237,29 +260,38 @@ def get_local_ip() -> str:
     finally:
         sock.close()
     
-def _json_error(message: str, status_code: int) -> Any:
+def _json_error(message: str, status_code: int) -> ResponseReturnValue:
     return jsonify(build_error_payload(message)), status_code
 
 
-def clamp_page(value: Any) -> int:
-    try:
-        page = int(value)
-    except (TypeError, ValueError):
+def clamp_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
+    if value is None:
         page = 1
+    else:
+        try:
+            page = int(value)
+        except (TypeError, ValueError):
+            page = 1
     return max(1, page)
 
-def clamp_page_size(value: Any) -> int:
-    try:
-        page_size = int(value)
-    except (TypeError, ValueError):
+def clamp_page_size(value: SupportsInt | str | bytes | bytearray | None) -> int:
+    if value is None:
         page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
+    else:
+        try:
+            page_size = int(value)
+        except (TypeError, ValueError):
+            page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
     return max(REPORT_VIEW_PAGE_SIZE_MIN, min(page_size, REPORT_VIEW_PAGE_SIZE_MAX))
 
-def clamp_run_results_per_page(value: Any) -> int:
-    try:
-        page_size = int(value)
-    except (TypeError, ValueError):
+def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
+    if value is None:
         page_size = RUN_RESULTS_PER_PAGE_DEFAULT
+    else:
+        try:
+            page_size = int(value)
+        except (TypeError, ValueError):
+            page_size = RUN_RESULTS_PER_PAGE_DEFAULT
     return max(RUN_RESULTS_PER_PAGE_MIN, min(page_size, RUN_RESULTS_PER_PAGE_MAX))
 
 
@@ -267,7 +299,7 @@ def _enqueue_job(
     *,
     job_id: str,
     saved_file: str,
-    job_params: Dict[str, Any],
+    job_params: JobParams,
     results_per_page: int,
     selected_item_paths: Optional[List[List[int]]],
 ) -> None:
@@ -301,13 +333,13 @@ _UPDATE_REPORT_META_FN = partial(
 
 
 @app.route("/health")
-def health() -> Any:
+def health() -> ResponseReturnValue:
     """健康检查端点，用于监控系统存活状态。"""
     return jsonify(build_health_payload(datetime.now().isoformat()))
 
 
 @app.route("/")
-def index() -> Any:
+def index() -> ResponseReturnValue:
     reports = _repo_list_reports()
     port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
     return render_template(
@@ -335,7 +367,7 @@ def index() -> Any:
 
 
 @app.route("/adhoc-run")
-def adhoc_run_page() -> Any:
+def adhoc_run_page() -> ResponseReturnValue:
     if not ENABLE_ADHOC_RUN:
         return redirect(url_for("index"))
     return render_template(
@@ -353,7 +385,7 @@ def adhoc_run_page() -> Any:
 
 
 @app.route("/report-view")
-def report_view() -> Any:
+def report_view() -> ResponseReturnValue:
     report_name = request.args.get("name", "")
     if not report_name:
         reports = _repo_list_reports()
@@ -403,22 +435,22 @@ def report_view() -> Any:
 
 
 @app.route("/reports/<path:filename>")
-def serve_report(filename: str) -> Any:
+def serve_report(filename: str) -> ResponseReturnValue:
     return send_from_directory(REPORTS_DIR, filename)
 
 
 @app.route("/exports/<path:filename>")
-def serve_export(filename: str) -> Any:
+def serve_export(filename: str) -> ResponseReturnValue:
     return send_from_directory(EXPORTS_DIR, filename, as_attachment=True)
 
 
 @app.route("/api/reports")
-def api_reports() -> Any:
+def api_reports() -> ResponseReturnValue:
     return jsonify(_repo_list_reports())
 
 
 @app.route("/api/collection-preview", methods=["POST"])
-def api_collection_preview() -> Any:
+def api_collection_preview() -> ResponseReturnValue:
     if not ENABLE_SELECTIVE_RUN:
         return _json_error("当前环境未启用接口选择执行功能。", 403)
 
@@ -453,7 +485,7 @@ def api_collection_preview() -> Any:
 
 
 @app.route("/api/export-collection", methods=["POST"])
-def api_export_collection() -> Any:
+def api_export_collection() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
@@ -494,7 +526,7 @@ def api_export_collection() -> Any:
 
 
 @app.route("/api/export-collection-stream", methods=["POST"])
-def api_export_collection_stream() -> Any:
+def api_export_collection_stream() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
@@ -529,7 +561,7 @@ def api_export_collection_stream() -> Any:
     if not export_path.exists():
         return _json_error("导出文件不存在，无法进行流式下载", 500)
 
-    def generate_chunks() -> Any:
+    def generate_chunks() -> Iterator[bytes]:
         with export_path.open("rb") as file:
             while True:
                 chunk = file.read(64 * 1024)
@@ -544,7 +576,7 @@ def api_export_collection_stream() -> Any:
 
 
 @app.route("/api/report-meta/<path:report_name>")
-def api_report_detail(report_name: str) -> Any:
+def api_report_detail(report_name: str) -> ResponseReturnValue:
     try:
         return jsonify(build_report_meta_payload(_repo_find_report(report_name)))
     except FileNotFoundError:
@@ -552,7 +584,7 @@ def api_report_detail(report_name: str) -> Any:
 
 
 @app.route("/api/manual-cases/<path:report_name>")
-def api_manual_cases(report_name: str) -> Any:
+def api_manual_cases(report_name: str) -> ResponseReturnValue:
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
@@ -568,7 +600,7 @@ def api_manual_cases(report_name: str) -> Any:
 
 
 @app.route("/api/manual-cases/add", methods=["POST"])
-def api_manual_case_add() -> Any:
+def api_manual_case_add() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     if not report_name:
@@ -594,7 +626,7 @@ def api_manual_case_add() -> Any:
 
 
 @app.route("/api/manual-cases/update", methods=["PUT"])
-def api_manual_case_update() -> Any:
+def api_manual_case_update() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
@@ -621,7 +653,7 @@ def api_manual_case_update() -> Any:
 
 
 @app.route("/api/manual-cases/delete", methods=["DELETE"])
-def api_manual_case_delete() -> Any:
+def api_manual_case_delete() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
@@ -646,7 +678,7 @@ def api_manual_case_delete() -> Any:
 
 
 @app.route("/api/report-case-exclusion", methods=["POST"])
-def api_report_case_exclusion() -> Any:
+def api_report_case_exclusion() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     exclusion_key = str(payload.get("exclusion_key") or "").strip()
@@ -672,7 +704,7 @@ def api_report_case_exclusion() -> Any:
 
 
 @app.route("/api/report-result-judgement", methods=["POST"])
-def api_report_result_judgement() -> Any:
+def api_report_result_judgement() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     if not report_name:
@@ -724,7 +756,7 @@ def api_report_result_judgement() -> Any:
 # 升级二：一键重试失败用例
 # ---------------------------------------------------------------
 @app.route("/api/retry-failures", methods=["POST"])
-def api_retry_failures() -> Any:
+def api_retry_failures() -> ResponseReturnValue:
     if not ENABLE_RETRY_FAILURES:
         return _json_error("当前环境未启用重试失败接口能力。", 403)
 
@@ -775,7 +807,7 @@ def api_retry_failures() -> Any:
 
 
 @app.route("/api/retry-all", methods=["POST"])
-def api_retry_all() -> Any:
+def api_retry_all() -> ResponseReturnValue:
     if not ENABLE_RETRY_FAILURES:
         return _json_error("当前环境未启用重试接口能力。", 403)
 
@@ -829,7 +861,7 @@ def api_retry_all() -> Any:
 # 升级七：JUnit XML 报告导出
 # ---------------------------------------------------------------
 @app.route("/api/export-junit/<path:report_name>")
-def api_export_junit(report_name: str) -> Any:
+def api_export_junit(report_name: str) -> ResponseReturnValue:
     if not ENABLE_JUNIT_EXPORT:
         return _json_error("当前环境未启用 JUnit XML 导出能力。", 403)
 
@@ -856,7 +888,7 @@ def api_export_junit(report_name: str) -> Any:
 # 升级四：多环境配置查询
 # ---------------------------------------------------------------
 @app.route("/api/environments")
-def api_environments() -> Any:
+def api_environments() -> ResponseReturnValue:
     """返回可用环境列表（不含 token 值）。"""
     env_list = []
     for env_name, env_cfg in ENVIRONMENTS.items():
@@ -871,7 +903,7 @@ def api_environments() -> Any:
 
 
 @app.route("/api/report-delete/<path:report_name>", methods=["DELETE"])
-def api_report_delete(report_name: str) -> Any:
+def api_report_delete(report_name: str) -> ResponseReturnValue:
     try:
         deleted_files = _admin_delete_report_artifacts(
             report_name,
@@ -886,7 +918,7 @@ def api_report_delete(report_name: str) -> Any:
 
 
 @app.route("/api/report-results/<path:report_name>")
-def api_report_results(report_name: str) -> Any:
+def api_report_results(report_name: str) -> ResponseReturnValue:
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
@@ -913,7 +945,7 @@ def api_report_results(report_name: str) -> Any:
 
 
 @app.route("/api/report-result-detail/<path:report_name>/<int:result_index>")
-def api_report_result_detail(report_name: str, result_index: int) -> Any:
+def api_report_result_detail(report_name: str, result_index: int) -> ResponseReturnValue:
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
@@ -926,7 +958,7 @@ def api_report_result_detail(report_name: str, result_index: int) -> Any:
 
 
 @app.route("/api/compare")
-def api_compare() -> Any:
+def api_compare() -> ResponseReturnValue:
     left_name = request.args.get("left", "")
     right_name = request.args.get("right", "")
     if not left_name or not right_name:
@@ -940,7 +972,7 @@ def api_compare() -> Any:
 
 
 @app.route("/test-token", methods=["POST"])
-def test_token() -> Any:
+def test_token() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     token = str(payload.get("token", "")).strip()
     if not token:
@@ -949,7 +981,7 @@ def test_token() -> Any:
 
 
 @app.route("/re-request-api", methods=["POST"])
-def re_request_api() -> Any:
+def re_request_api() -> ResponseReturnValue:
     is_multipart, payload, source = _svc_resolve_request_payload_source(
         content_type=request.content_type,
         json_payload=request.get_json(silent=True),
@@ -1047,7 +1079,7 @@ def re_request_api() -> Any:
         "err_code": err_code,
     }
 
-    new_summary: Dict[str, Any] = {}
+    new_summary: SummaryPayload = {}
     if save_to_report and rpt_name and rpt_index is not None:
         new_summary = _patch_report_result(
             rpt_name,
@@ -1077,7 +1109,7 @@ def re_request_api() -> Any:
 
 
 @app.route("/api/proxy-request", methods=["POST"])
-def api_proxy_request() -> Any:
+def api_proxy_request() -> ResponseReturnValue:
     """代理执行 HTTP 请求，供人工用例「发送」功能调用。仅允许 http/https。"""
     is_multipart, payload, source = _svc_resolve_request_payload_source(
         content_type=request.content_type,
@@ -1125,7 +1157,7 @@ def api_proxy_request() -> Any:
 
 
 @app.route("/api/run-postman", methods=["POST"])
-def api_run_postman() -> Any:
+def api_run_postman() -> ResponseReturnValue:
     collection_file = request.files.get("collection_file")
     if not collection_file or not str(collection_file.filename or "").strip():
         return _json_error("请上传有效的 Postman JSON 文件", 400)
@@ -1170,7 +1202,7 @@ def api_run_postman() -> Any:
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id, suffix)
     collection_file.save(str(saved_file))
-    job_params = _build_run_postman_job_params(
+    job_params: JobParams = _build_run_postman_job_params(
         job_id=job_id,
         original_name=original_name,
         saved_file=str(saved_file),
@@ -1193,7 +1225,7 @@ def api_run_postman() -> Any:
 
 
 @app.route("/api/run-ad-hoc-tests", methods=["POST"])
-def api_run_ad_hoc_tests() -> Any:
+def api_run_ad_hoc_tests() -> ResponseReturnValue:
     if not ENABLE_ADHOC_RUN:
         return _json_error("当前环境未启用直接新增接口测试能力。", 403)
 
@@ -1226,7 +1258,7 @@ def api_run_ad_hoc_tests() -> Any:
         json.dump(collection_data, f, indent=2, ensure_ascii=False)
 
     source_original_file = _sanitize_uploaded_name(f"{collection_name}.json")
-    job_params = _build_ad_hoc_job_params(
+    job_params: JobParams = _build_ad_hoc_job_params(
         job_id=job_id,
         source_original_file=source_original_file,
         saved_file=str(saved_file),
@@ -1249,7 +1281,7 @@ def api_run_ad_hoc_tests() -> Any:
 
 
 @app.route("/api/run-postman-status/<path:job_id>")
-def api_run_postman_status(job_id: str) -> Any:
+def api_run_postman_status(job_id: str) -> ResponseReturnValue:
     job = get_run_job(job_id)
     if not job:
         return _json_error("任务不存在。", 404)
@@ -1257,7 +1289,7 @@ def api_run_postman_status(job_id: str) -> Any:
 
 
 @app.route("/latest")
-def latest_report() -> Any:
+def latest_report() -> ResponseReturnValue:
     reports = _repo_list_reports()
     if not reports:
         return redirect(url_for("index"))

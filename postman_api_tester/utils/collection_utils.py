@@ -213,13 +213,17 @@ def append_manual_cases_to_collection(
         if not case.get("name") or not case.get("url"):
             continue
 
-        method = case.get("method", "GET")
-        url = case.get("url", "")
-        request_info = case.get("request_info") if isinstance(case.get("request_info"), dict) else {}
-        headers = request_info.get("headers") if isinstance(request_info.get("headers"), dict) else {}
+        method = str(case.get("method") or "GET").strip().upper() or "GET"
+        url = str(case.get("url") or "").strip()
+        case_name = str(case.get("name") or "").strip()
+        raw_request_info = case.get("request_info")
+        request_info: Dict[str, Any] = raw_request_info if isinstance(raw_request_info, dict) else {}
+        raw_headers = request_info.get("headers")
+        headers: Dict[str, Any] = raw_headers if isinstance(raw_headers, dict) else {}
         if not include_auth:
             headers = strip_auth_headers(headers)
-        params = request_info.get("params") if isinstance(request_info.get("params"), dict) else {}
+        raw_params = request_info.get("params")
+        params: Dict[str, Any] = raw_params if isinstance(raw_params, dict) else {}
         body = request_info.get("body")
         body_mode = request_info.get("body_mode")
         body_data = request_info.get("body_data")
@@ -234,7 +238,7 @@ def append_manual_cases_to_collection(
         set_request_headers(request_obj, headers)
         set_request_body(request_obj, body, body_mode=body_mode, body_data=body_data)
 
-        children.append({"name": case.get("name", ""), "request": request_obj, "response": []})
+        children.append({"name": case_name, "request": request_obj, "response": []})
         appended += 1
 
     return appended

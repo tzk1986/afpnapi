@@ -28,8 +28,9 @@ def set_request_headers(request_obj: Dict[str, Any], headers: Dict[str, Any]) ->
 
 
 def normalize_urlencoded_rows(data: Any) -> List[Dict[str, Any]]:
+    rows: List[Any]
     if isinstance(data, dict) and isinstance(data.get("urlencoded"), list):
-        rows = data.get("urlencoded")
+        rows = data["urlencoded"]
     elif isinstance(data, list):
         rows = data
     elif isinstance(data, dict):
@@ -50,8 +51,9 @@ def normalize_urlencoded_rows(data: Any) -> List[Dict[str, Any]]:
 
 
 def normalize_formdata_rows(data: Any) -> List[Dict[str, Any]]:
+    rows: List[Any]
     if isinstance(data, dict) and isinstance(data.get("formdata"), list):
-        rows = data.get("formdata")
+        rows = data["formdata"]
     elif isinstance(data, list):
         rows = data
     else:

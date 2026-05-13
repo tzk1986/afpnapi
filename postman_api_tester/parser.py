@@ -20,12 +20,16 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, TypedDict, Union
+from typing import Dict, List, Optional, TypedDict, Union
 from urllib.parse import urljoin
 
 from postman_api_tester.exceptions import ParseError
 
 logger = logging.getLogger(__name__)
+
+
+JsonObject = Dict[str, object]
+AssertionConfig = Dict[str, object]
 
 
 # === 类型定义 ===
@@ -37,12 +41,12 @@ class ApiConfig(TypedDict, total=False):
     url: str
     full_url: str
     headers: Dict[str, str]
-    body: Optional[Union[str, Dict[str, Any]]]
-    params: Dict[str, Any]
+    body: Optional[Union[str, JsonObject]]
+    params: JsonObject
     expected_status: int
     description: str
     item_path: List[int]
-    x_assertions: Optional[List[Dict[str, Any]]]
+    x_assertions: Optional[List[AssertionConfig]]
     x_expected_status: Optional[int]
 
 
@@ -55,7 +59,7 @@ class PostmanApiParser:
         :param file_path: Postman导出的JSON文件路径
         """
         self.file_path = file_path
-        self.data: Dict[str, Any] = {}
+        self.data: JsonObject = {}
         self.base_url = ""
         self.collections: List[ApiConfig] = []
         self.load_file()
@@ -76,16 +80,22 @@ class PostmanApiParser:
         从Postman文件中提取基础URL
         :return: 基础URL
         """
-        if self.data.get('variable'):
-            for var in self.data['variable']:
+        raw_variables = self.data.get('variable')
+        if isinstance(raw_variables, list):
+            for var in raw_variables:
+                if not isinstance(var, dict):
+                    continue
                 if var.get('key') == 'baseUrl' or var.get('key') == 'base_url':
                     self.base_url = var.get('value', '')
 
         # 如果没有找到baseUrl变量，尝试从第一个请求中提取
         if not self.base_url:
-            items = self.data.get('item', [])
-            if items and items[0].get('request'):
-                url = items[0]['request'].get('url')
+            raw_items = self.data.get('item')
+            items = raw_items if isinstance(raw_items, list) else []
+            first_item = items[0] if items and isinstance(items[0], dict) else None
+            first_request = first_item.get('request') if isinstance(first_item, dict) else None
+            if isinstance(first_request, dict):
+                url = first_request.get('url')
                 if isinstance(url, dict):
                     self.base_url = f"{url.get('protocol', 'https')}://{url.get('host', 'localhost')}"
                 elif isinstance(url, str):
@@ -102,7 +112,8 @@ class PostmanApiParser:
         :return: API列表
         """
         apis = []
-        items = self.data.get('item', [])
+        raw_items = self.data.get('item')
+        items = raw_items if isinstance(raw_items, list) else []
 
         self.extract_base_url()
 
@@ -220,7 +231,7 @@ class PostmanApiParser:
             'item_path': list(item_path or []),
         }
 
-    def _normalize_api_name(self, name: Any, method: str, url: str) -> str:
+    def _normalize_api_name(self, name: object, method: str, url: str) -> str:
         text = str(name or '').strip()
         if text and not re.fullmatch(r'[?？\s_]+', text):
             return text
@@ -243,7 +254,7 @@ class PostmanApiParser:
 
         return f"{method} {url_text}"
 
-    def _build_url_from_dict(self, url_dict: Dict) -> str:
+    def _build_url_from_dict(self, url_dict: JsonObject) -> str:
         """
         从字典格式的URL构建字符串URL
         :param url_dict: URL字典
@@ -269,8 +280,9 @@ class PostmanApiParser:
                 return raw_url
 
         query = ''
-        if url_dict.get('query'):
-            query_parts = [f"{q.get('key')}={q.get('value')}" for q in url_dict['query']]
+        raw_query = url_dict.get('query')
+        if isinstance(raw_query, list):
+            query_parts = [f"{q.get('key')}={q.get('value')}" for q in raw_query if isinstance(q, dict)]
             query = '?' + '&'.join(query_parts)
 
         return path + query

@@ -1,6 +1,7 @@
 """Admin handler thin wrappers over service layer."""
 
-from typing import Callable, Dict, List
+from pathlib import Path
+from typing import Any, Callable, Dict, List
 
 from postman_api_tester.services.report_delete_service import (
     delete_report_artifacts as _svc_delete_report_artifacts,
@@ -10,8 +11,8 @@ from postman_api_tester.services.report_delete_service import (
 def delete_report_artifacts(
     report_name: str,
     *,
-    find_report: Callable[[str], Dict[str, object]],
-    collect_report_artifacts: Callable[[Dict[str, object]], List[object]],
+    find_report: Callable[[str], Dict[str, Any]],
+    collect_report_artifacts: Callable[[Dict[str, Any]], List[Path]],
     invalidate_reports_cache: Callable[[], None],
 ) -> List[str]:
     return _svc_delete_report_artifacts(

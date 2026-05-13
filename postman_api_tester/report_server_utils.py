@@ -1,11 +1,23 @@
 ﻿import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional, SupportsInt, cast
 
 from postman_api_tester.utils.security import strip_sensitive_headers
 
 
-def build_exclusion_key(folder: Any, name: Any, method: Any, url: Any) -> str:
+JsonDict = Dict[str, object]
+
+
+def _coerce_int(value: object) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return int(cast(SupportsInt | str | bytes | bytearray, value))
+    except (TypeError, ValueError):
+        return None
+
+
+def build_exclusion_key(folder: object, name: object, method: object, url: object) -> str:
     folder_text = str(folder or "").strip()
     name_text = str(name or "").strip()
     method_text = str(method or "").strip().upper()
@@ -13,7 +25,7 @@ def build_exclusion_key(folder: Any, name: Any, method: Any, url: Any) -> str:
     return "|".join([folder_text, name_text, method_text, url_text])
 
 
-def normalize_exclusion_key(value: Any) -> str:
+def normalize_exclusion_key(value: object) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
@@ -30,7 +42,7 @@ def normalize_exclusion_key(value: Any) -> str:
     return build_exclusion_key(folder_text, name_text, method_text, url_text)
 
 
-def result_exclusion_key(result: Dict[str, Any]) -> str:
+def result_exclusion_key(result: JsonDict) -> str:
     return build_exclusion_key(
         result.get("folder", ""),
         result.get("name", ""),
@@ -39,7 +51,7 @@ def result_exclusion_key(result: Dict[str, Any]) -> str:
     )
 
 
-def manual_case_exclusion_key(case: Dict[str, Any]) -> str:
+def manual_case_exclusion_key(case: JsonDict) -> str:
     return build_exclusion_key(
         case.get("folder", ""),
         case.get("name", ""),
@@ -48,7 +60,7 @@ def manual_case_exclusion_key(case: Dict[str, Any]) -> str:
     )
 
 
-def normalize_manual_exclusions(values: Any) -> List[str]:
+def normalize_manual_exclusions(values: object) -> List[str]:
     if not isinstance(values, list):
         return []
     normalized: List[str] = []
@@ -62,11 +74,11 @@ def normalize_manual_exclusions(values: Any) -> List[str]:
     return normalized
 
 
-def strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
+def strip_auth_headers(headers: JsonDict) -> JsonDict:
     return strip_sensitive_headers(headers)
 
 
-def normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str, Any]:
+def normalize_manual_case(case: JsonDict, default_folder: str) -> JsonDict:
     case_id = str(case.get("id") or "").strip()
     method = str(case.get("method") or "GET").strip().upper() or "GET"
     url = str(case.get("url") or "").strip()
@@ -78,26 +90,14 @@ def normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str
     err_code = str(case.get("err_code") or "").strip()
     created_at = str(case.get("created_at") or "").strip()
 
-    try:
-        expected_status = int(case.get("expected_status") or 200)
-    except (TypeError, ValueError):
-        expected_status = 200
+    expected_status = _coerce_int(case.get("expected_status")) or 200
 
-    status_code = case.get("status_code")
-    if status_code is not None:
-        try:
-            status_code = int(status_code)
-        except (TypeError, ValueError):
-            status_code = None
+    status_code = _coerce_int(case.get("status_code"))
 
-    elapsed_ms = case.get("elapsed_ms")
-    if elapsed_ms is not None:
-        try:
-            elapsed_ms = int(elapsed_ms)
-        except (TypeError, ValueError):
-            elapsed_ms = None
+    elapsed_ms = _coerce_int(case.get("elapsed_ms"))
 
-    raw_request_info = case.get("request_info") if isinstance(case.get("request_info"), dict) else {}
+    raw_request_info_value = case.get("request_info")
+    raw_request_info: JsonDict = raw_request_info_value if isinstance(raw_request_info_value, dict) else {}
     req_headers = raw_request_info.get("headers")
     if not isinstance(req_headers, dict):
         req_headers = case.get("headers") if isinstance(case.get("headers"), dict) else {}
@@ -111,7 +111,8 @@ def normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str
         "body": req_body,
     }
 
-    raw_response_info = case.get("response_info") if isinstance(case.get("response_info"), dict) else {}
+    raw_response_info_value = case.get("response_info")
+    raw_response_info: JsonDict = raw_response_info_value if isinstance(raw_response_info_value, dict) else {}
     resp_headers = raw_response_info.get("headers")
     if not isinstance(resp_headers, dict):
         resp_headers = case.get("response_headers") if isinstance(case.get("response_headers"), dict) else {}
@@ -148,7 +149,7 @@ def normalize_manual_case(case: Dict[str, Any], default_folder: str) -> Dict[str
     }
 
 
-def to_bool(value: Any, default: bool = False) -> bool:
+def to_bool(value: object, default: bool = False) -> bool:
     if value is None:
         return default
     if isinstance(value, bool):

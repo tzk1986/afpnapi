@@ -9,7 +9,8 @@ import os
 import socket
 import sys
 import hashlib
-from typing import Dict, List, Any, Optional, Callable, Tuple
+from types import ModuleType
+from typing import Dict, List, Optional, Callable, Tuple, TypedDict
 from datetime import datetime
 import re
 from urllib.parse import parse_qsl, urljoin, urlsplit, urlunsplit
@@ -30,6 +31,44 @@ from postman_api_tester.session import SessionLike, RequestTimeout, create_share
 
 logger = logging.getLogger(__name__)
 
+
+class SummaryData(TypedDict):
+    total: int
+    passed: int
+    failed: int
+    error: int
+    success_rate: str
+    duration: str
+    start_time: str
+    end_time: str
+    avg_response_ms: int
+    max_response_ms: int
+    p95_response_ms: int
+
+
+ReportJson = Dict[str, object]
+DetailsData = Dict[str, ReportJson]
+IndexResultsData = List[ReportJson]
+ReportMetadata = Dict[str, object]
+ProgressPayload = Dict[str, object]
+ProgressCallback = Callable[[ProgressPayload], None]
+
+
+def _copy_summary(summary: SummaryData) -> SummaryData:
+    return {
+        'total': summary['total'],
+        'passed': summary['passed'],
+        'failed': summary['failed'],
+        'error': summary['error'],
+        'success_rate': summary['success_rate'],
+        'duration': summary['duration'],
+        'start_time': summary['start_time'],
+        'end_time': summary['end_time'],
+        'avg_response_ms': summary['avg_response_ms'],
+        'max_response_ms': summary['max_response_ms'],
+        'p95_response_ms': summary['p95_response_ms'],
+    }
+
 class PostmanTestReport:
     """Postman 测试报告生成器。"""
     
@@ -48,7 +87,7 @@ class PostmanTestReport:
         self.interrupted = False
         self.interrupt_reason = ""
         self.assertion_strict_mode = False
-        self._summary_cache: Optional[Dict[str, Any]] = None
+        self._summary_cache: Optional[SummaryData] = None
     
     def add_result(self, result: TestResultRecord) -> None:
         """添加单条测试结果。"""
@@ -60,10 +99,10 @@ class PostmanTestReport:
         self.results.extend(results)
         self._summary_cache = None
     
-    def generate_summary(self) -> Dict[str, Any]:
+    def generate_summary(self) -> SummaryData:
         """生成测试摘要。"""
         if self._summary_cache is not None:
-            return dict(self._summary_cache)
+            return _copy_summary(self._summary_cache)
 
         self.end_time = datetime.now()
 
@@ -91,7 +130,7 @@ class PostmanTestReport:
         p95_idx = max(0, int(len(times_sorted) * 0.95) - 1)
         p95_response_ms = times_sorted[p95_idx] if times_sorted else 0
 
-        summary = {
+        summary: SummaryData = {
             'total': total,
             'passed': passed,
             'failed': failed,
@@ -105,11 +144,11 @@ class PostmanTestReport:
             'p95_response_ms': p95_response_ms,
         }
         self._summary_cache = summary
-        return dict(summary)
+        return _copy_summary(summary)
 
-    def _build_details_data(self) -> Dict[str, Dict[str, Any]]:
+    def _build_details_data(self) -> DetailsData:
         """构建详情数据并执行请求头脱敏。"""
-        details_data: Dict[str, Dict[str, Any]] = {}
+        details_data: DetailsData = {}
         for idx, result in enumerate(self.results):
             req_info = result.get('request_info', {})
             raw_req_headers = req_info.get('headers', {}) or {}
@@ -120,7 +159,7 @@ class PostmanTestReport:
             }
         return details_data
 
-    def _write_json_file(self, file_path: str, payload: Any) -> None:
+    def _write_json_file(self, file_path: str, payload: object) -> None:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
 
@@ -134,7 +173,7 @@ class PostmanTestReport:
         base_name: str,
         total_pages: int,
         results_per_page: int,
-        summary: Dict,
+        summary: SummaryData,
         details_file_name: str,
     ) -> None:
         for page in range(1, total_pages + 1):
@@ -142,9 +181,9 @@ class PostmanTestReport:
             page_path = f"{base_name}_page_{page}.html"
             self._write_text_file(page_path, page_content)
 
-    def _build_index_results_data(self) -> List[Dict[str, Any]]:
+    def _build_index_results_data(self) -> IndexResultsData:
         """构建首页报告表格数据（包含详情字段）。"""
-        results_data: List[Dict[str, Any]] = []
+        results_data: IndexResultsData = []
         for result in self.results:
             results_data.append({
                 'name': result.get('name', ''),
@@ -246,7 +285,7 @@ class PostmanTestReport:
         self.generated_details_file = details_file
         self.generated_meta_file = meta_file
 
-    def _build_report_metadata(self, summary: Dict[str, Any], output_path: str, details_file: str) -> Dict[str, Any]:
+    def _build_report_metadata(self, summary: SummaryData, output_path: str, details_file: str) -> ReportMetadata:
         """鏋勫缓鍘嗗彶鎶ュ憡鍜屽樊寮傛瘮瀵规墍闇€鐨勭粨鏋勫寲鍏冩暟鎹€"""
         return {
             'report_name': os.path.basename(output_path),
@@ -287,7 +326,7 @@ class PostmanTestReport:
             ]
         }
     
-    def _generate_index_html(self, summary: Dict, total_pages: int, results_per_page: int, total_results: int) -> str:
+    def _generate_index_html(self, summary: SummaryData, total_pages: int, results_per_page: int, total_results: int) -> str:
         """生成索引页面 HTML，支持客户端分页与每页条数切换。"""
         # 准备结果数据 JSON（包含详情信息）
         results_data = self._build_index_results_data()
@@ -897,7 +936,7 @@ class PostmanTestReport:
 </html>
 """
     
-    def _generate_page_html(self, page: int, results_per_page: int, summary: Dict, details_filename: str) -> str:
+    def _generate_page_html(self, page: int, results_per_page: int, summary: SummaryData, details_filename: str) -> str:
         """生成分页页面 HTML。"""
         start_idx, end_idx, page_results = self._get_page_window(page, results_per_page)
         table_rows = self._build_page_table_rows(page_results, start_idx)
@@ -1126,7 +1165,7 @@ def _resolve_runtime_config(
 
     try:
         from postman_api_tester import config as _cfg_module
-        cfg: Any = _cfg_module
+        cfg: Optional[ModuleType] = _cfg_module
 
         cfg_token = str(getattr(cfg, 'TOKEN', '') or '').strip()
         if token is None and cfg_token:
@@ -1299,7 +1338,7 @@ def _apply_base_url_override(
         api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
 
 
-def _emit_progress(progress_callback: Optional[Callable[[Dict[str, Any]], None]], payload: Dict[str, Any]) -> None:
+def _emit_progress(progress_callback: Optional[ProgressCallback], payload: ProgressPayload) -> None:
     if not progress_callback:
         return
     try:
@@ -1309,7 +1348,7 @@ def _emit_progress(progress_callback: Optional[Callable[[Dict[str, Any]], None]]
 
 
 def _emit_start_progress(
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     *,
     current_total: int,
     total_apis_count: int,
@@ -1444,7 +1483,7 @@ def _execute_api_suite(
     resolved_token: Optional[str],
     request_timeout: RequestTimeout,
     assertion_strict_mode: bool,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     enable_checkpoint_recovery: bool,
     checkpoint_flush_every_n: int,
     checkpoint_path: str,
@@ -1516,7 +1555,7 @@ def _execute_and_finalize_suite(
     resolved_token: Optional[str],
     request_timeout: RequestTimeout,
     assertion_strict_mode: bool,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     enable_checkpoint_recovery: bool,
     checkpoint_flush_every_n: int,
     checkpoint_path: str,
@@ -1652,7 +1691,7 @@ def _prepare_checkpoint_and_progress(
     selected_item_paths: Optional[List[List[int]]],
     apis: List[ApiConfig],
     checkpoint_dir: str,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     total_apis_count: int,
 ) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _resolve_checkpoint_execution_apis(
@@ -1680,7 +1719,8 @@ def _build_report_context(
     assertion_strict_mode: bool,
 ) -> PostmanTestReport:
     report = PostmanTestReport()
-    report.collection_name = parser.data.get('info', {}).get('name', '') if isinstance(parser.data, dict) else ''
+    raw_info = parser.data.get('info') if isinstance(parser.data, dict) else None
+    report.collection_name = str(raw_info.get('name', '') or '') if isinstance(raw_info, dict) else ''
     report.source_file = os.path.abspath(postman_file)
     report.source_original_file = str(source_original_file or '').strip()
     report.base_url = parser.base_url
@@ -1695,7 +1735,7 @@ def _set_report_execution_outcome(report: PostmanTestReport, execution_error: Op
 
 
 def _emit_finish_progress(
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     *,
     execution_error: Optional[Exception],
     completed_count: int,
@@ -1735,7 +1775,7 @@ def _generate_and_log_report(
 def _complete_report_output(
     report: PostmanTestReport,
     *,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]],
+    progress_callback: Optional[ProgressCallback],
     execution_error: Optional[Exception],
     completed_count: int,
     current_total: int,
@@ -1771,7 +1811,7 @@ def run_postman_tests(
     source_original_file: Optional[str] = None,
     results_per_page: int = 30,
     selected_item_paths: Optional[List[List[int]]] = None,
-    progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    progress_callback: Optional[ProgressCallback] = None,
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。

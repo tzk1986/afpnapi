@@ -1,7 +1,7 @@
 import json
 import time as _time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 from postman_api_tester.report_meta_repository import (
     legacy_postman_html_files,
@@ -16,9 +16,14 @@ _REPORTS_DIR: Path = Path("reports").resolve()
 _REPORTS_CACHE_TTL = 30.0
 
 
+ReportRecord = Dict[str, object]
+ReportDetailsEntry = Dict[str, object]
+ReportDetailsMap = Dict[str, ReportDetailsEntry]
+
+
 class _ReportsCache(TypedDict):
-    data: Optional[List[Dict[str, Any]]]
-    by_name: Optional[Dict[str, Dict[str, Any]]]
+    data: Optional[List[ReportRecord]]
+    by_name: Optional[Dict[str, ReportRecord]]
     ts: float
 
 
@@ -41,7 +46,7 @@ def invalidate_reports_cache() -> None:
     _REPORTS_CACHE["ts"] = 0.0
 
 
-def load_report_details_map(report: Dict[str, Any]) -> Dict[str, Any]:
+def load_report_details_map(report: ReportRecord) -> ReportDetailsMap:
     details_file = str(report.get("details_file") or "").strip()
     if not details_file:
         return {}
@@ -51,7 +56,13 @@ def load_report_details_map(report: Dict[str, Any]) -> Dict[str, Any]:
     try:
         with details_path.open("r", encoding="utf-8") as file:
             details = json.load(file)
-        return details if isinstance(details, dict) else {}
+        if not isinstance(details, dict):
+            return {}
+        return {
+            str(key): value
+            for key, value in details.items()
+            if isinstance(value, dict)
+        }
     except Exception:
         return {}
 
@@ -60,12 +71,12 @@ def _is_total_report_name(report_name: str) -> bool:
     return "_page_" not in str(report_name or "").lower()
 
 
-def list_reports() -> List[Dict[str, Any]]:
+def list_reports() -> List[ReportRecord]:
     _now = _time.monotonic()
     if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
         return list(_REPORTS_CACHE["data"])
 
-    reports: List[Dict[str, Any]] = []
+    reports: List[ReportRecord] = []
     seen_report_names = set()
 
     for meta_path in report_meta_files():
@@ -96,9 +107,9 @@ def list_reports() -> List[Dict[str, Any]]:
             continue
 
     # Final guard: regardless of data source, do not expose paged child reports.
-    reports = [item for item in reports if _is_total_report_name(item.get("report_name", ""))]
+    reports = [item for item in reports if _is_total_report_name(str(item.get("report_name", "") or ""))]
 
-    reports.sort(key=lambda item: item.get("generated_at", ""), reverse=True)
+    reports.sort(key=lambda item: str(item.get("generated_at", "") or ""), reverse=True)
 
     _REPORTS_CACHE["data"] = reports
     _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
@@ -106,7 +117,7 @@ def list_reports() -> List[Dict[str, Any]]:
     return list(reports)
 
 
-def find_report(report_name: str) -> Dict[str, Any]:
+def find_report(report_name: str) -> ReportRecord:
     reports_by_name = _REPORTS_CACHE.get("by_name")
     if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
         list_reports()
@@ -136,7 +147,7 @@ def find_report(report_name: str) -> Dict[str, Any]:
     raise FileNotFoundError(report_name)
 
 
-def collect_report_artifacts(report: Dict[str, Any]) -> List[Path]:
+def collect_report_artifacts(report: ReportRecord) -> List[Path]:
     artifacts: List[Path] = []
     seen: set[str] = set()
 

@@ -64,7 +64,8 @@ def export_collection_with_latest_params(
 
     for index, result in enumerate(report.get("results", [])):
         detail = details_map.get(str(index)) or {}
-        request_info = detail.get("request_info") or {}
+        request_info_obj = detail.get("request_info") if isinstance(detail, dict) else {}
+        request_info = request_info_obj if isinstance(request_info_obj, dict) else {}
 
         item = item_by_path(collection_data, result.get("item_path") or [])
         if item is None:

@@ -1,10 +1,14 @@
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 
 
 _REPORTS_DIR: Path = Path("reports").resolve()
+
+
+ReportRecord = Dict[str, object]
+SummaryRecord = Dict[str, object]
 
 
 def configure_reports_dir(reports_dir: Path) -> None:
@@ -23,13 +27,13 @@ def report_meta_files() -> List[Path]:
     return [path for path in sorted(_REPORTS_DIR.glob("*_meta.json"), reverse=True) if is_total_report_file(path)]
 
 
-def _extract_json_value(text: str) -> Any:
+def _extract_json_value(text: str) -> object:
     text = text.strip().rstrip(",")
     return json.loads(text)
 
 
-def _load_report_meta_summary(meta_path: Path) -> Dict[str, Any]:
-    data: Dict[str, Any] = {
+def _load_report_meta_summary(meta_path: Path) -> ReportRecord:
+    data: ReportRecord = {
         "report_name": meta_path.name.replace("_meta.json", ".html"),
         "generated_at": "",
         "host_name": "",
@@ -40,7 +44,7 @@ def _load_report_meta_summary(meta_path: Path) -> Dict[str, Any]:
         "results": [],
         "_summary_only": True,
     }
-    summary: Dict[str, Any] = {}
+    summary: SummaryRecord = {}
     in_summary = False
     summary_keys = {
         "total", "passed", "failed", "error", "success_rate", "duration", "start_time", "end_time",
@@ -86,14 +90,14 @@ def _load_report_meta_summary(meta_path: Path) -> Dict[str, Any]:
     return data
 
 
-def load_report_meta(meta_path: Path, include_results: bool = True) -> Dict[str, Any]:
+def load_report_meta(meta_path: Path, include_results: bool = True) -> ReportRecord:
     if include_results:
         with meta_path.open("r", encoding="utf-8") as file:
             data = json.load(file)
         if "summary" not in data:
             data["summary"] = {}
         data["_summary_only"] = False
-        return data
+        return data if isinstance(data, dict) else {}
 
     try:
         return _load_report_meta_summary(meta_path)
@@ -105,7 +109,7 @@ def load_report_meta(meta_path: Path, include_results: bool = True) -> Dict[str,
             data["summary"] = {}
         data["results"] = []
         data["_summary_only"] = True
-        return data
+        return data if isinstance(data, dict) else {}
 
 
 def legacy_postman_html_files() -> List[Path]:
@@ -114,7 +118,7 @@ def legacy_postman_html_files() -> List[Path]:
     return [path for path in sorted(_REPORTS_DIR.glob("*.html"), reverse=True) if is_total_report_file(path)]
 
 
-def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
+def load_legacy_postman_report(report_path: Path) -> ReportRecord:
     content = report_path.read_text(encoding="utf-8")
     results_match = re.search(r"let\s+allResults\s*=\s*(\[.*?\]);", content, re.S)
     total_match = re.search(r"<label>总计</label>\s*<span>(\d+)</span>", content)
@@ -126,6 +130,8 @@ def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
     time_match = re.search(r"开始:\s*([^|<]+)\s*\|\s*结束:\s*([^<]+)", content)
 
     raw_results = json.loads(results_match.group(1)) if results_match else []
+    if not isinstance(raw_results, list):
+        raw_results = []
     results = [
         {
             "key": " | ".join([
@@ -144,6 +150,7 @@ def load_legacy_postman_report(report_path: Path) -> Dict[str, Any]:
             "err_code": item.get("err_code", ""),
         }
         for item in raw_results
+        if isinstance(item, dict)
     ]
 
     generated_at = time_match.group(2).strip() if time_match else ""

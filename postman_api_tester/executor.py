@@ -19,7 +19,7 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Any, Dict, List, Mapping, Optional, Tuple, TypedDict, Union
+from typing import Dict, List, Optional, Tuple, TypedDict, Union
 from postman_api_tester.session import RequestTimeout
 
 try:
@@ -31,8 +31,13 @@ except ImportError:
 from postman_api_tester.runtime_utils import normalize_url_and_params as _normalize_url_and_params
 from postman_api_tester.db_feedback import build_db_feedback
 from postman_api_tester.session import normalize_timeout
+from postman_api_tester.parser import ApiConfig
 
 logger = logging.getLogger(__name__)
+
+
+JsonObject = Dict[str, object]
+AssertionResult = Dict[str, object]
 
 
 # === 类型定义 ===
@@ -50,24 +55,24 @@ class TestResultRecord(TypedDict, total=False):
     status_code: Optional[int]
     expected_status: int
     response_time_ms: int
-    request_info: Dict[str, Any]
-    response_info: Dict[str, Any]
-    assertion_results: List[Dict[str, Any]]
+    request_info: "RequestInfo"
+    response_info: "ResponseInfo"
+    assertion_results: List[AssertionResult]
     assertion_engine_error: str
-    db_feedback: Dict[str, Any]
+    db_feedback: JsonObject
 
 
 class RequestInfo(TypedDict, total=False):
     """请求信息记录"""
     headers: Dict[str, str]
-    params: Dict[str, Any]
-    body: Optional[Union[str, Dict[str, Any]]]
+    params: JsonObject
+    body: object
 
 
 class ResponseInfo(TypedDict, total=False):
     """响应信息记录"""
     headers: Dict[str, str]
-    body: Union[str, Dict, Any]
+    body: object
 
 
 class PostmanTestExecutor:
@@ -75,9 +80,9 @@ class PostmanTestExecutor:
 
     def __init__(
         self,
-        api_config: Mapping[str, Any],
+        api_config: ApiConfig,
         auth_token: Optional[str] = None,
-        session: Any = None,
+        session: Optional[object] = None,
         request_timeout: Optional[RequestTimeout] = None,
         assertion_strict_mode: bool = False,
     ) -> None:
@@ -91,12 +96,12 @@ class PostmanTestExecutor:
         """
         import requests as _requests_mod
         self.api_config = dict(api_config)
-        self.http_response = None
-        self.resp_status_code = None
-        self.response_data = None
+        self.http_response: Optional[object] = None
+        self.resp_status_code: Optional[int] = None
+        self.response_data: Optional[object] = None
         # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
         self._owns_session = session is None
-        self.session = session if session is not None else _requests_mod.Session()
+        self.session: object = session if session is not None else _requests_mod.Session()
         # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
         self._auth_token: Optional[str] = auth_token or None
         self.request_timeout: Tuple[int, int] = normalize_timeout(request_timeout, default=(10, 30))
@@ -128,21 +133,27 @@ class PostmanTestExecutor:
     ) -> TestResultRecord:
         """构建统一结果边界，避免不同分支字段漂移。"""
         api = self.api_config
+        item_path_value = api.get('item_path')
+        item_path = item_path_value if isinstance(item_path_value, list) else []
+        expected_status_value = api.get('expected_status')
+        expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
+        default_request_info: RequestInfo = {'headers': {}, 'params': {}, 'body': None}
+        default_response_info: ResponseInfo = {'headers': {}, 'body': ''}
         return {
-            'name': api['name'],
-            'method': api['method'],
-            'url': api['full_url'],
+            'name': str(api.get('name') or ''),
+            'method': str(api.get('method') or ''),
+            'url': str(api.get('full_url') or ''),
             'actual_request_url': actual_request_url,
-            'item_path': api.get('item_path', []),
-            'expected_status': api.get('expected_status', 200),
+            'item_path': item_path,
+            'expected_status': expected_status,
             'status': status,
             'message': message,
             'err_code': err_code,
             'status_code': status_code,
-            'folder': api.get('folder', ''),
+            'folder': str(api.get('folder') or ''),
             'response_time_ms': response_time_ms,
-            'request_info': dict(request_info or {'headers': {}, 'params': {}, 'body': None}),
-            'response_info': dict(response_info or {'headers': {}, 'body': ''}),
+            'request_info': request_info or default_request_info,
+            'response_info': response_info or default_response_info,
             'assertion_results': [],
             'assertion_engine_error': '',
         }
@@ -150,10 +161,12 @@ class PostmanTestExecutor:
     def execute_test(self) -> TestResultRecord:
         """执行单个API测试，返回标准化结果记录"""
         api = self.api_config
-        method = api['method'].lower()
-        raw_url = api['full_url']  # 使用完整URL
-        headers = api.get('headers', {}).copy()  # 复制headers避免修改原数据
-        params = api.get('params', {})
+        method = str(api.get('method') or 'GET').lower()
+        raw_url = str(api.get('full_url') or '')  # 使用完整URL
+        raw_headers = api.get('headers')
+        headers = dict(raw_headers) if isinstance(raw_headers, dict) else {}
+        raw_params = api.get('params')
+        params = raw_params if isinstance(raw_params, dict) else {}
         url, params = _normalize_url_and_params(raw_url, params)
         body = api.get('body')
 
@@ -186,7 +199,7 @@ class PostmanTestExecutor:
                     response_info={'headers': {}, 'body': ''},
                 )
 
-            request_kwargs = {
+            request_kwargs: Dict[str, object] = {
                 'params': params,
                 'headers': headers,
                 'timeout': self.request_timeout,
@@ -210,7 +223,8 @@ class PostmanTestExecutor:
             response_message, err_code = self._extract_message_and_err_code(self.response_data)
 
             # 验证响应
-            expected_status = api.get('expected_status', 200)
+            expected_status_value = api.get('expected_status')
+            expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
 
             # 准备请求和响应详情
             request_info: RequestInfo = {
@@ -230,10 +244,11 @@ class PostmanTestExecutor:
 
             if status_code_ok and message_ok:
                 # 升级五：断言校验
-                assertion_results: List[Dict[str, Any]] = []
+                assertion_results: List[AssertionResult] = []
                 assertion_failed = False
                 assertion_engine_error = ""
-                assertions_rules = api.get('x_assertions') or []
+                raw_assertions = api.get('x_assertions')
+                assertions_rules = [item for item in raw_assertions if isinstance(item, dict)] if isinstance(raw_assertions, list) else []
                 if assertions_rules and _ASSERTIONS_AVAILABLE:
                     try:
                         assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
@@ -250,7 +265,7 @@ class PostmanTestExecutor:
                 result = self._build_result_base(
                     actual_request_url=actual_request_url,
                     status='FAILED' if assertion_failed else 'PASSED',
-                    message=('断言失败: ' + '; '.join(a['message'] for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
+                    message=('断言失败: ' + '; '.join(str(a.get('message', '')) for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
                     err_code=err_code,
                     status_code=self.resp_status_code,
                     response_time_ms=response_time_ms,
@@ -320,26 +335,30 @@ class PostmanTestExecutor:
         finally:
             # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
             if self._owns_session:
-                self.session.close()
+                close_fn = getattr(self.session, 'close', None)
+                if callable(close_fn):
+                    close_fn()
 
-    def _extract_message_and_err_code(self, response_data: Any) -> Tuple[str, str]:
+    def _extract_message_and_err_code(self, response_data: object) -> Tuple[str, str]:
         """从响应体中提取 message 与 errCode 字段，用于成功判定与报告查询。"""
         if not isinstance(response_data, dict):
             return "", ""
 
+        response_map: JsonObject = response_data
+
         message_keys = ["message", "msg", "error_message", "errorMessage", "errMsg"]
         err_code_keys = ["errCode", "errcode", "errorCode", "error_code", "code"]
 
-        def pick_text(data: Dict[str, Any], keys: List[str]) -> str:
+        def pick_text(data: JsonObject, keys: List[str]) -> str:
             for key in keys:
                 if key in data and data[key] is not None:
                     return str(data[key]).strip()
             return ""
 
-        message = pick_text(response_data, message_keys)
-        err_code = pick_text(response_data, err_code_keys)
+        message = pick_text(response_map, message_keys)
+        err_code = pick_text(response_map, err_code_keys)
 
-        payload = response_data.get("data")
+        payload = response_map.get("data")
         if isinstance(payload, dict):
             if not message:
                 message = pick_text(payload, message_keys)

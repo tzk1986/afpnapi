@@ -78,8 +78,10 @@ def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Di
         "response_info": {"headers": {}, "body": None},
     }
     if detail:
-        response["request_info"] = detail.get("request_info") or {"headers": {}, "params": {}, "body": None}
-        response["response_info"] = detail.get("response_info") or {"headers": {}, "body": None}
+        request_info = detail.get("request_info") if isinstance(detail, dict) else None
+        response_info = detail.get("response_info") if isinstance(detail, dict) else None
+        response["request_info"] = request_info if isinstance(request_info, dict) else {"headers": {}, "params": {}, "body": None}
+        response["response_info"] = response_info if isinstance(response_info, dict) else {"headers": {}, "body": None}
     return response
 
 

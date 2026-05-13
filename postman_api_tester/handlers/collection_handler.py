@@ -32,7 +32,8 @@ def _build_preview_url(url_obj: Any) -> str:
     if path_text and not path_text.startswith("/"):
         path_text = "/" + path_text
 
-    query_list = url_obj.get("query") if isinstance(url_obj.get("query"), list) else []
+    raw_query_list = url_obj.get("query")
+    query_list: List[Any] = raw_query_list if isinstance(raw_query_list, list) else []
     query_parts = []
     for query in query_list:
         if not isinstance(query, dict) or query.get("disabled"):
