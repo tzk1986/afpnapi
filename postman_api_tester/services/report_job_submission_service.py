@@ -1,6 +1,10 @@
 import re
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_uploaded_name(original_name: str) -> str:
@@ -20,6 +24,15 @@ def build_run_postman_job_params(
     selected_item_paths: Optional[List[List[int]]],
 ) -> Dict[str, Any]:
     selected_count = len(selected_item_paths or [])
+    logger.info(
+        "build run job params",
+        extra={
+            "event": "job.submit.params_built",
+            "job_id": job_id,
+            "run_scope": ("selected" if selected_count else "all"),
+            "selected_count": selected_count,
+        },
+    )
     return {
         "id": job_id,
         "status": "queued",
@@ -49,6 +62,14 @@ def build_ad_hoc_job_params(
     base_url: Optional[str],
     token: Optional[str],
 ) -> Dict[str, Any]:
+    logger.info(
+        "build adhoc job params",
+        extra={
+            "event": "job.submit.adhoc_params_built",
+            "job_id": job_id,
+            "source_file": source_original_file,
+        },
+    )
     return {
         "id": job_id,
         "status": "queued",
@@ -72,4 +93,13 @@ def build_ad_hoc_job_params(
 
 def build_saved_json_path(base_dir: Path, job_id: str, suffix: str = ".json") -> Path:
     base_dir.mkdir(parents=True, exist_ok=True)
-    return base_dir / f"{job_id}{suffix}"
+    saved_path = base_dir / f"{job_id}{suffix}"
+    logger.info(
+        "build saved json path",
+        extra={
+            "event": "job.submit.path_built",
+            "job_id": job_id,
+            "saved_path": str(saved_path),
+        },
+    )
+    return saved_path

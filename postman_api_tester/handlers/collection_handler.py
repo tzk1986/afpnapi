@@ -1,6 +1,7 @@
 ﻿"""Collection handler implementations for route-level orchestration."""
 
 import json
+import logging
 import re
 import uuid
 from datetime import datetime
@@ -12,6 +13,9 @@ from postman_api_tester.utils.request_builder import (
     set_request_headers,
     set_request_url,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _build_preview_url(url_obj: Any) -> str:
@@ -83,6 +87,14 @@ def extract_collection_preview_items(collection_data: Dict[str, Any], max_items:
                 walk(children, folder_chain + [name], current_path)
 
     walk(root_items, [], [])
+    logger.info(
+        "collection preview extracted",
+        extra={
+            "event": "handler.collection.preview.extracted",
+            "preview_count": len(result),
+            "max_items": max_items,
+        },
+    )
     return result
 
 
@@ -211,7 +223,7 @@ def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str
     except (TypeError, ValueError):
         expected_status = 200
 
-    return {
+    normalized_case = {
         "name": name,
         "folder": str(raw.get("folder") or "").strip(),
         "method": method,
@@ -222,6 +234,16 @@ def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str
         "body_data": body_data,
         "expected_status": expected_status,
     }
+    logger.info(
+        "adhoc case normalized",
+        extra={
+            "event": "handler.collection.adhoc_case.normalized",
+            "case_index": index,
+            "method": method,
+            "has_base_url": bool(base_url),
+        },
+    )
+    return normalized_case
 
 
 def build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, base_url: Optional[str]) -> Dict[str, Any]:
@@ -267,6 +289,15 @@ def build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, ba
         parent_items = _get_or_create_folder(root_items, folder_chain)
         parent_items.append(item_node)
 
+    logger.info(
+        "adhoc collection built",
+        extra={
+            "event": "handler.collection.adhoc_collection.built",
+            "collection_name": collection_name,
+            "case_count": len(cases),
+            "has_base_url": bool(base_url),
+        },
+    )
     return collection
 
 
@@ -299,6 +330,13 @@ def parse_selected_item_paths(raw: Any) -> List[List[int]]:
             continue
         seen.add(key)
         normalized.append(list(item))
+    logger.info(
+        "selected item paths parsed",
+        extra={
+            "event": "handler.collection.selected_paths.parsed",
+            "path_count": len(normalized),
+        },
+    )
     return normalized
 
 

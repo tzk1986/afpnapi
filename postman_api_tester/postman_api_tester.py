@@ -27,9 +27,16 @@ from postman_api_tester.auth import get_auth_token
 from postman_api_tester.parser import ApiConfig, PostmanApiParser
 from postman_api_tester.executor import PostmanTestExecutor, TestResultRecord
 from postman_api_tester.utils.security import sanitize_headers
+from postman_api_tester.utils.logging_utils import (
+    configure_logging_from_config,
+    get_log_sample_rate,
+    log_sampled,
+)
 from postman_api_tester.session import SessionLike, RequestTimeout, create_shared_session, close_session, normalize_timeout, resolve_request_timeout
 
+configure_logging_from_config(service_name="test_runner")
 logger = logging.getLogger(__name__)
+PASSED_TEST_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)
 
 
 class SummaryData(TypedDict):
@@ -1526,8 +1533,28 @@ def _execute_api_suite(
                     completed=False,
                 )
 
-            _log = logger.info if result['status'] == 'PASSED' else logger.warning
-            _log("[%d/%d] %s %s 鈫?%s", idx, len(apis), api['method'], api['name'], result['status'])
+            event_payload = {
+                'event': 'test.run.executed',
+                'api_name': str(api.get('name', '')),
+                'method': str(api.get('method', '')),
+                'status': str(result.get('status', '')),
+                'response_time_ms': int(result.get('response_time_ms', 0) or 0),
+            }
+            if result['status'] == 'PASSED':
+                log_sampled(
+                    logger,
+                    logging.INFO,
+                    "[%d/%d] %s %s 鈫?%s",
+                    idx,
+                    len(apis),
+                    api['method'],
+                    api['name'],
+                    result['status'],
+                    sample_rate=PASSED_TEST_LOG_SAMPLE_RATE,
+                    extra=event_payload,
+                )
+            else:
+                logger.warning("[%d/%d] %s %s 鈫?%s", idx, len(apis), api['method'], api['name'], result['status'], extra=event_payload)
 
             _emit_progress(progress_callback, {
                 'stage': 'running',

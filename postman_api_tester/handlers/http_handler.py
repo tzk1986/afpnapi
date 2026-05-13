@@ -1,5 +1,6 @@
 ﻿"""HTTP handler real implementations for re-request/proxy flows."""
 
+import logging
 import time as _time
 from typing import Any, Dict
 from urllib.parse import urlparse
@@ -8,6 +9,9 @@ import requests
 
 from postman_api_tester.runtime_utils import normalize_url_and_params
 from postman_api_tester.utils.request_builder import build_request_kwargs
+
+
+logger = logging.getLogger(__name__)
 
 
 def execute_http_request(
@@ -22,11 +26,27 @@ def execute_http_request(
 	is_multipart: bool,
 	files_source: Any,
 ) -> Dict[str, Any]:
+	logger.info(
+		"http request received",
+		extra={
+			"event": "handler.http.execute.received",
+			"method": method,
+			"url": url,
+			"is_multipart": bool(is_multipart),
+		},
+	)
 	try:
 		normalized_url, normalized_params = normalize_url_and_params(url, params)
 
 		parsed = urlparse(normalized_url)
 		if parsed.scheme not in ("http", "https") or not parsed.netloc:
+			logger.warning(
+				"http request validation failed",
+				extra={
+					"event": "handler.http.execute.invalid_url",
+					"url": normalized_url,
+				},
+			)
 			return {
 				"success": False,
 				"error_message": "url 浠呭厑璁稿悎娉曠殑 http/https 鍦板潃",
@@ -51,6 +71,15 @@ def execute_http_request(
 				files_source=files_source,
 			)
 		except ValueError as exc:
+			logger.warning(
+				"http request build failed",
+				extra={
+					"event": "handler.http.execute.invalid_body",
+					"method": method,
+					"url": normalized_url,
+					"error": str(exc),
+				},
+			)
 			return {
 				"success": False,
 				"error_message": str(exc),
@@ -80,6 +109,16 @@ def execute_http_request(
 			response_body = response.text
 
 		actual_request_url = str(getattr(response.request, "url", "") or "")
+		logger.info(
+			"http request completed",
+			extra={
+				"event": "handler.http.execute.completed",
+				"method": method,
+				"url": normalized_url,
+				"status_code": int(response.status_code),
+				"elapsed_ms": elapsed_ms,
+			},
+		)
 
 		return {
 			"success": True,
@@ -96,6 +135,14 @@ def execute_http_request(
 			"stored_body_data": stored_body_data,
 		}
 	except Exception as exc:
+		logger.exception(
+			"http request failed",
+			extra={
+				"event": "handler.http.execute.failed",
+				"method": method,
+				"url": url,
+			},
+		)
 		return {
 			"success": False,
 			"error_message": str(exc),

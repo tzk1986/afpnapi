@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import socket
+import time
 import uuid
 from types import ModuleType
 from datetime import datetime
@@ -109,12 +110,17 @@ from postman_api_tester.utils.report_utils import (
 from postman_api_tester.utils.response_parser import (
     extract_msg_errcode as _utils_extract_msg_errcode,
 )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+from postman_api_tester.utils.logging_utils import (
+    configure_logging_from_config,
+    get_log_alert_snapshot,
+    get_log_metrics_snapshot,
+    get_log_sample_rate,
+    log_sampled,
 )
+
+configure_logging_from_config(service_name="report_server")
 logger = logging.getLogger(__name__)
+ACCESS_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)
 
 MODULE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = MODULE_DIR.parent
@@ -332,10 +338,62 @@ _UPDATE_REPORT_META_FN = partial(
 )
 
 
+@app.before_request
+def _capture_request_start() -> None:
+    request.environ["_request_start_at"] = time.perf_counter()
+    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
+    request.environ["_request_id"] = request_id
+
+
+@app.after_request
+def _log_access(response: Response) -> Response:
+    started_at = request.environ.get("_request_start_at")
+    duration_ms = 0
+    if isinstance(started_at, (int, float)):
+        duration_ms = round((time.perf_counter() - started_at) * 1000)
+
+    request_id = str(request.environ.get("_request_id") or "")
+    extra_payload = {
+        "event": "http.access.logged",
+        "request_id": request_id,
+        "method": request.method,
+        "path": request.path,
+        "status_code": int(response.status_code),
+        "duration_ms": duration_ms,
+        "remote_addr": request.remote_addr or "",
+    }
+    if request.user_agent and request.user_agent.string:
+        extra_payload["user_agent"] = request.user_agent.string
+
+    level = logging.WARNING if response.status_code >= 500 else logging.INFO
+    sample_rate = 1.0 if response.status_code >= 400 else ACCESS_LOG_SAMPLE_RATE
+    log_sampled(
+        logger,
+        level,
+        "http_request",
+        sample_rate=sample_rate,
+        extra=extra_payload,
+    )
+    if request_id:
+        response.headers["X-Request-Id"] = request_id
+    return response
+
+
 @app.route("/health")
 def health() -> ResponseReturnValue:
     """健康检查端点，用于监控系统存活状态。"""
-    return jsonify(build_health_payload(datetime.now().isoformat()))
+    return jsonify(
+        build_health_payload(
+            datetime.now().isoformat(),
+            log_alert=get_log_alert_snapshot(),
+        )
+    )
+
+
+@app.route("/api/log-metrics")
+def log_metrics() -> ResponseReturnValue:
+    """日志聚合指标（内存计数快照）。"""
+    return jsonify(get_log_metrics_snapshot())
 
 
 @app.route("/")

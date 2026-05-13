@@ -1,4 +1,5 @@
 ﻿import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
@@ -26,6 +27,9 @@ from postman_api_tester.utils.request_builder import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def export_collection_with_latest_params(
     report: Dict[str, Any],
     *,
@@ -44,6 +48,16 @@ def export_collection_with_latest_params(
     source_path = Path(source_file)
     if not source_path.exists():
         raise FileNotFoundError(f"婧愰泦鍚堟枃浠朵笉瀛樺湪: {source_file}")
+
+    logger.info(
+        "export started",
+        extra={
+            "event": "report.export.started",
+            "report_name": str(report.get("report_name") or ""),
+            "scope": str(export_scope or "full"),
+            "include_auth": bool(include_auth),
+        },
+    )
 
     with source_path.open("r", encoding="utf-8") as file:
         collection_data = json.load(file)
@@ -139,6 +153,19 @@ def export_collection_with_latest_params(
 
     with export_path.open("w", encoding="utf-8") as file:
         json.dump(final_collection, file, indent=2, ensure_ascii=False)
+
+    logger.info(
+        "export completed",
+        extra={
+            "event": "report.export.completed",
+            "report_name": str(report.get("report_name") or ""),
+            "file_name": export_name,
+            "scope": scope,
+            "updated_count": updated_count,
+            "manual_cases_added": appended_manual_count,
+            "excluded_removed": removed_excluded_count,
+        },
+    )
 
     return {
         "file_name": export_name,

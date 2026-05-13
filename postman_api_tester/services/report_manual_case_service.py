@@ -1,5 +1,9 @@
 from datetime import datetime
+import logging
 from typing import Any, Callable, Dict, List
+
+
+logger = logging.getLogger(__name__)
 
 
 def add_manual_case(
@@ -32,6 +36,15 @@ def add_manual_case(
         return meta
 
     updated_meta = update_report_meta(report_name, updater)
+    logger.info(
+        "manual case added",
+        extra={
+            "event": "manual_case.add.created",
+            "report_name": report_name,
+            "case_id": str(case.get("id") or ""),
+            "status": str(case.get("status") or ""),
+        },
+    )
     return {"case": case, "manual_cases": updated_meta.get("manual_cases", [])}
 
 
@@ -74,6 +87,14 @@ def update_manual_case(
         return meta
 
     updated_meta = update_report_meta(report_name, updater)
+    logger.info(
+        "manual case updated",
+        extra={
+            "event": "manual_case.update.updated",
+            "report_name": report_name,
+            "case_id": case_id,
+        },
+    )
     return {"case": holder.get("case"), "manual_cases": updated_meta.get("manual_cases", [])}
 
 
@@ -113,6 +134,15 @@ def delete_manual_case(
         return meta
 
     updated_meta = update_report_meta(report_name, updater)
+    logger.info(
+        "manual case deleted",
+        extra={
+            "event": "manual_case.delete.deleted",
+            "report_name": report_name,
+            "case_id": case_id,
+            "exclusion_key": removed_key,
+        },
+    )
     return {"manual_cases": updated_meta.get("manual_cases", [])}
 
 
@@ -140,4 +170,13 @@ def set_case_exclusion(
         return meta
 
     updated_meta = update_report_meta(report_name, updater)
+    logger.info(
+        "manual case exclusion changed",
+        extra={
+            "event": "manual_case.exclusion.updated",
+            "report_name": report_name,
+            "exclusion_key": exclusion_key,
+            "excluded": bool(excluded),
+        },
+    )
     return {"manual_exclusions": updated_meta.get("manual_exclusions", [])}

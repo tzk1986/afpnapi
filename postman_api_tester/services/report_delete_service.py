@@ -1,5 +1,9 @@
 from pathlib import Path
+import logging
 from typing import Any, Callable, Dict, List
+
+
+logger = logging.getLogger(__name__)
 
 
 def delete_report_artifacts(
@@ -9,6 +13,13 @@ def delete_report_artifacts(
     collect_report_artifacts: Callable[[Dict[str, Any]], List[Path]],
     invalidate_reports_cache: Callable[[], None],
 ) -> List[str]:
+    logger.info(
+        "report delete started",
+        extra={
+            "event": "report.delete.started",
+            "report_name": report_name,
+        },
+    )
     report = find_report(report_name)
     artifacts = collect_report_artifacts(report)
     deleted_files: List[str] = []
@@ -18,4 +29,12 @@ def delete_report_artifacts(
             deleted_files.append(artifact.name)
 
     invalidate_reports_cache()
+    logger.info(
+        "report delete completed",
+        extra={
+            "event": "report.delete.completed",
+            "report_name": report_name,
+            "deleted_count": len(deleted_files),
+        },
+    )
     return deleted_files

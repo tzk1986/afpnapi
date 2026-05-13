@@ -40,6 +40,30 @@ REQUEST_CONNECT_TIMEOUT = int(os.environ.get("REQUEST_CONNECT_TIMEOUT", "10"))
 REQUEST_READ_TIMEOUT = int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))
 
 # ==============================================================
+# 日志系统配置
+# LOG_LEVEL: 日志级别（DEBUG/INFO/WARNING/ERROR）
+# LOG_FORMAT: 日志格式（structured/json）
+# LOG_SAMPLE_RATE: 高频日志采样率（0.0 ~ 1.0，默认 10%）
+# LOG_ALERT_ERROR_WINDOW_SECONDS: ERROR 速率统计窗口（秒）
+# LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN: ERROR 告警阈值（每分钟）
+# ==============================================================
+LOG_LEVEL = str(os.environ.get("LOG_LEVEL", "INFO")).strip().upper() or "INFO"
+LOG_FORMAT = str(os.environ.get("LOG_FORMAT", "structured")).strip().lower() or "structured"
+if LOG_FORMAT not in {"structured", "json"}:
+    LOG_FORMAT = "structured"
+try:
+    LOG_SAMPLE_RATE = float(os.environ.get("LOG_SAMPLE_RATE", "0.1"))
+except (TypeError, ValueError):
+    LOG_SAMPLE_RATE = 0.1
+LOG_SAMPLE_RATE = min(max(LOG_SAMPLE_RATE, 0.0), 1.0)
+LOG_ALERT_ERROR_WINDOW_SECONDS = max(60, int(os.environ.get("LOG_ALERT_ERROR_WINDOW_SECONDS", "300")))
+try:
+    LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = float(os.environ.get("LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", "10"))
+except (TypeError, ValueError):
+    LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = 10.0
+LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN)
+
+# ==============================================================
 # 任务历史记录上限
 # 超出上限时最早的任务记录会被淘汰（已在 report_server.py 中实现）
 # ==============================================================

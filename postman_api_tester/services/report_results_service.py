@@ -197,11 +197,14 @@ def build_retry_queued_payload(job_id: str, retry_count: int, message: str) -> D
     }
 
 
-def build_health_payload(timestamp: str) -> Dict[str, Any]:
-    return {
+def build_health_payload(timestamp: str, log_alert: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
         "status": "ok",
         "timestamp": timestamp,
     }
+    if isinstance(log_alert, dict):
+        payload["log_alert"] = log_alert
+    return payload
 
 
 def build_test_token_payload(success: bool, message: str) -> Dict[str, Any]:

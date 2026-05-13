@@ -1,5 +1,6 @@
 ﻿"""Manual-case handler thin wrappers over service layer."""
 
+import logging
 from typing import Any, Callable, Dict, List
 
 from postman_api_tester.utils.collection_utils import append_manual_cases_to_collection
@@ -12,12 +13,23 @@ from postman_api_tester.services.report_manual_case_service import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 def list_manual_cases(
     report_name: str,
     report: Dict[str, Any],
     default_folder: str,
     enabled: bool,
 ) -> Dict[str, Any]:
+    logger.info(
+        "handler list manual cases",
+        extra={
+            "event": "handler.manual_case.list.forward",
+            "report_name": report_name,
+            "enabled": bool(enabled),
+        },
+    )
     return build_manual_cases_payload(
         report_name=report_name,
         report=report,
@@ -36,6 +48,13 @@ def add_manual_case(
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
     create_id: Callable[[], str],
 ) -> Dict[str, Any]:
+    logger.info(
+        "handler add manual case",
+        extra={
+            "event": "handler.manual_case.add.forward",
+            "report_name": report_name,
+        },
+    )
     return _svc_add_manual_case(
         report_name,
         payload,
@@ -57,6 +76,14 @@ def update_manual_case(
     normalize_manual_case: Callable[[Dict[str, Any], str], Dict[str, Any]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    logger.info(
+        "handler update manual case",
+        extra={
+            "event": "handler.manual_case.update.forward",
+            "report_name": report_name,
+            "case_id": case_id,
+        },
+    )
     return _svc_update_manual_case(
         report_name,
         case_id,
@@ -77,6 +104,14 @@ def delete_manual_case(
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    logger.info(
+        "handler delete manual case",
+        extra={
+            "event": "handler.manual_case.delete.forward",
+            "report_name": report_name,
+            "case_id": case_id,
+        },
+    )
     return _svc_delete_manual_case(
         report_name,
         case_id,
@@ -96,6 +131,14 @@ def set_case_exclusion(
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    logger.info(
+        "handler set manual case exclusion",
+        extra={
+            "event": "handler.manual_case.exclusion.forward",
+            "report_name": report_name,
+            "excluded": bool(excluded),
+        },
+    )
     return _svc_set_case_exclusion(
         report_name,
         exclusion_key,

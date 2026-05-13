@@ -1,5 +1,6 @@
 ﻿"""Job handler thin wrappers over service layer."""
 
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from postman_api_tester.services.report_job_execution_service import (
@@ -8,6 +9,9 @@ from postman_api_tester.services.report_job_execution_service import (
     prepare_retry_job_context as _svc_prepare_retry_job_context,
     run_postman_job as _svc_run_postman_job,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def run_postman_job(
@@ -24,6 +28,14 @@ def run_postman_job(
     set_run_job: Callable[..., None],
     invalidate_reports_cache: Callable[[], None],
 ) -> None:
+    logger.info(
+        "handler run job",
+        extra={
+            "event": "handler.job.run.forward",
+            "job_id": job_id,
+            "selected_count": len(selected_item_paths or []),
+        },
+    )
     return _svc_run_postman_job(
         job_id,
         postman_file,
@@ -48,6 +60,14 @@ def enqueue_retry_job(
     set_run_job: Callable[..., None],
     run_postman_job_fn: Callable[..., None],
 ) -> str:
+    logger.info(
+        "handler enqueue retry",
+        extra={
+            "event": "handler.job.retry.forward",
+            "selected_count": len(selected_paths),
+            "source_file": saved_file,
+        },
+    )
     return _svc_enqueue_retry_job(
         saved_file,
         runtime,
@@ -88,6 +108,15 @@ def enqueue_job_with_worker(
     default_output_dir: str,
     selected_item_paths: Optional[List[List[int]]] = None,
 ) -> None:
+    logger.info(
+        "handler enqueue job",
+        extra={
+            "event": "handler.job.enqueue.forward",
+            "job_id": job_id,
+            "saved_file": saved_file,
+            "selected_count": len(selected_item_paths or []),
+        },
+    )
     return _svc_enqueue_job_with_worker(
         job_id,
         saved_file,

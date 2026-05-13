@@ -1,5 +1,6 @@
 ﻿import os
 import threading
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from postman_api_tester.services.report_retry_service import (
@@ -8,6 +9,11 @@ from postman_api_tester.services.report_retry_service import (
     collect_all_item_paths,
     collect_failed_item_paths,
 )
+from postman_api_tester.utils.logging_utils import get_log_sample_rate, log_sampled
+
+
+logger = logging.getLogger(__name__)
+PROGRESS_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)
 
 
 def run_postman_job(
@@ -24,6 +30,16 @@ def run_postman_job(
     set_run_job: Callable[..., None],
     invalidate_reports_cache: Callable[[], None],
 ) -> None:
+    logger.info(
+        "job started",
+        extra={
+            "event": "job.run.started",
+            "job_id": job_id,
+            "postman_file": postman_file,
+            "report_name": str(report_name or ""),
+            "selected_count": len(selected_item_paths or []),
+        },
+    )
     set_run_job(job_id, status="running", message="任务正在执行中...")
     try:
         from postman_api_tester.postman_api_tester import run_postman_tests
@@ -54,6 +70,21 @@ def run_postman_job(
                 current_url=current_url,
                 last_status=str(progress.get("last_status") or ""),
             )
+            log_sampled(
+                logger,
+                logging.INFO,
+                "job progress",
+                sample_rate=PROGRESS_LOG_SAMPLE_RATE,
+                extra={
+                    "event": "job.run.progress",
+                    "job_id": job_id,
+                    "completed": completed,
+                    "total": total,
+                    "percent": percent,
+                    "current_name": current_name,
+                    "last_status": str(progress.get("last_status") or ""),
+                },
+            )
 
         report = run_postman_tests(
             postman_file=postman_file,
@@ -73,8 +104,24 @@ def run_postman_job(
             report_name=os.path.basename(str(report.generated_report_file or "")),
             report_meta_name=os.path.basename(str(report.generated_meta_file or "")),
         )
+        logger.info(
+            "job completed",
+            extra={
+                "event": "job.run.completed",
+                "job_id": job_id,
+                "report_name": os.path.basename(str(report.generated_report_file or "")),
+                "meta_name": os.path.basename(str(report.generated_meta_file or "")),
+            },
+        )
         invalidate_reports_cache()
     except Exception as exc:
+        logger.exception(
+            "job failed",
+            extra={
+                "event": "job.run.failed",
+                "job_id": job_id,
+            },
+        )
         set_run_job(job_id, status="failed", message=str(exc))
 
 
@@ -94,6 +141,15 @@ def enqueue_retry_job(
         queued_message=queued_message,
     )
     set_run_job(job_plan["job_id"], **job_plan["queue_record"])
+    logger.info(
+        "retry job queued",
+        extra={
+            "event": "job.retry.queued",
+            "job_id": str(job_plan["job_id"]),
+            "selected_count": len(selected_paths),
+            "source_file": saved_file,
+        },
+    )
 
     worker = threading.Thread(
         target=run_postman_job_fn,
@@ -118,6 +174,13 @@ def prepare_retry_job_context(
     elif retry_mode == "all":
         selected_paths = collect_all_item_paths(report)
     else:
+        logger.warning(
+            "retry mode invalid",
+            extra={
+                "event": "job.retry.invalid_mode",
+                "retry_mode": retry_mode,
+            },
+        )
         return [], None, f"未知重试模式: {retry_mode}"
 
     source_runtime_ctx, source_runtime_error = build_retry_source_runtime_context(
@@ -127,6 +190,24 @@ def prepare_retry_job_context(
         default_results_per_page=default_results_per_page,
         clamp_run_results_per_page=clamp_run_results_per_page,
     )
+    if source_runtime_error:
+        logger.warning(
+            "retry context failed",
+            extra={
+                "event": "job.retry.context_failed",
+                "retry_mode": retry_mode,
+                "error": source_runtime_error,
+            },
+        )
+    else:
+        logger.info(
+            "retry context ready",
+            extra={
+                "event": "job.retry.context_ready",
+                "retry_mode": retry_mode,
+                "selected_count": len(selected_paths),
+            },
+        )
     return selected_paths, source_runtime_ctx, source_runtime_error
 
 
@@ -148,6 +229,16 @@ def enqueue_job_with_worker(
     original_name = job_params.pop("file_name", "collection.json")
 
     set_run_job(job_id, **job_params)
+    logger.info(
+        "job queued",
+        extra={
+            "event": "job.enqueue.queued",
+            "job_id": job_id,
+            "saved_file": saved_file,
+            "report_name": str(report_name or ""),
+            "selected_count": len(selected_item_paths or []),
+        },
+    )
 
     worker = threading.Thread(
         target=run_postman_job_fn,
