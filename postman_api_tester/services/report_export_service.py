@@ -1,4 +1,10 @@
-﻿import json
+﻿"""开发导读：
+- 职责：基于报告最新请求参数导出集合，支持 full/report_only 两种范围。
+- 入口：export_collection_with_latest_params()。
+- 关键行为：回填最新请求、可选剔除鉴权头、合并人工用例并移除排除项。
+"""
+
+import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -41,13 +47,15 @@ def export_collection_with_latest_params(
     include_auth: bool = False,
     export_scope: str = "full",
 ) -> Dict[str, Any]:
+    # 1) 加载源集合；2) 依据报告详情回填最新请求参数；
+    # 3) 按范围裁剪；4) 合并人工用例并剔除排除项；5) 生成导出文件。
     source_file = str(report.get("source_file") or "").strip()
     if not source_file:
         raise ValueError("报告缺少 source_file，无法导出集合。")
 
     source_path = Path(source_file)
     if not source_path.exists():
-        raise FileNotFoundError(f"婧愰泦鍚堟枃浠朵笉瀛樺湪: {source_file}")
+        raise FileNotFoundError(f"源集合文件不存在: {source_file}")
 
     logger.info(
         "export started",
@@ -115,6 +123,7 @@ def export_collection_with_latest_params(
     report_only_count = 0
     scope_effective_same_as_full = False
     if scope == "report_only":
+        # report_only 基于 item_path 精确裁剪，确保导出集合与本次报告执行范围一致。
         selected_paths = collect_report_item_paths(report)
         if not selected_paths:
             raise ValueError("导出范围为 report_only 时，报告中缺少可用 item_path。")
@@ -134,6 +143,7 @@ def export_collection_with_latest_params(
 
     manual_exclusions = normalize_manual_exclusions(report.get("manual_exclusions") or [])
     folder_name = str(manual_case_folder_name).strip() or manual_case_folder_name
+    # 统一导出语义：原始集合(已回填) + manual_cases - manual_exclusions。
     appended_manual_count = append_manual_cases_to_collection(
         collection_data=final_collection,
         manual_cases=manual_cases,

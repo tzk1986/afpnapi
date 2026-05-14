@@ -1,3 +1,10 @@
+"""认证辅助模块。
+
+开发导读:
+- 负责在集合接口中识别登录候选接口并提取 token。
+- 提供自动登录探测与 token 注入的公共能力。
+"""
+
 import logging
 from typing import Any, Dict, Optional, Sequence, TypedDict
 

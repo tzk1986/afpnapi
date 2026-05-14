@@ -1,5 +1,12 @@
 ﻿"""Ad-hoc handler concrete implementations."""
 
+"""开发导读：
+- 职责：将 ad-hoc 页面输入标准化，并组装为可复用的 Postman Collection v2.1。
+- 入口：normalize_adhoc_case()、build_adhoc_collection()。
+- 输出：返回可直接落盘并交给统一执行链路的 collection 字典。
+- 关系：依赖 utils.request_builder，保证 body/header/url 语义与主执行链路一致。
+"""
+
 import json
 import re
 import uuid
@@ -84,6 +91,8 @@ def _derive_case_name(raw_name: Any, method: str, url: str, index: int) -> str:
 
 
 def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str]) -> Dict[str, Any]:
+    # 将前端 ad-hoc 输入统一为内部稳定结构，
+    # 在入队前尽早兜底 method/url/body 等边界校验。
     if not isinstance(raw, dict):
         raise ValueError(f"第 {index + 1} 条接口配置不是对象")
 
@@ -149,6 +158,7 @@ def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str
 
 
 def build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, base_url: Optional[str]) -> Dict[str, Any]:
+    # ad-hoc 最终复用主执行链路，因此这里构造标准 Postman v2.1 Collection。
     now_iso = datetime.utcnow().isoformat() + "Z"
     collection: Dict[str, Any] = {
         "info": {

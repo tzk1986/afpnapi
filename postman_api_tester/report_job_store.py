@@ -1,3 +1,10 @@
+"""运行任务状态存储模块。
+
+开发导读:
+- 维护内存态任务字典与并发锁，供报告服务查询任务进度。
+- 提供任务写入、读取、上限控制与过期淘汰能力。
+"""
+
 import threading
 from typing import Any, Dict, Optional
 

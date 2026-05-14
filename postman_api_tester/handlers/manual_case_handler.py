@@ -1,5 +1,12 @@
 ﻿"""Manual-case handler thin wrappers over service layer."""
 
+"""开发导读：
+- 职责：人工用例相关路由的统一入口（查询、新增、更新、删除、排除）。
+- 入口：list_manual_cases()/add/update/delete_manual_case()、set_case_exclusion()。
+- 行为：通过 service 层写回 meta，保证筛选与导出链路读取同一份数据。
+- 关系：append_manual_cases_to_collection 供导出链路复用。
+"""
+
 import logging
 from typing import Any, Callable, Dict, List
 
@@ -22,6 +29,7 @@ def list_manual_cases(
     default_folder: str,
     enabled: bool,
 ) -> Dict[str, Any]:
+    # 列表查询统一走 results service，保证结果页与人工用例页口径一致。
     logger.info(
         "handler list manual cases",
         extra={
@@ -131,6 +139,7 @@ def set_case_exclusion(
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    # 排除标记最终写回 meta，供结果筛选与导出链路共同消费。
     logger.info(
         "handler set manual case exclusion",
         extra={

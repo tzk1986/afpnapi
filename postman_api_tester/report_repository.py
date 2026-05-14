@@ -1,3 +1,10 @@
+"""报告仓储聚合模块。
+
+开发导读:
+- 统一聚合元数据仓储与详情文件读取能力。
+- 对外提供报告列表缓存、单报告查询与详情映射加载。
+"""
+
 import json
 import time as _time
 from pathlib import Path

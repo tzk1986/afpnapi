@@ -1,5 +1,12 @@
 ﻿"""HTTP handler real implementations for re-request/proxy flows."""
 
+"""开发导读：
+- 职责：执行重试/代理请求前的 URL 安全校验、请求参数归一化与统一响应封装。
+- 入口：execute_http_request()。
+- 输出：固定 success/error 结构，供前端调试、编辑重试与报告写回复用。
+- 安全：仅允许 http/https，超时配置从 config 动态读取，避免硬编码。
+"""
+
 import logging
 import time as _time
 from typing import Any, Dict
@@ -26,6 +33,8 @@ def execute_http_request(
 	is_multipart: bool,
 	files_source: Any,
 ) -> Dict[str, Any]:
+	# 统一在 handler 层完成请求前置校验与请求参数归一化，
+	# 让路由层保持轻量、服务层可复用。
 	logger.info(
 		"http request received",
 		extra={
@@ -49,7 +58,7 @@ def execute_http_request(
 			)
 			return {
 				"success": False,
-				"error_message": "url 浠呭厑璁稿悎娉曠殑 http/https 鍦板潃",
+				"error_message": "url 仅允许合法的 http/https 地址",
 				"error_code": 400,
 			}
 
@@ -109,6 +118,7 @@ def execute_http_request(
 			response_body = response.text
 
 		actual_request_url = str(getattr(response.request, "url", "") or "")
+		# 返回统一结构，供重试编辑、代理调试、报告写入链路复用。
 		logger.info(
 			"http request completed",
 			extra={

@@ -1,6 +1,10 @@
 """Postman API 测试主模块。
 
 用于读取 APIFox/Postman 导出的接口文件，执行测试并生成报告。
+
+开发导读:
+- 主流程包含: 集合解析、可选筛选、认证解析、执行、报告生成与落盘。
+- 对外建议调用 run_postman_tests；其余函数主要用于流程拆分与可测试性。
 """
 
 import json
@@ -216,7 +220,7 @@ class PostmanTestReport:
         options: List[str] = []
         for value in option_values:
             selected = ' selected' if value == selected_page_size else ''
-            options.append(f'<option value="{value}"{selected}>{value}鏉?/option>')
+            options.append(f'<option value="{value}"{selected}>{value}条</option>')
         return '\n                    '.join(options)
 
     def _get_page_window(self, page: int, results_per_page: int) -> Tuple[int, int, List[TestResultRecord]]:
@@ -262,7 +266,7 @@ class PostmanTestReport:
         output_dir = os.path.dirname(output_path) if os.path.dirname(output_path) else '.'
         os.makedirs(output_dir, exist_ok=True)
         
-        # 璁＄畻鍒嗛〉
+        # 计算分页
         total_results = len(self.results)
         total_pages = (total_results + results_per_page - 1) // results_per_page
         details_data = self._build_details_data()
@@ -293,7 +297,7 @@ class PostmanTestReport:
         self.generated_meta_file = meta_file
 
     def _build_report_metadata(self, summary: SummaryData, output_path: str, details_file: str) -> ReportMetadata:
-        """鏋勫缓鍘嗗彶鎶ュ憡鍜屽樊寮傛瘮瀵规墍闇€鐨勭粨鏋勫寲鍏冩暟鎹€"""
+        """构建历史报告和差异比对所需的结构化元数据。"""
         return {
             'report_name': os.path.basename(output_path),
             'generated_at': summary['end_time'],
@@ -346,7 +350,7 @@ class PostmanTestReport:
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Postman API 娴嬭瘯鎶ュ憡</title>
+    <title>Postman API 测试报告</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; }}
@@ -420,14 +424,14 @@ class PostmanTestReport:
 </head>
 <body>
     <div class="header">
-        <h1>Postman API 娴嬭瘯鎶ュ憡</h1>
-        <p>鑷姩鍖栨帴鍙ｆ祴璇曠粨鏋滄眹鎬?- 浼樺寲鐗?/p>
+        <h1>Postman API 测试报告</h1>
+        <p>自动化接口测试结果汇总 - 优化版</p>
     </div>
     
     <div class="summary">
         <div class="summary-grid">
             <div class="summary-item">
-                <label>鎬昏</label>
+                <label>总计</label>
                 <span>{summary['total']}</span>
             </div>
             <div class="summary-item passed">
@@ -447,7 +451,7 @@ class PostmanTestReport:
                 <span>{summary['success_rate']}</span>
             </div>
             <div class="summary-item">
-                <label>鑰楁椂</label>
+                <label>耗时</label>
                 <span>{summary['duration']}</span>
             </div>
         </div>
@@ -460,26 +464,26 @@ class PostmanTestReport:
         <div class="control-row">
             <div class="search-item">
                 <label for="search-input">搜索:</label>
-                <input type="text" id="search-input" placeholder="杈撳叆API鍚嶇О銆佽矾寰勩€佹枃浠跺す杩涜鎼滅储..." onkeyup="performSearch()">
-                <button onclick="clearSearch()">娓呯┖</button>
+                <input type="text" id="search-input" placeholder="输入API名称、路径、文件夹进行搜索..." onkeyup="performSearch()">
+                <button onclick="clearSearch()">清空</button>
             </div>
         </div>
         <div class="control-row">
             <div class="token-item">
                 <label for="token-input">Token:</label>
                 <input type="text" id="token-input" placeholder="输入认证 token（可选，用于重新请求接口）">
-                <button id="test-token-btn" onclick="testToken()">娴嬭瘯Token</button>
+                <button id="test-token-btn" onclick="testToken()">测试Token</button>
             </div>
         </div>
         <div class="control-row">
             <div class="control-item">
-                <label for="page-size">姣忛〉鏄剧ず:</label>
+                <label for="page-size">每页显示:</label>
                 <select id="page-size" onchange="changePageSize()">
                     {page_size_options_html}
                 </select>
             </div>
             <div class="control-item">
-                <label>鐘舵€佺瓫閫?</label>
+                <label>状态筛选:</label>
                 <button class="filter-btn active" onclick="filterResults('all', this)">全部</button>
                 <button class="filter-btn" onclick="filterResults('PASSED', this)">√ 成功</button>
                 <button class="filter-btn" onclick="filterResults('FAILED', this)">× 失败</button>
@@ -495,7 +499,7 @@ class PostmanTestReport:
     </div>
     
     <div class="pagination-section">
-        <div class="pagination-info" id="pagination-info">绗?1 椤?| 鍏?{total_pages} 椤?| 鍏?{total_results} 鏉℃暟鎹?/div>
+        <div class="pagination-info" id="pagination-info">第 1 页 | 共 {total_pages} 页 | 共 {total_results} 条数据</div>
         <div class="page-buttons" id="pagination-buttons"></div>
     </div>
     
@@ -509,20 +513,20 @@ class PostmanTestReport:
         let detailCache = {{}};
         let currentToken = '';
         
-        // 鍒濆鍖?
+        // 初始化
         function init() {{
             changePageSize();
             renderTable();
         }}
         
-        // 鎵ц鎼滅储
+        // 执行搜索
         function performSearch() {{
             searchQuery = document.getElementById('search-input').value.toLowerCase().trim();
             currentPage = 1;
             applyFilters();
         }}
         
-        // 娓呯┖鎼滅储
+        // 清空搜索
         function clearSearch() {{
             document.getElementById('search-input').value = '';
             searchQuery = '';
@@ -552,14 +556,14 @@ class PostmanTestReport:
             }});
         }}
         
-        // 搴旂敤鎵€鏈夎繃婊ゆ潯浠?
+        // 应用所有过滤条件
         function applyFilters() {{
             const statusFiltered = applyStatusFilter(allResults);
             filteredResults = applySearchFilter(statusFiltered);
             renderTable();
         }}
         
-        // 鏀瑰彉姣忛〉鏄剧ず鏁伴噺
+        // 改变每页显示数量
         function changePageSize() {{
             pageSize = parseInt(document.getElementById('page-size').value);
             currentPage = 1;
@@ -593,7 +597,7 @@ class PostmanTestReport:
 
                 html += `
                     <tr data-result-idx="${{globalIdx}}">
-                        <td><span class="expand-btn" onclick="toggleDetail('${{detailId}}', ${{globalIdx}}, this)">鈻?灞曞紑</span></td>
+                        <td><span class="expand-btn" onclick="toggleDetail('${{detailId}}', ${{globalIdx}}, this)">展开</span></td>
                         <td title="${{result.name}}">${{result.name}}</td>
                         <td title="${{result.folder || '-'}}">${{result.folder || '-'}}</td>
                         <td><strong>${{result.method}}</strong></td>
@@ -630,12 +634,12 @@ class PostmanTestReport:
                     <thead>
                         <tr>
                             <th>操作</th>
-                            <th>API鍚嶇О</th>
-                            <th>鏂囦欢澶?/th>
-                            <th>鏂规硶</th>
+                            <th>API名称</th>
+                            <th>文件夹</th>
+                            <th>方法</th>
                             <th>URL</th>
-                            <th>鐘舵€?/th>
-                            <th>鐘舵€佺爜</th>
+                            <th>状态</th>
+                            <th>状态码</th>
                             <th>详情</th>
                         </tr>
                     </thead>
@@ -646,7 +650,7 @@ class PostmanTestReport:
             `;
         }}
         
-        // 绛涢€夌粨鏋?
+        // 筛选结果
         function filterResults(status, activeButton) {{
             currentFilter = status;
             currentPage = 1;
@@ -659,7 +663,7 @@ class PostmanTestReport:
             return Math.ceil(filteredResults.length / pageSize);
         }}
         
-        // 娓叉煋琛ㄦ牸
+        // 渲染表格
         function renderTable() {{
             const pageState = getCurrentPageData();
             const totalPages = pageState.totalPages;
@@ -667,7 +671,7 @@ class PostmanTestReport:
             const pageData = pageState.pageData;
             
             if (filteredResults.length === 0) {{
-                document.getElementById('table-container').innerHTML = '<div class="no-data">娌℃湁绗﹀悎鏉′欢鐨勬暟鎹?/div>';
+                document.getElementById('table-container').innerHTML = '<div class="no-data">没有符合条件的数据</div>';
                 updatePagination(0, 0);
                 return;
             }}
@@ -679,8 +683,8 @@ class PostmanTestReport:
         function buildPaginationButtons(totalPages) {{
             let buttons = '';
 
-            // 涓婁竴椤?
-            buttons += `<button class="page-btn" onclick="goPage(${{currentPage - 1}})" ${{currentPage === 1 ? 'disabled' : ''}}>芦 涓婁竴椤?/button>`;
+            // 上一页
+            buttons += `<button class="page-btn" onclick="goPage(${{currentPage - 1}})" ${{currentPage === 1 ? 'disabled' : ''}}>上一页</button>`;
 
             // 椤电爜
             const maxPages = 10;
@@ -699,20 +703,20 @@ class PostmanTestReport:
             if (endPage < totalPages - 1) buttons += '<span style="padding: 8px 5px;">...</span>';
             if (endPage < totalPages) buttons += `<button class="page-btn" onclick="goPage(${{totalPages}})">${{totalPages}}</button>`;
 
-            // 涓嬩竴椤?
-            buttons += `<button class="page-btn" onclick="goPage(${{currentPage + 1}})" ${{currentPage === totalPages ? 'disabled' : ''}}>涓嬩竴椤?禄</button>`;
+            // 下一页
+            buttons += `<button class="page-btn" onclick="goPage(${{currentPage + 1}})" ${{currentPage === totalPages ? 'disabled' : ''}}>下一页</button>`;
             return buttons;
         }}
 
-        // 鏇存柊鍒嗛〉淇℃伅鍜屾寜閽?
+        // 更新分页信息和按钮
         function updatePagination(totalPages, totalItems) {{
             document.getElementById('pagination-info').textContent = 
-                `绗?${{currentPage}} 椤?| 鍏?${{totalPages}} 椤?| 鍏?${{totalItems}} 鏉℃暟鎹甡;
+                `第 ${{currentPage}} 页 | 共 ${{totalPages}} 页 | 共 ${{totalItems}} 条数据`;
 
             document.getElementById('pagination-buttons').innerHTML = buildPaginationButtons(totalPages);
         }}
         
-        // 杞埌鎸囧畾椤?
+        // 跳转到指定页
         function goPage(page) {{
             const totalPages = getTotalPages();
             if (page >= 1 && page <= totalPages) {{
@@ -736,10 +740,10 @@ class PostmanTestReport:
             
             if (isExpanded) {{
                 detailRow.classList.remove('expanded');
-                btn.textContent = '鈻?灞曞紑';
+                btn.textContent = '展开';
             }} else {{
                 detailRow.classList.add('expanded');
-                btn.textContent = '鈻?鏀惰捣';
+                btn.textContent = '收起';
                 loadDetail(resultIdx);
             }}
         }}
@@ -748,7 +752,7 @@ class PostmanTestReport:
         function loadDetail(resultIdx) {{
             const detailContent = document.getElementById(`detail-content-${{resultIdx}}`);
             
-            // 妫€鏌ョ紦瀛?
+            // 检查缓存
             if (detailCache[resultIdx]) {{
                 detailContent.innerHTML = detailCache[resultIdx];
                 return;
@@ -767,11 +771,11 @@ class PostmanTestReport:
                 const requestInfo = result.request_info || {{}};
                 const responseInfo = result.response_info || {{}};
                 
-                const requestHeaders = JSON.stringify(requestInfo.headers || {{}}, null, 2) || '鏃?;
-                const requestParams = JSON.stringify(requestInfo.params || {{}}, null, 2) || '鏃?;
-                const requestBody = typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body, null, 2) : (requestInfo.body || '鏃?);
-                const responseBody = typeof responseInfo.body === 'object' ? JSON.stringify(responseInfo.body, null, 2) : (responseInfo.body || '鏃?);
-                const responseHeaders = JSON.stringify(responseInfo.headers || {{}}, null, 2) || '鏃?;
+                const requestHeaders = JSON.stringify(requestInfo.headers || {{}}, null, 2) || '无';
+                const requestParams = JSON.stringify(requestInfo.params || {{}}, null, 2) || '无';
+                const requestBody = typeof requestInfo.body === 'object' ? JSON.stringify(requestInfo.body, null, 2) : (requestInfo.body || '无');
+                const responseBody = typeof responseInfo.body === 'object' ? JSON.stringify(responseInfo.body, null, 2) : (responseInfo.body || '无');
+                const responseHeaders = JSON.stringify(responseInfo.headers || {{}}, null, 2) || '无';
                 
                 const html = `
                     <div style="margin-bottom: 15px; padding: 10px; background-color: #e8f5e8; border-radius: 4px; border-left: 4px solid #28a745;">
@@ -803,22 +807,22 @@ class PostmanTestReport:
             }}
         }}
         
-        // 娴嬭瘯Token鏈夋晥鎬?
+        // 测试 Token 有效性
         async function testToken() {{
             const token = document.getElementById('token-input').value.trim();
             if (!token) {{
-                alert('璇峰厛杈撳叆Token锛?);
+                alert('请先输入Token！');
                 document.getElementById('token-input').focus();
                 return;
             }}
             
             const testBtn = document.getElementById('test-token-btn');
             const originalText = testBtn.textContent;
-            testBtn.textContent = '娴嬭瘯涓?..';
+            testBtn.textContent = '测试中...';
             testBtn.disabled = true;
             
             try {{
-                // 鍙戦€佹祴璇曡姹?
+                // 发送测试请求
                 const response = await fetch('/test-token', {{
                     method: 'POST',
                     headers: {{
@@ -835,7 +839,7 @@ class PostmanTestReport:
                     testBtn.style.backgroundColor = '#28a745';
                 }} else {{
                     alert('Token 无效: ' + (result.message || '未知错误'));
-                    testBtn.textContent = '鉂?Token鏃犳晥';
+                    testBtn.textContent = '✗ Token无效';
                     testBtn.style.backgroundColor = '#dc3545';
                 }}
                 
@@ -857,7 +861,7 @@ class PostmanTestReport:
         async function reRequestApi(resultIdx) {{
             const token = document.getElementById('token-input').value.trim();
             if (!token) {{
-                alert('璇峰厛杈撳叆Token锛?);
+                alert('请先输入Token！');
                 document.getElementById('token-input').focus();
                 return;
             }}
@@ -883,7 +887,7 @@ class PostmanTestReport:
                     token: token
                 }};
                 
-                // 鍙戦€佽姹傚埌鍚庣閲嶆柊娴嬭瘯
+                // 发送请求到后端重新测试
                 const response = await fetch('/re-request-api', {{
                     method: 'POST',
                     headers: {{
@@ -901,11 +905,11 @@ class PostmanTestReport:
                 // 更新结果数据
                 allResults[resultIdx] = newResult;
                 
-                // 娓呴櫎缂撳瓨锛岄噸鏂板姞杞借鎯?
+                // 清除缓存并重新加载详情
                 delete detailCache[resultIdx];
                 loadDetail(resultIdx);
                 
-                // 鏇存柊琛ㄦ牸涓殑鐘舵€?
+                    // 更新表格中的状态
                 const row = document.querySelector(`tr[data-result-idx="${{resultIdx}}"]`);
                 if (row) {{
                     const statusCell = row.querySelector('td:nth-child(6) span');
@@ -923,7 +927,7 @@ class PostmanTestReport:
                         messageCell.textContent = newResult.message;
                     }}
                     
-                    // 鏇存柊琛屾牱寮?
+                    // 更新行样式
                     row.className = `result-row result-${{newResult.status.toLowerCase()}}`;
                     row.setAttribute('data-status', newResult.status.toLowerCase());
                 }}
@@ -992,11 +996,11 @@ class PostmanTestReport:
     
     <div class="summary">
         <div class="summary-item">
-            <label>鎬昏:</label>
+            <label>总计:</label>
             <span>{summary['total']}</span>
         </div>
         <div class="summary-item">
-            <label style="color: green;">閫氳繃:</label>
+            <label style="color: green;">通过:</label>
             <span style="color: green;">{summary['passed']}</span>
         </div>
         <div class="summary-item">
@@ -1012,7 +1016,7 @@ class PostmanTestReport:
             <span>{summary['success_rate']}</span>
         </div>
         <div class="summary-item">
-            <label>鑰楁椂:</label>
+            <label>耗时:</label>
             <span>{summary['duration']}</span>
         </div>
     </div>
@@ -1029,12 +1033,12 @@ class PostmanTestReport:
         <thead>
             <tr>
                 <th>操作</th>
-                <th>API鍚嶇О</th>
-                <th>鏂囦欢澶?/th>
-                <th>鏂规硶</th>
+                <th>API名称</th>
+                <th>文件夹</th>
+                <th>方法</th>
                 <th>URL</th>
-                <th>鐘舵€?/th>
-                <th>鐘舵€佺爜</th>
+                <th>状态</th>
+                <th>状态码</th>
                 <th>详情</th>
             </tr>
         </thead>
@@ -1126,7 +1130,7 @@ class PostmanTestReport:
                 }}
             }});
             
-            // 鏇存柊鎸夐挳鐘舵€?
+            // 更新按钮状态
             const buttons = document.querySelectorAll('.filter-btn');
             buttons.forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -1137,11 +1141,11 @@ class PostmanTestReport:
 """
     
     def print_console_report(self) -> None:
-        """鍦ㄦ帶鍒跺彴杈撳嚭娴嬭瘯鎶ュ憡"""
+        """在控制台输出测试报告。"""
         summary = self.generate_summary()
         
         print("\n" + "="*80)
-        print("Postman API 娴嬭瘯鎶ュ憡".center(80))
+        print("Postman API 测试报告".center(80))
         print("="*80)
         print(f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}")
         print(f"成功率: {summary['success_rate']} | 耗时: {summary['duration']}")
@@ -1216,7 +1220,7 @@ def _validate_base_url(base_url: Optional[str]) -> None:
     from urllib.parse import urlparse as _urlparse
     _parsed = _urlparse(base_url)
     if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
-        raise ValidationError(f"base_url 鏍煎紡鏃犳晥锛堜粎鏀寔 http/https锛? {base_url!r}")
+        raise ValidationError(f"base_url 格式无效（仅支持 http/https）：{base_url!r}")
 
 
 def _filter_selected_apis(
@@ -1302,7 +1306,7 @@ def _log_execution_scope(
 ) -> None:
     logger.info("成功加载 %d 个 API 接口，基础 URL: %s", current_count, parser_base_url)
     if selected_path_set is not None:
-        logger.info("鏈鎵ц鑼冨洿锛氬凡閫夋帴鍙?%d / 鍏ㄩ噺 %d", current_count, total_apis_count)
+        logger.info("本次执行范围：已选接口 %d / 全量 %d", current_count, total_apis_count)
 
 
 def _resolve_checkpoint_execution_apis(
@@ -1382,13 +1386,13 @@ def _resolve_auth_token(
     request_timeout: RequestTimeout,
 ) -> Optional[str]:
     if token:
-        logger.info("浣跨敤鎵嬪姩鎸囧畾鐨則oken: %s...", token[:20])
+        logger.info("使用手动指定的 token: %s...", token[:20])
         return token
 
     auth_token = get_auth_token(apis, base_url, session=auth_session, request_timeout=request_timeout)
 
     if auth_token:
-        logger.info("宸茶幏鍙栬璇乼oken: %s...", auth_token[:20])
+        logger.info("已获取认证 token: %s...", auth_token[:20])
     return auth_token
 
 
@@ -1505,7 +1509,7 @@ def _execute_api_suite(
 
     try:
         for idx, api in enumerate(apis, 1):
-            logger.debug("[%d/%d] 娴嬭瘯: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
+            logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
 
             executor = PostmanTestExecutor(
                 api,
@@ -1569,7 +1573,7 @@ def _execute_api_suite(
             })
     except Exception as exc:
         execution_error = exc
-        logger.exception("鎵ц杩囩▼涓彂鐢熶腑鏂紓甯革紝灏嗚緭鍑洪儴鍒嗘垚鍔熸姤鍛? %s", exc)
+        logger.exception("执行过程中发生中断异常，将输出部分成功报告: %s", exc)
 
     return completed_count, execution_error
 
@@ -1635,10 +1639,10 @@ def _prepare_execution_context(
     source_original_file: Optional[str],
     assertion_strict_mode: bool,
 ) -> Tuple[Optional[str], PostmanTestReport, RequestTimeout, SessionLike]:
-    # 棰勮幏鍙栬璇?token锛屼娇鐢ㄧ粺涓€ runtime context锛坰hared_session + timeout锛?
+    # 预获取认证 token，并使用统一 runtime context（shared_session + timeout）。
     resolved_token, request_timeout, shared_session = _build_runtime_context(token, apis, parser.base_url)
 
-    # 鍒涘缓鎶ュ憡瀵硅薄
+    # 创建报告对象
     report = _build_report_context(
         parser=parser,
         postman_file=postman_file,
@@ -1646,7 +1650,7 @@ def _prepare_execution_context(
         assertion_strict_mode=assertion_strict_mode,
     )
 
-    # 鎵ц娴嬭瘯 鈥斺€?鎵€鏈?API 鍏变韩鍚屼竴 Session锛岄伩鍏嶆瘡娆″缓绔嬫柊 TCP 杩炴帴
+    # 执行测试：所有 API 共享同一 Session，避免每次建立新 TCP 连接。
     logger.info("开始执行测试，共 %d 个接口", len(apis))
     return resolved_token, report, request_timeout, shared_session
 
@@ -1792,10 +1796,10 @@ def _generate_and_log_report(
 
     report_file = _resolve_report_file_path(output_dir, report_name)
     report.generate_html_report(report_file, results_per_page=results_per_page)
-    logger.info("HTML鎶ュ憡宸蹭繚瀛? %s", report_file)
-    logger.info("鎶ュ憡鍏冩暟鎹凡淇濆瓨: %s", report.generated_meta_file)
+    logger.info("HTML 报告已保存: %s", report_file)
+    logger.info("报告元数据已保存: %s", report.generated_meta_file)
     if execution_error is not None:
-        logger.warning("鏈鎶ュ憡涓洪儴鍒嗘垚鍔熸姤鍛婏紝鍘熷洜: %s", execution_error)
+        logger.warning("本次报告为部分成功报告，原因: %s", execution_error)
     return report_file
 
 
@@ -1926,9 +1930,9 @@ def run_postman_tests(
 
 if __name__ == '__main__':
     """
-    浣跨敤绀轰緥:
-    1. 灏哖ostman瀵煎嚭鐨凧SON鏂囦欢鏀惧湪椤圭洰鐩綍
-    2. 鍦ㄥ懡浠よ鎵ц: python -m postman_api_tester.postman_api_tester <postman_file_path> [base_url] [output_dir]
+    使用示例:
+    1. 将 Postman 导出的 JSON 文件放在项目目录
+    2. 在命令行执行: python -m postman_api_tester.postman_api_tester <postman_file_path> [base_url] [output_dir]
     """
     
     if len(sys.argv) > 1:
@@ -1940,7 +1944,7 @@ if __name__ == '__main__':
 
         if len(sys.argv) > 4:
             arg4 = str(sys.argv[4]).strip()
-            # 鍏煎鐩存帴鎶婄4涓弬鏁板綋鍒嗛〉澶у皬鐨勭敤娉?
+            # 兼容第4个参数直接作为分页大小的用法
             if arg4.isdigit() and len(sys.argv) == 5:
                 results_per_page = int(arg4)
             else:
@@ -1957,9 +1961,9 @@ if __name__ == '__main__':
             results_per_page=results_per_page,
         )
     else:
-        print("浣跨敤鏂规硶:")
+        print("使用方法:")
         print("  python postman_api_tester.py <postman_file_path> [base_url] [output_dir] [token] [results_per_page]")
-        print("\n鍙傛暟璇存槑:")
+        print("\n参数说明:")
         print("  postman_file_path: Postman导出的JSON文件路径（必需）")
         print("  base_url: 基础URL（可选，将覆盖Postman文件中的配置）")
         print("  output_dir: 报告输出目录（可选，默认：../reports）")

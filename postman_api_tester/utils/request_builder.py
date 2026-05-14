@@ -1,5 +1,11 @@
 """Request builder utilities for HTTP request assembly."""
 
+"""开发导读：
+- 职责：统一构建 URL/Headers/Body（含多 body_mode）并生成 requests 参数。
+- 入口：set_request_url()/set_request_headers()/set_request_body()/build_request_kwargs()。
+- 目标：让执行、重试、代理、导出链路共享同一请求语义。
+"""
+
 import json
 from typing import Any, Dict, List
 from urllib.parse import urlencode
@@ -132,6 +138,7 @@ def infer_body_mode_from_stored_body(body: Any) -> Dict[str, Any] | None:
 
 
 def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | None = None, body_data: Any = None) -> None:
+    # set_request_body 负责将前端/历史结构统一映射到 Postman request.body 语义。
     mode = str(body_mode or "legacy").strip().lower()
     data = body_data
 
@@ -219,6 +226,8 @@ def build_request_kwargs(
     headers: Dict[str, Any],
     files_source: Any,
 ) -> Dict[str, Any]:
+    # build_request_kwargs 负责生成 requests.request 可直接消费的 kwargs，
+    # 并同步返回可持久化的 body/header 形态，供报告详情与重试回写复用。
     request_kwargs: Dict[str, Any] = {}
     headers_to_send = dict(headers or {})
     normalized_mode = str(body_mode or "legacy").strip().lower() or "legacy"
@@ -226,6 +235,7 @@ def build_request_kwargs(
     stored_body: Any = None
 
     if is_multipart:
+        # multipart 分支只接受 formdata/binary，且会接管 Content-Type 处理。
         if normalized_mode == "formdata":
             rows = normalize_formdata_rows(body_data)
             data_rows = []
@@ -263,6 +273,7 @@ def build_request_kwargs(
         else:
             raise ValueError(f"multipart 请求不支持 body_mode={normalized_mode}")
     else:
+        # 非 multipart 分支按 body_mode 显式分流，避免 legacy/新模式混用。
         if normalized_mode == "none":
             request_kwargs["data"] = None
             normalized_data = None

@@ -1,3 +1,10 @@
+"""HTTP 会话与超时策略模块。
+
+开发导读:
+- 提供共享 Session 的创建/关闭封装，减少重复连接开销。
+- 统一超时配置读取与超时参数规范化逻辑。
+"""
+
 from typing import Any, Optional, Protocol, Tuple
 
 

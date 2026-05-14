@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：生成首页报告列表摘要项，避免返回完整 results 造成重载。
+- 入口：report_list_item()。
+- 输出：列表页所需最小字段集（时间、来源、汇总、成功率等）。
+"""
+
 from typing import Any, Dict
 
 

@@ -1,4 +1,11 @@
-﻿import re
+﻿"""报告服务通用工具模块。
+
+开发导读:
+- 提供排除键规范化、手工用例合并与安全字段脱敏能力。
+- 作为 handler/service 与仓储层之间的共享工具集合。
+"""
+
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, SupportsInt, cast
 

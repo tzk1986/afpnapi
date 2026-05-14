@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：重试任务路径收集、子集集合构建与运行上下文准备。
+- 入口：collect_failed_item_paths()、build_retry_job_plan() 等。
+- 目标：保证“仅失败重试”与“全量重试”路径选择一致且可验证。
+"""
+
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -85,6 +91,8 @@ def parse_retry_runtime_params(
     default_results_per_page: int,
     clamp_run_results_per_page: Callable[[Any], int],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    # 重试运行参数统一在此处做协议校验与默认值归一，
+    # 避免不同重试入口出现行为漂移。
     base_url = str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
     if base_url:
         parsed = urlparse(base_url)
@@ -108,6 +116,7 @@ def build_retry_source_runtime_context(
     default_results_per_page: int,
     clamp_run_results_per_page: Callable[[Any], int],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    # 先确认源集合仍可用，再组装可直接入队的运行时上下文。
     saved_file = resolve_existing_source_file(report)
     if not saved_file:
         return None, "找不到原始集合文件，无法重试。请确认报告对应的集合文件仍然存在。"
@@ -135,6 +144,8 @@ def build_retry_job_plan(
     selected_paths: List[List[int]],
     queued_message: str,
 ) -> Dict[str, Any]:
+    # 输出 queue_record + worker_args 的稳定结构，
+    # 供 job 执行服务直接落 RUN_JOBS 并启动线程。
     job_id = uuid.uuid4().hex
     queue_record = build_retry_queue_record(
         job_id=job_id,

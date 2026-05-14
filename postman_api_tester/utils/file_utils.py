@@ -1,5 +1,10 @@
 """File utility implementations for report artifacts."""
 
+"""开发导读：
+- 职责：导出文件名安全清洗，防止非法字符与路径穿透风险。
+- 入口：sanitize_export_name()。
+"""
+
 import re
 from pathlib import Path
 from typing import Optional

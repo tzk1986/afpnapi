@@ -1,4 +1,9 @@
-"""升级五：JSONPath 断言引擎"""
+"""断言引擎模块。
+
+开发导读:
+- 负责解析并执行 JSONPath 断言规则。
+- 输出统一断言结果结构，供执行器汇总到报告层。
+"""
 import logging as _logging
 from typing import Any, Dict, List, Tuple
 

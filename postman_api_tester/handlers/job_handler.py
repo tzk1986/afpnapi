@@ -1,5 +1,12 @@
 ﻿"""Job handler thin wrappers over service layer."""
 
+"""开发导读：
+- 职责：任务执行与重试入队的路由薄封装。
+- 入口：run_postman_job()、enqueue_retry_job()、prepare_retry_job_context()、enqueue_job_with_worker()。
+- 行为：负责日志与函数注入转发，不承载任务业务细节。
+- 关系：核心执行链路位于 services.report_job_* 与 postman_api_tester 主执行模块。
+"""
+
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -28,6 +35,7 @@ def run_postman_job(
     set_run_job: Callable[..., None],
     invalidate_reports_cache: Callable[[], None],
 ) -> None:
+    # handler 只做日志与依赖注入转发，核心执行逻辑沉到 service。
     logger.info(
         "handler run job",
         extra={
@@ -60,6 +68,7 @@ def enqueue_retry_job(
     set_run_job: Callable[..., None],
     run_postman_job_fn: Callable[..., None],
 ) -> str:
+    # 统一复用 retry 入队协议，避免路由层直接拼装线程参数。
     logger.info(
         "handler enqueue retry",
         extra={

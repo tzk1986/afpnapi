@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：删除单份报告及其关联产物（html/details/meta/page 子页）。
+- 入口：delete_report_artifacts()。
+- 安全边界：依赖上层传入的工件收集函数，确保删除范围可控。
+"""
+
 from pathlib import Path
 import logging
 from typing import Any, Callable, Dict, List

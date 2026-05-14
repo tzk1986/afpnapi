@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：报告结果人工判定（标记成功/失败/恢复自动）及历史记录维护。
+- 入口：set_report_result_judgement()。
+- 关系：与 patch 重试回写链路协同，保证判定来源可追踪。
+"""
+
 import json
 import os
 from datetime import datetime

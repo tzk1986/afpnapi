@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：将报告详情结果转换为 JUnit XML 结构。
+- 入口：build_junit_xml()（及其辅助解析函数）。
+- 输出：可直接下载/集成 CI 的 testsuite/testcase/failure XML 文本。
+"""
+
 import io
 import xml.etree.ElementTree as ET
 from typing import Any, Dict

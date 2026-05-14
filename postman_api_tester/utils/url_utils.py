@@ -1,5 +1,11 @@
 """URL utilities for request normalization and merge helpers."""
 
+"""开发导读：
+- 职责：URL 与 params 归一化、查询串合并与去重。
+- 入口：normalize_url_and_params()、merge_url_with_params()。
+- 使用方：执行层、代理请求与实际请求 URL 展示链路。
+"""
+
 from typing import Any, Dict, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 

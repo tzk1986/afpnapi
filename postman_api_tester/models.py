@@ -1,4 +1,9 @@
-"""Report data/model access layer with query helpers."""
+"""报告模型访问层。
+
+开发导读:
+- 封装报告列表、详情与排除项相关的数据访问能力。
+- 对上层 handler/service 提供稳定的查询接口。
+"""
 
 from typing import Any, Dict, List, Optional
 

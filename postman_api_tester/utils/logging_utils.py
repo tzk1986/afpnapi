@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：结构化日志封装、采样日志与告警窗口统计。
+- 入口：log_structured()/log_sampled()/check_error_rate_alert() 等。
+- 目标：统一事件字段与健康检查可观测数据来源。
+"""
+
 import json
 import logging
 import random

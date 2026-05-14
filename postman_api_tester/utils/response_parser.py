@@ -1,5 +1,10 @@
 """Response parsing helpers."""
 
+"""开发导读：
+- 职责：从响应体提取通用 message/err_code 字段，统一错误展示口径。
+- 入口：extract_msg_errcode()。
+"""
+
 from typing import Any, Dict, List, Tuple
 
 

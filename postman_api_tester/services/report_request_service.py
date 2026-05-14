@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：统一解析路由请求体来源（JSON 与 multipart）并做 URL/base_url 安全校验。
+- 入口：resolve_request_payload_source()、validate_base_url_scheme() 等。
+- 目标：收敛输入差异，降低路由层参数解析复杂度。
+"""
+
 import json
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse

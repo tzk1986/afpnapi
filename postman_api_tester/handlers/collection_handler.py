@@ -1,5 +1,14 @@
 ﻿"""Collection handler implementations for route-level orchestration."""
 
+"""开发导读：
+- 职责：处理 Collection 预览、ad-hoc case 归一化、ad-hoc collection 组装、选择路径解析。
+- 入口：extract_collection_preview_items()、normalize_adhoc_case()、build_adhoc_collection()、parse_selected_item_paths()。
+- 输出：
+    1) 前端预览所需扁平项（含 item_path）；
+    2) 可直接执行的标准 Postman collection。
+- 关系：该层负责“路由编排与数据整形”，具体请求细节复用 utils.request_builder。
+"""
+
 import json
 import logging
 import re
@@ -51,6 +60,8 @@ def _build_preview_url(url_obj: Any) -> str:
 
 
 def extract_collection_preview_items(collection_data: Dict[str, Any], max_items: int) -> List[Dict[str, Any]]:
+    # 深度遍历 Collection，提取“可预览且可选择执行”的扁平视图，
+    # 同时保留 item_path 以支持后续按路径精确执行。
     result: List[Dict[str, Any]] = []
     root_items = collection_data.get("item")
     if not isinstance(root_items, list):
@@ -172,6 +183,7 @@ def _derive_case_name(raw_name: Any, method: str, url: str, index: int) -> str:
 
 
 def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str]) -> Dict[str, Any]:
+    # 将 ad-hoc 草稿标准化为统一请求描述，供构建 Collection 与执行链路复用。
     if not isinstance(raw, dict):
         raise ValueError(f"第 {index + 1} 条接口配置不是对象")
 
@@ -247,6 +259,7 @@ def normalize_adhoc_case(raw: Dict[str, Any], index: int, base_url: Optional[str
 
 
 def build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, base_url: Optional[str]) -> Dict[str, Any]:
+    # 生成标准 Postman 结构，确保 ad-hoc、上传执行、重试执行走同一执行模型。
     now_iso = datetime.utcnow().isoformat() + "Z"
     collection: Dict[str, Any] = {
         "info": {
@@ -302,6 +315,7 @@ def build_adhoc_collection(cases: List[Dict[str, Any]], collection_name: str, ba
 
 
 def parse_selected_item_paths(raw: Any) -> List[List[int]]:
+    # 解析并去重前端回传的 item_path，防止重复路径导致重复执行。
     if raw is None:
         return []
 

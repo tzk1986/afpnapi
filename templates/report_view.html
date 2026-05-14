@@ -389,11 +389,11 @@
 
         <section class="panel">
             <div class="toolbar">
-                <input id="queryInput" type="text" placeholder="按接口名称或路径搜索" />
+                <input id="queryInput" type="text" placeholder="按接口/用例名称或路径搜索" />
                 <input id="messageInput" type="text" placeholder="按 message 搜索" />
                 <input id="errCodeInput" type="text" placeholder="按 errCode 搜索" />
                 <select id="statusSelect">
-                    <option value="all">全部结果</option>
+                    <option value="all">全部状态</option>
                     <option value="PASSED">成功</option>
                     <option value="FAILED">失败</option>
                     <option value="ERROR">错误</option>
@@ -407,7 +407,7 @@
                 <select id="exportScopeSelect">
                     <option value="full" {% if report_export_default_scope == 'full' %}selected{% endif %}>全量导出</option>
                     {% if report_export_allow_report_only %}
-                    <option value="report_only" {% if report_export_default_scope == 'report_only' %}selected{% endif %}>导出本次报告接口</option>
+                    <option value="report_only" {% if report_export_default_scope == 'report_only' %}selected{% endif %}>导出本次报告中的接口</option>
                     {% endif %}
                 </select>
                 <button onclick="applySearchFilters()">查询</button>
@@ -426,7 +426,7 @@
                 </label>
                 <label class="hint" style="display:flex;align-items:center;gap:6px;">
                     <input id="includeExcludedToggle" type="checkbox" style="width:14px;height:14px;" checked>
-                    显示已排除用例
+                    显示已排除项
                 </label>
                 <span class="hint">默认 20 条/页，最高 100 条/页</span>
             </div>
@@ -454,7 +454,7 @@
         <div class="detail-dialog">
             <div class="detail-head">
                 <div class="detail-head-main">
-                    <h3 id="detailTitle">接口详情</h3>
+                    <h3 id="detailTitle">执行详情</h3>
                     <div id="detailMeta" class="muted detail-meta"></div>
                 </div>
                 <div class="detail-actions">
@@ -463,7 +463,7 @@
                     <button id="markFailedBtn" class="secondary" style="display:none;" onclick="overrideCurrentResultStatus('FAILED')">标记失败</button>
                     <button id="restoreResultBtn" class="secondary" style="display:none;" onclick="restoreCurrentResultStatus()">恢复自动结果</button>
                     <button id="saveManualBtn" class="secondary" style="display:none;" onclick="saveCurrentAsManualCase()">保存为人工用例</button>
-                    <button id="excludeCaseBtn" class="secondary" style="display:none;" onclick="toggleCurrentCaseExclusion()">排除此用例</button>
+                    <button id="excludeCaseBtn" class="secondary" style="display:none;" onclick="toggleCurrentCaseExclusion()">排除此接口</button>
                     <button onclick="closeDetail()">关闭</button>
                 </div>
             </div>
@@ -473,17 +473,32 @@
     </div>
     <div id="appTooltip" class="app-tooltip" role="tooltip" aria-hidden="true"></div>
 
+<script id="report-view-runtime" type="application/json">
+{
+    "reportName": {{ report_name_json|safe }},
+    "reportViewPageSizeDefault": {{ report_view_page_size_default }},
+    "reportExportDefaultScope": {{ report_export_default_scope|tojson }},
+    "reportExportChannelMode": {{ report_export_channel_mode | default('auto') | tojson }},
+    "reportExportStreamThreshold": {{ report_export_stream_threshold | default(800) }},
+    "enableManualCases": {{ enable_manual_cases|tojson }},
+    "manualCaseFolderName": {{ manual_case_folder_name|tojson }},
+    "enableRetryFailures": {{ enable_retry_failures|tojson }},
+    "enableJunitExport": {{ enable_junit_export|tojson }},
+    "enableResponseTime": {{ enable_response_time|tojson }}
+}
+</script>
 <script>
-const reportName = {{ report_name_json|safe }};
-const REPORT_VIEW_PAGE_SIZE_DEFAULT = {{ report_view_page_size_default }};
-const REPORT_EXPORT_DEFAULT_SCOPE = {{ report_export_default_scope|tojson }};
-const REPORT_EXPORT_CHANNEL_MODE = {{ report_export_channel_mode | default('auto') | tojson }};
-const REPORT_EXPORT_STREAM_THRESHOLD = {{ report_export_stream_threshold | default(800) }};
-const ENABLE_MANUAL_CASES = {{ enable_manual_cases|tojson }};
-const MANUAL_CASE_FOLDER_NAME = {{ manual_case_folder_name|tojson }};
-const ENABLE_RETRY_FAILURES = {{ enable_retry_failures|tojson }};
-const ENABLE_JUNIT_EXPORT = {{ enable_junit_export|tojson }};
-const ENABLE_RESPONSE_TIME = {{ enable_response_time|tojson }};
+const runtimeConfig = JSON.parse(document.getElementById('report-view-runtime').textContent || '{}');
+const reportName = runtimeConfig.reportName || '';
+const REPORT_VIEW_PAGE_SIZE_DEFAULT = Number(runtimeConfig.reportViewPageSizeDefault || 20);
+const REPORT_EXPORT_DEFAULT_SCOPE = String(runtimeConfig.reportExportDefaultScope || 'full');
+const REPORT_EXPORT_CHANNEL_MODE = String(runtimeConfig.reportExportChannelMode || 'auto');
+const REPORT_EXPORT_STREAM_THRESHOLD = Number(runtimeConfig.reportExportStreamThreshold || 800);
+const ENABLE_MANUAL_CASES = Boolean(runtimeConfig.enableManualCases);
+const MANUAL_CASE_FOLDER_NAME = String(runtimeConfig.manualCaseFolderName || '人工用例');
+const ENABLE_RETRY_FAILURES = Boolean(runtimeConfig.enableRetryFailures);
+const ENABLE_JUNIT_EXPORT = Boolean(runtimeConfig.enableJunitExport);
+const ENABLE_RESPONSE_TIME = Boolean(runtimeConfig.enableResponseTime);
 let currentDetailData = null;
 let currentDetailIndex = null;
 let currentResultsPage = 1;
@@ -1772,7 +1787,7 @@ async function reloadResults(page = 1) {
 
 function renderResults(data) {
     if (!data.items || data.items.length === 0) {
-        document.getElementById('resultTableContainer').innerHTML = '<div class="empty">没有匹配的数据。</div>';
+        document.getElementById('resultTableContainer').innerHTML = '<div class="empty">没有匹配的结果。</div>';
         document.getElementById('pagerInfo').textContent = `第 ${data.page} 页 / 共 ${data.total_pages} 页，匹配 ${data.total} 条`;
         document.getElementById('pagination').innerHTML = '';
         return;
@@ -1786,7 +1801,7 @@ function renderResults(data) {
         const excluded = Boolean(item.excluded);
         const rowTooltip = excluded ? '已排除（导出时会忽略）' : '';
         const excludeBtn = item.exclusion_key
-            ? `<button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" onclick="toggleResultExclusion('${exKey}', ${excluded})" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>`
+            ? `<button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" onclick="toggleResultExclusion('${exKey}', ${excluded})" title="${excluded ? '取消排除此接口' : '排除此接口'}">${excluded ? '恢' : '排'}</button>`
             : '';
         return `
         <tr class="${excluded ? 'excluded-row' : ''}" ${rowTooltip ? `data-tooltip="${escapeHtml(rowTooltip)}"` : ''}>
@@ -1799,7 +1814,7 @@ function renderResults(data) {
             <td class="msg-td tooltip-target ${item.status === 'FAILED' || item.status === 'ERROR' ? 'msg-failed' : ''}" data-tooltip="${escapeHtml(item.message || '-') }" onclick="toggleMsg(this)">${escapeHtml(item.message || '-')}</td>
             <td class="errcode-td tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
             {% if enable_response_time %}<td class="num-td">${item.response_time_ms > 0 ? item.response_time_ms : '-'}</td>{% endif %}
-            <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '详情' : '无详情'}</button>${excludeBtn}</td>
+            <td class="td-op"><button class="btn-compact" onclick="openDetail(${item.index})" ${item.detail_available ? '' : 'disabled'}>${item.detail_available ? '执行详情' : '无详情'}</button>${excludeBtn}</td>
         </tr>
     `;
     }
@@ -1816,7 +1831,7 @@ function renderResults(data) {
                         <th>路径</th>
                         <th>状态</th>
                         <th>状态码</th>
-                        <th>结果说明</th>
+                        <th>执行说明</th>
                         <th>errCode</th>
                         {% if enable_response_time %}<th>耗时(ms)</th>{% endif %}
                         <th>操作</th>
@@ -1900,7 +1915,7 @@ async function openDetail(index) {
     const response = await fetch(`/api/report-result-detail/${encodeURIComponent(reportName)}/${index}`);
     const data = await response.json();
 
-    document.getElementById('detailTitle').innerHTML = escapeHtml(data.name || '接口详情') +
+    document.getElementById('detailTitle').innerHTML = escapeHtml(data.name || '执行详情') +
         (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
     renderDetailMeta(data);
 
@@ -1920,7 +1935,7 @@ async function openDetail(index) {
     }
     if (data.exclusion_key) {
         excludeCaseBtn.style.display = '';
-        excludeCaseBtn.textContent = data.excluded ? '取消排除' : '排除此用例';
+        excludeCaseBtn.textContent = data.excluded ? '取消排除' : '排除此接口';
     }
 
     if (!data.detail_available) {
@@ -2581,7 +2596,7 @@ async function sendRetry() {
             applySummaryToCards(result.new_summary);
         }
 
-        // 更新列表行（状态、状态码、结果说明）
+        // 更新列表行（状态、状态码、执行说明）
         if (saveToReport) {
             await reloadResults(currentResultsPage);
         }
@@ -2590,7 +2605,7 @@ async function sendRetry() {
         const updated = { ...data, ...result, retried: true, retry_history: (data.retry_history || []) };
         currentDetailData = updated;
         document.getElementById('detailTitle').innerHTML =
-            escapeHtml(updated.name || '接口详情') + ' <span class="retried-badge">已重试</span>';
+            escapeHtml(updated.name || '执行详情') + ' <span class="retried-badge">已重试</span>';
         renderDetailMeta(updated);
         renderDetailPanels(updated);
 
@@ -2725,7 +2740,7 @@ async function toggleCurrentCaseExclusion() {
         currentDetailData.excluded = nextExcluded;
         const btn = document.getElementById('excludeCaseBtn');
         if (btn) {
-            btn.textContent = nextExcluded ? '取消排除' : '排除此用例';
+            btn.textContent = nextExcluded ? '取消排除' : '排除此接口';
         }
         await reloadResults(currentResultsPage);
     } catch (error) {
@@ -2750,8 +2765,8 @@ async function saveCurrentAsManualCase() {
             <h4>保存为人工用例</h4>
             <div class="editor-top-grid">
                 <div class="editor-field">
-                    <label for="sm-name">接口名称 *</label>
-                    <input id="sm-name" type="text" value="${escapeAttr(currentDetailData.name || '未命名接口')}">
+                    <label for="sm-name">用例名称 *</label>
+                    <input id="sm-name" type="text" value="${escapeAttr(currentDetailData.name || '未命名用例')}">
                 </div>
                 <div class="editor-field">
                     <label for="sm-folder">目录</label>
@@ -2781,7 +2796,7 @@ async function confirmSaveCurrentAsManualCase() {
         return;
     }
 
-    const name = (document.getElementById('sm-name')?.value || '').trim() || '未命名接口';
+    const name = (document.getElementById('sm-name')?.value || '').trim() || '未命名用例';
     const folderInput = (document.getElementById('sm-folder')?.value || '').trim();
     const folder = folderInput || MANUAL_CASE_FOLDER_NAME;
 
@@ -2935,7 +2950,7 @@ function renderManualEditor(existingCase = null) {
             <h4>${isEdit ? '编辑人工用例' : '新增人工用例'}</h4>
             <div class="manual-form">
                 <div class="manual-field">
-                    <label for="mc-name">接口名称 *</label>
+                    <label for="mc-name">用例名称 *</label>
                     <input type="text" id="mc-name" placeholder="例如：创建订单" value="${escapeHtml((existingCase && existingCase.name) || '')}">
                 </div>
                 <div class="manual-field">
@@ -2991,7 +3006,7 @@ function renderManualEditor(existingCase = null) {
             <!-- 段一：请求信息 -->
             <div class="manual-form" id="mc-request-form">
                 <div class="manual-field">
-                    <label for="mc-name">接口名称 *</label>
+                    <label for="mc-name">用例名称 *</label>
                     <input type="text" id="mc-name" placeholder="例如：创建订单" value="${escapeHtml((existingCase && existingCase.name) || '')}">
                 </div>
                 <div class="manual-field">
@@ -3216,7 +3231,7 @@ async function confirmSaveManualCase(caseId) {
         },
     };
     if (!payload.name || !payload.url) {
-        alert('接口名称和 URL 不能为空');
+        alert('用例名称和 URL 不能为空');
         return;
     }
     const isEdit = !!caseId;
@@ -3270,7 +3285,7 @@ async function directSaveManualCase(caseId) {
         response_info: existingResp,
     };
     if (!payload.name || !payload.url) {
-        alert('接口名称和 URL 不能为空');
+        alert('用例名称和 URL 不能为空');
         return;
     }
     const isEdit = !!caseId;
@@ -3333,7 +3348,7 @@ async function saveManualCase(caseId) {
         response_info: { headers: respHeaders || {}, body: respBody },
     };
     if (!payload.name || !payload.url) {
-        alert('接口名称和 URL 不能为空');
+        alert('用例名称和 URL 不能为空');
         return;
     }
 
@@ -3620,7 +3635,7 @@ function renderManualCases() {
                 <td class="tooltip-target" data-tooltip="${escapeHtml(item.err_code || '-')}">${escapeHtml(item.err_code || '-')}</td>
                 {% if enable_response_time %}<td class="num-td">${item.response_time_ms > 0 ? item.response_time_ms : '-'}</td>{% endif %}
                 <td class="td-op">
-                    <button class="btn-compact" data-mc-action="detail" data-mc-id="${encodedCaseId}">详情</button>
+                    <button class="btn-compact" data-mc-action="detail" data-mc-id="${encodedCaseId}">用例详情</button>
                     <button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" data-mc-action="toggle-exclude" data-mc-key="${encodeURIComponent(exclusionKey)}" data-mc-excluded="${excluded ? 'true' : 'false'}" title="${excluded ? '取消排除此用例' : '排除此用例'}">${excluded ? '恢' : '排'}</button>
                     <button class="btn-compact" data-mc-action="edit" data-mc-id="${encodedCaseId}">编辑</button>
                     <button class="btn-compact" data-mc-action="delete" data-mc-id="${encodedCaseId}">删除</button>
@@ -3634,13 +3649,13 @@ function renderManualCases() {
                 ${REPORT_TABLE_COLGROUP}
                 <thead>
                     <tr>
-                        <th>接口名称</th>
+                        <th>用例名称</th>
                         <th>文件夹</th>
                         <th>方法</th>
                         <th>路径</th>
                         <th>状态</th>
                         <th>状态码</th>
-                        <th>结果说明</th>
+                        <th>执行说明</th>
                         <th>errCode</th>
                         {% if enable_response_time %}<th>耗时(ms)</th>{% endif %}
                         <th>操作</th>
@@ -3772,7 +3787,7 @@ async function openManualCaseDetail(caseId) {
     currentDetailData = caseData;
     currentDetailIndex = null;
 
-    title.innerHTML = `${escapeHtml(caseData.name || '接口详情')} <span class="manual-tag">人工用例</span>`;
+    title.innerHTML = `${escapeHtml(caseData.name || '用例详情')} <span class="manual-tag">人工用例</span>`;
     const actualRequestUrl = buildActualRequestUrl(caseData) || caseData.url || '-';
     const configuredUrl = caseData.url || '-';
     const statusText = String(caseData.status || '-').toUpperCase();
@@ -4090,10 +4105,10 @@ async function exportLatestCollectionLegacy(payload, summaryTotal, threshold, st
             ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`
             : '';
         const scopeText = data.export_scope === 'report_only'
-            ? `仅本次报告接口（${data.report_only_count || 0} 个）`
+            ? `仅本次报告中的接口（${data.report_only_count || 0} 个）`
             : '全量集合';
         const scopeDiffHint = data.export_scope === 'report_only' && data.scope_effective_same_as_full
-            ? `\n提示: 当前源集合共 ${data.source_total_count || 0} 个接口，与本次报告接口一致，因此 report_only 与 full 导出内容相同。`
+            ? `\n提示: 当前源集合共 ${data.source_total_count || 0} 个接口，与本次报告中的接口一致，因此 report_only 与 full 导出内容相同。`
             : '';
         const composeText = `原执行更新 ${data.updated_count} + 人工用例 ${data.manual_case_exported_count || 0}（配置 ${data.manual_case_count || 0}）- 排除 ${data.excluded_count || 0}`;
         let routeHint = `\n导出通道: 旧接口（模式 ${channelMode}，阈值 ${threshold}，当前总数 ${summaryTotal}）`;
@@ -4159,7 +4174,7 @@ async function exportLatestCollectionStream(payload, summaryTotal, threshold, ch
     a.remove();
     window.URL.revokeObjectURL(url);
 
-    const scopeText = payload.export_scope === 'report_only' ? '仅本次报告接口' : '全量集合';
+    const scopeText = payload.export_scope === 'report_only' ? '仅本次报告中的接口' : '全量集合';
     alert(`导出完成！\n文件: ${fileName}\n导出范围: ${scopeText}\n包含认证头: ${payload.include_auth ? '是' : '否'}\n导出通道: 流式接口（模式 ${channelMode}，阈值 ${threshold}，当前总数 ${summaryTotal}）`);
 }
 

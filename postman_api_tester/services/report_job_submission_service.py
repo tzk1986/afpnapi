@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：提交前参数规范化（文件名清洗、任务初始状态、落盘路径）。
+- 入口：sanitize_uploaded_name()、build_*_job_params()、build_saved_json_path()。
+- 目标：统一入队参数结构，降低路由层重复拼装风险。
+"""
+
 import re
 import logging
 from pathlib import Path

@@ -1,3 +1,10 @@
+"""数据库错误反馈规则模块。
+
+开发导读:
+- 维护常见数据库异常关键字到建议文案的映射规则。
+- 供执行器在失败场景下生成更可读的诊断提示。
+"""
+
 import json
 from typing import Any, Dict, List, Optional, Tuple
 

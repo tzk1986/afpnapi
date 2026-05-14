@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：聚合报告结果与人工用例视图数据，输出前端可直接消费 payload。
+- 入口：build_report_results_payload()、build_manual_cases_payload()。
+- 关系：复用 models/report_repository/report_server_utils 完成筛选与详情拼装。
+"""
+
 from typing import Any, Dict, List, Optional
 
 from postman_api_tester.models import compare_report_data, filter_report_results, paginate_items
@@ -20,6 +26,7 @@ def build_report_results_payload(
     status_filter: Optional[str],
     include_excluded: bool,
 ) -> Dict[str, Any]:
+    # 结果列表接口统一入口：先筛选再分页，并回传查询条件以支持前端状态回显。
     filtered_items = filter_report_results(
         report,
         keyword,
@@ -45,6 +52,7 @@ def build_compare_payload(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[s
 
 
 def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Dict[str, Any]:
+    # 详情载荷遵循“结果摘要 + details_map 按需补充”的轻量策略。
     results = report.get("results", [])
     if result_index < 0 or result_index >= len(results):
         raise IndexError(result_index)
@@ -91,6 +99,8 @@ def build_manual_cases_payload(
     default_folder: str,
     enabled: bool,
 ) -> Dict[str, Any]:
+    # 人工用例返回时同步计算 exclusion_key/excluded，
+    # 保证列表展示与导出剔除逻辑使用同一判定键。
     manual_cases = [
         normalize_manual_case(case, str(case.get("folder") or default_folder))
         for case in (report.get("manual_cases") or [])

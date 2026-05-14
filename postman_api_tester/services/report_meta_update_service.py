@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：安全更新报告 meta 文件（读-改-写），并处理并发写锁。
+- 入口：update_report_meta()。
+- 目标：让上层以 updater 回调方式专注业务字段变更。
+"""
+
 import json
 import os
 from pathlib import Path

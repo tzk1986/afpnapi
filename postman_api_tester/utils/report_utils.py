@@ -1,5 +1,10 @@
 """Report utility helpers for summary computation."""
 
+"""开发导读：
+- 职责：根据执行结果聚合 summary 指标（总数、通过率、状态分布）。
+- 入口：compute_summary()。
+"""
+
 from typing import Any, Dict, List
 
 

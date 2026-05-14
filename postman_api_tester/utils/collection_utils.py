@@ -1,5 +1,11 @@
 ﻿"""Collection utility implementations used by export/query flows."""
 
+"""开发导读：
+- 职责：collection 树遍历、路径裁剪、人工用例追加、排除项剔除。
+- 入口：item_by_path()/prune_collection_to_paths()/append_manual_cases_to_collection()。
+- 使用方：report_export_service 与 collection 查询相关服务。
+"""
+
 import copy
 from typing import Any, Dict, List, Optional, Set, Tuple
 

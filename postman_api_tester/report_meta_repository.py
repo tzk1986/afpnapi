@@ -1,3 +1,10 @@
+"""报告元数据仓储模块。
+
+开发导读:
+- 负责扫描并加载 *_meta.json 报告元数据文件。
+- 提供旧版 HTML 报告兼容读取能力，便于平滑升级。
+"""
+
 import json
 import re
 from pathlib import Path

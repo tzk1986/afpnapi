@@ -1,8 +1,8 @@
-"""
-Postman API 自动化测试工具
+"""Postman API 自动化测试工具包。
 
-基于Seldom框架的Postman接口测试自动化解决方案
-支持读取APIFox/Postman导出的接口文件，自动执行测试，生成详细报告
+开发导读:
+- 作为对外入口统一导出解析器、执行器、报告对象与运行函数。
+- 业务调用建议优先使用 run_postman_tests，避免直接依赖内部细节。
 """
 
 from .postman_api_tester import (

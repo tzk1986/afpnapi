@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：对单条报告结果执行补丁式回写（结果字段、请求信息、响应信息）。
+- 入口：patch_report_result()。
+- 场景：编辑重试后将最新执行结果合并回 details/meta。
+"""
+
 import json
 import os
 from pathlib import Path

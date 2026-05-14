@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：按 item_path/回退规则在 collection 中定位接口节点。
+- 入口：item_by_path()、find_item_fallback()、collect_report_item_paths() 等。
+- 使用方：导出与重试相关服务，确保“报告结果 -> 集合节点”可追溯。
+"""
+
 import copy
 from typing import Any, Dict, List, Optional, Set, Tuple
 

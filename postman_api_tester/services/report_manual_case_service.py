@@ -1,3 +1,9 @@
+"""开发导读：
+- 职责：人工用例 CRUD 与排除标记的业务实现。
+- 入口：add/update/delete_manual_case()、set_case_exclusion()。
+- 持久化：通过 meta 更新函数写回 manual_cases/manual_exclusions。
+"""
+
 from datetime import datetime
 import logging
 from typing import Any, Callable, Dict, List
