@@ -245,6 +245,34 @@ ENABLE_REPORT_LIST_FILTER = str(os.environ.get("ENABLE_REPORT_LIST_FILTER", "tru
 }
 
 # ==============================================================
+# 2.1 测试结果分析与报告洞察
+# ENABLE_REPORT_ANALYTICS: 是否启用 /api/report-analytics 接口
+# REPORT_ANALYTICS_TOP_N_DEFAULT/MAX: TopN 参数默认值与上限
+# REPORT_ANALYTICS_TREND_LIMIT_DEFAULT/MAX: 趋势报告数量默认值与上限
+# REPORT_ANALYTICS_ENABLE_SAMPLES: 是否默认返回错误样本
+# REPORT_ANALYTICS_HISTOGRAM_BUCKETS: 逗号分隔响应时间桶边界（ms）
+# QUALITY_SCORE_*: 质量评分扣分项阈值
+# ==============================================================
+ENABLE_REPORT_ANALYTICS = str(os.environ.get("ENABLE_REPORT_ANALYTICS", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+REPORT_ANALYTICS_TOP_N_DEFAULT = int(os.environ.get("REPORT_ANALYTICS_TOP_N_DEFAULT", "10"))
+REPORT_ANALYTICS_TOP_N_MAX = int(os.environ.get("REPORT_ANALYTICS_TOP_N_MAX", "100"))
+REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = int(os.environ.get("REPORT_ANALYTICS_TREND_LIMIT_DEFAULT", "20"))
+REPORT_ANALYTICS_TREND_LIMIT_MAX = int(os.environ.get("REPORT_ANALYTICS_TREND_LIMIT_MAX", "100"))
+REPORT_ANALYTICS_ENABLE_SAMPLES = str(os.environ.get("REPORT_ANALYTICS_ENABLE_SAMPLES", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+REPORT_ANALYTICS_HISTOGRAM_BUCKETS = str(
+    os.environ.get("REPORT_ANALYTICS_HISTOGRAM_BUCKETS", "0,50,100,200,500,1000,3000,5000")
+).strip()
+
+QUALITY_SCORE_FAILED_PENALTY = int(os.environ.get("QUALITY_SCORE_FAILED_PENALTY", "10"))
+QUALITY_SCORE_ERROR_PENALTY = int(os.environ.get("QUALITY_SCORE_ERROR_PENALTY", "15"))
+QUALITY_SCORE_SLOW_PENALTY = int(os.environ.get("QUALITY_SCORE_SLOW_PENALTY", "5"))
+QUALITY_SCORE_ASSERTION_MISSING_PENALTY = int(os.environ.get("QUALITY_SCORE_ASSERTION_MISSING_PENALTY", "2"))
+
+# ==============================================================
 # 安全脱敏配置（请求头）
 # SENSITIVE_HEADERS: 逗号分隔的敏感头列表（可扩展）
 # 说明：运行时会与内置默认值合并，避免误删关键脱敏项。

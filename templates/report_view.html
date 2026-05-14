@@ -355,6 +355,67 @@
             pointer-events: auto;
         }
         .app-tooltip.show { display: block; }
+        .view-tabs { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .view-tab-btn {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #334155;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .view-tab-btn.active {
+            background: #0f172a;
+            border-color: #0f172a;
+            color: #fff;
+        }
+        .analytics-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 16px; }
+        .analytics-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .analytics-card .label { color: #64748b; font-size: 12px; margin-bottom: 6px; }
+        .analytics-card .value { color: #0f172a; font-size: 20px; font-weight: 700; }
+        .analytics-section-title { margin: 18px 0 8px; font-size: 14px; color: #334155; }
+        .analytics-empty { color: #64748b; font-size: 13px; padding: 8px 0; }
+        .analytics-table-wrap { width: 100%; overflow-x: auto; }
+        .analytics-table { min-width: 760px; width: 100%; border-collapse: collapse; table-layout: auto; }
+        .analytics-table th, .analytics-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 8px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .analytics-table th { background: #f8fafc; font-size: 12px; color: #475569; }
+        .analytics-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+        .analytics-toolbar input {
+            width: 110px;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .analytics-toolbar select {
+            min-width: 220px;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            background: #fff;
+        }
+        .analytics-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+            margin-right: 6px;
+        }
     </style>
 </head>
 <body>
@@ -387,7 +448,17 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" style="padding:14px 20px;">
+            <div class="view-tabs" id="viewTabs">
+                <button id="tabResultsBtn" class="view-tab-btn active" type="button" onclick="switchMainTab('results')">执行结果</button>
+                <button id="tabManualBtn" class="view-tab-btn" type="button" onclick="switchMainTab('manual')">人工用例</button>
+                {% if enable_report_analytics %}
+                <button id="tabAnalyticsBtn" class="view-tab-btn" type="button" onclick="switchMainTab('analytics')">分析洞察</button>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="panel" id="resultsPanel">
             <div class="toolbar">
                 <input id="queryInput" type="text" placeholder="按接口/用例名称或路径搜索" />
                 <input id="messageInput" type="text" placeholder="按 message 搜索" />
@@ -448,6 +519,32 @@
             <div id="manualPagerInfo" class="pager-info"></div>
             <div id="manualPagination" class="pagination"></div>
         </section>
+
+        {% if enable_report_analytics %}
+        <section class="panel" id="analyticsPanel" style="display:none;">
+            <div class="manual-head" style="margin-bottom:12px;">
+                <h3>分析洞察</h3>
+                <div class="analytics-toolbar">
+                    <label class="hint">TopN <input id="analyticsTopN" type="number" min="1" max="100" value="{{ report_analytics_top_n_default | default(10) }}"></label>
+                    <label class="hint">趋势N <input id="analyticsTrendLimit" type="number" min="1" max="100" value="{{ report_analytics_trend_limit_default | default(20) }}"></label>
+                    <label class="hint" style="display:flex;align-items:center;gap:6px;"><input id="analyticsIncludeSamples" type="checkbox" {% if report_analytics_enable_samples %}checked{% endif %}>含错误样本</label>
+                    <button class="secondary" type="button" onclick="reloadAnalytics(true)">刷新分析</button>
+                </div>
+            </div>
+            <div id="analyticsContainer" class="loading">切换到该页签后加载分析数据...</div>
+            <div class="analytics-section-title">报告对比</div>
+            <div class="analytics-toolbar">
+                <label class="hint">左侧报告
+                    <select id="analyticsCompareLeft"></select>
+                </label>
+                <label class="hint">右侧报告
+                    <select id="analyticsCompareRight"></select>
+                </label>
+                <button class="secondary" type="button" onclick="reloadAnalyticsCompare(true)">执行对比</button>
+            </div>
+            <div id="analyticsCompareContainer" class="loading">切换到该页签后加载对比数据...</div>
+        </section>
+        {% endif %}
     </div>
 
     <div id="detailMask" class="detail-mask" onclick="closeDetail(event)">
@@ -484,7 +581,11 @@
     "manualCaseFolderName": {{ manual_case_folder_name|tojson }},
     "enableRetryFailures": {{ enable_retry_failures|tojson }},
     "enableJunitExport": {{ enable_junit_export|tojson }},
-    "enableResponseTime": {{ enable_response_time|tojson }}
+    "enableResponseTime": {{ enable_response_time|tojson }},
+    "enableReportAnalytics": {{ enable_report_analytics|tojson }},
+    "reportAnalyticsTopNDefault": {{ report_analytics_top_n_default | default(10) }},
+    "reportAnalyticsTrendLimitDefault": {{ report_analytics_trend_limit_default | default(20) }},
+    "reportAnalyticsEnableSamples": {{ report_analytics_enable_samples|tojson }}
 }
 </script>
 <script>
@@ -499,6 +600,10 @@ const MANUAL_CASE_FOLDER_NAME = String(runtimeConfig.manualCaseFolderName || '�
 const ENABLE_RETRY_FAILURES = Boolean(runtimeConfig.enableRetryFailures);
 const ENABLE_JUNIT_EXPORT = Boolean(runtimeConfig.enableJunitExport);
 const ENABLE_RESPONSE_TIME = Boolean(runtimeConfig.enableResponseTime);
+const ENABLE_REPORT_ANALYTICS = Boolean(runtimeConfig.enableReportAnalytics);
+const REPORT_ANALYTICS_TOP_N_DEFAULT = Number(runtimeConfig.reportAnalyticsTopNDefault || 10);
+const REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = Number(runtimeConfig.reportAnalyticsTrendLimitDefault || 20);
+const REPORT_ANALYTICS_ENABLE_SAMPLES = Boolean(runtimeConfig.reportAnalyticsEnableSamples);
 let currentDetailData = null;
 let currentDetailIndex = null;
 let currentResultsPage = 1;
@@ -512,6 +617,13 @@ let _mcEditMode = 'form'; // 'json' | 'form'
 let _mcBodySeq = 1;
 let _erBodyEditorState = null;
 let _erEditMode = 'json'; // 'json' | 'form' — for edit-retry panel
+let currentMainTab = 'results';
+let analyticsLoaded = false;
+let analyticsLoading = false;
+let analyticsCompareLoaded = false;
+let analyticsCompareLoading = false;
+let analyticsCompareReportsLoaded = false;
+let analyticsReportsCache = [];
 
 const REPORT_TABLE_COLGROUP = `
     <colgroup>
@@ -1765,6 +1877,362 @@ function currentFilters() {
         pageSize: document.getElementById('pageSizeSelect').value,
         includeExcluded: document.getElementById('includeExcludedToggle').checked
     };
+}
+
+function switchMainTab(tab) {
+    currentMainTab = tab;
+    const resultsPanel = document.getElementById('resultsPanel');
+    const manualPanel = document.getElementById('manualCasesPanel');
+    const analyticsPanel = document.getElementById('analyticsPanel');
+    const tabResultsBtn = document.getElementById('tabResultsBtn');
+    const tabManualBtn = document.getElementById('tabManualBtn');
+    const tabAnalyticsBtn = document.getElementById('tabAnalyticsBtn');
+
+    if (resultsPanel) {
+        resultsPanel.style.display = tab === 'results' ? '' : 'none';
+    }
+    if (manualPanel) {
+        manualPanel.style.display = tab === 'manual' ? '' : 'none';
+    }
+    if (analyticsPanel) {
+        analyticsPanel.style.display = tab === 'analytics' ? '' : 'none';
+    }
+
+    if (tabResultsBtn) tabResultsBtn.classList.toggle('active', tab === 'results');
+    if (tabManualBtn) tabManualBtn.classList.toggle('active', tab === 'manual');
+    if (tabAnalyticsBtn) tabAnalyticsBtn.classList.toggle('active', tab === 'analytics');
+
+    if (tab === 'analytics' && ENABLE_REPORT_ANALYTICS) {
+        if (!analyticsLoaded) {
+            reloadAnalytics(false);
+        }
+        if (!analyticsCompareReportsLoaded) {
+            loadAnalyticsCompareReports();
+        } else if (!analyticsCompareLoaded) {
+            reloadAnalyticsCompare(false);
+        }
+    }
+}
+
+function analyticsParams() {
+    const topNEl = document.getElementById('analyticsTopN');
+    const trendLimitEl = document.getElementById('analyticsTrendLimit');
+    const includeSamplesEl = document.getElementById('analyticsIncludeSamples');
+    const topNRaw = Number(topNEl?.value || REPORT_ANALYTICS_TOP_N_DEFAULT);
+    const trendRaw = Number(trendLimitEl?.value || REPORT_ANALYTICS_TREND_LIMIT_DEFAULT);
+    const topN = Math.max(1, Math.min(100, Number.isFinite(topNRaw) ? topNRaw : REPORT_ANALYTICS_TOP_N_DEFAULT));
+    const trendLimit = Math.max(1, Math.min(100, Number.isFinite(trendRaw) ? trendRaw : REPORT_ANALYTICS_TREND_LIMIT_DEFAULT));
+    const includeSamples = Boolean(includeSamplesEl ? includeSamplesEl.checked : REPORT_ANALYTICS_ENABLE_SAMPLES);
+    return { topN, trendLimit, includeSamples };
+}
+
+async function reloadAnalytics(forceReload) {
+    if (!ENABLE_REPORT_ANALYTICS) {
+        return;
+    }
+    if (analyticsLoading) {
+        return;
+    }
+    if (analyticsLoaded && !forceReload) {
+        return;
+    }
+    const container = document.getElementById('analyticsContainer');
+    if (!container) {
+        return;
+    }
+    const params = analyticsParams();
+    analyticsLoading = true;
+    container.innerHTML = '<div class="loading">加载分析数据中...</div>';
+    try {
+        const query = new URLSearchParams({
+            top_n: String(params.topN),
+            trend_limit: String(params.trendLimit),
+            include_samples: params.includeSamples ? 'true' : 'false',
+        });
+        const response = await fetch(`/api/report-analytics/${encodeURIComponent(reportName)}?${query.toString()}`);
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '分析数据加载失败');
+        }
+        renderAnalytics(data);
+        analyticsLoaded = true;
+    } catch (error) {
+        container.innerHTML = `<div class="empty">分析数据加载失败：${escapeHtml(error.message || String(error))}</div>`;
+    } finally {
+        analyticsLoading = false;
+    }
+}
+
+async function loadAnalyticsCompareReports() {
+    if (!ENABLE_REPORT_ANALYTICS || analyticsCompareReportsLoaded) {
+        return;
+    }
+    const compareContainer = document.getElementById('analyticsCompareContainer');
+    if (compareContainer) {
+        compareContainer.innerHTML = '<div class="loading">加载可对比报告列表中...</div>';
+    }
+    try {
+        const response = await fetch('/api/reports');
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '报告列表加载失败');
+        }
+        const items = Array.isArray(data.items) ? data.items : [];
+        analyticsReportsCache = items
+            .map((item) => ({ report_name: String(item.report_name || ''), generated_at: String(item.generated_at || '') }))
+            .filter((item) => item.report_name);
+        renderAnalyticsCompareSelectors();
+        analyticsCompareReportsLoaded = true;
+        reloadAnalyticsCompare(false);
+    } catch (error) {
+        if (compareContainer) {
+            compareContainer.innerHTML = `<div class="empty">加载对比报告列表失败：${escapeHtml(error.message || String(error))}</div>`;
+        }
+    }
+}
+
+function renderAnalyticsCompareSelectors() {
+    const leftSelect = document.getElementById('analyticsCompareLeft');
+    const rightSelect = document.getElementById('analyticsCompareRight');
+    if (!leftSelect || !rightSelect) {
+        return;
+    }
+    if (!analyticsReportsCache.length) {
+        leftSelect.innerHTML = '';
+        rightSelect.innerHTML = '';
+        return;
+    }
+
+    const optionsHtml = analyticsReportsCache.map((item) => {
+        const label = item.generated_at ? `${item.report_name} (${item.generated_at})` : item.report_name;
+        return `<option value="${escapeHtml(item.report_name)}">${escapeHtml(label)}</option>`;
+    }).join('');
+
+    leftSelect.innerHTML = optionsHtml;
+    rightSelect.innerHTML = optionsHtml;
+
+    const currentIndex = analyticsReportsCache.findIndex((item) => item.report_name === reportName);
+    const fallbackLeftIndex = currentIndex >= 0 ? currentIndex : 0;
+    let fallbackRightIndex = analyticsReportsCache.length > 1 ? 1 : 0;
+    if (fallbackRightIndex === fallbackLeftIndex && analyticsReportsCache.length > 1) {
+        fallbackRightIndex = 0;
+    }
+    if (currentIndex >= 0 && analyticsReportsCache.length > 1) {
+        fallbackRightIndex = currentIndex === 0 ? 1 : 0;
+    }
+
+    leftSelect.selectedIndex = fallbackLeftIndex;
+    rightSelect.selectedIndex = fallbackRightIndex;
+}
+
+async function reloadAnalyticsCompare(forceReload) {
+    if (!ENABLE_REPORT_ANALYTICS) {
+        return;
+    }
+    if (analyticsCompareLoading) {
+        return;
+    }
+    if (analyticsCompareLoaded && !forceReload) {
+        return;
+    }
+    const container = document.getElementById('analyticsCompareContainer');
+    const leftSelect = document.getElementById('analyticsCompareLeft');
+    const rightSelect = document.getElementById('analyticsCompareRight');
+    if (!container || !leftSelect || !rightSelect) {
+        return;
+    }
+    const left = String(leftSelect.value || '').trim();
+    const right = String(rightSelect.value || '').trim();
+    if (!left || !right) {
+        container.innerHTML = '<div class="empty">请先选择左右报告。</div>';
+        return;
+    }
+    if (left === right) {
+        container.innerHTML = '<div class="empty">左右报告不能相同。</div>';
+        return;
+    }
+
+    const params = analyticsParams();
+    analyticsCompareLoading = true;
+    container.innerHTML = '<div class="loading">加载对比分析中...</div>';
+    try {
+        const query = new URLSearchParams({
+            left,
+            right,
+            top_n: String(params.topN),
+            trend_limit: String(params.trendLimit),
+            include_samples: params.includeSamples ? 'true' : 'false',
+        });
+        const response = await fetch(`/api/report-analytics-compare?${query.toString()}`);
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || '对比分析加载失败');
+        }
+        renderAnalyticsCompare(data);
+        analyticsCompareLoaded = true;
+    } catch (error) {
+        container.innerHTML = `<div class="empty">对比分析加载失败：${escapeHtml(error.message || String(error))}</div>`;
+    } finally {
+        analyticsCompareLoading = false;
+    }
+}
+
+function formatNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed.toLocaleString('zh-CN') : '-';
+}
+
+function renderAnalyticsTable(headers, rows) {
+    if (!rows || !rows.length) {
+        return '<div class="analytics-empty">暂无数据</div>';
+    }
+    const thead = `<thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(String(cell ?? '-'))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    return `<div class="analytics-table-wrap"><table class="analytics-table">${thead}${tbody}</table></div>`;
+}
+
+function renderAnalytics(data) {
+    const container = document.getElementById('analyticsContainer');
+    if (!container) {
+        return;
+    }
+    const score = data.quality_score || {};
+    const penalties = score.penalties || {};
+    const coverage = data.coverage || {};
+    const quantiles = (data.performance || {}).quantiles || {};
+    const diagnostics = data.diagnostics || {};
+    const dist = data.distributions || {};
+    const trend = data.trend || {};
+
+    const cards = `
+        <div class="analytics-grid">
+            <div class="analytics-card"><div class="label">质量总分</div><div class="value">${formatNumber(score.total_score ?? 0)}</div></div>
+            <div class="analytics-card"><div class="label">稳定性分</div><div class="value">${formatNumber(score.stability_score ?? 0)}</div></div>
+            <div class="analytics-card"><div class="label">性能分</div><div class="value">${formatNumber(score.performance_score ?? 0)}</div></div>
+            <div class="analytics-card"><div class="label">断言完整性分</div><div class="value">${formatNumber(score.assertion_score ?? 0)}</div></div>
+            <div class="analytics-card"><div class="label">执行覆盖率</div><div class="value">${coverage.execution_coverage ?? 0}%</div></div>
+            <div class="analytics-card"><div class="label">人工覆盖率</div><div class="value">${coverage.manual_coverage ?? 0}%</div></div>
+            <div class="analytics-card"><div class="label">P95 响应(ms)</div><div class="value">${formatNumber(quantiles.p95 ?? 0)}</div></div>
+            <div class="analytics-card"><div class="label">P99 响应(ms)</div><div class="value">${formatNumber(quantiles.p99 ?? 0)}</div></div>
+        </div>
+    `;
+
+    const statusRows = Object.entries(dist.status || {}).map(([key, value]) => [key, String(value)]);
+    const methodRows = Object.entries(dist.method || {}).map(([key, value]) => [key, String(value)]);
+    const folderRows = (dist.folder_top || []).map((item) => [item.folder || '-', String(item.count || 0)]);
+    const histogramRows = ((data.performance || {}).histogram || []).map((item) => [item.bucket || '-', String(item.count || 0)]);
+    const categoryRows = (diagnostics.category_summary || []).map((item) => [item.category || '-', String(item.count || 0), `${item.ratio || 0}%`]);
+    const frequentRows = (diagnostics.frequent_errors || []).map((item) => {
+        const categories = Array.isArray(item.categories) ? item.categories.join(', ') : '-';
+        return [item.message || '-', String(item.count || 0), categories || '-'];
+    });
+    const suggestionHtml = (diagnostics.suggestions || []).map((item) => `<span class="analytics-badge">${escapeHtml(item.category || '-')}</span>${escapeHtml(item.suggestion || '-')}`).join('<br>');
+
+    const trendRows = [];
+    const successTrend = trend.success_rate || [];
+    const avgTrend = trend.avg_response_ms || [];
+    const failedTrend = trend.failed_count || [];
+    const trendSize = Math.max(successTrend.length, avgTrend.length, failedTrend.length);
+    for (let i = 0; i < trendSize; i += 1) {
+        const s = successTrend[i] || {};
+        const a = avgTrend[i] || {};
+        const f = failedTrend[i] || {};
+        trendRows.push([
+            s.generated_at || a.generated_at || f.generated_at || '-',
+            s.report_name || a.report_name || f.report_name || '-',
+            `${s.value ?? '-'}%`,
+            String(a.value ?? '-'),
+            String(f.value ?? '-'),
+        ]);
+    }
+
+    const penaltyRows = [
+        ['FAILED 扣分', String(penalties.failed_points || 0), `条数 ${penalties.failed_count || 0}`],
+        ['ERROR 扣分', String(penalties.error_points || 0), `条数 ${penalties.error_count || 0}`],
+        ['慢请求扣分', String(penalties.slow_points || 0), `条数 ${penalties.slow_count || 0}`],
+        ['缺少断言扣分', String(penalties.assertion_points || 0), `条数 ${penalties.missing_assertion_count || 0}`],
+        ['总扣分', String(penalties.total_penalty || 0), '-'],
+    ];
+
+    container.innerHTML = `
+        ${cards}
+        <div class="analytics-section-title">基础分布</div>
+        ${renderAnalyticsTable(['状态', '数量'], statusRows)}
+        ${renderAnalyticsTable(['方法', '数量'], methodRows)}
+        ${renderAnalyticsTable(['目录', '数量'], folderRows)}
+
+        <div class="analytics-section-title">性能分布</div>
+        ${renderAnalyticsTable(['响应时间桶', '数量'], histogramRows)}
+
+        <div class="analytics-section-title">故障诊断</div>
+        ${renderAnalyticsTable(['分类', '数量', '占比'], categoryRows)}
+        ${renderAnalyticsTable(['错误消息', '频次', '分类'], frequentRows)}
+        <div class="analytics-card" style="margin-top:10px;">
+            <div class="label">建议</div>
+            <div style="font-size:13px;line-height:1.6;">${suggestionHtml || '<span class="analytics-empty">暂无建议</span>'}</div>
+        </div>
+
+        <div class="analytics-section-title">质量评分与覆盖率</div>
+        ${renderAnalyticsTable(['扣分项', '分值', '说明'], penaltyRows)}
+        ${renderAnalyticsTable(['覆盖项', '值'], [
+            ['源接口总数', String(coverage.source_total ?? 0)],
+            ['执行结果总数', String(coverage.executed_total ?? 0)],
+            ['人工用例总数', String(coverage.manual_cases_total ?? 0)],
+        ])}
+
+        <div class="analytics-section-title">趋势</div>
+        ${renderAnalyticsTable(['时间', '报告', '成功率', '平均响应(ms)', '失败数'], trendRows)}
+    `;
+}
+
+function signedValue(value, suffix = '') {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) {
+        return `0${suffix}`;
+    }
+    const fixed = Number.isInteger(num) ? String(num) : num.toFixed(2);
+    if (num > 0) {
+        return `+${fixed}${suffix}`;
+    }
+    return `${fixed}${suffix}`;
+}
+
+function renderAnalyticsCompare(data) {
+    const container = document.getElementById('analyticsCompareContainer');
+    if (!container) {
+        return;
+    }
+    const delta = data.delta || {};
+    const left = data.left_snapshot || {};
+    const right = data.right_snapshot || {};
+    const leftSummary = left.summary_snapshot || {};
+    const rightSummary = right.summary_snapshot || {};
+    const leftScore = left.quality_score || {};
+    const rightScore = right.quality_score || {};
+
+    const cards = `
+        <div class="analytics-grid" style="margin-top:8px;">
+            <div class="analytics-card"><div class="label">成功率变化</div><div class="value">${signedValue(delta.success_rate_delta, '%')}</div></div>
+            <div class="analytics-card"><div class="label">平均响应变化(ms)</div><div class="value">${signedValue(delta.avg_response_delta_ms, '')}</div></div>
+            <div class="analytics-card"><div class="label">失败数变化</div><div class="value">${signedValue(delta.failed_delta, '')}</div></div>
+            <div class="analytics-card"><div class="label">错误数变化</div><div class="value">${signedValue(delta.error_delta, '')}</div></div>
+            <div class="analytics-card"><div class="label">质量分变化</div><div class="value">${signedValue(data.score_delta, '')}</div></div>
+        </div>
+    `;
+
+    const rows = [
+        ['报告名', String(left.report_name || '-'), String(right.report_name || '-')],
+        ['成功率', String(leftSummary.success_rate || '-'), String(rightSummary.success_rate || '-')],
+        ['平均响应(ms)', String(leftSummary.avg_response_ms ?? '-'), String(rightSummary.avg_response_ms ?? '-')],
+        ['失败数', String(leftSummary.failed ?? '-'), String(rightSummary.failed ?? '-')],
+        ['错误数', String(leftSummary.error ?? '-'), String(rightSummary.error ?? '-')],
+        ['质量总分', String(leftScore.total_score ?? '-'), String(rightScore.total_score ?? '-')],
+    ];
+
+    container.innerHTML = `
+        ${cards}
+        ${renderAnalyticsTable(['指标', '左侧', '右侧'], rows)}
+    `;
 }
 
 async function reloadResults(page = 1) {
@@ -4223,8 +4691,24 @@ if (document.getElementById('exportScopeSelect')) {
     document.getElementById('exportScopeSelect').value = REPORT_EXPORT_DEFAULT_SCOPE;
 }
 
+if (ENABLE_REPORT_ANALYTICS) {
+    const topNInput = document.getElementById('analyticsTopN');
+    const trendInput = document.getElementById('analyticsTrendLimit');
+    const includeSamplesInput = document.getElementById('analyticsIncludeSamples');
+    if (topNInput) {
+        topNInput.value = String(REPORT_ANALYTICS_TOP_N_DEFAULT);
+    }
+    if (trendInput) {
+        trendInput.value = String(REPORT_ANALYTICS_TREND_LIMIT_DEFAULT);
+    }
+    if (includeSamplesInput) {
+        includeSamplesInput.checked = REPORT_ANALYTICS_ENABLE_SAMPLES;
+    }
+}
+
 reloadResults(1);
 reloadManualCases();
+switchMainTab('results');
 initCustomTooltip();
 // 升级二：根据初始摘要数据显示重试按钮
 updateRetryBtn({{ (summary.failed | default(0)) + (summary.error | default(0)) }});

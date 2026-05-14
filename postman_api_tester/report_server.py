@@ -109,6 +109,11 @@ from postman_api_tester.handlers.report_handler import (
     build_report_results_payload as _report_build_report_results_payload,
     normalize_status_filter as _report_normalize_status_filter,
 )
+from postman_api_tester.handlers.report_analytics_handler import (
+    build_analytics_compare_payload as _report_build_analytics_compare_payload,
+    build_analytics_payload as _report_build_analytics_payload,
+    normalize_analytics_query_params as _report_normalize_analytics_query_params,
+)
 from postman_api_tester.utils.report_utils import (
     compute_summary as _utils_compute_summary,
 )
@@ -198,6 +203,17 @@ ENABLE_RETRY_FAILURES = _cfg_bool("ENABLE_RETRY_FAILURES", True)
 ENABLE_JUNIT_EXPORT = _cfg_bool("ENABLE_JUNIT_EXPORT", True)
 ENABLE_REPORT_LIST_FILTER = _cfg_bool("ENABLE_REPORT_LIST_FILTER", True)
 ENABLE_ASSERTIONS = _cfg_bool("ENABLE_ASSERTIONS", False)
+ENABLE_REPORT_ANALYTICS = _cfg_bool("ENABLE_REPORT_ANALYTICS", True)
+REPORT_ANALYTICS_TOP_N_DEFAULT = _cfg_int("REPORT_ANALYTICS_TOP_N_DEFAULT", 10)
+REPORT_ANALYTICS_TOP_N_MAX = _cfg_int("REPORT_ANALYTICS_TOP_N_MAX", 100)
+REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = _cfg_int("REPORT_ANALYTICS_TREND_LIMIT_DEFAULT", 20)
+REPORT_ANALYTICS_TREND_LIMIT_MAX = _cfg_int("REPORT_ANALYTICS_TREND_LIMIT_MAX", 100)
+REPORT_ANALYTICS_ENABLE_SAMPLES = _cfg_bool("REPORT_ANALYTICS_ENABLE_SAMPLES", False)
+REPORT_ANALYTICS_HISTOGRAM_BUCKETS = _cfg_str("REPORT_ANALYTICS_HISTOGRAM_BUCKETS", "0,50,100,200,500,1000,3000,5000")
+QUALITY_SCORE_FAILED_PENALTY = max(0, _cfg_int("QUALITY_SCORE_FAILED_PENALTY", 10))
+QUALITY_SCORE_ERROR_PENALTY = max(0, _cfg_int("QUALITY_SCORE_ERROR_PENALTY", 15))
+QUALITY_SCORE_SLOW_PENALTY = max(0, _cfg_int("QUALITY_SCORE_SLOW_PENALTY", 5))
+QUALITY_SCORE_ASSERTION_MISSING_PENALTY = max(0, _cfg_int("QUALITY_SCORE_ASSERTION_MISSING_PENALTY", 2))
 
 
 def _cfg_dict(name: str, default: Optional[Dict[str, object]] = None) -> Dict[str, object]:
@@ -488,6 +504,10 @@ def report_view() -> ResponseReturnValue:
         enable_response_time=ENABLE_RESPONSE_TIME,
         enable_retry_failures=ENABLE_RETRY_FAILURES,
         enable_junit_export=ENABLE_JUNIT_EXPORT,
+        enable_report_analytics=ENABLE_REPORT_ANALYTICS,
+        report_analytics_top_n_default=REPORT_ANALYTICS_TOP_N_DEFAULT,
+        report_analytics_trend_limit_default=REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
+        report_analytics_enable_samples=REPORT_ANALYTICS_ENABLE_SAMPLES,
     )
     response = make_response(html)
     # 避免浏览器缓存旧版页面，确保模板改动即时生效。
@@ -1003,6 +1023,85 @@ def api_report_results(report_name: str) -> ResponseReturnValue:
         err_code_keyword=err_code_keyword,
         status_filter=status_filter,
         include_excluded=include_excluded,
+    )
+    return jsonify(payload)
+
+
+@app.route("/api/report-analytics/<path:report_name>")
+def api_report_analytics(report_name: str) -> ResponseReturnValue:
+    if not ENABLE_REPORT_ANALYTICS:
+        return _json_error("当前环境未启用测试结果分析能力。", 403)
+
+    try:
+        report = _repo_find_report(report_name)
+    except FileNotFoundError:
+        return _json_error(f"报告不存在: {report_name}", 404)
+
+    params = _report_normalize_analytics_query_params(
+        top_n_raw=request.args.get("top_n"),
+        trend_limit_raw=request.args.get("trend_limit"),
+        include_samples_raw=request.args.get("include_samples"),
+        top_n_default=REPORT_ANALYTICS_TOP_N_DEFAULT,
+        top_n_max=REPORT_ANALYTICS_TOP_N_MAX,
+        trend_limit_default=REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
+        trend_limit_max=REPORT_ANALYTICS_TREND_LIMIT_MAX,
+        include_samples_default=REPORT_ANALYTICS_ENABLE_SAMPLES,
+    )
+    payload = _report_build_analytics_payload(
+        report=report,
+        reports=_repo_list_reports(),
+        top_n=int(params["top_n"]),
+        trend_limit=int(params["trend_limit"]),
+        include_samples=bool(params["include_samples"]),
+        histogram_buckets_text=REPORT_ANALYTICS_HISTOGRAM_BUCKETS,
+        failed_penalty=QUALITY_SCORE_FAILED_PENALTY,
+        error_penalty=QUALITY_SCORE_ERROR_PENALTY,
+        slow_penalty=QUALITY_SCORE_SLOW_PENALTY,
+        assertion_missing_penalty=QUALITY_SCORE_ASSERTION_MISSING_PENALTY,
+        assertions_enabled=ENABLE_ASSERTIONS,
+    )
+    return jsonify(payload)
+
+
+@app.route("/api/report-analytics-compare")
+def api_report_analytics_compare() -> ResponseReturnValue:
+    if not ENABLE_REPORT_ANALYTICS:
+        return _json_error("当前环境未启用测试结果分析能力。", 403)
+
+    left_name = str(request.args.get("left", "")).strip()
+    right_name = str(request.args.get("right", "")).strip()
+    if not left_name or not right_name:
+        return _json_error("left 和 right 参数不能为空", 400)
+
+    try:
+        left_report = _repo_find_report(left_name)
+        right_report = _repo_find_report(right_name)
+    except FileNotFoundError as exc:
+        return _json_error(f"报告不存在: {exc}", 404)
+
+    params = _report_normalize_analytics_query_params(
+        top_n_raw=request.args.get("top_n"),
+        trend_limit_raw=request.args.get("trend_limit"),
+        include_samples_raw=request.args.get("include_samples"),
+        top_n_default=REPORT_ANALYTICS_TOP_N_DEFAULT,
+        top_n_max=REPORT_ANALYTICS_TOP_N_MAX,
+        trend_limit_default=REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
+        trend_limit_max=REPORT_ANALYTICS_TREND_LIMIT_MAX,
+        include_samples_default=REPORT_ANALYTICS_ENABLE_SAMPLES,
+    )
+    payload = _report_build_analytics_compare_payload(
+        left_report=left_report,
+        right_report=right_report,
+        reports=_repo_list_reports(),
+        top_n=int(params["top_n"]),
+        trend_limit=int(params["trend_limit"]),
+        include_samples=bool(params["include_samples"]),
+        histogram_buckets_text=REPORT_ANALYTICS_HISTOGRAM_BUCKETS,
+        failed_penalty=QUALITY_SCORE_FAILED_PENALTY,
+        error_penalty=QUALITY_SCORE_ERROR_PENALTY,
+        slow_penalty=QUALITY_SCORE_SLOW_PENALTY,
+        assertion_missing_penalty=QUALITY_SCORE_ASSERTION_MISSING_PENALTY,
+        assertions_enabled=ENABLE_ASSERTIONS,
     )
     return jsonify(payload)
 
