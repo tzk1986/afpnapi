@@ -269,11 +269,11 @@ def resolve_reports_dir() -> Path:
 REPORTS_DIR = resolve_reports_dir()
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()
 EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
+from postman_api_tester.report_server_app import ReportServerApp
+
+app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
 configure_report_repository(REPORTS_DIR, cache_ttl=30.0)
-
-
-app = Flask(__name__, template_folder=str((PROJECT_ROOT / "templates").resolve()))
 
 
 
@@ -358,47 +358,6 @@ _UPDATE_REPORT_META_FN = partial(
     find_report=_repo_find_report,
     invalidate_reports_cache=_repo_invalidate_reports_cache,
 )
-
-
-@app.before_request
-def _capture_request_start() -> None:
-    request.environ["_request_start_at"] = time.perf_counter()
-    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
-    request.environ["_request_id"] = request_id
-
-
-@app.after_request
-def _log_access(response: Response) -> Response:
-    started_at = request.environ.get("_request_start_at")
-    duration_ms = 0
-    if isinstance(started_at, (int, float)):
-        duration_ms = round((time.perf_counter() - started_at) * 1000)
-
-    request_id = str(request.environ.get("_request_id") or "")
-    extra_payload = {
-        "event": "http.access.logged",
-        "request_id": request_id,
-        "method": request.method,
-        "path": request.path,
-        "status_code": int(response.status_code),
-        "duration_ms": duration_ms,
-        "remote_addr": request.remote_addr or "",
-    }
-    if request.user_agent and request.user_agent.string:
-        extra_payload["user_agent"] = request.user_agent.string
-
-    level = logging.WARNING if response.status_code >= 500 else logging.INFO
-    sample_rate = 1.0 if response.status_code >= 400 else ACCESS_LOG_SAMPLE_RATE
-    log_sampled(
-        logger,
-        level,
-        "http_request",
-        sample_rate=sample_rate,
-        extra=extra_payload,
-    )
-    if request_id:
-        response.headers["X-Request-Id"] = request_id
-    return response
 
 
 @app.route("/health")
@@ -1460,23 +1419,7 @@ def latest_report() -> ResponseReturnValue:
     return redirect(url_for("report_view", name=reports[0]["report_name"]))
 
 
-def main() -> None:
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
-    host = os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")
-    print(f"报告目录: {REPORTS_DIR}")
-    logger.info("报告服务启动: http://127.0.0.1:%d", port)
-    logger.info("局域网访问地址: http://%s:%d", get_local_ip(), port)
-    try:
-        from waitress import serve
-        logger.info("使用 waitress WSGI 服务器（生产模式）")
-        serve(app, host=host, port=port)
-    except ImportError:
-        logger.warning("waitress 未安装，降级使用 Flask 开发服务器（建议 pip install waitress）")
-        app.run(host=host, port=port, debug=False)
-
-
-if __name__ == "__main__":
-    main()
+# 入口已迁移到 postman_api_tester.report_server_app.ReportServerApp.run_app()
+# 命令行启动: python -c "from postman_api_tester.report_server_app import ReportServerApp; ReportServerApp.run_app(ReportServerApp.create_app())"
 
 
