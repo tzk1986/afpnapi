@@ -204,6 +204,7 @@ ENABLE_JUNIT_EXPORT = _cfg_bool("ENABLE_JUNIT_EXPORT", True)
 ENABLE_REPORT_LIST_FILTER = _cfg_bool("ENABLE_REPORT_LIST_FILTER", True)
 ENABLE_ASSERTIONS = _cfg_bool("ENABLE_ASSERTIONS", False)
 ENABLE_REPORT_ANALYTICS = _cfg_bool("ENABLE_REPORT_ANALYTICS", True)
+ENABLE_REPORT_ANALYTICS_CHARTS = _cfg_bool("ENABLE_REPORT_ANALYTICS_CHARTS", True)
 REPORT_ANALYTICS_TOP_N_DEFAULT = _cfg_int("REPORT_ANALYTICS_TOP_N_DEFAULT", 10)
 REPORT_ANALYTICS_TOP_N_MAX = _cfg_int("REPORT_ANALYTICS_TOP_N_MAX", 100)
 REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = _cfg_int("REPORT_ANALYTICS_TREND_LIMIT_DEFAULT", 20)
@@ -505,6 +506,7 @@ def report_view() -> ResponseReturnValue:
         enable_retry_failures=ENABLE_RETRY_FAILURES,
         enable_junit_export=ENABLE_JUNIT_EXPORT,
         enable_report_analytics=ENABLE_REPORT_ANALYTICS,
+        enable_report_analytics_charts=ENABLE_REPORT_ANALYTICS_CHARTS,
         report_analytics_top_n_default=REPORT_ANALYTICS_TOP_N_DEFAULT,
         report_analytics_trend_limit_default=REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
         report_analytics_enable_samples=REPORT_ANALYTICS_ENABLE_SAMPLES,

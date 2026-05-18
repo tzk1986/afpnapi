@@ -391,6 +391,26 @@
         }
         .analytics-table th { background: #f8fafc; font-size: 12px; color: #475569; }
         .analytics-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+        .analytics-chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (max-width: 768px) {
+            .analytics-chart-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        .analytics-chart-box {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .analytics-chart-box canvas {
+            max-height: 280px;
+        }
         .analytics-toolbar input {
             width: 110px;
             padding: 8px 10px;
@@ -583,11 +603,17 @@
     "enableJunitExport": {{ enable_junit_export|tojson }},
     "enableResponseTime": {{ enable_response_time|tojson }},
     "enableReportAnalytics": {{ enable_report_analytics|tojson }},
+    "enableReportAnalyticsCharts": {{ enable_report_analytics_charts|tojson }},
     "reportAnalyticsTopNDefault": {{ report_analytics_top_n_default | default(10) }},
     "reportAnalyticsTrendLimitDefault": {{ report_analytics_trend_limit_default | default(20) }},
     "reportAnalyticsEnableSamples": {{ report_analytics_enable_samples|tojson }}
 }
 </script>
+{% if enable_report_analytics and enable_report_analytics_charts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+        crossorigin="anonymous"
+        onerror="window._chartJsLoadFailed=true"></script>
+{% endif %}
 <script>
 const runtimeConfig = JSON.parse(document.getElementById('report-view-runtime').textContent || '{}');
 const reportName = runtimeConfig.reportName || '';
@@ -601,6 +627,7 @@ const ENABLE_RETRY_FAILURES = Boolean(runtimeConfig.enableRetryFailures);
 const ENABLE_JUNIT_EXPORT = Boolean(runtimeConfig.enableJunitExport);
 const ENABLE_RESPONSE_TIME = Boolean(runtimeConfig.enableResponseTime);
 const ENABLE_REPORT_ANALYTICS = Boolean(runtimeConfig.enableReportAnalytics);
+const ENABLE_REPORT_ANALYTICS_CHARTS = Boolean(runtimeConfig.enableReportAnalyticsCharts);
 const REPORT_ANALYTICS_TOP_N_DEFAULT = Number(runtimeConfig.reportAnalyticsTopNDefault || 10);
 const REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = Number(runtimeConfig.reportAnalyticsTrendLimitDefault || 20);
 const REPORT_ANALYTICS_ENABLE_SAMPLES = Boolean(runtimeConfig.reportAnalyticsEnableSamples);
@@ -2154,17 +2181,35 @@ function renderAnalytics(data) {
         ['总扣分', String(penalties.total_penalty || 0), '-'],
     ];
 
+    const chartsEnabled = ENABLE_REPORT_ANALYTICS_CHARTS && typeof Chart !== 'undefined';
+    const statusChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsStatusChart"></canvas></div>' : '';
+    const methodChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsMethodChart"></canvas></div>' : '';
+    const histogramChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsHistogramChart"></canvas></div>' : '';
+    const categoryChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsCategoryChart"></canvas></div>' : '';
+    const qualityScoreChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsQualityScoreChart"></canvas></div>' : '';
+    const trendChartCanvas = chartsEnabled ? '<div class="analytics-chart-box"><canvas id="analyticsTrendChart"></canvas></div>' : '';
+
     container.innerHTML = `
         ${cards}
         <div class="analytics-section-title">基础分布</div>
+        <div class="analytics-chart-row">
+            ${statusChartCanvas}
+            ${methodChartCanvas}
+        </div>
         ${renderAnalyticsTable(['状态', '数量'], statusRows)}
         ${renderAnalyticsTable(['方法', '数量'], methodRows)}
         ${renderAnalyticsTable(['目录', '数量'], folderRows)}
 
         <div class="analytics-section-title">性能分布</div>
+        <div class="analytics-chart-row">
+            ${histogramChartCanvas}
+        </div>
         ${renderAnalyticsTable(['响应时间桶', '数量'], histogramRows)}
 
         <div class="analytics-section-title">故障诊断</div>
+        <div class="analytics-chart-row">
+            ${categoryChartCanvas}
+        </div>
         ${renderAnalyticsTable(['分类', '数量', '占比'], categoryRows)}
         ${renderAnalyticsTable(['错误消息', '频次', '分类'], frequentRows)}
         <div class="analytics-card" style="margin-top:10px;">
@@ -2173,6 +2218,9 @@ function renderAnalytics(data) {
         </div>
 
         <div class="analytics-section-title">质量评分与覆盖率</div>
+        <div class="analytics-chart-row">
+            ${qualityScoreChartCanvas}
+        </div>
         ${renderAnalyticsTable(['扣分项', '分值', '说明'], penaltyRows)}
         ${renderAnalyticsTable(['覆盖项', '值'], [
             ['源接口总数', String(coverage.source_total ?? 0)],
@@ -2181,8 +2229,273 @@ function renderAnalytics(data) {
         ])}
 
         <div class="analytics-section-title">趋势</div>
+        <div class="analytics-chart-row">
+            ${trendChartCanvas}
+        </div>
         ${renderAnalyticsTable(['时间', '报告', '成功率', '平均响应(ms)', '失败数'], trendRows)}
     `;
+
+    if (chartsEnabled) {
+        renderAnalyticsCharts(data);
+    }
+}
+
+function renderAnalyticsCharts(data) {
+    const dist = data.distributions || {};
+    const performance = data.performance || {};
+    const diagnostics = data.diagnostics || {};
+    const trend = data.trend || {};
+    const chartFont = { family: "Arial, sans-serif", size: 12 };
+    const chartColors = {
+        passed: "#22c55e",
+        failed: "#ef4444",
+        error: "#f59e0b",
+        other: "#94a3b8",
+        primary: "#3b82f6",
+        secondary: "#8b5cf6",
+        grid: "#e2e8f0",
+    };
+
+    // 1. 状态分布饼图
+    const statusCanvas = document.getElementById("analyticsStatusChart");
+    if (statusCanvas) {
+        const statusData = dist.status || {};
+        new Chart(statusCanvas, {
+            type: "doughnut",
+            data: {
+                labels: ["通过", "失败", "错误", "其他"],
+                datasets: [{
+                    data: [
+                        statusData.PASSED || 0,
+                        statusData.FAILED || 0,
+                        statusData.ERROR || 0,
+                        statusData.OTHER || 0,
+                    ],
+                    backgroundColor: [chartColors.passed, chartColors.failed, chartColors.error, chartColors.other],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: "状态分布", font: { size: 14 } },
+                    legend: { position: "bottom", labels: { font: chartFont } },
+                },
+            },
+        });
+    }
+
+    // 2. 响应时间直方图
+    const histogramCanvas = document.getElementById("analyticsHistogramChart");
+    if (histogramCanvas) {
+        const histogram = performance.histogram || [];
+        new Chart(histogramCanvas, {
+            type: "bar",
+            data: {
+                labels: histogram.map((item) => item.bucket || "-"),
+                datasets: [{
+                    label: "接口数量",
+                    data: histogram.map((item) => item.count || 0),
+                    backgroundColor: chartColors.primary,
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: "响应时间分布", font: { size: 14 } },
+                    legend: { display: false },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: chartFont } },
+                    y: { grid: { color: chartColors.grid }, ticks: { font: chartFont } },
+                },
+            },
+        });
+    }
+
+    // 3. 错误分类柱状图
+    const categoryCanvas = document.getElementById("analyticsCategoryChart");
+    if (categoryCanvas) {
+        const categorySummary = diagnostics.category_summary || [];
+        const categoryColors = {
+            connection: "#f59e0b",
+            auth: "#8b5cf6",
+            business: "#3b82f6",
+            assertion: "#ef4444",
+            database: "#10b981",
+            unknown: "#94a3b8",
+        };
+        new Chart(categoryCanvas, {
+            type: "bar",
+            data: {
+                labels: categorySummary.map((item) => item.category || "-"),
+                datasets: [{
+                    label: "错误数量",
+                    data: categorySummary.map((item) => item.count || 0),
+                    backgroundColor: categorySummary.map((item) => categoryColors[item.category] || chartColors.other),
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: "错误分类", font: { size: 14 } },
+                    legend: { display: false },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: chartFont } },
+                    y: { grid: { color: chartColors.grid }, ticks: { font: chartFont } },
+                },
+            },
+        });
+    }
+
+    // 4. 趋势双折线图（成功率 + 平均响应）
+    const trendCanvas = document.getElementById("analyticsTrendChart");
+    if (trendCanvas) {
+        const successRate = trend.success_rate || [];
+        const avgResponse = trend.avg_response_ms || [];
+        // 取时间对齐的数据点
+        const labels = successRate.map((item) => {
+            const raw = item.generated_at || "";
+            return raw.replace(/^\d{4}-/, "").replace(/:\d{2}$/, "");
+        });
+        new Chart(trendCanvas, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: "成功率(%)",
+                        data: successRate.map((item) => item.value ?? 0),
+                        borderColor: chartColors.passed,
+                        backgroundColor: chartColors.passed,
+                        yAxisID: "y",
+                        tension: 0.3,
+                        pointRadius: 3,
+                    },
+                    {
+                        label: "平均响应(ms)",
+                        data: avgResponse.map((item) => item.value ?? 0),
+                        borderColor: chartColors.primary,
+                        backgroundColor: chartColors.primary,
+                        yAxisID: "y1",
+                        tension: 0.3,
+                        pointRadius: 3,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false },
+                plugins: {
+                    title: { display: true, text: "趋势（成功率 vs 平均响应）", font: { size: 14 } },
+                    legend: { position: "bottom", labels: { font: chartFont } },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: chartFont, maxRotation: 45 } },
+                    y: {
+                        type: "linear",
+                        display: true,
+                        position: "left",
+                        grid: { color: chartColors.grid },
+                        ticks: { font: chartFont },
+                        title: { display: true, text: "成功率(%)", font: chartFont },
+                    },
+                    y1: {
+                        type: "linear",
+                        display: true,
+                        position: "right",
+                        grid: { drawOnChartArea: false },
+                        ticks: { font: chartFont },
+                        title: { display: true, text: "响应(ms)", font: chartFont },
+                    },
+                },
+            },
+        });
+    }
+
+    // 5. 方法分布环形图
+    const methodCanvas = document.getElementById("analyticsMethodChart");
+    if (methodCanvas) {
+        const methodData = dist.method || {};
+        new Chart(methodCanvas, {
+            type: "doughnut",
+            data: {
+                labels: ["GET", "POST", "PUT", "PATCH", "DELETE", "OTHER"],
+                datasets: [{
+                    data: [
+                        methodData.GET || 0,
+                        methodData.POST || 0,
+                        methodData.PUT || 0,
+                        methodData.PATCH || 0,
+                        methodData.DELETE || 0,
+                        methodData.OTHER || 0,
+                    ],
+                    backgroundColor: [
+                        "#3b82f6", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#94a3b8",
+                    ],
+                    borderWidth: 0,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: "方法分布", font: { size: 14 } },
+                    legend: { position: "bottom", labels: { font: chartFont } },
+                },
+            },
+        });
+    }
+
+    // 6. 质量评分雷达图
+    const qualityScoreCanvas = document.getElementById("analyticsQualityScoreChart");
+    if (qualityScoreCanvas) {
+        const qualityScore = data.quality_score || {};
+        new Chart(qualityScoreCanvas, {
+            type: "radar",
+            data: {
+                labels: ["稳定性", "性能", "断言完整性", "总分"],
+                datasets: [{
+                    label: "质量评分",
+                    data: [
+                        qualityScore.stability_score ?? 0,
+                        qualityScore.performance_score ?? 0,
+                        qualityScore.assertion_score ?? 0,
+                        qualityScore.total_score ?? 0,
+                    ],
+                    backgroundColor: "rgba(59, 130, 246, 0.2)",
+                    borderColor: "#3b82f6",
+                    pointBackgroundColor: "#3b82f6",
+                    pointBorderColor: "#fff",
+                    pointHoverBackgroundColor: "#fff",
+                    pointHoverBorderColor: "#3b82f6",
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: "质量评分", font: { size: 14 } },
+                    legend: { display: false },
+                },
+                scales: {
+                    r: {
+                        min: 0,
+                        max: 100,
+                        ticks: { stepSize: 20, font: chartFont },
+                        pointLabels: { font: { size: 12 } },
+                    },
+                },
+            },
+        });
+    }
 }
 
 function signedValue(value, suffix = '') {

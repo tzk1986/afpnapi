@@ -263,6 +263,9 @@ REPORT_ANALYTICS_TREND_LIMIT_MAX = int(os.environ.get("REPORT_ANALYTICS_TREND_LI
 REPORT_ANALYTICS_ENABLE_SAMPLES = str(os.environ.get("REPORT_ANALYTICS_ENABLE_SAMPLES", "false")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
+ENABLE_REPORT_ANALYTICS_CHARTS = str(os.environ.get("ENABLE_REPORT_ANALYTICS_CHARTS", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
 REPORT_ANALYTICS_HISTOGRAM_BUCKETS = str(
     os.environ.get("REPORT_ANALYTICS_HISTOGRAM_BUCKETS", "0,50,100,200,500,1000,3000,5000")
 ).strip()
