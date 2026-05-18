@@ -270,6 +270,7 @@ REPORTS_DIR = resolve_reports_dir()
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()
 EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
 from postman_api_tester.report_server_app import ReportServerApp
+from postman_api_tester.handlers.base_handler import BaseHandler
 
 app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
@@ -289,7 +290,8 @@ def get_local_ip() -> str:
         sock.close()
     
 def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    return jsonify(build_error_payload(message)), status_code
+    from postman_api_tester.exceptions import ValidationError
+    return BaseHandler.error_response(ValidationError(message), status_code)
 
 
 def clamp_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
