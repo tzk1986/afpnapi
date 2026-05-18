@@ -1,10 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.2.4
-发布日期：2026-05-14
+版本：v1.2.5
+发布日期：2026-05-18
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点：响应时间记录与展示（每接口耗时 + avg/max/p95 统计）、一键重试全部失败用例、多环境配置切换、JSONPath 断言规则（需 `ENABLE_ASSERTIONS=true`）、JUnit XML 报告导出（CI/CD 集成）、首页报告列表筛选增强（状态/通过率/日期范围）；并保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力完全兼容。
+本版新增重点：新增 2.1 测试结果分析与报告洞察能力，包括分析洞察页签、单报告 analytics、报告对比、错误诊断建议、质量评分、覆盖率与趋势视图；同时保留响应时间记录与展示（每接口耗时 + avg/max/p95 统计）、一键重试全部失败用例、多环境配置切换、JSONPath 断言规则（需 `ENABLE_ASSERTIONS=true`）、JUnit XML 报告导出（CI/CD 集成）、首页报告列表筛选增强（状态/通过率/日期范围），并保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力完全兼容。
 
 v1.2.1 实施补充：已落地 1.1（断点恢复/部分成功报告/断言严格模式）与 1.3（报告列表摘要懒加载/结果分块渲染/流式导出接口）；同时新增导出通道三态策略（`auto` / `legacy` / `stream`）与阈值自动分流，默认配置下保持旧行为兼容。
 
@@ -147,6 +147,12 @@ pip install -r requirements.txt
 - `ENABLE_RETRY_FAILURES`：是否在报告页启用"一键重试失败用例"按钮（默认 `True`）
 - `ENABLE_JUNIT_EXPORT`：是否启用 JUnit XML 导出链接（默认 `True`）
 - `ENABLE_REPORT_LIST_FILTER`：是否启用首页报告列表筛选面板（默认 `True`）
+- `ENABLE_REPORT_ANALYTICS`：是否启用“分析洞察”页签及 analytics 接口（默认 `True`）
+- `REPORT_ANALYTICS_TOP_N_DEFAULT` / `REPORT_ANALYTICS_TOP_N_MAX`：分析 TopN 默认值与上限
+- `REPORT_ANALYTICS_TREND_LIMIT_DEFAULT` / `REPORT_ANALYTICS_TREND_LIMIT_MAX`：趋势序列默认值与上限
+- `REPORT_ANALYTICS_ENABLE_SAMPLES`：是否默认返回错误样本（默认 `False`）
+- `REPORT_ANALYTICS_HISTOGRAM_BUCKETS`：响应时间直方图桶边界（默认 `0,50,100,200,500,1000,3000,5000`）
+- `QUALITY_SCORE_FAILED_PENALTY` / `QUALITY_SCORE_ERROR_PENALTY` / `QUALITY_SCORE_SLOW_PENALTY` / `QUALITY_SCORE_ASSERTION_MISSING_PENALTY`：质量评分扣分项阈值
 - `ENABLE_ASSERTIONS`：是否启用 JSONPath 断言校验（默认 `False`，需显式开启）
 - `ASSERTIONS_ENGINE`：断言引擎类型（默认 `jsonpath`）
 - `ENVIRONMENTS`：多环境配置字典（键为环境名，值为 `{base_url, token}`），通过环境变量 `ENVIRONMENTS_JSON` 注入 JSON
@@ -245,6 +251,8 @@ python report_server.py
 - `上传并执行`：支持先解析集合接口，再选择“全量执行”或“仅执行已选接口”。
 - `新增接口测试`：在首页点击入口按钮后进入独立页面，录入接口（名称/目录/方法/URL/Headers/Params/Body）并执行生成报告，无需先准备完整 Collection 文件。支持多环境下拉选择与 JSONPath 断言配置（需 `ENABLE_ASSERTIONS=true`）。
 - `数据视图`：按接口逐条查看请求头、参数、响应体、错误信息；报告页带响应时间列（耗时 ms）与 avg/max/p95 统计汇总。
+- `分析洞察`：在单报告页新增 analytics 页签，查看状态/方法/目录分布、响应时间直方图、错误分类、建议、质量评分、覆盖率与历史趋势；受 `ENABLE_REPORT_ANALYTICS` 控制。
+- `报告对比`：分析洞察页签内支持选择左右两份报告进行成功率、平均响应、失败数、错误数与质量分差异对比；数据来自 `/api/report-analytics-compare`。
 - `人工用例编辑器`：按三段式流程新增/编辑人工用例（先发送请求，再确认 PASSED/FAILED，再保存）。
 - `编辑器切换与 Body 选择`：mc 与 er 双编辑器互相隔离，Body 类型切换互不污染；支持 none/raw/urlencoded/formdata/graphql/binary 切换。
 - `导入执行一致性`：针对导出后二次导入场景，`request.url` 仅含 `raw`（缺少 `path`）时也可被正确解析并执行，避免“预览 2 条、执行 1 条”。
@@ -258,6 +266,29 @@ python report_server.py
 - `导出范围选择`：`full` 适合完整回归；`report_only` 适合最小复现。本次报告已覆盖全量时，两者导出内容可能一致，页面会提示“范围等价”。
 - `一键重试失败用例`：报告页工具栏点击"重试失败用例"，后端自动重跑所有 FAILED/ERROR 接口并生成新报告，无需手动重新上传集合。
 - `导出通道策略`：支持 `auto` / `legacy` / `stream` 三态。`auto` 按阈值自动分流（大报告优先流式），流式失败会自动回退旧接口；`legacy` 强制旧接口；`stream` 强制流式接口。
+
+### 4.1 分析洞察速览（2.1）
+
+当 `ENABLE_REPORT_ANALYTICS=true` 时，单报告页会显示“分析洞察”页签，并启用以下接口：
+
+- `GET /api/report-analytics/<report_name>`：返回单报告 analytics 聚合结果。
+- `GET /api/report-analytics-compare?left=...&right=...`：返回左右报告 analytics 快照与差异值。
+
+页面可查看的重点信息：
+
+- 基础分布：状态分布、方法分布、目录 TopN。
+- 性能分布：响应时间直方图、avg/p50/p95/p99/max。
+- 故障诊断：错误分类占比、高频错误、按类别生成的修复建议。
+- 质量评分：总分、稳定性分、性能分、断言完整性分与扣分明细。
+- 覆盖率：执行覆盖率、人工覆盖率、未覆盖接口 TopN。
+- 趋势与对比：最近同集合报告趋势，以及左右报告 delta 对比。
+
+如需灰度关闭，可通过环境变量临时覆盖：
+
+```powershell
+$env:ENABLE_REPORT_ANALYTICS = "false"
+python report_server.py
+```
 - `一键重试失败用例`：报告页工具栏点击"重试失败用例"，后端自动重跑所有 FAILED/ERROR 接口并生成新报告，无需手动重新上传集合。
 - `JUnit XML 导出`：报告页工具栏提供"导出 JUnit XML"链接，下载 JUnit 格式报告，可接入 Jenkins/GitLab CI 等 CI/CD 管线展示测试结果。
 - `响应时间展示`：数据视图结果列表新增"耗时(ms)"列，底部汇总区显示 avg/max/p95 响应时间。
