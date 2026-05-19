@@ -5,7 +5,7 @@
 """
 
 import copy
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 
 def item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optional[Dict[str, Any]]:
@@ -72,11 +72,11 @@ def find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) 
         if row["name"] == name and row["method"] == method and row["folder"] == folder
     ]
     if len(exact) == 1:
-        return exact[0]["item"]
+        return cast(Optional[Dict[str, Any]], exact[0]["item"])
 
     loose = [row for row in candidates if row["name"] == name and row["method"] == method]
     if len(loose) == 1:
-        return loose[0]["item"]
+        return cast(Optional[Dict[str, Any]], loose[0]["item"])
     return None
 
 

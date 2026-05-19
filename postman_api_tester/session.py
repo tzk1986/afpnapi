@@ -5,7 +5,7 @@
 - 统一超时配置读取与超时参数规范化逻辑。
 """
 
-from typing import Any, Optional, Protocol, Tuple
+from typing import Any, Optional, Protocol, Tuple, cast
 
 
 RequestTimeout = Tuple[int, int]
@@ -24,7 +24,7 @@ class SessionLike(Protocol):
 
 def create_shared_session() -> SessionLike:
     import requests as _requests_mod
-    return _requests_mod.Session()
+    return cast(SessionLike, _requests_mod.Session())
 
 
 def close_session(session: Optional[SessionLike]) -> None:

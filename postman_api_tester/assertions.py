@@ -19,12 +19,12 @@ except ImportError:  # pragma: no cover
 SUPPORTED_OPS = {"eq", "ne", "gt", "lt", "gte", "lte", "exists", "not_exists", "contains"}
 
 
-def evaluate_assertions(response_body: Any, assertions: List[Dict]) -> List[Dict]:
+def evaluate_assertions(response_body: Any, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """评估断言列表，返回每条断言的结果列表。
 
     每项结果包含: path, op, expected, actual, passed, message
     """
-    results: List[Dict] = []
+    results: List[Dict[str, Any]] = []
     if not _JSONPATH_AVAILABLE:
         return [{"path": "*", "op": "*", "expected": None, "actual": None,
                  "passed": False, "message": "jsonpath_ng 未安装，请运行: pip install 'jsonpath-ng>=1.5.3'"}]

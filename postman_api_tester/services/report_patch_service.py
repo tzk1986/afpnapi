@@ -7,7 +7,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, cast
 
 
 def patch_report_result(
@@ -115,4 +115,4 @@ def patch_report_result(
             os.replace(str(tmp_details), str(details_path))
 
         invalidate_reports_cache()
-        return meta["summary"]
+        return cast(Dict[str, Any], meta["summary"])

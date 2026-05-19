@@ -6,3 +6,8 @@ __pycache__/
 reports/
 *.log
 uploaded_collections/
+
+# 备份与临时文件
+.backup/
+.coverage
+server.log
