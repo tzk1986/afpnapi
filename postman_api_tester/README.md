@@ -1,13 +1,15 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.2.5
+版本：v1.3.0
 发布日期：2026-05-18
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点：
-- 分析洞察图表可视化：报告详情页「分析洞察」页签新增 Chart.js 六大图表（状态分布环形图、方法分布环形图、响应时间直方图、错误分类柱状图、质量评分雷达图、趋势双折线图），与现有表格数据并排共存，支持 CDN 失败自动降级为纯表格。
-- 2.1 测试结果分析与报告洞察能力（延续）：包括分析洞察页签、单报告 analytics、报告对比、错误诊断建议、质量评分、覆盖率与趋势视图。
-- 同时保留响应时间记录与展示（每接口耗时 + avg/max/p95 统计）、一键重试全部失败用例、多环境配置切换、JSONPath 断言规则（需 `ENABLE_ASSERTIONS=true`）、JUnit XML 报告导出（CI/CD 集成）、首页报告列表筛选增强（状态/通过率/日期范围），并保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力完全兼容。
+本版新增重点（v1.3.0）：
+- **5 阶段代码质量精细化重构收官**：
+  1. Phase 3 路由深度提取：`postman_api_tester/report_server.py` 从 1324 行缩减至 272 行，全部 33 条路由的业务逻辑提取至 `handlers/` 下 9 个独立模块（`server_routes`、`job_routes`、`retry_routes`、`export_routes`、`test_proxy_routes`、`report_meta_routes`、`report_result_routes`、`collection_routes`、`page_routes`），report_server.py 仅保留路由装饰器与单行委托调用。
+  2. Phase 4 类型检查全量合规：`mypy --strict` 全项目通过，修复 15 处类型错误；handlers/ 目录独立通过 strict 检查。
+  3. Phase 5 测试覆盖补齐：新增 42 个 handler 单元测试，总计 79 个测试全部通过；覆盖 server/export/test-proxy/retry/job/report-meta 路由的正常路径与异常路径。
+- 同时保留分析洞察图表可视化（Chart.js 六大图表）、响应时间记录与展示、一键重试全部失败用例、多环境配置切换、JSONPath 断言规则、JUnit XML 报告导出、首页报告列表筛选增强，并保持与现有任务队列、报告三件套、历史对比、导出与人工用例能力完全兼容。
 
 v1.2.1 实施补充：已落地 1.1（断点恢复/部分成功报告/断言严格模式）与 1.3（报告列表摘要懒加载/结果分块渲染/流式导出接口）；同时新增导出通道三态策略（`auto` / `legacy` / `stream`）与阈值自动分流，默认配置下保持旧行为兼容。
 
@@ -36,7 +38,7 @@ d:/tangzk/py/seldom-api-testing/
 │  ├─ postman_api_tester.py          # 主执行入口，负责解析 Postman、发请求、生成报告
 │  ├─ report_server.py               # 报告中心主实现（Flask 路由与页面渲染）
 │  ├─ config.py                      # 地址、Token、超时、报告目录等集中配置
-│  ├─ handlers/                      # 路由编排层（admin/http/job/manual/report/collection/adhoc）
+│  ├─ handlers/                      # 路由编排层（server/job/retry/export/test-proxy/report-meta/report-result/collection/page）
 │  ├─ services/                      # 领域服务层（导出、重试、列表、判定、锁、提交等）
 │  ├─ utils/                         # 通用工具层（URL、请求构建、脱敏、缓存、解析）
 │  ├─ models.py                      # 共享数据模型与结构定义
@@ -74,7 +76,7 @@ d:/tangzk/py/seldom-api-testing/
 1. 服务启动路径：`python report_server.py` -> 根目录兼容启动器 -> `postman_api_tester/report_server.py`。
 2. 路由处理路径：`report_server.py` 路由 -> `handlers/*`（参数校验与编排）-> `services/*`（业务能力）-> `report_repository.py` / `report_meta_repository.py` / `report_job_store.py`（仓储与状态）。
 3. 通用能力路径：`handlers/services` 共享依赖 `utils/*`（URL 合并、请求体构建、响应解析、脱敏、缓存）。
-4. 执行链路路径：任务入队与重试由 `handlers/job_handler.py` 编排，最终调用 `postman_api_tester.py` 的 `run_postman_tests()` 生成报告三件套。
+4. 执行链路路径：任务入队与重试由 `handlers/job_routes.py` 编排，最终调用 `postman_api_tester.py` 的 `run_postman_tests()` 生成报告三件套。
 
 ## 1. 文档位置统一
 

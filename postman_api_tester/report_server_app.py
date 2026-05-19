@@ -13,7 +13,7 @@ import os
 import time
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from flask import Flask, Response, request
 
@@ -37,7 +37,7 @@ class ReportServerApp:
     """报告服务应用工厂。"""
 
     @staticmethod
-    def create_app(config: Optional[dict] = None) -> Flask:
+    def create_app(config: Optional[Dict[str, Any]] = None) -> Flask:
         """创建 Flask app 实例。
 
         Args:

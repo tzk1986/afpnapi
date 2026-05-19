@@ -4,7 +4,29 @@
       "Bash(python *)",
       "Bash(netstat -ano)",
       "Bash(echo \"PID: $!\")",
-      "Bash(curl -s http://127.0.0.1:5000/health)"
+      "Bash(curl -s http://127.0.0.1:5000/health)",
+      "Bash(git checkout *)",
+      "Bash(pytest *)",
+      "Bash(pip install *)",
+      "Bash(PYTHONPATH=. pytest *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: expand exception hierarchy from 4 to 12 classes *)",
+      "Bash(git commit -m 'feat: create BaseHandler for unified parameter validation and response wrapping *)",
+      "Bash(git commit -m 'feat: create BaseService for unified error handling and logging *)",
+      "Bash(git commit -m 'feat: create UrlHandler for centralized URL processing *)",
+      "Bash(cp -r postman_api_tester/ .backup/phase1/)",
+      "Bash(cp -r tests/ .backup/phase1/)",
+      "Bash(git commit -m 'docs: add Phase 1 verification record and checkpoint *)",
+      "Bash(git commit -m 'feat: add CheckpointManager for atomic checkpoint save/load/cleanup *)",
+      "Bash(git commit -m 'feat: add ReportEngine for pure-memory report generation *)",
+      "Bash(git commit -m 'feat: add ExecutionPipeline for unified test execution orchestration *)",
+      "Bash(git commit *)",
+      "Bash(grep -c \"handlers\\\\\\\\\\\\\\\\\")",
+      "Bash(echo \"PID=$!\")",
+      "Bash(pkill -f \"python -m postman_api_tester.report_server\")",
+      "Bash(pkill -f \"python.*report_server\")",
+      "Bash(pkill -f \"python -c.*ReportServerApp.run_app\")",
+      "Bash(git reset *)"
     ]
   }
 }

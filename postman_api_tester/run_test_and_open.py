@@ -14,7 +14,7 @@ import socket
 import sys
 import webbrowser
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 # 获取项目根目录（脚本所在目录的父目录）
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -32,7 +32,7 @@ def get_local_ip() -> str:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.connect(("8.8.8.8", 80))
-            return sock.getsockname()[0]
+            return cast(str, sock.getsockname()[0])
     except OSError:
         return "127.0.0.1"
 

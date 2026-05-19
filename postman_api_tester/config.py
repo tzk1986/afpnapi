@@ -12,6 +12,7 @@ token 优先级：命令行参数 > 环境变量 POSTMAN_TOKEN > 此文件中的
 """
 
 import os
+from typing import Any, Dict
 
 # ==============================================================
 # 认证 Token 配置
@@ -185,7 +186,7 @@ _ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", '''
 }
 ''')
 try:
-    ENVIRONMENTS: dict = _json_cfg.loads(_ENVIRONMENTS_JSON)
+    ENVIRONMENTS: Dict[str, Any] = _json_cfg.loads(_ENVIRONMENTS_JSON)
     if not isinstance(ENVIRONMENTS, dict):
         ENVIRONMENTS = {}
 except Exception:

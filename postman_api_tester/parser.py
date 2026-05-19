@@ -20,7 +20,7 @@ import json
 import logging
 import os
 import re
-from typing import Dict, List, Optional, TypedDict, Union
+from typing import Any, Dict, List, Optional, TypedDict, Union
 from urllib.parse import urljoin
 
 from postman_api_tester.exceptions import ParseError
@@ -123,7 +123,7 @@ class PostmanApiParser:
         self.collections = apis
         return apis
 
-    def _parse_item(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> List[ApiConfig]:
+    def _parse_item(self, item: Dict[str, Any], parent_name: str = "", item_path: Optional[List[int]] = None) -> List[ApiConfig]:
         """
         递归解析item（可能是文件夹或请求）
         :param item: item对象
@@ -153,7 +153,7 @@ class PostmanApiParser:
 
         return apis
 
-    def _parse_request(self, item: Dict, parent_name: str = "", item_path: Optional[List[int]] = None) -> ApiConfig:
+    def _parse_request(self, item: Dict[str, Any], parent_name: str = "", item_path: Optional[List[int]] = None) -> ApiConfig:
         """
         解析单个请求
         :param item: item对象

@@ -110,7 +110,7 @@ def _filter_selected_apis(
     apis: List[ApiConfig],
     selected_item_paths: Optional[List[List[int]]],
 ) -> Tuple[List[ApiConfig], Optional[set[tuple[int, ...]]]]:
-    selected_path_set: Optional[set] = None
+    selected_path_set: Optional[set[tuple[int, ...]]] = None
     if selected_item_paths:
         normalized_paths = []
         for path in selected_item_paths:
@@ -143,7 +143,7 @@ def _prepare_checkpoint_recovery(
 ) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path = ""
     collection_fingerprint = ""
-    executed_item_paths: set = set()
+    executed_item_paths: set[str] = set()
 
     if not enable_checkpoint_recovery:
         return checkpoint_path, collection_fingerprint, executed_item_paths, apis
