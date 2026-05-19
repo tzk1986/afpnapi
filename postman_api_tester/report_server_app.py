@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, Response, request
 
-from postman_api_tester.report_meta_repository import configure_reports_dir
+from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
 from postman_api_tester.report_repository import configure_report_repository
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.utils.logging_utils import (
@@ -78,6 +78,8 @@ class ReportServerApp:
         app.config["EXPORTS_DIR"] = exports_dir
 
         configure_reports_dir(reports_dir)
+        from postman_api_tester.report_server_config import REPORT_SCAN_EXCLUDE_DIRS
+        configure_scan_excludes(REPORT_SCAN_EXCLUDE_DIRS)
         configure_report_repository(reports_dir, cache_ttl=30.0)
 
         max_jobs = 200

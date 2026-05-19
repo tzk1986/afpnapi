@@ -10,8 +10,10 @@ import re
 from pathlib import Path
 from typing import Dict, List
 
+from postman_api_tester.report_server_config import REPORT_SCAN_EXCLUDE_DIRS
 
 _REPORTS_DIR: Path = Path("reports").resolve()
+_EXCLUDE_DIRS: set[str] = set(REPORT_SCAN_EXCLUDE_DIRS)
 
 
 ReportRecord = Dict[str, object]
@@ -23,6 +25,24 @@ def configure_reports_dir(reports_dir: Path) -> None:
     _REPORTS_DIR = Path(reports_dir).resolve()
 
 
+def configure_scan_excludes(exclude_dirs: List[str]) -> None:
+    """配置扫描时排除的目录名列表。"""
+    global _EXCLUDE_DIRS
+    _EXCLUDE_DIRS = set(str(d).strip() for d in exclude_dirs if str(d).strip())
+
+
+def _is_excluded(path: Path) -> bool:
+    """判断文件是否位于排除目录中（只检查目录层级，不检查文件名本身）。"""
+    try:
+        rel = path.relative_to(_REPORTS_DIR)
+    except ValueError:
+        return True
+    for part in rel.parts[:-1]:
+        if part in _EXCLUDE_DIRS:
+            return True
+    return False
+
+
 def is_total_report_file(path: Path) -> bool:
     name = path.name.lower()
     return "_page_" not in name
@@ -31,7 +51,10 @@ def is_total_report_file(path: Path) -> bool:
 def report_meta_files() -> List[Path]:
     if not _REPORTS_DIR.exists():
         return []
-    return [path for path in sorted(_REPORTS_DIR.glob("*_meta.json"), reverse=True) if is_total_report_file(path)]
+    return [
+        path for path in sorted(_REPORTS_DIR.rglob("*_meta.json"), reverse=True)
+        if is_total_report_file(path) and not _is_excluded(path)
+    ]
 
 
 def _extract_json_value(text: str) -> object:
@@ -122,7 +145,10 @@ def load_report_meta(meta_path: Path, include_results: bool = True) -> ReportRec
 def legacy_postman_html_files() -> List[Path]:
     if not _REPORTS_DIR.exists():
         return []
-    return [path for path in sorted(_REPORTS_DIR.glob("*.html"), reverse=True) if is_total_report_file(path)]
+    return [
+        path for path in sorted(_REPORTS_DIR.rglob("*.html"), reverse=True)
+        if is_total_report_file(path) and not _is_excluded(path)
+    ]
 
 
 def load_legacy_postman_report(report_path: Path) -> ReportRecord:
@@ -161,6 +187,8 @@ def load_legacy_postman_report(report_path: Path) -> ReportRecord:
     ]
 
     generated_at = time_match.group(2).strip() if time_match else ""
+    details_file_name = f"{report_path.stem}_details.json"
+    details_file_path = report_path.parent / details_file_name
     return {
         "report_name": report_path.name,
         "generated_at": generated_at,
@@ -177,7 +205,7 @@ def load_legacy_postman_report(report_path: Path) -> ReportRecord:
             "start_time": time_match.group(1).strip() if time_match else "",
             "end_time": time_match.group(2).strip() if time_match else "",
         },
-        "details_file": f"{report_path.stem}_details.json",
+        "details_file": str(details_file_path.relative_to(_REPORTS_DIR)) if details_file_path.exists() else details_file_name,
         "results": results,
         "meta_file": "",
         "legacy": True,

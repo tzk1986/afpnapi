@@ -5,7 +5,7 @@
 - 提供类型安全的配置访问辅助函数
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from types import ModuleType
 
 _cfg: Optional[ModuleType]
@@ -116,6 +116,11 @@ QUALITY_SCORE_FAILED_PENALTY = max(0, _cfg_int("QUALITY_SCORE_FAILED_PENALTY", 1
 QUALITY_SCORE_ERROR_PENALTY = max(0, _cfg_int("QUALITY_SCORE_ERROR_PENALTY", 15))
 QUALITY_SCORE_SLOW_PENALTY = max(0, _cfg_int("QUALITY_SCORE_SLOW_PENALTY", 5))
 QUALITY_SCORE_ASSERTION_MISSING_PENALTY = max(0, _cfg_int("QUALITY_SCORE_ASSERTION_MISSING_PENALTY", 2))
+
+# 报告扫描排除目录（逗号分隔，默认排除 old）
+REPORT_SCAN_EXCLUDE_DIRS: List[str] = [
+    d.strip() for d in _cfg_str("REPORT_SCAN_EXCLUDE_DIRS", "old").split(",") if d.strip()
+]
 
 ENVIRONMENTS: Dict[str, EnvironmentConfig] = _normalize_environments(_cfg_dict("ENVIRONMENTS", {}))
 DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")

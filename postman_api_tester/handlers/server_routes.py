@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from flask import jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask import jsonify, redirect, render_template, request, send_from_directory, send_file, url_for
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.report_server_config import (
@@ -150,8 +150,36 @@ def latest_report() -> ResponseReturnValue:
 
 
 def serve_report(filename: str) -> ResponseReturnValue:
-    """服务报告文件。"""
-    return send_from_directory(REPORTS_DIR, filename)
+    """服务报告文件。支持子目录中的报告。"""
+    filepath = REPORTS_DIR / filename
+    if filepath.exists():
+        return send_file(filepath)
+    # 如果直接路径不存在，尝试查找报告并获取实际路径
+    try:
+        for report in _repo_list_reports():
+            if report.get("report_name") == filename:
+                meta_file = str(report.get("meta_file") or "").strip()
+                if meta_file:
+                    meta_path = REPORTS_DIR / meta_file
+                    report_path = meta_path.with_name(meta_path.name.replace("_meta.json", ".html"))
+                    if report_path.exists():
+                        return send_file(report_path)
+                # 无 meta 文件的 legacy 报告：尝试 source_file 或 details_file 推导
+                source_file = str(report.get("source_file") or "").strip()
+                if source_file:
+                    source_path = Path(source_file)
+                    if source_path.exists():
+                        return send_file(source_path)
+                details_file = str(report.get("details_file") or "").strip()
+                if details_file:
+                    details_path = REPORTS_DIR / details_file
+                    report_path = details_path.with_name(details_path.name.replace("_details.json", ".html"))
+                    if report_path.exists():
+                        return send_file(report_path)
+    except Exception:
+        pass
+    from postman_api_tester.exceptions import ValidationError
+    return BaseHandler.error_response(ValidationError(f"报告文件不存在: {filename}"), 404)
 
 
 def serve_export(filename: str) -> ResponseReturnValue:

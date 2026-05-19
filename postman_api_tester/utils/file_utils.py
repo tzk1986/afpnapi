@@ -17,9 +17,10 @@ def sanitize_export_name(name: str) -> str:
 
 
 def safe_report_artifact(reports_dir: Path, name: str) -> Optional[Path]:
-	normalized = Path(str(name or "").strip()).name
+	normalized = str(name or "").strip().replace("\\", "/")
 	if not normalized:
 		return None
+	normalized = normalized.lstrip("/")
 	candidate = (reports_dir / normalized).resolve()
 	try:
 		candidate.relative_to(reports_dir)

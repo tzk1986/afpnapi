@@ -113,8 +113,24 @@ def api_run_postman() -> ResponseReturnValue:
                     base_url = env_base
             if not token and env_cfg.get("token", "").strip():
                 token = env_cfg["token"].strip()
-    output_dir = str(request.form.get("output_dir", "")).strip() or str(REPORTS_DIR)
+    output_dir = str(request.form.get("output_dir", "")).strip()
     report_name = str(request.form.get("report_name", "")).strip() or None
+    # 防护：用户可能误将报告名称填入输出目录字段
+    if output_dir.lower().endswith(".html"):
+        if not report_name:
+            report_name = output_dir
+        output_dir = ""
+    # 任何非空的 output_dir 都作为 REPORTS_DIR 的子目录
+    if output_dir:
+        resolved = (REPORTS_DIR / output_dir).resolve()
+        # 确保解析后的路径仍在 REPORTS_DIR 之下，防止目录遍历
+        try:
+            resolved.relative_to(REPORTS_DIR)
+            output_dir = str(resolved)
+        except ValueError:
+            output_dir = str(REPORTS_DIR)
+    else:
+        output_dir = str(REPORTS_DIR)
     results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
     run_scope = str(request.form.get("run_scope", "all")).strip().lower() or "all"
     raw_selected_paths = request.form.get("selected_item_paths", "")
@@ -169,8 +185,24 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         return _json_error("base_url 仅允许合法的 http/https 地址", 400)
 
     token = str(payload.get("token", "")).strip() or None
-    output_dir = str(payload.get("output_dir", "")).strip() or str(REPORTS_DIR)
+    output_dir = str(payload.get("output_dir", "")).strip()
     report_name = str(payload.get("report_name", "")).strip() or None
+    # 防护：用户可能误将报告名称填入输出目录字段
+    if output_dir.lower().endswith(".html"):
+        if not report_name:
+            report_name = output_dir
+        output_dir = ""
+    # 任何非空的 output_dir 都作为 REPORTS_DIR 的子目录
+    if output_dir:
+        resolved = (REPORTS_DIR / output_dir).resolve()
+        # 确保解析后的路径仍在 REPORTS_DIR 之下，防止目录遍历
+        try:
+            resolved.relative_to(REPORTS_DIR)
+            output_dir = str(resolved)
+        except ValueError:
+            output_dir = str(REPORTS_DIR)
+    else:
+        output_dir = str(REPORTS_DIR)
     results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
     collection_name = str(payload.get("collection_name", "")).strip() or ADHOC_DEFAULT_COLLECTION_NAME
 

@@ -65,7 +65,7 @@ from postman_api_tester.handlers.test_proxy_routes import (
     test_token as _route_test_token,
 )
 from postman_api_tester.report_job_store import configure_run_jobs
-from postman_api_tester.report_meta_repository import configure_reports_dir
+from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
 from postman_api_tester.report_repository import configure_report_repository
 from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import _cfg_int
@@ -78,6 +78,8 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
+from postman_api_tester.report_server_config import REPORT_SCAN_EXCLUDE_DIRS
+configure_scan_excludes(REPORT_SCAN_EXCLUDE_DIRS)
 configure_report_repository(REPORTS_DIR, cache_ttl=30.0)
 configure_run_jobs(_cfg_int("RUN_JOBS_MAX", 200))
 

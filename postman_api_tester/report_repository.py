@@ -6,6 +6,7 @@
 """
 
 import json
+import os
 import time as _time
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
@@ -89,7 +90,13 @@ def list_reports() -> List[ReportRecord]:
     for meta_path in report_meta_files():
         try:
             report = load_report_meta(meta_path, include_results=False)
-            report["meta_file"] = meta_path.name
+            report["meta_file"] = str(meta_path.relative_to(_REPORTS_DIR))
+            # 修正 details_file 路径：如果 details_file 只是文件名，且 meta 文件在子目录中
+            details_file = str(report.get("details_file") or "").strip()
+            if details_file and os.path.basename(details_file) == details_file:
+                expected_details = meta_path.parent / details_file
+                if expected_details.exists():
+                    report["details_file"] = str(expected_details.relative_to(_REPORTS_DIR))
             reports.append(report)
             seen_report_names.add(report.get("report_name"))
         except Exception as exc:
@@ -124,6 +131,19 @@ def list_reports() -> List[ReportRecord]:
     return list(reports)
 
 
+def _fix_details_file_path(report: ReportRecord) -> None:
+    """如果 details_file 只是文件名且 meta_file 在子目录中，修正为相对路径。"""
+    details_file = str(report.get("details_file") or "").strip()
+    if not details_file or os.path.basename(details_file) != details_file:
+        return
+    meta_file = str(report.get("meta_file") or "").strip()
+    if not meta_file:
+        return
+    expected_details = (_REPORTS_DIR / meta_file).parent / details_file
+    if expected_details.exists():
+        report["details_file"] = str(expected_details.relative_to(_REPORTS_DIR))
+
+
 def find_report(report_name: str) -> ReportRecord:
     reports_by_name = _REPORTS_CACHE.get("by_name")
     if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
@@ -138,6 +158,7 @@ def find_report(report_name: str) -> ReportRecord:
             meta_path = _REPORTS_DIR / meta_file
             full_report = load_report_meta(meta_path, include_results=True)
             full_report["meta_file"] = meta_file
+            _fix_details_file_path(full_report)
             cache_by_name = _REPORTS_CACHE.get("by_name")
             if cache_by_name is None:
                 cache_by_name = {}
@@ -150,6 +171,7 @@ def find_report(report_name: str) -> ReportRecord:
                     break
             _REPORTS_CACHE["data"] = cached_data
             return full_report
+        _fix_details_file_path(report)
         return report
     raise FileNotFoundError(report_name)
 
@@ -164,22 +186,30 @@ def collect_report_artifacts(report: ReportRecord) -> List[Path]:
         report.get("meta_file", ""),
     ):
         path = safe_report_artifact(_REPORTS_DIR, str(file_name or ""))
-        if path is not None and path.name not in seen:
-            artifacts.append(path)
-            seen.add(path.name)
+        if path is not None:
+            rel = str(path.relative_to(_REPORTS_DIR))
+            if rel not in seen:
+                artifacts.append(path)
+                seen.add(rel)
 
     report_name = str(report.get("report_name") or "").strip()
     report_stem = Path(report_name).stem
     if report_stem:
-        for page_path in sorted(_REPORTS_DIR.glob(f"{report_stem}_page_*.html")):
+        # 从 meta_file 推导出报告所在目录，以便在正确目录下查找分页文件
+        meta_file = str(report.get("meta_file") or "").strip()
+        search_dir = _REPORTS_DIR
+        if meta_file and "/" in meta_file.replace("\\", "/"):
+            search_dir = (_REPORTS_DIR / meta_file).parent
+        for page_path in sorted(search_dir.glob(f"{report_stem}_page_*.html")):
             resolved = page_path.resolve()
             try:
                 resolved.relative_to(_REPORTS_DIR)
             except ValueError:
                 continue
-            if resolved.name not in seen:
+            rel = str(resolved.relative_to(_REPORTS_DIR))
+            if rel not in seen:
                 artifacts.append(resolved)
-                seen.add(resolved.name)
+                seen.add(rel)
 
     return artifacts
 

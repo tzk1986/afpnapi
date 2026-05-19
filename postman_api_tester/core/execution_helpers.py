@@ -632,6 +632,7 @@ def _build_report_context(
     source_original_file: Optional[str],
     assertion_strict_mode: bool,
 ) -> PostmanTestReport:
+    from postman_api_tester.postman_api_tester import PostmanTestReport
     report = PostmanTestReport()
     raw_info = parser.data.get('info') if isinstance(parser.data, dict) else None
     report.collection_name = str(raw_info.get('name', '') or '') if isinstance(raw_info, dict) else ''
