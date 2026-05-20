@@ -11,3 +11,12 @@ uploaded_collections/
 .backup/
 .coverage
 server.log
+
+# 独立测试脚本
+ups_test/
+
+# 项目知识库（本地经验沉淀，不同步云端）
+知识库/
+
+# Claude 配置与记忆（本地环境相关）
+.claude/
