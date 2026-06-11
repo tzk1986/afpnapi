@@ -48,6 +48,10 @@ class ApiConfig(TypedDict, total=False):
     item_path: List[int]
     x_assertions: Optional[List[AssertionConfig]]
     x_expected_status: Optional[int]
+    x_success_err_codes: Optional[str]
+    x_success_messages: Optional[str]
+    x_enable_err_code_judgment: Optional[bool]
+    x_enable_message_judgment: Optional[bool]
 
 
 class PostmanApiParser:
@@ -221,7 +225,24 @@ class PostmanApiParser:
                 if '200' in str(script):
                     expected_status = 200
 
-        return {
+        # 解析可配置结果判定扩展字段（x_* 系列）
+        x_success_err_codes = request.get('x_success_err_codes')
+        if x_success_err_codes is not None:
+            x_success_err_codes = str(x_success_err_codes).strip() or None
+
+        x_success_messages = request.get('x_success_messages')
+        if x_success_messages is not None:
+            x_success_messages = str(x_success_messages).strip() or None
+
+        x_enable_err_code = request.get('x_enable_err_code_judgment')
+        if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
+            x_enable_err_code = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+        x_enable_message = request.get('x_enable_message_judgment')
+        if x_enable_message is not None and not isinstance(x_enable_message, bool):
+            x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+        result: Dict[str, Any] = {
             'name': name,
             'folder': parent_name,
             'method': method,
@@ -234,6 +255,18 @@ class PostmanApiParser:
             'description': item.get('description', ''),
             'item_path': list(item_path or []),
         }
+
+        # 仅在存在时写入 x_* 扩展字段，避免污染无配置接口的字典
+        if x_success_err_codes is not None:
+            result['x_success_err_codes'] = x_success_err_codes
+        if x_success_messages is not None:
+            result['x_success_messages'] = x_success_messages
+        if x_enable_err_code is not None:
+            result['x_enable_err_code_judgment'] = x_enable_err_code
+        if x_enable_message is not None:
+            result['x_enable_message_judgment'] = x_enable_message
+
+        return result
 
     def _normalize_api_name(self, name: object, method: str, url: str) -> str:
         text = str(name or '').strip()

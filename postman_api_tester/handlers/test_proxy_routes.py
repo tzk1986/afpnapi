@@ -38,6 +38,11 @@ from postman_api_tester.utils.url_utils import (
     merge_url_with_params as _merge_url_with_params,
     normalize_url_and_params as _normalize_url_and_params,
 )
+from postman_api_tester.utils.judgment_utils import (
+    evaluate_result_judgment as _evaluate_result_judgment,
+    resolve_judgment_params as _resolve_judgment_params,
+)
+from postman_api_tester import report_server_config as _rsc
 
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
@@ -55,6 +60,20 @@ def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
     if host and host not in PROXY_ALLOWED_HOSTS:
         return _json_error(f"proxy 域名不在白名单内: {host}", 403)
     return None
+
+
+def _resolve_judgment_params_for_proxy(source: Dict[str, Any]) -> dict:
+    """为代理/重新请求场景解析判定参数（集合接口级 > 全局 > 默认）。"""
+    return _resolve_judgment_params(
+        global_enable_err_code=_rsc.ENABLE_ERR_CODE_JUDGMENT,
+        global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
+        global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
+        global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
+        item_x_enable_err_code=source.get('x_enable_err_code_judgment'),
+        item_x_success_err_codes=source.get('x_success_err_codes'),
+        item_x_enable_message=source.get('x_enable_message_judgment'),
+        item_x_success_messages=source.get('x_success_messages'),
+    )
 
 
 def test_token() -> ResponseReturnValue:
@@ -127,19 +146,26 @@ def re_request_api() -> ResponseReturnValue:
 
     response_body = exec_result["response_body"]
     response_message, err_code = _utils_extract_msg_errcode(response_body)
-    status_code_ok = exec_result["status_code"] == expected_status
-    normalized_msg = str(response_message or "").strip().lower()
-    message_ok = normalized_msg == "" or normalized_msg == "success"
 
-    if status_code_ok and message_ok:
+    # 可配置结果判定：集合接口级 x_* > 全局 config > 内置默认
+    judgment_params = _resolve_judgment_params_for_proxy(source)
+    judgment_passed, judgment_fail_reason = _evaluate_result_judgment(
+        status_code=exec_result["status_code"],
+        expected_status=expected_status,
+        err_code=err_code,
+        response_message=response_message,
+        success_err_codes=judgment_params['success_err_codes'],
+        success_messages=judgment_params['success_messages'],
+        enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
+        enable_message_judgment=judgment_params['enable_message_judgment'],
+    )
+
+    if judgment_passed:
         result_status = "PASSED"
         result_message = response_message
     else:
         result_status = "FAILED"
-        if not status_code_ok:
-            result_message = f"状态码不匹配: 期望 {expected_status}, 实际 {exec_result['status_code']}; message: {response_message}"
-        else:
-            result_message = f"message 校验未通过(期望为空或 success), 实际为: {response_message}"
+        result_message = judgment_fail_reason
 
     new_request_info = {
         "headers": exec_result["headers_to_send"],

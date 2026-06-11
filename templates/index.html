@@ -203,6 +203,22 @@
             <div class="run-actions">
                 <button id="runJobBtn" onclick="startRunPostmanJob()">上传并执行</button>
             </div>
+            <details class="judgment-config-panel" style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#334155;">判定条件配置（可选，点击展开）</summary>
+                <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
+                    <div class="upload-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+                        <div class="field">
+                            <label>errCode 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="judgmentSuccessErrCodes" type="text" placeholder="默认值: 0">
+                        </div>
+                        <div class="field">
+                            <label>message 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="judgmentSuccessMessages" type="text" placeholder="默认值: success">
+                        </div>
+                    </div>
+                    <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
+                </div>
+            </details>
             {% if enable_selective_run %}
             <div class="selector-box">
                 <div class="selector-toolbar">
@@ -993,6 +1009,11 @@ async function startRunPostmanJob() {
     formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
     formData.append('report_name', document.getElementById('reportNameInput').value.trim());
     formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
+    // 可配置结果判定（填写即启用）
+    const jErrCodes = document.getElementById('judgmentSuccessErrCodes');
+    if (jErrCodes && jErrCodes.value.trim()) formData.append('judgment_success_err_codes', jErrCodes.value.trim());
+    const jMsgs = document.getElementById('judgmentSuccessMessages');
+    if (jMsgs && jMsgs.value.trim()) formData.append('judgment_success_messages', jMsgs.value.trim());
     if (ENABLE_SELECTIVE_RUN) {
         const selectedOnly = Boolean(document.getElementById('runSelectedOnly')?.checked);
         if (selectedOnly) {

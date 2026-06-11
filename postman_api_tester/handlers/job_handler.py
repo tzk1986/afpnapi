@@ -34,6 +34,7 @@ def run_postman_job(
     *,
     set_run_job: Callable[..., None],
     invalidate_reports_cache: Callable[[], None],
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     # handler 只做日志与依赖注入转发，核心执行逻辑沉到 service。
     logger.info(
@@ -56,6 +57,7 @@ def run_postman_job(
         selected_item_paths,
         set_run_job=set_run_job,
         invalidate_reports_cache=invalidate_reports_cache,
+        judgment_config=judgment_config,
     )
 
 

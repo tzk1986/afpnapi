@@ -271,6 +271,12 @@ def latest_report() -> ResponseReturnValue:
     return _route_latest_report()
 
 
+@app.route("/favicon.ico")
+def favicon() -> ResponseReturnValue:
+    from flask import make_response
+    return make_response("", 204)
+
+
 # 入口已迁移到 postman_api_tester.report_server_app.ReportServerApp.run_app()
 # 命令行启动: python -c "from postman_api_tester.report_server_app import ReportServerApp; ReportServerApp.run_app(ReportServerApp.create_app())"
 

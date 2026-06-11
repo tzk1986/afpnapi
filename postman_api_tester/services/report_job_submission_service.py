@@ -28,6 +28,7 @@ def build_run_postman_job_params(
     base_url: Optional[str],
     token: Optional[str],
     selected_item_paths: Optional[List[List[int]]],
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     selected_count = len(selected_item_paths or [])
     logger.info(
@@ -39,7 +40,7 @@ def build_run_postman_job_params(
             "selected_count": selected_count,
         },
     )
-    return {
+    result: Dict[str, Any] = {
         "id": job_id,
         "status": "queued",
         "message": "任务已入队，等待执行。",
@@ -56,6 +57,9 @@ def build_run_postman_job_params(
         "base_url": base_url,
         "token": token,
     }
+    if judgment_config is not None:
+        result["judgment_config"] = judgment_config
+    return result
 
 
 def build_ad_hoc_job_params(
@@ -67,6 +71,7 @@ def build_ad_hoc_job_params(
     report_name: Optional[str],
     base_url: Optional[str],
     token: Optional[str],
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     logger.info(
         "build adhoc job params",
@@ -76,7 +81,7 @@ def build_ad_hoc_job_params(
             "source_file": source_original_file,
         },
     )
-    return {
+    result: Dict[str, Any] = {
         "id": job_id,
         "status": "queued",
         "message": "任务已入队，等待执行。",
@@ -95,6 +100,9 @@ def build_ad_hoc_job_params(
         "base_url": base_url,
         "token": token,
     }
+    if judgment_config is not None:
+        result["judgment_config"] = judgment_config
+    return result
 
 
 def build_saved_json_path(base_dir: Path, job_id: str, suffix: str = ".json") -> Path:

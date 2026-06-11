@@ -119,5 +119,12 @@ REPORT_SCAN_EXCLUDE_DIRS: List[str] = [
 ENVIRONMENTS: Dict[str, EnvironmentConfig] = _normalize_environments(_cfg_dict("ENVIRONMENTS", {}))
 DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")
 
+ENABLE_ERR_CODE_JUDGMENT: bool = _cfg_bool("ENABLE_ERR_CODE_JUDGMENT", False)
+ENABLE_MESSAGE_JUDGMENT: bool = _cfg_bool("ENABLE_MESSAGE_JUDGMENT", True)
+
+from postman_api_tester.utils.judgment_utils import parse_success_list as _parse_success_list
+SUCCESS_ERR_CODES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_ERR_CODES", "0"))
+SUCCESS_MESSAGES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_MESSAGES", "success"))
+
 JobParams = Dict[str, Any]
 SummaryPayload = Dict[str, Any]

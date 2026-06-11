@@ -12,7 +12,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from postman_api_tester.core.html_reporter import HtmlReporter
 from postman_api_tester.core.types import (
@@ -132,6 +132,7 @@ def run_postman_tests(
     results_per_page: int = 30,
     selected_item_paths: Optional[List[List[int]]] = None,
     progress_callback: Optional[ProgressCallback] = None,
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。
@@ -145,6 +146,7 @@ def run_postman_tests(
     :param results_per_page: 报告分页大小。
     :param selected_item_paths: 仅执行指定 item_path 的接口（可选）。
     :param progress_callback: 进度回调（可选）。
+    :param judgment_config: 任务级结果判定配置（可选）。
     :return: 测试报告对象。
     """
 
@@ -201,6 +203,7 @@ def run_postman_tests(
         selected_total_count=selected_total_count,
         executed_item_paths=executed_item_paths,
         shared_session=shared_session,
+        judgment_config=judgment_config,
     )
 
     _complete_report_output(

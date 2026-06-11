@@ -483,6 +483,23 @@ def normalize_adhoc_case(
     except (TypeError, ValueError):
         expected_status = 200
 
+    # 解析可配置结果判定扩展字段
+    x_success_err_codes = raw.get("x_success_err_codes")
+    if x_success_err_codes is not None:
+        x_success_err_codes = str(x_success_err_codes).strip() or None
+
+    x_success_messages = raw.get("x_success_messages")
+    if x_success_messages is not None:
+        x_success_messages = str(x_success_messages).strip() or None
+
+    x_enable_err_code = raw.get("x_enable_err_code_judgment")
+    if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
+        x_enable_err_code = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+    x_enable_message = raw.get("x_enable_message_judgment")
+    if x_enable_message is not None and not isinstance(x_enable_message, bool):
+        x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
     logger.info(
         "adhoc case normalized",
         extra={
@@ -492,7 +509,7 @@ def normalize_adhoc_case(
             "has_base_url": bool(base_url),
         },
     )
-    return {
+    result: Dict[str, Any] = {
         "name": name,
         "folder": str(raw.get("folder") or "").strip(),
         "method": method,
@@ -503,6 +520,18 @@ def normalize_adhoc_case(
         "body_data": body_data,
         "expected_status": expected_status,
     }
+
+    # 仅在存在时写入 x_* 扩展字段
+    if x_success_err_codes is not None:
+        result["x_success_err_codes"] = x_success_err_codes
+    if x_success_messages is not None:
+        result["x_success_messages"] = x_success_messages
+    if x_enable_err_code is not None:
+        result["x_enable_err_code_judgment"] = x_enable_err_code
+    if x_enable_message is not None:
+        result["x_enable_message_judgment"] = x_enable_message
+
+    return result
 
 
 def build_adhoc_collection(
@@ -531,6 +560,16 @@ def build_adhoc_collection(
             "x_expected_status": case["expected_status"],
             "description": f"adhoc_generated_at={now_iso}",
         }
+        # 写入可配置结果判定扩展字段（x_* 系列）
+        if case.get("x_success_err_codes") is not None:
+            request_obj["x_success_err_codes"] = case["x_success_err_codes"]
+        if case.get("x_success_messages") is not None:
+            request_obj["x_success_messages"] = case["x_success_messages"]
+        if case.get("x_enable_err_code_judgment") is not None:
+            request_obj["x_enable_err_code_judgment"] = case["x_enable_err_code_judgment"]
+        if case.get("x_enable_message_judgment") is not None:
+            request_obj["x_enable_message_judgment"] = case["x_enable_message_judgment"]
+
         set_request_url(request_obj, case["url"], case["params"])
         set_request_headers(request_obj, case["headers"])
         set_request_body(

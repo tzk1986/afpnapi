@@ -266,6 +266,23 @@
 
             <div class="adhoc-case-list" id="adhocCaseList"></div>
 
+            <details class="judgment-config-panel" style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#334155;">判定条件配置（可选，点击展开）</summary>
+                <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+                        <div class="field">
+                            <label>errCode 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="adhocJudgmentSuccessErrCodes" type="text" placeholder="默认值: 0">
+                        </div>
+                        <div class="field">
+                            <label>message 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="adhocJudgmentSuccessMessages" type="text" placeholder="默认值: success">
+                        </div>
+                    </div>
+                    <div style="font-size:12px;color:#64748b;margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。</div>
+                </div>
+            </details>
+
             <div class="adhoc-actions">
                 <button id="runAdhocBtn" type="button" onclick="startRunAdhocJob()">执行并生成报告</button>
                 <button class="secondary" type="button" onclick="clearAdhocCases()">清空待测列表</button>
@@ -929,6 +946,13 @@ async function startRunAdhocJob() {
     if (adhocAssertionsEl && adhocAssertionsEl.value.trim()) {
         try { payload.assertions_json = JSON.parse(adhocAssertionsEl.value.trim()); } catch (_) {}
     }
+    // 可配置结果判定（填写即启用）
+    const adhocJC = {};
+    const jErrCodes = document.getElementById('adhocJudgmentSuccessErrCodes');
+    if (jErrCodes && jErrCodes.value.trim()) adhocJC.success_err_codes = jErrCodes.value.trim();
+    const jMsgs = document.getElementById('adhocJudgmentSuccessMessages');
+    if (jMsgs && jMsgs.value.trim()) adhocJC.success_messages = jMsgs.value.trim();
+    if (Object.keys(adhocJC).length > 0) payload.judgment_config = adhocJC;
 
     try {
         const response = await fetch('/api/run-ad-hoc-tests', {

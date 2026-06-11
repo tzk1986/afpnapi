@@ -54,6 +54,34 @@ _RUN_POSTMAN_JOB_FN = partial(
 )
 
 
+def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
+    """从表单解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
+    config: Dict[str, Any] = {}
+
+    raw_err_codes = form.get("judgment_success_err_codes")
+    if raw_err_codes is not None and str(raw_err_codes).strip():
+        config["success_err_codes"] = str(raw_err_codes).strip()
+
+    raw_messages = form.get("judgment_success_messages")
+    if raw_messages is not None and str(raw_messages).strip():
+        config["success_messages"] = str(raw_messages).strip()
+
+    return config if config else None
+
+
+def _parse_judgment_config_from_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
+    raw_cfg = payload.get("judgment_config")
+    if isinstance(raw_cfg, dict) and raw_cfg:
+        config: Dict[str, Any] = {}
+        if "success_err_codes" in raw_cfg and str(raw_cfg["success_err_codes"]).strip():
+            config["success_err_codes"] = str(raw_cfg["success_err_codes"]).strip()
+        if "success_messages" in raw_cfg and str(raw_cfg["success_messages"]).strip():
+            config["success_messages"] = str(raw_cfg["success_messages"]).strip()
+        return config if config else None
+    return None
+
+
 def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
     return _clamp_page_size(
         value,
@@ -138,6 +166,9 @@ def api_run_postman() -> ResponseReturnValue:
         if not selected_item_paths:
             return _json_error("选择了仅执行已选接口，但未提供有效 selected_item_paths", 400)
 
+    # 解析可配置结果判定（judgment_config）
+    judgment_config = _parse_judgment_config_from_form(request.form)
+
     suffix = Path(original_name).suffix or ".json"
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id, suffix)
@@ -151,6 +182,7 @@ def api_run_postman() -> ResponseReturnValue:
         base_url=base_url,
         token=token,
         selected_item_paths=selected_item_paths if selected_item_paths else None,
+        judgment_config=judgment_config,
     )
 
     _enqueue_job(
@@ -213,6 +245,8 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         json.dump(collection_data, f, indent=2, ensure_ascii=False)
 
     source_original_file = _sanitize_uploaded_name(f"{collection_name}.json")
+    # 解析可配置结果判定（judgment_config）
+    adhoc_judgment_config = _parse_judgment_config_from_payload(payload)
     job_params = _build_ad_hoc_job_params(
         job_id=job_id,
         source_original_file=source_original_file,
@@ -221,6 +255,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         report_name=report_name,
         base_url=base_url,
         token=token,
+        judgment_config=adhoc_judgment_config,
     )
     job_params["collection_name"] = collection_name
 
