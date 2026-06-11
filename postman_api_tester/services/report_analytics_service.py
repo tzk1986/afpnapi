@@ -349,6 +349,7 @@ def build_report_analytics_payload(
     assertion_missing_penalty: int,
     assertions_enabled: bool,
 ) -> Dict[str, Any]:
+    """聚合单份报告的分析数据，包含分布、性能、诊断和质量评分。"""
     results = _safe_results(report)
     response_times = extract_response_times(results)
     quantiles = build_quantiles(response_times)
@@ -415,6 +416,7 @@ def build_report_analytics_compare_payload(
     assertion_missing_penalty: int,
     assertions_enabled: bool,
 ) -> Dict[str, Any]:
+    """对比两份报告的分析快照，计算各指标的变化量并输出对比结果。"""
     left_snapshot = build_report_analytics_payload(
         report=left_report,
         reports=reports,

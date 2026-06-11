@@ -31,6 +31,7 @@ def resolve_request_payload_source(
 
 
 def is_valid_http_url(url: Optional[str]) -> bool:
+    """校验给定字符串是否为合法的 http/https URL。"""
     if not url:
         return False
     parsed = urlparse(url)
@@ -38,6 +39,7 @@ def is_valid_http_url(url: Optional[str]) -> bool:
 
 
 def parse_int_default(value: Any, default: int) -> int:
+    """尝试将 value 转换为 int，失败则返回默认值。"""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -45,6 +47,7 @@ def parse_int_default(value: Any, default: int) -> int:
 
 
 def parse_optional_int(value: Any) -> Optional[int]:
+    """尝试将 value 转换为 int；None 或转换失败时返回 None。"""
     if value is None:
         return None
     try:
@@ -54,6 +57,7 @@ def parse_optional_int(value: Any) -> Optional[int]:
 
 
 def inject_token_header(headers: Dict[str, Any], token: str) -> Dict[str, Any]:
+    """在请求头中注入 token，优先覆盖已有的 Authorization 头。"""
     if not token:
         return headers
 
@@ -74,6 +78,7 @@ def inject_token_header(headers: Dict[str, Any], token: str) -> Dict[str, Any]:
 
 
 def extract_http_request_fields(source: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    """从源数据与载荷中提取 HTTP 请求相关字段并统一格式。"""
     return {
         "url": str(source.get("url", "")).strip(),
         "method": str(source.get("method", "GET")).upper(),

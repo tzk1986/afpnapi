@@ -47,6 +47,7 @@ def export_collection_with_latest_params(
     include_auth: bool = False,
     export_scope: str = "full",
 ) -> Dict[str, Any]:
+    """基于报告最新请求参数导出 Postman 集合，支持 full/report_only 范围。"""
     # 1) 加载源集合；2) 依据报告详情回填最新请求参数；
     # 3) 按范围裁剪；4) 合并人工用例并剔除排除项；5) 生成导出文件。
     source_file = str(report.get("source_file") or "").strip()

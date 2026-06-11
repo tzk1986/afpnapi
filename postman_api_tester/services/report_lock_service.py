@@ -14,6 +14,7 @@ _REPORT_WRITE_LOCKS_META = threading.Lock()
 
 
 def get_report_write_lock(report_name: str) -> threading.RLock:
+    """按报告名获取或创建 RLock，确保同一报告的写操作互斥。"""
     with _REPORT_WRITE_LOCKS_META:
         if report_name not in REPORT_WRITE_LOCKS:
             REPORT_WRITE_LOCKS[report_name] = threading.RLock()

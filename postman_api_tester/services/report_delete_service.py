@@ -19,6 +19,7 @@ def delete_report_artifacts(
     collect_report_artifacts: Callable[[Dict[str, Any]], List[Path]],
     invalidate_reports_cache: Callable[[], None],
 ) -> List[str]:
+    """删除报告的所有关联产物文件，包括 html、details、meta 和子页。"""
     logger.info(
         "report delete started",
         extra={

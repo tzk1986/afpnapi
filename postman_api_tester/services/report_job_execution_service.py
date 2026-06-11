@@ -55,6 +55,7 @@ def run_postman_job(
     invalidate_reports_cache: Callable[[], None],
     judgment_config: Optional[Dict[str, Any]] = None,
 ) -> None:
+    """执行 Postman 测试任务，包含进度追踪与异常处理。"""
     logger.info(
         "job started",
         extra={
@@ -160,6 +161,7 @@ def enqueue_retry_job(
     set_run_job: Callable[..., None],
     run_postman_job_fn: Callable[..., None],
 ) -> str:
+    """构建重试任务计划并启动执行线程，返回 job_id。"""
     job_plan = build_retry_job_plan(
         saved_file=saved_file,
         runtime=runtime,
@@ -195,6 +197,7 @@ def prepare_retry_job_context(
     default_results_per_page: int,
     clamp_run_results_per_page: Callable[[Any], int],
 ) -> Tuple[List[List[int]], Optional[Dict[str, Any]], Optional[str]]:
+    """根据重试模式收集路径并校验源集合可用性，返回参数元组。"""
     if retry_mode == "failures":
         selected_paths = collect_failed_item_paths(report)
     elif retry_mode == "all":
@@ -248,6 +251,7 @@ def enqueue_job_with_worker(
     default_output_dir: str,
     selected_item_paths: Optional[List[List[int]]] = None,
 ) -> None:
+    """入队普通任务并启动后台工作线程执行 Postman 测试。"""
     base_url = job_params.pop("base_url", None)
     token = job_params.pop("token", None)
     output_dir = job_params.pop("output_dir", default_output_dir)

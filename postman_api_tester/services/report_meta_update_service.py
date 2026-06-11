@@ -19,6 +19,7 @@ def update_report_meta(
     find_report: Callable[[str], Dict[str, Any]],
     invalidate_reports_cache: Callable[[], None],
 ) -> Dict[str, Any]:
+    """以原子方式读-改-写报告 meta 文件，调用 updater 回调执行变更。"""
     lock = get_report_write_lock(report_name)
     with lock:
         report = find_report(report_name)

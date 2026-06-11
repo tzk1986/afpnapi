@@ -24,6 +24,7 @@ def set_report_result_judgement(
     compute_summary: Callable[[List[Dict[str, Any]]], Dict[str, Any]],
     invalidate_reports_cache: Callable[[], None],
 ) -> Dict[str, Any]:
+    """对指定结果条目执行人工判定（覆盖或恢复自动）并持久化元数据。"""
     action = str(action or "override").strip().lower()
     if action not in {"override", "restore"}:
         raise ValueError("action 仅支持 override 或 restore")

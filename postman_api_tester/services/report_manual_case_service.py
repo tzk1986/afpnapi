@@ -22,6 +22,7 @@ def add_manual_case(
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
     create_id: Callable[[], str],
 ) -> Dict[str, Any]:
+    """新增人工用例并追加到报告的 manual_cases 列表中。"""
     if not enable_manual_cases:
         raise ValueError("当前环境未启用人工用例能力。")
 
@@ -64,6 +65,7 @@ def update_manual_case(
     normalize_manual_case: Callable[[Dict[str, Any], str], Dict[str, Any]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """按 case_id 更新已有的人工用例信息。"""
     if not enable_manual_cases:
         raise ValueError("当前环境未启用人工用例能力。")
     case_id = str(case_id or "").strip()
@@ -113,6 +115,7 @@ def delete_manual_case(
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """按 case_id 删除人工用例并清理关联的排除标记。"""
     if not enable_manual_cases:
         raise ValueError("当前环境未启用人工用例能力。")
     case_id = str(case_id or "").strip()
@@ -161,6 +164,7 @@ def set_case_exclusion(
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
     update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """设置或清除人工用例的排除标记。"""
     exclusion_key = normalize_exclusion_key(exclusion_key)
     if not exclusion_key:
         raise ValueError("exclusion_key 不能为空")

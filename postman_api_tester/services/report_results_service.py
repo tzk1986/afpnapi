@@ -48,11 +48,13 @@ def build_report_results_payload(
 
 
 def build_compare_payload(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+    """比对两份报告数据并生成对比结果字典。"""
     return compare_report_data(left, right)
 
 
 def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Dict[str, Any]:
-    # 详情载荷遵循“结果摘要 + details_map 按需补充”的轻量策略。
+    """根据索引获取单条结果的完整详情，包括请求/响应信息。"""
+    # 详情载荷遵循"结果摘要 + details_map 按需补充"的轻量策略。
     results = report.get("results", [])
     if result_index < 0 or result_index >= len(results):
         raise IndexError(result_index)
@@ -126,6 +128,7 @@ def build_manual_cases_payload(
 
 
 def build_manual_case_upsert_payload(report_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """拼装人工用例新增/更新后的返回载荷。"""
     return {
         "report_name": report_name,
         "case": result.get("case"),
@@ -134,6 +137,7 @@ def build_manual_case_upsert_payload(report_name: str, result: Dict[str, Any]) -
 
 
 def build_manual_case_delete_payload(report_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """拼装人工用例删除后的返回载荷。"""
     return {
         "report_name": report_name,
         "manual_cases": result.get("manual_cases", []),
@@ -141,6 +145,7 @@ def build_manual_case_delete_payload(report_name: str, result: Dict[str, Any]) -
 
 
 def build_case_exclusion_payload(report_name: str, excluded: bool, result: Dict[str, Any]) -> Dict[str, Any]:
+    """拼装人工用例排除状态变更后的返回载荷。"""
     return {
         "report_name": report_name,
         "excluded": excluded,
@@ -154,6 +159,7 @@ def build_result_judgement_payload(
     action: str,
     result: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """拼装人工判定操作的返回载荷。"""
     return {
         "report_name": report_name,
         "result_index": result_index,
@@ -168,6 +174,7 @@ def build_export_collection_payload(
     exported: Dict[str, Any],
     include_auth: bool,
 ) -> Dict[str, Any]:
+    """拼装集合导出完成后的返回载荷，包含文件信息与统计数字。"""
     return {
         "report_name": report_name,
         "file_name": exported["file_name"],
@@ -187,10 +194,12 @@ def build_export_collection_payload(
 
 
 def build_report_meta_payload(report: Dict[str, Any]) -> Dict[str, Any]:
+    """将报告元数据直接转化为返回字典。"""
     return dict(report)
 
 
 def build_report_delete_payload(report_name: str, deleted_files: List[str]) -> Dict[str, Any]:
+    """拼装报告删除成功后的返回载荷。"""
     return {
         "success": True,
         "report_name": report_name,
@@ -199,6 +208,7 @@ def build_report_delete_payload(report_name: str, deleted_files: List[str]) -> D
 
 
 def build_retry_queued_payload(job_id: str, retry_count: int, message: str) -> Dict[str, Any]:
+    """拼装重试任务入队后的返回载荷。"""
     return {
         "job_id": job_id,
         "status": "queued",
@@ -208,6 +218,7 @@ def build_retry_queued_payload(job_id: str, retry_count: int, message: str) -> D
 
 
 def build_health_payload(timestamp: str, log_alert: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """拼装健康检查接口的返回载荷。"""
     payload: Dict[str, Any] = {
         "status": "ok",
         "timestamp": timestamp,
@@ -218,6 +229,7 @@ def build_health_payload(timestamp: str, log_alert: Optional[Dict[str, Any]] = N
 
 
 def build_test_token_payload(success: bool, message: str) -> Dict[str, Any]:
+    """拼装测试 token 验证的返回载荷。"""
     return {
         "success": success,
         "message": message,
@@ -225,6 +237,7 @@ def build_test_token_payload(success: bool, message: str) -> Dict[str, Any]:
 
 
 def build_environments_payload(env_list: List[Dict[str, Any]], default_env_name: str) -> Dict[str, Any]:
+    """拼装可用环境列表与默认环境的返回载荷。"""
     return {
         "environments": env_list,
         "default": default_env_name,
@@ -238,6 +251,7 @@ def build_collection_preview_payload(
     max_items: int,
     items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
+    """拼装集合文件预览结果的返回载荷。"""
     return {
         "file_name": file_name,
         "total": total,
@@ -248,6 +262,7 @@ def build_collection_preview_payload(
 
 
 def build_job_queued_payload(job_id: str, message: str) -> Dict[str, Any]:
+    """拼装普通任务入队后的返回载荷。"""
     return {
         "job_id": job_id,
         "status": "queued",
@@ -265,6 +280,7 @@ def build_re_request_success_payload(
     new_response_info: Dict[str, Any],
     new_summary: Dict[str, Any],
 ) -> Dict[str, Any]:
+    """拼装重新发送 HTTP 请求成功后的返回载荷。"""
     return {
         "name": source.get("name", normalized_url),
         "folder": source.get("folder", ""),
@@ -285,6 +301,7 @@ def build_proxy_response_payload(
     response_headers: Dict[str, Any],
     response_body: Any,
 ) -> Dict[str, Any]:
+    """拼装代理响应数据的返回载荷。"""
     return {
         "status_code": status_code,
         "elapsed_ms": elapsed_ms,
@@ -306,6 +323,7 @@ def build_re_request_error_payload(
     stored_body_mode: str,
     stored_body_data: Any,
 ) -> Dict[str, Any]:
+    """拼装重新发送 HTTP 请求失败后的错误返回载荷。"""
     return {
         "name": source.get("name", url),
         "folder": source.get("folder", ""),
@@ -330,6 +348,7 @@ def build_re_request_error_payload(
 
 
 def build_error_payload(message: str) -> Dict[str, Any]:
+    """拼装统一的错误信息返回载荷。"""
     return {
         "error": message,
     }

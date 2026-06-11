@@ -1,7 +1,7 @@
 """开发导读：
 - 职责：重试任务路径收集、子集集合构建与运行上下文准备。
 - 入口：collect_failed_item_paths()、build_retry_job_plan() 等。
-- 目标：保证“仅失败重试”与“全量重试”路径选择一致且可验证。
+- 目标：保证"仅失败重试"与"全量重试"路径选择一致且可验证。
 """
 
 from pathlib import Path
@@ -11,6 +11,7 @@ import uuid
 
 
 def collect_failed_item_paths(report: Dict[str, Any]) -> List[List[int]]:
+    """收集报告中状态为 FAILED 或 ERROR 的测试项路径列表。"""
     paths: List[List[int]] = []
     for item in report.get("results", []):
         if item.get("status") in ("FAILED", "ERROR"):
@@ -21,6 +22,7 @@ def collect_failed_item_paths(report: Dict[str, Any]) -> List[List[int]]:
 
 
 def collect_all_item_paths(report: Dict[str, Any]) -> List[List[int]]:
+    """收集报告中所有有效 item_path 的列表。"""
     paths: List[List[int]] = []
     for item in report.get("results", []):
         item_path = item.get("item_path")
@@ -30,6 +32,7 @@ def collect_all_item_paths(report: Dict[str, Any]) -> List[List[int]]:
 
 
 def resolve_existing_source_file(report: Dict[str, Any]) -> Optional[str]:
+    """确认报告关联的源集合文件是否存在，存在则返回路径字符串。"""
     saved_file = str(report.get("source_file", "")).strip()
     if not saved_file:
         return None
@@ -43,6 +46,7 @@ def build_retry_queue_record(
     selected_count: int,
     queued_message: str,
 ) -> Dict[str, Any]:
+    """构建重试任务入队时写入 RUN_JOBS 的状态记录字典。"""
     file_name = Path(saved_file).name
     return {
         "id": job_id,
@@ -70,6 +74,7 @@ def build_retry_worker_args(
     results_per_page: int,
     selected_paths: List[List[int]],
 ) -> Tuple[Any, ...]:
+    """组装重试任务工作线程所需的参数元组。"""
     file_name = Path(saved_file).name
     return (
         job_id,
@@ -91,6 +96,7 @@ def parse_retry_runtime_params(
     default_results_per_page: int,
     clamp_run_results_per_page: Callable[[Any], int],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """解析并校验重试运行参数，返回归一化的参数字典或错误信息。"""
     # 重试运行参数统一在此处做协议校验与默认值归一，
     # 避免不同重试入口出现行为漂移。
     base_url = str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
@@ -116,6 +122,7 @@ def build_retry_source_runtime_context(
     default_results_per_page: int,
     clamp_run_results_per_page: Callable[[Any], int],
 ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """验证源集合可用性并组装重试任务的运行时上下文。"""
     # 先确认源集合仍可用，再组装可直接入队的运行时上下文。
     saved_file = resolve_existing_source_file(report)
     if not saved_file:
@@ -144,6 +151,7 @@ def build_retry_job_plan(
     selected_paths: List[List[int]],
     queued_message: str,
 ) -> Dict[str, Any]:
+    """生成包含 job_id、queue_record 和 worker_args 的重试任务计划字典。"""
     # 输出 queue_record + worker_args 的稳定结构，
     # 供 job 执行服务直接落 RUN_JOBS 并启动线程。
     job_id = uuid.uuid4().hex

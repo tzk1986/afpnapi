@@ -8,6 +8,7 @@ from typing import Any, Dict
 
 
 def report_list_item(report: Dict[str, Any]) -> Dict[str, Any]:
+    """生成首页报告列表所需的摘要项字典。"""
     summary = dict(report.get("summary") or {})
     return {
         "report_name": report.get("report_name", ""),
@@ -29,4 +30,5 @@ def report_list_item(report: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def is_total_report_name(report_name: str) -> bool:
+    """判断报告名是否为总报告名（不含分页标记 _page_）。"""
     return "_page_" not in str(report_name or "").lower()
