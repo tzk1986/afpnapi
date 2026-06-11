@@ -95,7 +95,7 @@ def load_checkpoint(path: str) -> Optional[Dict[str, Any]]:
     try:
         with open(path, "r", encoding="utf-8") as file:
             data = json.load(file)
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         return None
     if not isinstance(data, dict):
         return None

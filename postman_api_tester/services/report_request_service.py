@@ -23,7 +23,7 @@ def resolve_request_payload_source(
 
     try:
         req_meta = json.loads(str(request_meta_raw or "{}"))
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         req_meta = {}
 
     source = req_meta if isinstance(req_meta, dict) else {}

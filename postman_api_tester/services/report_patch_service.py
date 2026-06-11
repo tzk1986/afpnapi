@@ -103,7 +103,7 @@ def patch_report_result(
                 try:
                     with details_path.open("r", encoding="utf-8") as f:
                         details = json.load(f)
-                except Exception:
+                except (json.JSONDecodeError, OSError):
                     pass
             details[str(result_index)] = {
                 "request_info": new_request_info,

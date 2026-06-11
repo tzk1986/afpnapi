@@ -175,7 +175,7 @@ class ReportServerApp:
             port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
             host = os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")
 
-        print(f"报告目录: {reports_dir}")
+        logger.info("报告目录: %s", reports_dir)
         logger.info("报告服务启动: http://127.0.0.1:%d", port)
 
         try:

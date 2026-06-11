@@ -74,7 +74,7 @@ def load_report_details_map(report: ReportRecord) -> ReportDetailsMap:
             for key, value in details.items()
             if isinstance(value, dict)
         }
-    except Exception:
+    except (TypeError, AttributeError, ValueError):
         return {}
 
 
@@ -120,7 +120,7 @@ def list_reports() -> List[ReportRecord]:
             continue
         try:
             reports.append(load_legacy_postman_report(html_path))
-        except Exception:
+        except (OSError, ValueError):
             continue
 
     reports = [item for item in reports if _is_total_report_name(str(item.get("report_name", "") or ""))]

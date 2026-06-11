@@ -103,7 +103,7 @@ def _load_report_meta_summary(meta_path: Path) -> ReportRecord:
 
             try:
                 value = _extract_json_value(value_text)
-            except Exception:
+            except (ValueError, TypeError):
                 continue
 
             if in_summary:
@@ -131,7 +131,7 @@ def load_report_meta(meta_path: Path, include_results: bool = True) -> ReportRec
 
     try:
         return _load_report_meta_summary(meta_path)
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, KeyError):
         # 兜底：若轻量解析失败，退回标准解析并丢弃 results，保持接口可用。
         with meta_path.open("r", encoding="utf-8") as file:
             data = json.load(file)

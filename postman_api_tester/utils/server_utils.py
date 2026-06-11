@@ -10,7 +10,7 @@ def get_local_ip() -> str:
     try:
         sock.connect(("8.8.8.8", 80))
         return str(sock.getsockname()[0])
-    except Exception:
+    except OSError:
         return "127.0.0.1"
     finally:
         sock.close()

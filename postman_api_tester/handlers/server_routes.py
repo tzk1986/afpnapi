@@ -176,7 +176,7 @@ def serve_report(filename: str) -> ResponseReturnValue:
                     report_path = details_path.with_name(details_path.name.replace("_details.json", ".html"))
                     if report_path.exists():
                         return send_file(report_path)
-    except Exception:
+    except OSError:
         pass
     from postman_api_tester.exceptions import ValidationError
     return BaseHandler.error_response(ValidationError(f"报告文件不存在: {filename}"), 404)

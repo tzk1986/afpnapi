@@ -114,7 +114,7 @@ def report_view() -> ResponseReturnValue:
     try:
         template_path = (PROJECT_ROOT / "templates" / "report_view.html").resolve()
         template_updated_at = datetime.fromtimestamp(template_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
+    except OSError:
         template_updated_at = "-"
 
     html = render_template(

@@ -189,7 +189,7 @@ try:
     ENVIRONMENTS: Dict[str, Any] = _json_cfg.loads(_ENVIRONMENTS_JSON)
     if not isinstance(ENVIRONMENTS, dict):
         ENVIRONMENTS = {}
-except Exception:
+except _json_cfg.JSONDecodeError:
     ENVIRONMENTS = {}
 DEFAULT_ENV_NAME: str = os.environ.get("DEFAULT_ENV_NAME", "")
 

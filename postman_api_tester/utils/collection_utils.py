@@ -4,7 +4,7 @@
 - 职责：collection 树遍历、路径裁剪、人工用例追加、排除项剔除、ad-hoc 用例归一化、预览项提取。
 - 入口：item_by_path()/prune_collection_to_paths()/append_manual_cases_to_collection()、
        normalize_adhoc_case()/build_adhoc_collection()/extract_collection_preview_items()。
-- 使用方：report_export_service、collection 查询相关服务、adhoc_handler、collection_handler。
+- 使用方：report_export_service、collection 查询相关服务、job_routes。
 """
 
 import copy
@@ -259,7 +259,7 @@ def append_manual_cases_to_collection(
     return appended
 
 # ---------------------------------------------------------------------------
-# Collection 预览项提取（原 collection_handler）
+# Collection 预览项提取
 # ---------------------------------------------------------------------------
 
 def _build_preview_url(url_obj: Any) -> str:
@@ -345,7 +345,7 @@ def extract_collection_preview_items(
 
 
 # ---------------------------------------------------------------------------
-# Ad-hoc 用例归一化（原 adhoc_handler / collection_handler）
+# Ad-hoc 用例归一化
 # ---------------------------------------------------------------------------
 
 def _parse_json_text(value: Any, default: Any) -> Any:

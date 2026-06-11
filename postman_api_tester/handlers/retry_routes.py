@@ -1,7 +1,6 @@
 """重试失败用例与全量重试路由处理函数。"""
 
 from functools import partial
-from typing import SupportsInt
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -16,8 +15,6 @@ from postman_api_tester.report_job_store import set_run_job
 from postman_api_tester.report_server_config import (
     ENABLE_RETRY_FAILURES,
     RUN_RESULTS_PER_PAGE_DEFAULT,
-    RUN_RESULTS_PER_PAGE_MAX,
-    RUN_RESULTS_PER_PAGE_MIN,
 )
 from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_repository import (
@@ -25,7 +22,7 @@ from postman_api_tester.report_repository import (
     invalidate_reports_cache as _repo_invalidate_reports_cache,
 )
 from postman_api_tester.services.report_results_service import build_retry_queued_payload
-from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page_size
+from postman_api_tester.handlers.job_routes import clamp_run_results_per_page
 
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
@@ -34,15 +31,6 @@ _RUN_POSTMAN_JOB_FN = partial(
     set_run_job=set_run_job,
     invalidate_reports_cache=_repo_invalidate_reports_cache,
 )
-
-
-def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
-    return _clamp_page_size(
-        value,
-        default=RUN_RESULTS_PER_PAGE_DEFAULT,
-        min_size=RUN_RESULTS_PER_PAGE_MIN,
-        max_size=RUN_RESULTS_PER_PAGE_MAX,
-    )
 
 
 def api_retry_failures() -> ResponseReturnValue:
