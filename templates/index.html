@@ -208,21 +208,15 @@
                 <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
                     <div class="upload-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
                         <div class="field">
-                            <label style="display:flex;align-items:center;gap:6px;">
-                                <input id="judgmentEnableErrCode" type="checkbox" style="width:14px;height:14px;">
-                                启用 errCode 判定
-                            </label>
-                            <input id="judgmentSuccessErrCodes" type="text" placeholder="成功 errCode 值，逗号分隔（如: 0,200）">
+                            <label>errCode 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="judgmentSuccessErrCodes" type="text" placeholder="默认值: 0">
                         </div>
                         <div class="field">
-                            <label style="display:flex;align-items:center;gap:6px;">
-                                <input id="judgmentEnableMessage" type="checkbox" checked style="width:14px;height:14px;">
-                                启用 message 判定
-                            </label>
-                            <input id="judgmentSuccessMessages" type="text" placeholder="成功 message 值，逗号分隔（如: success,ok）">
+                            <label>message 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="judgmentSuccessMessages" type="text" placeholder="默认值: success">
                         </div>
                     </div>
-                    <div class="selector-tip" style="margin-top:6px;">提示：不勾选/不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
+                    <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
                 </div>
             </details>
             {% if enable_selective_run %}
@@ -1015,13 +1009,9 @@ async function startRunPostmanJob() {
     formData.append('output_dir', document.getElementById('outputDirInput').value.trim());
     formData.append('report_name', document.getElementById('reportNameInput').value.trim());
     formData.append('results_per_page', document.getElementById('resultsPerPageInput').value.trim());
-    // 可配置结果判定
-    const jErrChk = document.getElementById('judgmentEnableErrCode');
-    if (jErrChk && jErrChk.checked) formData.append('judgment_enable_err_code', 'true');
+    // 可配置结果判定（填写即启用）
     const jErrCodes = document.getElementById('judgmentSuccessErrCodes');
     if (jErrCodes && jErrCodes.value.trim()) formData.append('judgment_success_err_codes', jErrCodes.value.trim());
-    const jMsgChk = document.getElementById('judgmentEnableMessage');
-    if (jMsgChk && !jMsgChk.checked) formData.append('judgment_enable_message', 'false');
     const jMsgs = document.getElementById('judgmentSuccessMessages');
     if (jMsgs && jMsgs.value.trim()) formData.append('judgment_success_messages', jMsgs.value.trim());
     if (ENABLE_SELECTIVE_RUN) {

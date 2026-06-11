@@ -271,21 +271,15 @@
                 <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
                         <div class="field">
-                            <label style="display:flex;align-items:center;gap:6px;">
-                                <input id="adhocJudgmentEnableErrCode" type="checkbox" style="width:14px;height:14px;">
-                                启用 errCode 判定
-                            </label>
-                            <input id="adhocJudgmentSuccessErrCodes" type="text" placeholder="成功 errCode 值，逗号分隔（如: 0,200）">
+                            <label>errCode 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="adhocJudgmentSuccessErrCodes" type="text" placeholder="默认值: 0">
                         </div>
                         <div class="field">
-                            <label style="display:flex;align-items:center;gap:6px;">
-                                <input id="adhocJudgmentEnableMessage" type="checkbox" checked style="width:14px;height:14px;">
-                                启用 message 判定
-                            </label>
-                            <input id="adhocJudgmentSuccessMessages" type="text" placeholder="成功 message 值，逗号分隔（如: success,ok）">
+                            <label>message 成功值（填写即启用，覆盖全局配置）</label>
+                            <input id="adhocJudgmentSuccessMessages" type="text" placeholder="默认值: success">
                         </div>
                     </div>
-                    <div style="font-size:12px;color:#64748b;margin-top:6px;">提示：不勾选/不填写则使用全局默认配置；填写后仅对本次执行生效。</div>
+                    <div style="font-size:12px;color:#64748b;margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。</div>
                 </div>
             </details>
 
@@ -952,14 +946,10 @@ async function startRunAdhocJob() {
     if (adhocAssertionsEl && adhocAssertionsEl.value.trim()) {
         try { payload.assertions_json = JSON.parse(adhocAssertionsEl.value.trim()); } catch (_) {}
     }
-    // 可配置结果判定
+    // 可配置结果判定（填写即启用）
     const adhocJC = {};
-    const jErrChk = document.getElementById('adhocJudgmentEnableErrCode');
-    if (jErrChk && jErrChk.checked) adhocJC.enable_err_code_judgment = true;
     const jErrCodes = document.getElementById('adhocJudgmentSuccessErrCodes');
     if (jErrCodes && jErrCodes.value.trim()) adhocJC.success_err_codes = jErrCodes.value.trim();
-    const jMsgChk = document.getElementById('adhocJudgmentEnableMessage');
-    if (jMsgChk && !jMsgChk.checked) adhocJC.enable_message_judgment = false;
     const jMsgs = document.getElementById('adhocJudgmentSuccessMessages');
     if (jMsgs && jMsgs.value.trim()) adhocJC.success_messages = jMsgs.value.trim();
     if (Object.keys(adhocJC).length > 0) payload.judgment_config = adhocJC;

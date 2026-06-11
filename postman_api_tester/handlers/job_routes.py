@@ -55,24 +55,12 @@ _RUN_POSTMAN_JOB_FN = partial(
 
 
 def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
-    """从表单解析可配置结果判定参数，无任何配置时返回 None。"""
+    """从表单解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
     config: Dict[str, Any] = {}
-
-    raw_err_enable = form.get("judgment_enable_err_code")
-    if raw_err_enable is not None and str(raw_err_enable).strip():
-        config["enable_err_code_judgment"] = str(raw_err_enable).strip().lower() in {
-            "1", "true", "yes", "y", "on"
-        }
 
     raw_err_codes = form.get("judgment_success_err_codes")
     if raw_err_codes is not None and str(raw_err_codes).strip():
         config["success_err_codes"] = str(raw_err_codes).strip()
-
-    raw_msg_enable = form.get("judgment_enable_message")
-    if raw_msg_enable is not None and str(raw_msg_enable).strip():
-        config["enable_message_judgment"] = str(raw_msg_enable).strip().lower() in {
-            "1", "true", "yes", "y", "on"
-        }
 
     raw_messages = form.get("judgment_success_messages")
     if raw_messages is not None and str(raw_messages).strip():
@@ -82,22 +70,12 @@ def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
 
 
 def _parse_judgment_config_from_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。"""
+    """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
     raw_cfg = payload.get("judgment_config")
     if isinstance(raw_cfg, dict) and raw_cfg:
         config: Dict[str, Any] = {}
-        if "enable_err_code_judgment" in raw_cfg:
-            val = raw_cfg["enable_err_code_judgment"]
-            config["enable_err_code_judgment"] = bool(val) if isinstance(val, bool) else str(val).strip().lower() in {
-                "1", "true", "yes", "y", "on"
-            }
         if "success_err_codes" in raw_cfg and str(raw_cfg["success_err_codes"]).strip():
             config["success_err_codes"] = str(raw_cfg["success_err_codes"]).strip()
-        if "enable_message_judgment" in raw_cfg:
-            val = raw_cfg["enable_message_judgment"]
-            config["enable_message_judgment"] = bool(val) if isinstance(val, bool) else str(val).strip().lower() in {
-                "1", "true", "yes", "y", "on"
-            }
         if "success_messages" in raw_cfg and str(raw_cfg["success_messages"]).strip():
             config["success_messages"] = str(raw_cfg["success_messages"]).strip()
         return config if config else None
