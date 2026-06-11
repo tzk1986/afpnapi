@@ -9,12 +9,11 @@ from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import json_error as _json_error
-from postman_api_tester.handlers.manual_case_handler import (
-    add_manual_case as _manual_add_manual_case,
-    delete_manual_case as _manual_delete_manual_case,
-    list_manual_cases as _manual_list_manual_cases,
-    set_case_exclusion as _manual_set_case_exclusion,
-    update_manual_case as _manual_update_manual_case,
+from postman_api_tester.services.report_manual_case_service import (
+    add_manual_case as _svc_add_manual_case,
+    delete_manual_case as _svc_delete_manual_case,
+    set_case_exclusion as _svc_set_case_exclusion,
+    update_manual_case as _svc_update_manual_case,
 )
 from postman_api_tester.report_server_config import (
     ENABLE_MANUAL_CASES,
@@ -43,6 +42,7 @@ from postman_api_tester.services.report_results_service import (
     build_case_exclusion_payload,
     build_manual_case_delete_payload,
     build_manual_case_upsert_payload,
+    build_manual_cases_payload,
     build_report_meta_payload,
     build_result_judgement_payload,
 )
@@ -78,7 +78,7 @@ def api_manual_cases(report_name: str) -> ResponseReturnValue:
     except FileNotFoundError:
         return _json_error(f"报告不存在: {report_name}", 404)
 
-    payload = _manual_list_manual_cases(
+    payload = build_manual_cases_payload(
         report_name=report_name,
         report=report,
         default_folder=MANUAL_CASE_FOLDER_NAME,
@@ -96,7 +96,7 @@ def api_manual_case_add() -> ResponseReturnValue:
     if not case_payload:
         return _json_error("case 不能为空", 400)
     try:
-        result = _manual_add_manual_case(
+        result = _svc_add_manual_case(
             report_name=report_name,
             payload=case_payload,
             enable_manual_cases=ENABLE_MANUAL_CASES,
@@ -122,7 +122,7 @@ def api_manual_case_update() -> ResponseReturnValue:
     if not case_id:
         return _json_error("case_id 不能为空", 400)
     try:
-        result = _manual_update_manual_case(
+        result = _svc_update_manual_case(
             report_name=report_name,
             case_id=case_id,
             payload=case_payload,
@@ -147,7 +147,7 @@ def api_manual_case_delete() -> ResponseReturnValue:
     if not case_id:
         return _json_error("case_id 不能为空", 400)
     try:
-        result = _manual_delete_manual_case(
+        result = _svc_delete_manual_case(
             report_name=report_name,
             case_id=case_id,
             enable_manual_cases=ENABLE_MANUAL_CASES,
@@ -173,7 +173,7 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     if not exclusion_key:
         return _json_error("exclusion_key 不能为空", 400)
     try:
-        result = _manual_set_case_exclusion(
+        result = _svc_set_case_exclusion(
             report_name=report_name,
             exclusion_key=exclusion_key,
             excluded=excluded,

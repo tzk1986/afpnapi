@@ -1,6 +1,7 @@
 """任务执行路由处理函数（run-postman、ad-hoc、状态查询）。"""
 
 import json
+import logging
 import uuid
 from functools import partial
 from pathlib import Path
@@ -10,12 +11,11 @@ from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import json_error as _json_error
-from postman_api_tester.handlers.collection_handler import (
+from postman_api_tester.utils.collection_utils import (
     build_adhoc_collection as _svc_build_adhoc_collection,
     normalize_adhoc_case as _svc_normalize_adhoc_case,
-    parse_selected_item_paths as _svc_parse_selected_item_paths,
 )
-from postman_api_tester.handlers.job_handler import (
+from postman_api_tester.services.report_job_execution_service import (
     enqueue_job_with_worker as _job_enqueue_job_with_worker,
     run_postman_job as _job_run_postman_job,
 )
@@ -44,8 +44,43 @@ from postman_api_tester.services.report_request_service import (
 from postman_api_tester.services.report_results_service import build_job_queued_payload
 from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page_size
 
+logger = logging.getLogger(__name__)
+
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 UPLOADS_DIR = (Path(__file__).resolve().parent.parent / "uploaded_collections").resolve()
+
+
+def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
+    if raw is None:
+        return []
+    data = raw
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"selected_item_paths 不是有效 JSON: {exc}") from exc
+    if not isinstance(data, list):
+        raise ValueError("selected_item_paths 必须是数组")
+    normalized: List[List[int]] = []
+    seen: set = set()
+    for item in data:
+        if not isinstance(item, list) or not item:
+            continue
+        if not all(isinstance(index, int) and index >= 0 for index in item):
+            raise ValueError("selected_item_paths 的每条路径必须是非负整数数组")
+        key = tuple(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(list(item))
+    logger.info(
+        "selected item paths parsed",
+        extra={"event": "handler.collection.selected_paths.parsed", "path_count": len(normalized)},
+    )
+    return normalized
 
 _RUN_POSTMAN_JOB_FN = partial(
     _job_run_postman_job,
@@ -160,7 +195,7 @@ def api_run_postman() -> ResponseReturnValue:
     selected_item_paths: List[List[int]] = []
     if ENABLE_SELECTIVE_RUN and run_scope == "selected":
         try:
-            selected_item_paths = _svc_parse_selected_item_paths(raw_selected_paths)
+            selected_item_paths = _parse_selected_item_paths(raw_selected_paths)
         except ValueError as exc:
             return _json_error(str(exc), 400)
         if not selected_item_paths:

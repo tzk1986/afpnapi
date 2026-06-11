@@ -10,7 +10,6 @@
 from typing import Any, Dict, List, Optional
 
 from postman_api_tester.report_repository import load_report_details_map
-from postman_api_tester.services.report_results_service import build_report_results_payload as _build_report_results_payload
 from postman_api_tester.report_server_utils import (
     normalize_manual_exclusions as _normalize_manual_exclusions,
     result_exclusion_key as _result_exclusion_key,
@@ -174,14 +173,10 @@ def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str
     }
 
 
-def build_report_results_payload(*args: Any, **kwargs: Any) -> Dict[str, Any]:
-    return _build_report_results_payload(*args, **kwargs)
-
 __all__ = [
     "normalize_status_filter",
     "filter_report_results",
     "paginate_items",
     "compare_report_data",
-    "build_report_results_payload",
 ]
 

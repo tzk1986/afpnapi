@@ -7,7 +7,7 @@ from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import json_error as _json_error
-from postman_api_tester.handlers.job_handler import (
+from postman_api_tester.services.report_job_execution_service import (
     enqueue_retry_job as _job_enqueue_retry_job,
     prepare_retry_job_context as _job_prepare_retry_job_context,
     run_postman_job as _job_run_postman_job,

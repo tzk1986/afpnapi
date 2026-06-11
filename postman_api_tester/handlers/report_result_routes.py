@@ -24,13 +24,15 @@ from postman_api_tester.report_server_config import (
 )
 from postman_api_tester.handlers.base_handler import BaseHandler
 from postman_api_tester.handlers.report_handler import (
-    build_report_results_payload as _build_report_results_payload,
     normalize_status_filter as _normalize_status_filter,
 )
-from postman_api_tester.handlers.report_analytics_handler import (
-    build_analytics_compare_payload as _build_analytics_compare_payload,
-    build_analytics_payload as _build_analytics_payload,
+from postman_api_tester.services.report_analytics_service import (
+    build_report_analytics_compare_payload as _build_analytics_compare_payload,
+    build_report_analytics_payload as _build_analytics_payload,
+)
+from postman_api_tester.utils.analytics_utils import (
     normalize_analytics_query_params as _normalize_analytics_query_params,
+    parse_histogram_buckets as _parse_histogram_buckets,
 )
 from postman_api_tester.report_repository import (
     find_report as _repo_find_report,
@@ -39,6 +41,7 @@ from postman_api_tester.report_repository import (
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 from postman_api_tester.services.report_results_service import (
     build_compare_payload,
+    build_report_results_payload as _build_report_results_payload,
     build_result_detail_payload,
 )
 from postman_api_tester.utils.server_utils import clamp_page as _clamp_page
@@ -104,7 +107,7 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
         top_n=int(params["top_n"]),
         trend_limit=int(params["trend_limit"]),
         include_samples=bool(params["include_samples"]),
-        histogram_buckets_text=REPORT_ANALYTICS_HISTOGRAM_BUCKETS,
+        histogram_buckets=_parse_histogram_buckets(REPORT_ANALYTICS_HISTOGRAM_BUCKETS),
         failed_penalty=QUALITY_SCORE_FAILED_PENALTY,
         error_penalty=QUALITY_SCORE_ERROR_PENALTY,
         slow_penalty=QUALITY_SCORE_SLOW_PENALTY,
@@ -149,7 +152,7 @@ def api_report_analytics_compare() -> ResponseReturnValue:
         top_n=int(params["top_n"]),
         trend_limit=int(params["trend_limit"]),
         include_samples=bool(params["include_samples"]),
-        histogram_buckets_text=REPORT_ANALYTICS_HISTOGRAM_BUCKETS,
+        histogram_buckets=_parse_histogram_buckets(REPORT_ANALYTICS_HISTOGRAM_BUCKETS),
         failed_penalty=QUALITY_SCORE_FAILED_PENALTY,
         error_penalty=QUALITY_SCORE_ERROR_PENALTY,
         slow_penalty=QUALITY_SCORE_SLOW_PENALTY,
