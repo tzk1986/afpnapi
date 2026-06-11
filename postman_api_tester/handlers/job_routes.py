@@ -147,6 +147,7 @@ def _enqueue_job(
 
 
 def api_run_postman() -> ResponseReturnValue:
+    """上传 Collection 并执行测试任务 API。"""
     collection_file = request.files.get("collection_file")
     if not collection_file or not str(collection_file.filename or "").strip():
         return _json_error("请上传有效的 Postman JSON 文件", 400)
@@ -232,6 +233,7 @@ def api_run_postman() -> ResponseReturnValue:
 
 
 def api_run_ad_hoc_tests() -> ResponseReturnValue:
+    """Ad-hoc 接口测试提交 API。"""
     if not ENABLE_ADHOC_RUN:
         return _json_error("当前环境未启用直接新增接口测试能力。", 403)
 
@@ -306,6 +308,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
 
 
 def api_run_postman_status(job_id: str) -> ResponseReturnValue:
+    """查询任务执行状态 API。"""
     job = get_run_job(job_id)
     if not job:
         return _json_error("任务不存在。", 404)

@@ -62,10 +62,12 @@ _UPDATE_REPORT_META_FN = partial(
 
 
 def api_reports() -> ResponseReturnValue:
+    """报告列表 API。"""
     return jsonify(_repo_list_reports())
 
 
 def api_report_detail(report_name: str) -> ResponseReturnValue:
+    """报告元数据详情 API。"""
     try:
         return jsonify(build_report_meta_payload(_repo_find_report(report_name)))
     except FileNotFoundError:
@@ -73,6 +75,7 @@ def api_report_detail(report_name: str) -> ResponseReturnValue:
 
 
 def api_manual_cases(report_name: str) -> ResponseReturnValue:
+    """人工用例列表 API。"""
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
@@ -88,6 +91,7 @@ def api_manual_cases(report_name: str) -> ResponseReturnValue:
 
 
 def api_manual_case_add() -> ResponseReturnValue:
+    """新增人工用例 API。"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     if not report_name:
@@ -113,6 +117,7 @@ def api_manual_case_add() -> ResponseReturnValue:
 
 
 def api_manual_case_update() -> ResponseReturnValue:
+    """更新人工用例 API。"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
@@ -139,6 +144,7 @@ def api_manual_case_update() -> ResponseReturnValue:
 
 
 def api_manual_case_delete() -> ResponseReturnValue:
+    """删除人工用例 API。"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
@@ -163,6 +169,7 @@ def api_manual_case_delete() -> ResponseReturnValue:
 
 
 def api_report_case_exclusion() -> ResponseReturnValue:
+    """用例排除标记 API。"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     exclusion_key = str(payload.get("exclusion_key") or "").strip()
@@ -189,6 +196,7 @@ def api_report_case_exclusion() -> ResponseReturnValue:
 
 
 def api_report_result_judgement() -> ResponseReturnValue:
+    """结果人工判定 API。"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     if not report_name:

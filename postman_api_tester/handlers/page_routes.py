@@ -51,6 +51,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def index() -> ResponseReturnValue:
+    """首页：报告列表与任务提交入口。"""
     reports = _repo_list_reports()
     from postman_api_tester.report_server_config import REPORT_SERVER_PORT as port
     return render_template(
@@ -78,6 +79,7 @@ def index() -> ResponseReturnValue:
 
 
 def adhoc_run_page() -> ResponseReturnValue:
+    """Ad-hoc 测试提交页面。"""
     if not ENABLE_ADHOC_RUN:
         return redirect(url_for("index"))
     return render_template(
@@ -95,6 +97,7 @@ def adhoc_run_page() -> ResponseReturnValue:
 
 
 def report_view() -> ResponseReturnValue:
+    """报告详情页。"""
     report_name = request.args.get("name", "")
     if not report_name:
         reports = _repo_list_reports()

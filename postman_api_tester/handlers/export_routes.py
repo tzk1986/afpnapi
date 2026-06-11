@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def api_export_junit(report_name: str) -> ResponseReturnValue:
+    """JUnit XML 导出 API。"""
     if not ENABLE_JUNIT_EXPORT:
         return _json_error("当前环境未启用 JUnit XML 导出能力。", 403)
 

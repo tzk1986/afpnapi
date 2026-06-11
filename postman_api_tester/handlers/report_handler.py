@@ -17,7 +17,7 @@ from postman_api_tester.report_server_utils import (
 
 
 def normalize_status_filter(value: str) -> Optional[str]:
-    # 支持中英文与别名输入，统一归一成内部状态枚举。
+    """状态筛选值归一化：支持中英文与别名输入。"""
     normalized = str(value or "").strip().upper()
     if normalized in {"", "ALL", "RESULT", "全部", "结果"}:
         return None
@@ -38,8 +38,7 @@ def filter_report_results(
     err_code_keyword: str,
     include_excluded: bool = True,
 ) -> List[Dict[str, Any]]:
-    # 结果筛选的唯一入口：组合状态/关键字/错误码/排除开关，
-    # 同时附带详情可用性与人工判定来源，供前端直接渲染。
+    """组合状态/关键字/错误码/排除开关，返回筛选后的结果列表。"""
     lowered_keyword = str(keyword or "").strip().lower()
     lowered_message_keyword = str(message_keyword or "").strip().lower()
     lowered_err_code_keyword = str(err_code_keyword or "").strip().lower()
@@ -97,7 +96,7 @@ def filter_report_results(
 
 
 def paginate_items(items: List[Dict[str, Any]], page: int, page_size: int) -> Dict[str, Any]:
-    # 统一分页结构，保持首页与详情页接口响应字段一致。
+    """统一分页结构。"""
     total = len(items)
     total_pages = max(1, (total + page_size - 1) // page_size)
     current_page = min(page, total_pages)
@@ -124,7 +123,7 @@ def _to_rate(value: str) -> float:
 
 
 def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
-    # 历史对比以 key 为主键，输出新增/移除/状态变化与成功率差值。
+    """历史报告对比：以 key 为主键，输出新增/移除/状态变化与成功率差值。"""
     left_map = _map_results(left)
     right_map = _map_results(right)
     left_keys = set(left_map.keys())

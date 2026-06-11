@@ -46,6 +46,7 @@ def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | No
 
 
 def api_retry_failures() -> ResponseReturnValue:
+    """重试失败接口 API。"""
     if not ENABLE_RETRY_FAILURES:
         return _json_error("当前环境未启用重试失败接口能力。", 403)
 
@@ -96,6 +97,7 @@ def api_retry_failures() -> ResponseReturnValue:
 
 
 def api_retry_all() -> ResponseReturnValue:
+    """全量重试 API。"""
     if not ENABLE_RETRY_FAILURES:
         return _json_error("当前环境未启用重试接口能力。", 403)
 

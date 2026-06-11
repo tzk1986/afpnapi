@@ -37,6 +37,7 @@ EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
 
 
 def api_collection_preview() -> ResponseReturnValue:
+    """Collection 接口预览 API。"""
     if not ENABLE_SELECTIVE_RUN:
         return _json_error("当前环境未启用接口选择执行功能。", 403)
 

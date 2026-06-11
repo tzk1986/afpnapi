@@ -74,6 +74,7 @@ def _resolve_judgment_params_for_proxy(source: Dict[str, Any]) -> dict:
 
 
 def test_token() -> ResponseReturnValue:
+    """Token 格式校验 API。"""
     payload = request.get_json(silent=True) or {}
     token = str(payload.get("token", "")).strip()
     if not token:
@@ -82,6 +83,7 @@ def test_token() -> ResponseReturnValue:
 
 
 def re_request_api() -> ResponseReturnValue:
+    """重新请求 API：支持编辑后重发并可写回报告。"""
     is_multipart, payload, source = _svc_resolve_request_payload_source(
         content_type=request.content_type,
         json_payload=request.get_json(silent=True),
@@ -215,6 +217,7 @@ def re_request_api() -> ResponseReturnValue:
 
 
 def api_proxy_request() -> ResponseReturnValue:
+    """代理请求 API：转发请求并返回原始响应。"""
     is_multipart, payload, source = _svc_resolve_request_payload_source(
         content_type=request.content_type,
         json_payload=request.get_json(silent=True),
