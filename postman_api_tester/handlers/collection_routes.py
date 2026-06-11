@@ -7,8 +7,8 @@ from typing import Iterator
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import BaseHandler
-from postman_api_tester.handlers.collection_handler import (
+from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.utils.collection_utils import (
     extract_collection_preview_items as _svc_extract_collection_preview_items,
 )
 from postman_api_tester.report_server_config import (
@@ -34,11 +34,6 @@ from postman_api_tester.services.report_results_service import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()
 EXPORTS_DIR = (UPLOADS_DIR / "exports").resolve()
-
-
-def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(message), status_code)
 
 
 def api_collection_preview() -> ResponseReturnValue:

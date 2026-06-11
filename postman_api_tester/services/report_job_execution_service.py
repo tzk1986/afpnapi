@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 PROGRESS_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)
 
 
+def _safe_run_job(
+    fn: Callable[..., None],
+    args: tuple,
+    job_id: str,
+    set_run_job: Callable[..., None],
+) -> None:
+    """包装线程目标函数，捕获未处理异常并更新任务状态为 ERROR。"""
+    try:
+        fn(*args)
+    except Exception as exc:
+        logger.exception("job thread unhandled exception", extra={"job_id": job_id})
+        try:
+            set_run_job(job_id, status="error", message=f"任务异常退出: {exc}")
+        except Exception:
+            pass
+
+
 def run_postman_job(
     job_id: str,
     postman_file: str,
@@ -158,8 +175,8 @@ def enqueue_retry_job(
     )
 
     worker = threading.Thread(
-        target=run_postman_job_fn,
-        args=job_plan["worker_args"],
+        target=_safe_run_job,
+        args=(run_postman_job_fn, tuple(job_plan["worker_args"]), str(job_plan["job_id"]), set_run_job),
         daemon=True,
     )
     worker.start()
@@ -247,17 +264,22 @@ def enqueue_job_with_worker(
     )
 
     worker = threading.Thread(
-        target=run_postman_job_fn,
+        target=_safe_run_job,
         args=(
+            run_postman_job_fn,
+            (
+                job_id,
+                saved_file,
+                base_url,
+                output_dir,
+                token,
+                report_name,
+                original_name,
+                results_per_page,
+                selected_item_paths or [],
+            ),
             job_id,
-            saved_file,
-            base_url,
-            output_dir,
-            token,
-            report_name,
-            original_name,
-            results_per_page,
-            selected_item_paths or [],
+            set_run_job,
         ),
         daemon=True,
     )

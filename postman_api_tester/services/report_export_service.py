@@ -10,10 +10,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from postman_api_tester.handlers.collection_handler import extract_collection_preview_items
 from postman_api_tester.utils.collection_utils import (
     append_manual_cases_to_collection,
     collect_report_item_paths,
+    extract_collection_preview_items,
     find_item_fallback,
     item_by_path,
     prune_collection_to_paths,

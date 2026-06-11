@@ -167,8 +167,13 @@ class ReportServerApp:
         if reports_dir:
             reports_dir.mkdir(parents=True, exist_ok=True)
 
-        port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
-        host = os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")
+        try:
+            from postman_api_tester.config import REPORT_SERVER_PORT, REPORT_SERVER_HOST
+            port = REPORT_SERVER_PORT
+            host = REPORT_SERVER_HOST
+        except ImportError:
+            port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
+            host = os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")
 
         print(f"报告目录: {reports_dir}")
         logger.info("报告服务启动: http://127.0.0.1:%d", port)

@@ -92,3 +92,8 @@ class BaseHandler:
             status_code=status_code,
             message="Error",
         )
+
+
+def json_error(message: str, status_code: int) -> ResponseReturnValue:
+    """快捷 JSON 错误响应，统一各路由文件的 _json_error 实现。"""
+    return BaseHandler.error_response(ValidationError(message), status_code)

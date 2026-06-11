@@ -7,17 +7,12 @@ from pathlib import Path
 from flask import make_response
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.handlers.base_handler import json_error as _json_error
 from postman_api_tester.report_server_config import ENABLE_JUNIT_EXPORT
 from postman_api_tester.report_repository import find_report as _repo_find_report
 from postman_api_tester.services.report_junit_service import build_junit_xml as _svc_build_junit_xml
 
 logger = logging.getLogger(__name__)
-
-
-def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(message), status_code)
 
 
 def api_export_junit(report_name: str) -> ResponseReturnValue:

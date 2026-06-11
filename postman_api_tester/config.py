@@ -277,6 +277,14 @@ QUALITY_SCORE_SLOW_PENALTY = int(os.environ.get("QUALITY_SCORE_SLOW_PENALTY", "5
 QUALITY_SCORE_ASSERTION_MISSING_PENALTY = int(os.environ.get("QUALITY_SCORE_ASSERTION_MISSING_PENALTY", "2"))
 
 # ==============================================================
+# 报告服务端口与主机配置
+# REPORT_SERVER_PORT: Flask 服务监听端口
+# REPORT_SERVER_HOST: Flask 服务监听地址
+# ==============================================================
+REPORT_SERVER_PORT = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
+REPORT_SERVER_HOST = str(os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")).strip() or "0.0.0.0"
+
+# ==============================================================
 # 安全脱敏配置（请求头）
 # SENSITIVE_HEADERS: 逗号分隔的敏感头列表（可扩展）
 # 说明：运行时会与内置默认值合并，避免误删关键脱敏项。
@@ -306,3 +314,17 @@ if _SENSITIVE_HEADERS_TEXT:
     )
 else:
     SENSITIVE_HEADERS = _DEFAULT_SENSITIVE_HEADERS
+
+# ==============================================================
+# SSRF 防护：Proxy 端点域名白名单
+# PROXY_ALLOWED_HOSTS: 逗号分隔的允许代理访问的域名列表。
+#   - 空列表（默认）：不做域名限制（保持兼容，仅校验 http/https 协议）
+#   - 非空列表：仅允许列表中的域名，其余请求拒绝（403）
+# 示例：PROXY_ALLOWED_HOSTS = "api.example.com,10.50.11.130"
+# ==============================================================
+_PROXY_ALLOWED_HOSTS_TEXT = str(os.environ.get("PROXY_ALLOWED_HOSTS", "")).strip()
+PROXY_ALLOWED_HOSTS: tuple = tuple(
+    item.strip().lower()
+    for item in _PROXY_ALLOWED_HOSTS_TEXT.split(",")
+    if item.strip()
+) if _PROXY_ALLOWED_HOSTS_TEXT else ()

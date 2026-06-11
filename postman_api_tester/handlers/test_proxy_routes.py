@@ -2,11 +2,12 @@
 
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.handlers.base_handler import json_error as _json_error
 from postman_api_tester.handlers.http_handler import execute_http_request as _http_execute_http_request
 from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_repository import (
@@ -41,9 +42,19 @@ from postman_api_tester.utils.url_utils import (
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 
-def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(message), status_code)
+def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
+    """若配置了 PROXY_ALLOWED_HOSTS，校验 url 的域名是否在白名单内。返回 None 表示通过。"""
+    try:
+        from postman_api_tester.config import PROXY_ALLOWED_HOSTS
+    except ImportError:
+        return None
+    if not PROXY_ALLOWED_HOSTS:
+        return None
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host and host not in PROXY_ALLOWED_HOSTS:
+        return _json_error(f"proxy 域名不在白名单内: {host}", 403)
+    return None
 
 
 def test_token() -> ResponseReturnValue:
@@ -78,6 +89,9 @@ def re_request_api() -> ResponseReturnValue:
         return _json_error("url 不能为空", 400)
     if not _svc_is_valid_http_url(url):
         return _json_error("url 仅允许合法的 http/https 地址", 400)
+    host_check = _check_proxy_host_allowed(url)
+    if host_check is not None:
+        return host_check
 
     headers = _svc_inject_token_header(headers, token)
 
@@ -194,6 +208,9 @@ def api_proxy_request() -> ResponseReturnValue:
 
     if not url:
         return _json_error("url 不能为空", 400)
+    host_check = _check_proxy_host_allowed(url)
+    if host_check is not None:
+        return host_check
 
     exec_result = _http_execute_http_request(
         url=url,

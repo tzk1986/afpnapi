@@ -7,6 +7,7 @@
 
 import json
 import os
+import threading
 import time as _time
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
@@ -36,6 +37,7 @@ class _ReportsCache(TypedDict):
 
 
 _REPORTS_CACHE: _ReportsCache = {"data": None, "by_name": None, "ts": 0.0}
+_REPORTS_CACHE_LOCK = threading.Lock()
 
 
 def configure_report_repository(reports_dir: Path, cache_ttl: float = 30.0) -> None:
@@ -49,9 +51,10 @@ def configure_report_repository(reports_dir: Path, cache_ttl: float = 30.0) -> N
 
 def invalidate_reports_cache() -> None:
     """主动清理报告列表缓存。"""
-    _REPORTS_CACHE["data"] = None
-    _REPORTS_CACHE["by_name"] = None
-    _REPORTS_CACHE["ts"] = 0.0
+    with _REPORTS_CACHE_LOCK:
+        _REPORTS_CACHE["data"] = None
+        _REPORTS_CACHE["by_name"] = None
+        _REPORTS_CACHE["ts"] = 0.0
 
 
 def load_report_details_map(report: ReportRecord) -> ReportDetailsMap:
@@ -81,8 +84,9 @@ def _is_total_report_name(report_name: str) -> bool:
 
 def list_reports() -> List[ReportRecord]:
     _now = _time.monotonic()
-    if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
-        return list(_REPORTS_CACHE["data"])
+    with _REPORTS_CACHE_LOCK:
+        if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
+            return list(_REPORTS_CACHE["data"])
 
     reports: List[ReportRecord] = []
     seen_report_names = set()
@@ -91,7 +95,6 @@ def list_reports() -> List[ReportRecord]:
         try:
             report = load_report_meta(meta_path, include_results=False)
             report["meta_file"] = str(meta_path.relative_to(_REPORTS_DIR))
-            # 修正 details_file 路径：如果 details_file 只是文件名，且 meta 文件在子目录中
             details_file = str(report.get("details_file") or "").strip()
             if details_file and os.path.basename(details_file) == details_file:
                 expected_details = meta_path.parent / details_file
@@ -120,14 +123,13 @@ def list_reports() -> List[ReportRecord]:
         except Exception:
             continue
 
-    # Final guard: regardless of data source, do not expose paged child reports.
     reports = [item for item in reports if _is_total_report_name(str(item.get("report_name", "") or ""))]
-
     reports.sort(key=lambda item: str(item.get("generated_at", "") or ""), reverse=True)
 
-    _REPORTS_CACHE["data"] = reports
-    _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
-    _REPORTS_CACHE["ts"] = _time.monotonic()
+    with _REPORTS_CACHE_LOCK:
+        _REPORTS_CACHE["data"] = reports
+        _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
+        _REPORTS_CACHE["ts"] = _time.monotonic()
     return list(reports)
 
 
@@ -145,10 +147,14 @@ def _fix_details_file_path(report: ReportRecord) -> None:
 
 
 def find_report(report_name: str) -> ReportRecord:
-    reports_by_name = _REPORTS_CACHE.get("by_name")
-    if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
-        list_reports()
+    with _REPORTS_CACHE_LOCK:
         reports_by_name = _REPORTS_CACHE.get("by_name")
+        if reports_by_name is None or _REPORTS_CACHE.get("data") is None:
+            reports_by_name = None
+    if reports_by_name is None:
+        list_reports()
+        with _REPORTS_CACHE_LOCK:
+            reports_by_name = _REPORTS_CACHE.get("by_name")
     if reports_by_name and report_name in reports_by_name:
         report = reports_by_name[report_name]
         if bool(report.get("_summary_only")):
@@ -159,17 +165,18 @@ def find_report(report_name: str) -> ReportRecord:
             full_report = load_report_meta(meta_path, include_results=True)
             full_report["meta_file"] = meta_file
             _fix_details_file_path(full_report)
-            cache_by_name = _REPORTS_CACHE.get("by_name")
-            if cache_by_name is None:
-                cache_by_name = {}
-                _REPORTS_CACHE["by_name"] = cache_by_name
-            cache_by_name[report_name] = full_report
-            cached_data = _REPORTS_CACHE.get("data") or []
-            for index, item in enumerate(cached_data):
-                if str(item.get("report_name") or "") == report_name:
-                    cached_data[index] = full_report
-                    break
-            _REPORTS_CACHE["data"] = cached_data
+            with _REPORTS_CACHE_LOCK:
+                cache_by_name = _REPORTS_CACHE.get("by_name")
+                if cache_by_name is None:
+                    cache_by_name = {}
+                    _REPORTS_CACHE["by_name"] = cache_by_name
+                cache_by_name[report_name] = full_report
+                cached_data = _REPORTS_CACHE.get("data") or []
+                for index, item in enumerate(cached_data):
+                    if str(item.get("report_name") or "") == report_name:
+                        cached_data[index] = full_report
+                        break
+                _REPORTS_CACHE["data"] = cached_data
             return full_report
         _fix_details_file_path(report)
         return report

@@ -97,7 +97,11 @@ class PostmanApiParser:
             if isinstance(first_request, dict):
                 url = first_request.get('url')
                 if isinstance(url, dict):
-                    self.base_url = f"{url.get('protocol', 'https')}://{url.get('host', 'localhost')}"
+                    protocol = url.get('protocol', 'https')
+                    if str(protocol).lower() not in ('http', 'https'):
+                        logger.warning("ignoring non-http protocol in collection base_url: %s", protocol)
+                    else:
+                        self.base_url = f"{protocol}://{url.get('host', 'localhost')}"
                 elif isinstance(url, str):
                     # 提取协议和主机
                     match = re.match(r'(https?://[^/]+)', url)

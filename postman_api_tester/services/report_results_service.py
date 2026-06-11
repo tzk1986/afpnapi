@@ -187,7 +187,7 @@ def build_export_collection_payload(
 
 
 def build_report_meta_payload(report: Dict[str, Any]) -> Dict[str, Any]:
-    return report
+    return dict(report)
 
 
 def build_report_delete_payload(report_name: str, deleted_files: List[str]) -> Dict[str, Any]:

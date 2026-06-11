@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, SupportsInt
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.handlers.base_handler import json_error as _json_error
 from postman_api_tester.handlers.collection_handler import (
     build_adhoc_collection as _svc_build_adhoc_collection,
     normalize_adhoc_case as _svc_normalize_adhoc_case,
@@ -52,11 +52,6 @@ _RUN_POSTMAN_JOB_FN = partial(
     set_run_job=set_run_job,
     invalidate_reports_cache=_repo_invalidate_reports_cache,
 )
-
-
-def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(message), status_code)
 
 
 def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:

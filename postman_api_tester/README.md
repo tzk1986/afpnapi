@@ -1,8 +1,14 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.3.1
-发布日期：2026-05-19
+版本：v1.3.2
+发布日期：2026-06-11
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.3.2）：
+- **安全加固**：修复 XSS（html_reporter.py 全面转义 + Jinja2 模板化）、XML 注入（JUnit 导出转义）、SSRF（URL 协议白名单 + `PROXY_ALLOWED_HOSTS` 域名白名单）。
+- **代码质量精细化**：消除 adhoc/collection 7 个重复函数（统一至 `utils/collection_utils.py`）；统一 `_json_error()` 至 `base_handler.json_error()`；修复 `report_export_service.py` 逆向依赖；并发锁加固（缓存锁 + RLock + 线程异常捕获）。
+- **Jinja2 模板外置**：`_generate_index_html()` 从 600 行 f-string 重构为 `templates/report_index.html` Jinja2 模板渲染。
+- **死代码清理**：删除 `core/pipeline.py`（占位实现）及无引用模块。
 
 本版新增重点（v1.3.1）：
 - **子目录报告生成与访问**：`output_dir` 自动创建为 `reports/` 子目录；报告中心支持递归扫描子目录中的报告；原始 HTML 可正确访问子目录下的报告文件。

@@ -6,6 +6,7 @@
 
 import io
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 from typing import Any, Dict
 
 
@@ -27,31 +28,31 @@ def build_junit_xml(report: Dict[str, Any]) -> str:
     duration_sec = _parse_duration_to_seconds(summary.get("duration", "0s"))
 
     suite = ET.Element("testsuite")
-    suite.set("name", report_name)
+    suite.set("name", _xml_escape(str(report_name)))
     suite.set("tests", str(total))
     suite.set("failures", str(failures))
     suite.set("errors", str(errors))
     suite.set("time", f"{duration_sec:.3f}")
-    suite.set("timestamp", str(summary.get("start_time", "")))
+    suite.set("timestamp", _xml_escape(str(summary.get("start_time", ""))))
 
     for item in results:
         folder = item.get("folder", "") or ""
         name = item.get("name", "") or "unknown"
         classname = f"{folder}.{name}".strip(".") if folder else name
         tc = ET.SubElement(suite, "testcase")
-        tc.set("name", name)
-        tc.set("classname", classname)
+        tc.set("name", _xml_escape(name))
+        tc.set("classname", _xml_escape(classname))
         tc.set("time", str(round(item.get("response_time_ms", 0) / 1000, 3)))
 
         status = item.get("status", "")
         if status == "FAILED":
             failure = ET.SubElement(tc, "failure")
-            failure.set("message", str(item.get("message", "")))
-            failure.text = str(item.get("message", ""))
+            failure.set("message", _xml_escape(str(item.get("message", ""))))
+            failure.text = _xml_escape(str(item.get("message", "")))
         elif status == "ERROR":
             error_el = ET.SubElement(tc, "error")
-            error_el.set("message", str(item.get("message", "")))
-            error_el.text = str(item.get("message", ""))
+            error_el.set("message", _xml_escape(str(item.get("message", ""))))
+            error_el.text = _xml_escape(str(item.get("message", "")))
 
     try:
         ET.indent(suite, space="  ")

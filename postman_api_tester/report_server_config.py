@@ -8,6 +8,8 @@
 from typing import Any, Dict, List, Optional
 from types import ModuleType
 
+from postman_api_tester.report_server_utils import to_bool as _to_bool
+
 _cfg: Optional[ModuleType]
 try:
     from postman_api_tester import config as _cfg
@@ -27,15 +29,7 @@ def _cfg_int(name: str, default: int) -> int:
 def _cfg_bool(name: str, default: bool) -> bool:
     if _cfg is None:
         return bool(default)
-    value = getattr(_cfg, name, default)
-    if isinstance(value, bool):
-        return value
-    text = str(value).strip().lower()
-    if text in {"1", "true", "yes", "y", "on"}:
-        return True
-    if text in {"0", "false", "no", "n", "off"}:
-        return False
-    return bool(default)
+    return _to_bool(getattr(_cfg, name, default), default)
 
 
 def _cfg_str(name: str, default: str) -> str:

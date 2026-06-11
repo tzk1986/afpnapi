@@ -8,7 +8,7 @@ from typing import Any, Dict
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.handlers.base_handler import json_error as _json_error
 from postman_api_tester.handlers.manual_case_handler import (
     add_manual_case as _manual_add_manual_case,
     delete_manual_case as _manual_delete_manual_case,
@@ -59,11 +59,6 @@ _UPDATE_REPORT_META_FN = partial(
     find_report=_repo_find_report,
     invalidate_reports_cache=_repo_invalidate_reports_cache,
 )
-
-
-def _json_error(message: str, status_code: int) -> ResponseReturnValue:
-    from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(message), status_code)
 
 
 def api_reports() -> ResponseReturnValue:
