@@ -183,18 +183,48 @@ def find_report(report_name: str) -> ReportRecord:
     raise FileNotFoundError(report_name)
 
 
+def _resolve_artifact_dir(report: ReportRecord) -> Path:
+    """从 meta_file 或 source_file 推导报告产物所在子目录。"""
+    meta_file = str(report.get("meta_file") or "").strip()
+    if meta_file and "/" in meta_file.replace("\\", "/"):
+        candidate = (_REPORTS_DIR / meta_file.replace("\\", "/")).parent
+        try:
+            candidate.resolve().relative_to(_REPORTS_DIR)
+            return candidate
+        except ValueError:
+            pass
+    source_file = str(report.get("source_file") or "").strip()
+    if source_file:
+        try:
+            source_path = Path(source_file).resolve()
+            source_path.relative_to(_REPORTS_DIR)
+            return source_path.parent
+        except (ValueError, OSError):
+            pass
+    return _REPORTS_DIR
+
+
 def collect_report_artifacts(report: ReportRecord) -> List[Path]:
     artifacts: List[Path] = []
     seen: set[str] = set()
+    artifact_dir = _resolve_artifact_dir(report)
 
     for file_name in (
         report.get("report_name", ""),
         report.get("details_file", ""),
         report.get("meta_file", ""),
     ):
-        path = safe_report_artifact(_REPORTS_DIR, str(file_name or ""))
+        name = str(file_name or "").strip()
+        if not name:
+            continue
+        has_subdir = "/" in name.replace("\\", "/")
+        base_dir = _REPORTS_DIR if has_subdir else artifact_dir
+        path = safe_report_artifact(base_dir, name)
         if path is not None:
-            rel = str(path.relative_to(_REPORTS_DIR))
+            try:
+                rel = str(path.relative_to(_REPORTS_DIR))
+            except ValueError:
+                continue
             if rel not in seen:
                 artifacts.append(path)
                 seen.add(rel)
@@ -202,12 +232,7 @@ def collect_report_artifacts(report: ReportRecord) -> List[Path]:
     report_name = str(report.get("report_name") or "").strip()
     report_stem = Path(report_name).stem
     if report_stem:
-        # 从 meta_file 推导出报告所在目录，以便在正确目录下查找分页文件
-        meta_file = str(report.get("meta_file") or "").strip()
-        search_dir = _REPORTS_DIR
-        if meta_file and "/" in meta_file.replace("\\", "/"):
-            search_dir = (_REPORTS_DIR / meta_file).parent
-        for page_path in sorted(search_dir.glob(f"{report_stem}_page_*.html")):
+        for page_path in sorted(artifact_dir.glob(f"{report_stem}_page_*.html")):
             resolved = page_path.resolve()
             try:
                 resolved.relative_to(_REPORTS_DIR)
