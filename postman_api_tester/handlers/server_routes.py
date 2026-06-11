@@ -81,13 +81,9 @@ def _resolve_reports_dir() -> Path:
     ).strip()
     if env_dir:
         return Path(env_dir).expanduser().resolve()
-    try:
-        from postman_api_tester import config as cfg
-        cfg_dir = getattr(cfg, "REPORT_OUTPUT_DIR", "").strip()
-        if cfg_dir:
-            return Path(cfg_dir).expanduser().resolve()
-    except Exception:
-        pass
+    from postman_api_tester.report_server_config import REPORT_OUTPUT_DIR as _cfg_dir
+    if _cfg_dir:
+        return Path(_cfg_dir).expanduser().resolve()
     return (PROJECT_ROOT / "reports").resolve()
 
 
@@ -126,9 +122,13 @@ def api_environments() -> ResponseReturnValue:
 
 def api_report_delete(report_name: str) -> ResponseReturnValue:
     """删除报告产物。"""
-    from postman_api_tester.handlers.admin_handler import delete_report_artifacts as _admin_delete_report_artifacts
+    from postman_api_tester.services.report_delete_service import delete_report_artifacts as _svc_delete
+    logger.info(
+        "handler delete report",
+        extra={"event": "handler.server.report_delete.forward", "report_name": report_name},
+    )
     try:
-        deleted_files = _admin_delete_report_artifacts(
+        deleted_files = _svc_delete(
             report_name,
             find_report=_repo_find_report,
             collect_report_artifacts=collect_report_artifacts,

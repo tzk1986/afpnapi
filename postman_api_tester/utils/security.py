@@ -41,21 +41,17 @@ def _load_config_sensitive_headers() -> Set[str]:
         from postman_api_tester import config as _cfg
     except Exception:
         return set(DEFAULT_SENSITIVE_HEADERS)
-
     config_value = getattr(_cfg, "SENSITIVE_HEADERS", None)
     if config_value is None:
         return set(DEFAULT_SENSITIVE_HEADERS)
-
     if isinstance(config_value, str):
         configured = _normalize_header_names(config_value.split(","))
     elif isinstance(config_value, (list, tuple, set, frozenset)):
         configured = _normalize_header_names(config_value)
     else:
         configured = set()
-
     if not configured:
         return set(DEFAULT_SENSITIVE_HEADERS)
-
     return set(DEFAULT_SENSITIVE_HEADERS) | configured
 
 

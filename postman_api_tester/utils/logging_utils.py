@@ -158,23 +158,13 @@ def configure_logging(
 
 
 def configure_logging_from_config(service_name: str) -> None:
-    try:
-        from postman_api_tester import config as cfg
-        level = getattr(cfg, "LOG_LEVEL", "INFO")
-        log_format = getattr(cfg, "LOG_FORMAT", "structured")
-    except Exception:
-        level = "INFO"
-        log_format = "structured"
-    configure_logging(level=level, log_format=log_format, service_name=service_name)
+    from postman_api_tester.report_server_config import LOG_LEVEL, LOG_FORMAT
+    configure_logging(level=LOG_LEVEL, log_format=LOG_FORMAT, service_name=service_name)
 
 
 def get_log_sample_rate(default: float = 0.1) -> float:
-    try:
-        from postman_api_tester import config as cfg
-        configured = getattr(cfg, "LOG_SAMPLE_RATE", default)
-    except Exception:
-        configured = default
-    return _parse_sample_rate(configured, default=default)
+    from postman_api_tester.report_server_config import LOG_SAMPLE_RATE
+    return _parse_sample_rate(LOG_SAMPLE_RATE, default=default)
 
 
 def log_sampled(
@@ -201,16 +191,13 @@ def get_log_metrics_snapshot() -> Dict[str, Any]:
 
 
 def _get_alert_config() -> Dict[str, float]:
-    try:
-        from postman_api_tester import config as cfg
-        window_seconds = int(getattr(cfg, "LOG_ALERT_ERROR_WINDOW_SECONDS", 300))
-        threshold_per_min = float(getattr(cfg, "LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", 10.0))
-    except Exception:
-        window_seconds = 300
-        threshold_per_min = 10.0
+    from postman_api_tester.report_server_config import (
+        LOG_ALERT_ERROR_WINDOW_SECONDS,
+        LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN,
+    )
     return {
-        "window_seconds": float(max(60, window_seconds)),
-        "threshold_per_min": float(max(0.0, threshold_per_min)),
+        "window_seconds": float(LOG_ALERT_ERROR_WINDOW_SECONDS),
+        "threshold_per_min": float(LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN),
     }
 
 

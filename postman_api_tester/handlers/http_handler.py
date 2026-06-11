@@ -62,13 +62,12 @@ def execute_http_request(
 				"error_code": 400,
 			}
 
-		try:
-			import postman_api_tester.config as _cfg
-
-			connect_timeout = int(getattr(_cfg, "REQUEST_CONNECT_TIMEOUT", 10))
-			read_timeout = int(getattr(_cfg, "REQUEST_READ_TIMEOUT", 30))
-		except Exception:
-			connect_timeout, read_timeout = 10, 30
+		from postman_api_tester.report_server_config import (
+			REQUEST_CONNECT_TIMEOUT as _connect_timeout,
+			REQUEST_READ_TIMEOUT as _read_timeout,
+		)
+		connect_timeout = _connect_timeout
+		read_timeout = _read_timeout
 
 		try:
 			prepared = build_request_kwargs(

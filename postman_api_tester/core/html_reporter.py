@@ -458,24 +458,26 @@ class HtmlReporter:
 
     @staticmethod
     def print_console_report(report: Any) -> None:
-        """在控制台输出测试报告。"""
+        """在控制台输出测试报告（通过 logger 保持等价格式化输出）。"""
         summary = report.generate_summary()
 
-        print("\n" + "="*80)
-        print("Postman API 测试报告".center(80))
-        print("="*80)
-        print(f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}")
-        print(f"成功率: {summary['success_rate']} | 耗时: {summary['duration']}")
-        print(f"开始时间: {summary['start_time']} | 结束时间: {summary['end_time']}")
-
-        print("\n" + "-"*80)
-        print("详细结果:".ljust(80))
-        print("-"*80)
+        lines = [
+            "\n" + "=" * 80,
+            "Postman API 测试报告".center(80),
+            "=" * 80,
+            f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}",
+            f"成功率: {summary['success_rate']} | 耗时: {summary['duration']}",
+            f"开始时间: {summary['start_time']} | 结束时间: {summary['end_time']}",
+            "\n" + "-" * 80,
+            "详细结果:".ljust(80),
+            "-" * 80,
+        ]
 
         for result in report.results:
             status_symbol = "PASS" if result['status'] == 'PASSED' else "FAIL" if result['status'] == 'FAILED' else "ERR"
-            print(f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}")
-            print(f"    URL: {result['url']}")
-            print(f"    {result['message']}")
+            lines.append(f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}")
+            lines.append(f"    URL: {result['url']}")
+            lines.append(f"    {result['message']}")
 
-        print("="*80 + "\n")
+        lines.append("=" * 80 + "\n")
+        logger.info("\n".join(lines))

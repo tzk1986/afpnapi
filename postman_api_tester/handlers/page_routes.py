@@ -52,11 +52,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def index() -> ResponseReturnValue:
     reports = _repo_list_reports()
-    try:
-        from postman_api_tester.config import REPORT_SERVER_PORT
-        port = REPORT_SERVER_PORT
-    except ImportError:
-        port = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
+    from postman_api_tester.report_server_config import REPORT_SERVER_PORT as port
     return render_template(
         "index.html",
         host_name=socket.gethostname(),

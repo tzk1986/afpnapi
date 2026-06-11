@@ -49,10 +49,7 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
     """若配置了 PROXY_ALLOWED_HOSTS，校验 url 的域名是否在白名单内。返回 None 表示通过。"""
-    try:
-        from postman_api_tester.config import PROXY_ALLOWED_HOSTS
-    except ImportError:
-        return None
+    from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
     if not PROXY_ALLOWED_HOSTS:
         return None
     parsed = urlparse(url)

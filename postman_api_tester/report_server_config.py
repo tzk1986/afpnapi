@@ -39,6 +39,15 @@ def _cfg_str(name: str, default: str) -> str:
     return str(value).strip() if value is not None else str(default)
 
 
+def _cfg_float(name: str, default: float) -> float:
+    if _cfg is None:
+        return float(default)
+    try:
+        return float(getattr(_cfg, name, default))
+    except (TypeError, ValueError):
+        return float(default)
+
+
 def _cfg_dict(name: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     if default is None:
         default = {}
@@ -46,6 +55,17 @@ def _cfg_dict(name: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, 
         return default
     value = getattr(_cfg, name, default)
     return value if isinstance(value, dict) else default
+
+
+def _cfg_tuple(name: str, default: tuple = ()) -> tuple:
+    if _cfg is None:
+        return tuple(default)
+    value = getattr(_cfg, name, default)
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return tuple(value)
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    return tuple(default)
 
 
 EnvironmentConfig = Dict[str, str]
@@ -125,6 +145,20 @@ ENABLE_MESSAGE_JUDGMENT: bool = _cfg_bool("ENABLE_MESSAGE_JUDGMENT", True)
 from postman_api_tester.utils.judgment_utils import parse_success_list as _parse_success_list
 SUCCESS_ERR_CODES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_ERR_CODES", "0"))
 SUCCESS_MESSAGES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_MESSAGES", "success"))
+
+REQUEST_CONNECT_TIMEOUT = _cfg_int("REQUEST_CONNECT_TIMEOUT", 10)
+REQUEST_READ_TIMEOUT = _cfg_int("REQUEST_READ_TIMEOUT", 30)
+REPORT_SERVER_PORT = _cfg_int("REPORT_SERVER_PORT", 5000)
+REPORT_SERVER_HOST = _cfg_str("REPORT_SERVER_HOST", "0.0.0.0")
+REPORT_OUTPUT_DIR = _cfg_str("REPORT_OUTPUT_DIR", "")
+
+PROXY_ALLOWED_HOSTS: tuple = _cfg_tuple("PROXY_ALLOWED_HOSTS")
+
+LOG_LEVEL = _cfg_str("LOG_LEVEL", "INFO")
+LOG_FORMAT = _cfg_str("LOG_FORMAT", "structured")
+LOG_SAMPLE_RATE = _cfg_float("LOG_SAMPLE_RATE", 0.1)
+LOG_ALERT_ERROR_WINDOW_SECONDS = max(60, _cfg_int("LOG_ALERT_ERROR_WINDOW_SECONDS", 300))
+LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, _cfg_float("LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", 10.0))
 
 JobParams = Dict[str, Any]
 SummaryPayload = Dict[str, Any]

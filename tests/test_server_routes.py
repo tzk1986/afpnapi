@@ -89,7 +89,7 @@ class TestApiReportDelete:
     def test_api_report_delete_success(self, app_context: None) -> None:
         """删除存在的报告返回成功。"""
         with patch(
-            "postman_api_tester.handlers.admin_handler.delete_report_artifacts"
+            "postman_api_tester.services.report_delete_service.delete_report_artifacts"
         ) as mock_delete:
             mock_delete.return_value = ["file1.json"]
             result = api_report_delete("test_report")
@@ -100,7 +100,7 @@ class TestApiReportDelete:
     def test_api_report_delete_not_found(self, app_context: None) -> None:
         """删除不存在的报告返回 404。"""
         with patch(
-            "postman_api_tester.handlers.admin_handler.delete_report_artifacts"
+            "postman_api_tester.services.report_delete_service.delete_report_artifacts"
         ) as mock_delete:
             mock_delete.side_effect = FileNotFoundError()
             result = api_report_delete("missing_report")

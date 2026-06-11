@@ -1,6 +1,6 @@
 """报告结果与分析路由处理函数。"""
 
-from typing import Any, Dict
+from typing import Dict
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -19,6 +19,8 @@ from postman_api_tester.report_server_config import (
     REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
     REPORT_ANALYTICS_TREND_LIMIT_MAX,
     REPORT_VIEW_PAGE_SIZE_DEFAULT,
+    REPORT_VIEW_PAGE_SIZE_MAX,
+    REPORT_VIEW_PAGE_SIZE_MIN,
 )
 from postman_api_tester.handlers.base_handler import BaseHandler
 from postman_api_tester.handlers.report_handler import (
@@ -40,18 +42,7 @@ from postman_api_tester.services.report_results_service import (
     build_result_detail_payload,
 )
 from postman_api_tester.utils.server_utils import clamp_page as _clamp_page
-
-
-def clamp_page_size(value: Any) -> int:
-    if value is None:
-        page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
-    else:
-        try:
-            page_size = int(value)
-        except (TypeError, ValueError):
-            page_size = REPORT_VIEW_PAGE_SIZE_DEFAULT
-    from postman_api_tester.report_server_config import REPORT_VIEW_PAGE_SIZE_MIN, REPORT_VIEW_PAGE_SIZE_MAX
-    return max(REPORT_VIEW_PAGE_SIZE_MIN, min(page_size, REPORT_VIEW_PAGE_SIZE_MAX))
+from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page_size
 
 
 def api_report_results(report_name: str) -> ResponseReturnValue:
@@ -62,7 +53,12 @@ def api_report_results(report_name: str) -> ResponseReturnValue:
         return BaseHandler.error_response(ValidationError(f"报告不存在: {report_name}"), 404)
 
     page = _clamp_page(request.args.get("page", 1))
-    page_size = clamp_page_size(request.args.get("page_size", REPORT_VIEW_PAGE_SIZE_DEFAULT))
+    page_size = _clamp_page_size(
+        request.args.get("page_size", REPORT_VIEW_PAGE_SIZE_DEFAULT),
+        default=REPORT_VIEW_PAGE_SIZE_DEFAULT,
+        min_size=REPORT_VIEW_PAGE_SIZE_MIN,
+        max_size=REPORT_VIEW_PAGE_SIZE_MAX,
+    )
     keyword = request.args.get("query", "")
     message_keyword = request.args.get("message_query", "")
     err_code_keyword = request.args.get("err_code_query", "")

@@ -28,12 +28,17 @@ def create_shared_session() -> SessionLike:
 
 
 def close_session(session: Optional[SessionLike]) -> None:
+    """关闭共享 Session，失败时记录警告但不中断主流程。"""
     if session is None:
         return
     try:
         session.close()
-    except Exception:
-        pass
+    except OSError as exc:
+        import logging
+        logging.getLogger(__name__).warning("关闭 session 时发生 OSError: %s", exc)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("关闭 session 时发生未预期异常: %s", exc)
 
 
 def resolve_request_timeout(default: RequestTimeout = (10, 30)) -> RequestTimeout:
@@ -43,7 +48,13 @@ def resolve_request_timeout(default: RequestTimeout = (10, 30)) -> RequestTimeou
         connect_timeout = int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', default[0]))
         read_timeout = int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', default[1]))
         return (connect_timeout, read_timeout)
-    except Exception:
+    except (ValueError, TypeError, AttributeError) as exc:
+        import logging
+        logging.getLogger(__name__).warning("读取超时配置失败，回退默认值 %s: %s", default, exc)
+        return default
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("读取超时配置时发生未预期异常，回退默认值 %s: %s", default, exc)
         return default
 
 
@@ -54,7 +65,7 @@ def normalize_timeout(timeout: Optional[RequestTimeout], default: RequestTimeout
     try:
         connect_timeout = int(timeout[0])
         read_timeout = int(timeout[1])
-    except Exception:
+    except (IndexError, ValueError, TypeError):
         return default
     if connect_timeout <= 0 or read_timeout <= 0:
         return default

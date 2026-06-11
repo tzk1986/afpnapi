@@ -679,7 +679,7 @@ def _generate_and_log_report(
     results_per_page: int,
     execution_error: Optional[Exception],
 ) -> str:
-    print("\n生成测试报告...")
+    logger.info("\n生成测试报告...")
     report.generate_summary()
 
     report_file = _resolve_report_file_path(output_dir, report_name)
