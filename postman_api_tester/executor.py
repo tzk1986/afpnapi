@@ -245,19 +245,26 @@ class PostmanTestExecutor:
 
             # 可配置结果判定：优先级 任务级 > 集合接口级 x_* > 全局 config > 内置默认
             task_jcfg = self.judgment_config or {}
+
+            def _opt_bool(val: object) -> Optional[bool]:
+                return bool(val) if val is not None else None
+
+            def _opt_str(val: object) -> Optional[str]:
+                return str(val) if val is not None else None
+
             judgment_params = resolve_judgment_params(
                 global_enable_err_code=_rsc.ENABLE_ERR_CODE_JUDGMENT,
                 global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
                 global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
                 global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
-                item_x_enable_err_code=api.get('x_enable_err_code_judgment'),
-                item_x_success_err_codes=api.get('x_success_err_codes'),
-                item_x_enable_message=api.get('x_enable_message_judgment'),
-                item_x_success_messages=api.get('x_success_messages'),
-                task_enable_err_code=task_jcfg.get('enable_err_code_judgment'),
-                task_success_err_codes=task_jcfg.get('success_err_codes'),
-                task_enable_message=task_jcfg.get('enable_message_judgment'),
-                task_success_messages=task_jcfg.get('success_messages'),
+                item_x_enable_err_code=_opt_bool(api.get('x_enable_err_code_judgment')),
+                item_x_success_err_codes=_opt_str(api.get('x_success_err_codes')),
+                item_x_enable_message=_opt_bool(api.get('x_enable_message_judgment')),
+                item_x_success_messages=_opt_str(api.get('x_success_messages')),
+                task_enable_err_code=_opt_bool(task_jcfg.get('enable_err_code_judgment')),
+                task_success_err_codes=_opt_str(task_jcfg.get('success_err_codes')),
+                task_enable_message=_opt_bool(task_jcfg.get('enable_message_judgment')),
+                task_success_messages=_opt_str(task_jcfg.get('success_messages')),
             )
 
             judgment_passed, judgment_fail_reason = evaluate_result_judgment(

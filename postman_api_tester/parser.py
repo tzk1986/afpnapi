@@ -242,7 +242,7 @@ class PostmanApiParser:
         if x_enable_message is not None and not isinstance(x_enable_message, bool):
             x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
 
-        result: Dict[str, Any] = {
+        result: ApiConfig = {
             'name': name,
             'folder': parent_name,
             'method': method,
