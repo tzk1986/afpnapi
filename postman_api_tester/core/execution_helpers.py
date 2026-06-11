@@ -386,6 +386,7 @@ def _execute_api_suite(
     selected_total_count: int,
     executed_item_paths: set[str],
     shared_session: SessionLike,
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Optional[Exception]]:
     execution_error: Optional[Exception] = None
     completed_count = 0
@@ -400,6 +401,7 @@ def _execute_api_suite(
                 session=shared_session,
                 request_timeout=request_timeout,
                 assertion_strict_mode=assertion_strict_mode,
+                judgment_config=judgment_config,
             )
             executor.start()
             result: TestResultRecord = executor.execute_test()
@@ -478,6 +480,7 @@ def _execute_and_finalize_suite(
     selected_total_count: int,
     executed_item_paths: set[str],
     shared_session: SessionLike,
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[int, Optional[Exception]]:
     completed_count = 0
     execution_error: Optional[Exception] = None
@@ -498,6 +501,7 @@ def _execute_and_finalize_suite(
             selected_total_count=selected_total_count,
             executed_item_paths=executed_item_paths,
             shared_session=shared_session,
+            judgment_config=judgment_config,
         )
     finally:
         close_session(shared_session)

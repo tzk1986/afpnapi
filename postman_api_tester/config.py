@@ -328,3 +328,26 @@ PROXY_ALLOWED_HOSTS: tuple = tuple(
     for item in _PROXY_ALLOWED_HOSTS_TEXT.split(",")
     if item.strip()
 ) if _PROXY_ALLOWED_HOSTS_TEXT else ()
+
+# ==============================================================
+# 可配置结果自动判定条件（errCode & message）
+# ENABLE_ERR_CODE_JUDGMENT: 是否启用 errCode 参与结果判定
+#   False（默认）= 保持当前行为，不检查 errCode
+#   True = errCode 必须匹配 SUCCESS_ERR_CODES 中任一值才判定为成功
+# SUCCESS_ERR_CODES: 视为成功的 errCode 值列表（逗号分隔，匹配时忽略大小写）
+#   默认值: "0"
+# ENABLE_MESSAGE_JUDGMENT: 是否启用 message 参与结果判定
+#   True（默认）= 保持当前行为，message 为空或匹配 SUCCESS_MESSAGES 时通过
+#   False = 不检查 message
+# SUCCESS_MESSAGES: 视为成功的 message 值列表（逗号分隔，匹配时忽略大小写）
+#   默认值: "success"（保持当前行为：空字符串或 success 视为成功）
+# 支持 Web 界面运行时覆盖和集合内 x_* 字段接口级覆盖。
+# ==============================================================
+ENABLE_ERR_CODE_JUDGMENT = str(os.environ.get("ENABLE_ERR_CODE_JUDGMENT", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+SUCCESS_ERR_CODES = str(os.environ.get("SUCCESS_ERR_CODES", "0")).strip()
+ENABLE_MESSAGE_JUDGMENT = str(os.environ.get("ENABLE_MESSAGE_JUDGMENT", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+SUCCESS_MESSAGES = str(os.environ.get("SUCCESS_MESSAGES", "success")).strip()

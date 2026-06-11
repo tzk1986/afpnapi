@@ -32,6 +32,8 @@ from postman_api_tester.runtime_utils import normalize_url_and_params as _normal
 from postman_api_tester.db_feedback import build_db_feedback
 from postman_api_tester.session import normalize_timeout
 from postman_api_tester.parser import ApiConfig
+from postman_api_tester.utils.judgment_utils import evaluate_result_judgment, resolve_judgment_params
+from postman_api_tester import report_server_config as _rsc
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +87,7 @@ class PostmanTestExecutor:
         session: Optional[object] = None,
         request_timeout: Optional[RequestTimeout] = None,
         assertion_strict_mode: bool = False,
+        judgment_config: Optional[Dict[str, object]] = None,
     ) -> None:
         """
         初始化执行器
@@ -93,6 +96,7 @@ class PostmanTestExecutor:
         :param session: 可选的外部 requests.Session（由调用方统一管理生命周期）；
                         传入时本实例不拥有该 Session，execute_test 结束后不关闭它。
         :param request_timeout: 请求超时配置（connect_timeout, read_timeout）
+        :param judgment_config: 任务级结果判定配置（可选），支持覆盖全局与集合配置
         """
         import requests as _requests_mod
         self.api_config = dict(api_config)
@@ -106,6 +110,7 @@ class PostmanTestExecutor:
         self._auth_token: Optional[str] = auth_token or None
         self.request_timeout: Tuple[int, int] = normalize_timeout(request_timeout, default=(10, 30))
         self.assertion_strict_mode = bool(assertion_strict_mode)
+        self.judgment_config: Optional[Dict[str, object]] = judgment_config if isinstance(judgment_config, dict) else None
 
     def start(self) -> None:
         """测试前准备"""
@@ -238,11 +243,35 @@ class PostmanTestExecutor:
                 'body': self.response_data
             }
 
-            status_code_ok = self.resp_status_code == expected_status
-            normalized_message = str(response_message or "").strip().lower()
-            message_ok = (normalized_message == "") or (normalized_message == "success")
+            # 可配置结果判定：优先级 任务级 > 集合接口级 x_* > 全局 config > 内置默认
+            task_jcfg = self.judgment_config or {}
+            judgment_params = resolve_judgment_params(
+                global_enable_err_code=_rsc.ENABLE_ERR_CODE_JUDGMENT,
+                global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
+                global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
+                global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
+                item_x_enable_err_code=api.get('x_enable_err_code_judgment'),
+                item_x_success_err_codes=api.get('x_success_err_codes'),
+                item_x_enable_message=api.get('x_enable_message_judgment'),
+                item_x_success_messages=api.get('x_success_messages'),
+                task_enable_err_code=task_jcfg.get('enable_err_code_judgment'),
+                task_success_err_codes=task_jcfg.get('success_err_codes'),
+                task_enable_message=task_jcfg.get('enable_message_judgment'),
+                task_success_messages=task_jcfg.get('success_messages'),
+            )
 
-            if status_code_ok and message_ok:
+            judgment_passed, judgment_fail_reason = evaluate_result_judgment(
+                status_code=self.resp_status_code,
+                expected_status=expected_status,
+                err_code=err_code,
+                response_message=response_message,
+                success_err_codes=judgment_params['success_err_codes'],
+                success_messages=judgment_params['success_messages'],
+                enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
+                enable_message_judgment=judgment_params['enable_message_judgment'],
+            )
+
+            if judgment_passed:
                 # 升级五：断言校验
                 assertion_results: List[AssertionResult] = []
                 assertion_failed = False
@@ -276,11 +305,6 @@ class PostmanTestExecutor:
                 result['assertion_engine_error'] = assertion_engine_error
                 return result
             else:
-                if not status_code_ok:
-                    fail_message = f'期望状态码: {expected_status}, 实际: {self.resp_status_code}; message: {response_message}'
-                else:
-                    fail_message = f'message 不满足成功条件(应为空或 success), 实际返回: {response_message}'
-
                 db_feedback = build_db_feedback(
                     status='FAILED',
                     status_code=self.resp_status_code,
@@ -288,9 +312,9 @@ class PostmanTestExecutor:
                     err_code=err_code,
                     response_body=self.response_data,
                 )
-                fail_message_with_hint = fail_message
+                fail_message_with_hint = judgment_fail_reason
                 if db_feedback.get('is_db_related'):
-                    fail_message_with_hint = f"{fail_message} | 数据库反馈: {db_feedback.get('title')}"
+                    fail_message_with_hint = f"{judgment_fail_reason} | 数据库反馈: {db_feedback.get('title')}"
 
                 result = self._build_result_base(
                     actual_request_url=actual_request_url,

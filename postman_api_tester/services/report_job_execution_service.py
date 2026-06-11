@@ -27,10 +27,11 @@ def _safe_run_job(
     args: tuple,
     job_id: str,
     set_run_job: Callable[..., None],
+    kwargs: Optional[Dict[str, Any]] = None,
 ) -> None:
     """包装线程目标函数，捕获未处理异常并更新任务状态为 ERROR。"""
     try:
-        fn(*args)
+        fn(*args, **(kwargs or {}))
     except Exception as exc:
         logger.exception("job thread unhandled exception", extra={"job_id": job_id})
         try:
@@ -52,6 +53,7 @@ def run_postman_job(
     *,
     set_run_job: Callable[..., None],
     invalidate_reports_cache: Callable[[], None],
+    judgment_config: Optional[Dict[str, Any]] = None,
 ) -> None:
     logger.info(
         "job started",
@@ -119,6 +121,7 @@ def run_postman_job(
             results_per_page=results_per_page,
             selected_item_paths=selected_item_paths,
             progress_callback=on_progress,
+            judgment_config=judgment_config,
         )
         set_run_job(
             job_id,
@@ -250,6 +253,7 @@ def enqueue_job_with_worker(
     output_dir = job_params.pop("output_dir", default_output_dir)
     report_name = job_params.pop("report_name", "")
     original_name = job_params.pop("file_name", "collection.json")
+    judgment_config = job_params.pop("judgment_config", None)
 
     set_run_job(job_id, **job_params)
     logger.info(
@@ -262,6 +266,10 @@ def enqueue_job_with_worker(
             "selected_count": len(selected_item_paths or []),
         },
     )
+
+    job_kwargs: Dict[str, Any] = {}
+    if judgment_config is not None:
+        job_kwargs["judgment_config"] = judgment_config
 
     worker = threading.Thread(
         target=_safe_run_job,
@@ -281,6 +289,7 @@ def enqueue_job_with_worker(
             job_id,
             set_run_job,
         ),
+        kwargs={"kwargs": job_kwargs} if job_kwargs else {},
         daemon=True,
     )
     worker.start()
