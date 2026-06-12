@@ -357,12 +357,12 @@ SUCCESS_MESSAGES = str(os.environ.get("SUCCESS_MESSAGES", "success")).strip()
 # ==============================================================
 
 # ENABLE_DATA_DRIVEN: 是否启用数据驱动测试（CSV/JSON 数据文件展开接口）
-ENABLE_DATA_DRIVEN = str(os.environ.get("ENABLE_DATA_DRIVEN", "false")).strip().lower() in {
+ENABLE_DATA_DRIVEN = str(os.environ.get("ENABLE_DATA_DRIVEN", "true")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
 
 # ENABLE_VARIABLE_EXTRACTION: 是否启用请求串联与变量提取（x_extract 配置解析）
-ENABLE_VARIABLE_EXTRACTION = str(os.environ.get("ENABLE_VARIABLE_EXTRACTION", "false")).strip().lower() in {
+ENABLE_VARIABLE_EXTRACTION = str(os.environ.get("ENABLE_VARIABLE_EXTRACTION", "true")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
 
