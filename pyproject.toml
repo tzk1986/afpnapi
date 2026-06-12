@@ -40,6 +40,7 @@ files = [
 	"postman_api_tester/utils/url_utils.py",
 	"postman_api_tester/utils/variable_substitution.py",
 	"postman_api_tester/utils/extract_utils.py",
+	"postman_api_tester/utils/data_driver.py",
 	"postman_api_tester/core/variable_context.py",
 	"postman_api_tester/handlers/http_handler.py",
 	"postman_api_tester/handlers/report_handler.py",

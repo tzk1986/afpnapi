@@ -133,6 +133,8 @@ def run_postman_tests(
     selected_item_paths: Optional[List[List[int]]] = None,
     progress_callback: Optional[ProgressCallback] = None,
     judgment_config: Optional[Dict[str, Any]] = None,
+    data_file: str = "",
+    initial_variables: Optional[Dict[str, str]] = None,
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。
@@ -147,8 +149,11 @@ def run_postman_tests(
     :param selected_item_paths: 仅执行指定 item_path 的接口（可选）。
     :param progress_callback: 进度回调（可选）。
     :param judgment_config: 任务级结果判定配置（可选）。
+    :param data_file: 数据驱动文件路径（CSV/JSON，可选）。
+    :param initial_variables: 预置变量（可选，用于请求串联的初始值）。
     :return: 测试报告对象。
     """
+    from postman_api_tester import config as _cfg
 
     (
         token,
@@ -160,10 +165,27 @@ def run_postman_tests(
         assertion_strict_mode,
     ) = _prepare_runtime_settings(token, base_url, output_dir)
 
+    data_rows: Optional[List[Dict[str, str]]] = None
+    data_columns: Optional[set] = None
+    if data_file and getattr(_cfg, "ENABLE_DATA_DRIVEN", False):
+        from postman_api_tester.utils.data_driver import validate_data_file, get_data_columns
+        max_rows = int(getattr(_cfg, "DATA_FILE_MAX_ROWS", 10000))
+        rows, _fmt = validate_data_file(data_file, max_rows)
+        data_rows = rows
+        data_columns = get_data_columns(rows)
+        logger.info("数据驱动已加载: %s（%d 行，格式 %s）", data_file, len(rows), _fmt)
+
+    variable_context: Optional[object] = None
+    if getattr(_cfg, "ENABLE_VARIABLE_EXTRACTION", False):
+        from postman_api_tester.core.variable_context import VariableContext
+        variable_context = VariableContext(initial_variables)
+
     parser, apis, total_apis_count, selected_total_count = _prepare_execution_apis(
         postman_file=postman_file,
         selected_item_paths=selected_item_paths,
         base_url=base_url,
+        data_rows=data_rows,
+        data_columns=data_columns,
     )
 
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_and_progress(
@@ -176,6 +198,7 @@ def run_postman_tests(
         checkpoint_dir=checkpoint_dir,
         progress_callback=progress_callback,
         total_apis_count=total_apis_count,
+        data_file=data_file,
     )
 
     resolved_token, report, request_timeout, shared_session = _prepare_execution_context(
@@ -204,6 +227,7 @@ def run_postman_tests(
         executed_item_paths=executed_item_paths,
         shared_session=shared_session,
         judgment_config=judgment_config,
+        variable_context=variable_context,
     )
 
     _complete_report_output(

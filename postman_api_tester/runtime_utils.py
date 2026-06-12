@@ -66,7 +66,26 @@ def item_path_text(path: Any) -> str:
     return ".".join(str(index) for index in path)
 
 
-def compute_collection_fingerprint(postman_file: str, base_url: str, selected_item_paths: Optional[List[List[int]]]) -> str:
+def checkpoint_key(path: Any, data_index: int = 0) -> str:
+    """生成 checkpoint 复合键。
+
+    非展开接口（data_index=0）使用 ``"0.2.1"`` 格式，与旧 checkpoint 向后兼容。
+    展开接口（data_index>0）使用 ``"0.2.1#3"`` 格式。
+    """
+    base = item_path_text(path)
+    if not base:
+        return ""
+    if data_index <= 0:
+        return base
+    return f"{base}#{data_index}"
+
+
+def compute_collection_fingerprint(
+    postman_file: str,
+    base_url: str,
+    selected_item_paths: Optional[List[List[int]]],
+    data_file: str = "",
+) -> str:
     hasher = hashlib.sha256()
     with open(postman_file, "rb") as file:
         while True:
@@ -76,6 +95,13 @@ def compute_collection_fingerprint(postman_file: str, base_url: str, selected_it
             hasher.update(chunk)
     hasher.update((base_url or "").encode("utf-8"))
     hasher.update(json.dumps(selected_item_paths or [], ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    if data_file and os.path.isfile(data_file):
+        with open(data_file, "rb") as df:
+            while True:
+                chunk = df.read(1024 * 1024)
+                if not chunk:
+                    break
+                hasher.update(chunk)
     return hasher.hexdigest()
 
 

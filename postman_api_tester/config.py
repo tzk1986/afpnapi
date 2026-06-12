@@ -351,3 +351,23 @@ ENABLE_MESSAGE_JUDGMENT = str(os.environ.get("ENABLE_MESSAGE_JUDGMENT", "true"))
     "1", "true", "yes", "y", "on"
 }
 SUCCESS_MESSAGES = str(os.environ.get("SUCCESS_MESSAGES", "success")).strip()
+
+# ==============================================================
+# P0 功能开关：数据驱动测试 + 请求串联与变量提取
+# ==============================================================
+
+# ENABLE_DATA_DRIVEN: 是否启用数据驱动测试（CSV/JSON 数据文件展开接口）
+ENABLE_DATA_DRIVEN = str(os.environ.get("ENABLE_DATA_DRIVEN", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+
+# ENABLE_VARIABLE_EXTRACTION: 是否启用请求串联与变量提取（x_extract 配置解析）
+ENABLE_VARIABLE_EXTRACTION = str(os.environ.get("ENABLE_VARIABLE_EXTRACTION", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+
+# DATA_FILE_MAX_ROWS: 数据文件最大行数限制
+DATA_FILE_MAX_ROWS = int(os.environ.get("DATA_FILE_MAX_ROWS", "10000"))
+
+# DATA_FILE_MAX_SIZE: 数据文件最大字节数（默认 10MB）
+DATA_FILE_MAX_SIZE = int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024)))
