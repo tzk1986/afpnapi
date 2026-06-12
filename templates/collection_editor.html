@@ -1,3 +1,4 @@
+{% raw %}
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -792,7 +793,24 @@
                     const jsonStr = JSON.stringify(data.collection_json);
                     const blob = new Blob([jsonStr], {type: 'application/json'});
                     const formData = new FormData();
-                    formData.append('file', blob, 'collection.json');
+                    formData.append('collection_file', blob, 'collection.json');
+
+                    // 合并 Collection 预置变量 + 运行时变量池作为 initial_variables
+                    const mergedVars = {};
+                    const colVars = (state.collection.collection_info && state.collection.collection_info.variables) || [];
+                    if (Array.isArray(colVars)) {
+                        for (const v of colVars) {
+                            if (v && v.key) mergedVars[v.key] = v.value || '';
+                        }
+                    }
+                    Object.assign(mergedVars, state.runtimeVars || {});
+                    if (Object.keys(mergedVars).length > 0) {
+                        formData.append('initial_variables', JSON.stringify(mergedVars));
+                    }
+
+                    // 使用 Collection 名称作为报告名
+                    const colName = (state.collection.collection_info && state.collection.collection_info.name) || 'collection';
+                    formData.append('report_name', colName);
 
                     const runResp = await fetch('/api/run-postman', {
                         method: 'POST',
@@ -1107,3 +1125,4 @@
     </script>
 </body>
 </html>
+{% endraw %}
