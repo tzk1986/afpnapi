@@ -188,6 +188,7 @@
             lastResponseTab: 'body',
             selectedIds: new Set(),
             runtimeVars: {},
+            activeTab: 'general',
         };
 
         // Methods
@@ -276,6 +277,7 @@
         // Select Request
         function selectRequest(reqId) {
             state.currentRequestId = reqId;
+            state.activeTab = 'general';
             const req = state.allRequests.find(r => r.id === reqId);
             if (req) {
                 state.editBuffer = JSON.parse(JSON.stringify(req));
@@ -292,21 +294,23 @@
                 return;
             }
 
+            const tab = state.activeTab || 'general';
+            const tabs = ['general', 'headers', 'params', 'body', 'extract'];
+            const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', extract: 'x_extract'};
+            const tabsHtml = tabs.map(t =>
+                `<button type="button" class="tab ${t === tab ? 'active' : ''}" onclick="switchTab('${t}', this)">${tabLabels[t]}</button>`
+            ).join('');
+
             const container = document.getElementById('editorContent');
             container.innerHTML = `
-                <div class="editor-tabs">
-                    <button type="button" class="tab active" onclick="switchTab('general', this)">General</button>
-                    <button type="button" class="tab" onclick="switchTab('headers', this)">Headers</button>
-                    <button type="button" class="tab" onclick="switchTab('params', this)">Params</button>
-                    <button type="button" class="tab" onclick="switchTab('body', this)">Body</button>
-                    <button type="button" class="tab" onclick="switchTab('extract', this)">x_extract</button>
-                </div>
-                <div id="tabContent">${renderGeneralTab(req)}</div>
+                <div class="editor-tabs">${tabsHtml}</div>
+                <div id="tabContent">${renderTabContent(tab, req)}</div>
             `;
         }
 
         // Tab Switching
         function switchTab(tabName, btn) {
+            state.activeTab = tabName;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             btn.classList.add('active');
 
@@ -319,6 +323,16 @@
                 case 'params': content.innerHTML = renderKVTab(req.params || [], 'params'); break;
                 case 'body': content.innerHTML = renderBodyTab(req); break;
                 case 'extract': content.innerHTML = renderExtractTab(req); break;
+            }
+        }
+
+        function renderTabContent(tabName, req) {
+            switch(tabName) {
+                case 'headers': return renderKVTab(req.headers || [], 'headers');
+                case 'params': return renderKVTab(req.params || [], 'params');
+                case 'body': return renderBodyTab(req);
+                case 'extract': return renderExtractTab(req);
+                default: return renderGeneralTab(req);
             }
         }
 
