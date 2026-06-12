@@ -100,6 +100,11 @@ def adhoc_run_page() -> ResponseReturnValue:
     )
 
 
+def collection_editor_page() -> ResponseReturnValue:
+    """Collection 可视化编辑器页面。"""
+    return render_template("collection_editor.html")
+
+
 def report_view() -> ResponseReturnValue:
     """报告详情页。"""
     report_name = request.args.get("name", "")

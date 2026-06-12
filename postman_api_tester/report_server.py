@@ -11,6 +11,12 @@ import logging
 
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.handlers.collection_editor_routes import (
+    api_collection_dependency as _route_api_collection_dependency,
+    api_collection_parse as _route_api_collection_parse,
+    api_collection_save as _route_api_collection_save,
+    api_collection_send as _route_api_collection_send,
+)
 from postman_api_tester.handlers.collection_routes import (
     api_collection_preview as _route_api_collection_preview,
     api_export_collection as _route_api_export_collection,
@@ -26,6 +32,7 @@ from postman_api_tester.handlers.job_routes import (
 )
 from postman_api_tester.handlers.page_routes import (
     adhoc_run_page as _route_adhoc_run_page,
+    collection_editor_page as _route_collection_editor_page,
     index as _route_index,
     report_view as _route_report_view,
 )
@@ -106,6 +113,11 @@ def adhoc_run_page() -> ResponseReturnValue:
     return _route_adhoc_run_page()
 
 
+@app.route("/collection-editor")
+def collection_editor_page() -> ResponseReturnValue:
+    return _route_collection_editor_page()
+
+
 @app.route("/report-view")
 def report_view() -> ResponseReturnValue:
     return _route_report_view()
@@ -139,6 +151,26 @@ def api_export_collection() -> ResponseReturnValue:
 @app.route("/api/export-collection-stream", methods=["POST"])
 def api_export_collection_stream() -> ResponseReturnValue:
     return _route_api_export_collection_stream()
+
+
+@app.route("/api/collection-editor/parse", methods=["POST"])
+def api_collection_parse() -> ResponseReturnValue:
+    return _route_api_collection_parse()
+
+
+@app.route("/api/collection-editor/save", methods=["PUT"])
+def api_collection_save() -> ResponseReturnValue:
+    return _route_api_collection_save()
+
+
+@app.route("/api/collection-editor/dependency", methods=["POST"])
+def api_collection_dependency() -> ResponseReturnValue:
+    return _route_api_collection_dependency()
+
+
+@app.route("/api/collection-editor/send", methods=["POST"])
+def api_collection_send() -> ResponseReturnValue:
+    return _route_api_collection_send()
 
 
 @app.route("/api/report-meta/<path:report_name>")

@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Collection 可视化编辑器</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        /* Header */
+        .header { background: #fff; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 20px; color: #0f172a; }
+        .header-actions { display: flex; gap: 12px; }
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; }
+        .btn-primary { background: #1d4ed8; color: #fff; }
+        .btn-primary:hover { background: #1e40af; }
+        .btn-secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+        .btn-secondary:hover { background: #eff6ff; }
+
+        /* Layout */
+        .editor-layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; min-height: calc(100vh - 140px); }
+
+        /* Sidebar */
+        .sidebar { background: #fff; border-radius: 12px; padding: 16px; overflow-y: auto; max-height: calc(100vh - 140px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; }
+        .sidebar-header h3 { font-size: 14px; color: #334155; }
+        .tree-item { padding: 8px 10px; margin: 4px 0; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+        .tree-item:hover { background: #f1f5f9; }
+        .tree-item.selected { background: #dbeafe; }
+        .tree-group { margin-left: 12px; }
+        .tree-group-title { font-weight: 600; color: #475569; padding: 6px 10px; font-size: 12px; }
+        .method-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #fff; min-width: 44px; text-align: center; }
+        .method-GET { background: #22c55e; }
+        .method-POST { background: #f59e0b; }
+        .method-PUT { background: #3b82f6; }
+        .method-PATCH { background: #8b5cf6; }
+        .method-DELETE { background: #ef4444; }
+
+        /* Editor Panel */
+        .editor-panel { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .editor-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 16px; }
+        .tab { padding: 8px 14px; border: none; background: transparent; color: #64748b; cursor: pointer; font-size: 13px; border-radius: 6px; }
+        .tab.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+        .tab:hover { background: #f8fafc; }
+
+        /* Form Fields */
+        .field { margin-bottom: 16px; }
+        .field label { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+        .field input, .field select, .field textarea { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+        /* KV Table */
+        .kv-table { width: 100%; border-collapse: collapse; }
+        .kv-table th, .kv-table td { padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .kv-table th { font-size: 12px; color: #64748b; font-weight: 600; }
+        .kv-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; }
+        .kv-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .kv-row input { flex: 1; }
+        .kv-row button { padding: 4px 8px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; }
+
+        /* Variable Panel */
+        .var-panel { margin-top: 20px; padding: 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .var-panel h4 { font-size: 13px; color: #334155; margin-bottom: 8px; }
+        .var-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: 12px; }
+        .var-ok { color: #16a34a; }
+        .var-warn { color: #d97706; }
+        .var-error { color: #dc2626; }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
+        .empty-state p { margin-top: 12px; }
+
+        /* Status Bar */
+        .status-bar { margin-top: 16px; padding: 8px 16px; background: #fff; border-radius: 8px; font-size: 12px; color: #64748b; display: flex; justify-content: space-between; }
+
+        /* Send Button Row */
+        .url-row { display: flex; gap: 8px; align-items: flex-end; }
+        .url-row .method-select { width: 110px; flex-shrink: 0; }
+        .url-row .url-input { flex: 1; }
+        .btn-send { padding: 8px 18px; background: #16a34a; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+        .btn-send:hover { background: #15803d; }
+        .btn-send:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Response Panel */
+        .response-panel { background: #fff; border-radius: 12px; margin-top: 16px; padding: 16px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .response-panel.hidden { display: none; }
+        .response-summary { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        .response-status { padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; color: #fff; }
+        .response-status.s2xx { background: #16a34a; }
+        .response-status.s3xx { background: #2563eb; }
+        .response-status.s4xx { background: #d97706; }
+        .response-status.s5xx { background: #dc2626; }
+        .response-meta { color: #64748b; font-size: 12px; }
+
+        /* Response Tabs */
+        .resp-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px; }
+        .resp-tab { padding: 6px 12px; border: none; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; border-radius: 5px; }
+        .resp-tab.active { background: #f0fdf4; color: #16a34a; font-weight: 600; }
+
+        /* JSON Tree */
+        .json-tree { font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.7; background: #f8fafc; border-radius: 6px; padding: 12px; max-height: 500px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+        .json-key { color: #8b5cf6; }
+        .json-str { color: #16a34a; }
+        .json-num { color: #2563eb; }
+        .json-bool { color: #d97706; }
+        .json-null { color: #94a3b8; }
+        .json-toggle { cursor: pointer; user-select: none; color: #64748b; display: inline-block; width: 14px; }
+        .json-collapsed > .json-children { display: none; }
+        .json-collapsed > .json-ellipsis { display: inline; }
+        .json-ellipsis { display: none; color: #94a3b8; }
+        .json-extract-btn { display: none; margin-left: 8px; padding: 1px 6px; font-size: 10px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; border-radius: 3px; cursor: pointer; vertical-align: middle; }
+        .json-line:hover > .json-extract-btn { display: inline; }
+
+        /* Response Headers Table */
+        .resp-headers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .resp-headers-table th, .resp-headers-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .resp-headers-table th { color: #64748b; font-weight: 600; }
+        .resp-headers-table td:first-child { color: #8b5cf6; font-weight: 600; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Collection 可视化编辑器</h1>
+            <div class="header-actions">
+                <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileUpload(event)">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📂 导入 JSON</button>
+                <button type="button" class="btn btn-secondary" onclick="exportCollection()">💾 导出 JSON</button>
+                <button type="button" class="btn btn-primary" onclick="executeCollection()">▶ 执行</button>
+                <button type="button" class="btn btn-secondary" onclick="clearRuntimeVars()" title="清除运行时变量池">🧹 清除变量</button>
+                <a class="btn btn-secondary" href="/" style="text-decoration:none;">← 返回首页</a>
+            </div>
+        </div>
+
+        <!-- Editor Layout -->
+        <div class="editor-layout">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h3>接口列表</h3>
+                    <span id="requestCount" style="font-size:12px;color:#64748b;">0 个接口</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+                    <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+                        <input type="checkbox" id="selectAllCb" onchange="toggleSelectAll(this.checked)"> 全选
+                    </label>
+                    <button type="button" class="btn btn-secondary" style="font-size:11px;padding:4px 8px;margin-left:auto;" onclick="deleteSelected()">🗑 删除选中</button>
+                </div>
+                <div id="treeContainer">
+                    <div class="empty-state">
+                        <p>📂 点击"导入 JSON"加载 Collection 文件</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor + Response Column -->
+            <div style="display:flex;flex-direction:column;min-width:0;">
+                <div class="editor-panel" style="flex:1;">
+                    <div id="editorContent">
+                        <div class="empty-state">
+                            <p> 从左侧选择一个接口进行编辑</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="responsePanel" class="response-panel hidden">
+                    <div id="responseContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span id="statusMessage">就绪</span>
+            <span id="varStatus"></span>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let state = {
+            collection: null,
+            allRequests: [],
+            currentRequestId: null,
+            editBuffer: null,
+            lastResponse: null,
+            lastResponseTab: 'body',
+            selectedIds: new Set(),
+            runtimeVars: {},
+        };
+
+        // Methods
+        const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+        // File Upload
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            setStatus('正在解析...');
+            try {
+                const resp = await fetch('/api/collection-editor/parse', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    state.collection = data;
+                    state.allRequests = collectAllRequests(data.groups);
+                    state.selectedIds = new Set();
+                    state.runtimeVars = {};
+                    renderTree();
+                    setStatus(`已加载 ${state.allRequests.length} 个接口`);
+                } else {
+                    setStatus('解析失败：' + (data.details || data.message || '未知错误'), 'error');
+                }
+            } catch (e) {
+                setStatus('请求失败：' + e.message, 'error');
+            }
+        }
+
+        // Collect all requests from tree
+        function collectAllRequests(groups) {
+            const requests = [];
+            function walk(gs) {
+                for (const g of gs) {
+                    for (const req of (g.requests || [])) {
+                        requests.push(req);
+                    }
+                    walk(g.subgroups || []);
+                }
+            }
+            walk(groups);
+            return requests;
+        }
+
+        // Render Tree
+        function renderTree() {
+            const container = document.getElementById('treeContainer');
+            const groups = state.collection?.groups || [];
+            document.getElementById('requestCount').textContent = `${state.allRequests.length} 个接口`;
+
+            let html = '';
+            for (const g of groups) {
+                html += renderGroup(g, 0);
+            }
+            container.innerHTML = html || '<div class="empty-state"><p>暂无接口</p></div>';
+        }
+
+        function renderGroup(group, depth) {
+            let html = '';
+            if (group.group_name) {
+                html += `<div class="tree-group-title" style="margin-left:${depth * 12}px;">📁 ${escapeHtml(group.group_name)}</div>`;
+            }
+            for (const req of (group.requests || [])) {
+                const checked = state.selectedIds?.has(req.id) ? 'checked' : '';
+                html += `<div class="tree-item ${state.currentRequestId === req.id ? 'selected' : ''}"
+                    style="margin-left:${(depth + 1) * 12}px;"
+                    onclick="selectRequest('${req.id}')">
+                    <input type="checkbox" ${checked} onclick="event.stopPropagation();toggleSelect('${req.id}', this.checked)" style="margin-right:4px;">
+                    <span class="method-badge method-${req.method}">${req.method}</span>
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(req.name || req.url || '未命名')}</span>
+                </div>`;
+            }
+            for (const sg of (group.subgroups || [])) {
+                html += renderGroup(sg, depth + 1);
+            }
+            return html;
+        }
+
+        // Select Request
+        function selectRequest(reqId) {
+            state.currentRequestId = reqId;
+            const req = state.allRequests.find(r => r.id === reqId);
+            if (req) {
+                state.editBuffer = JSON.parse(JSON.stringify(req));
+                renderEditor();
+                renderTree(); // Update selected highlight
+            }
+        }
+
+        // Render Editor
+        function renderEditor() {
+            const req = state.editBuffer;
+            if (!req) {
+                document.getElementById('editorContent').innerHTML = '<div class="empty-state"><p>👈 从左侧选择一个接口进行编辑</p></div>';
+                return;
+            }
+
+            const container = document.getElementById('editorContent');
+            container.innerHTML = `
+                <div class="editor-tabs">
+                    <button type="button" class="tab active" onclick="switchTab('general', this)">General</button>
+                    <button type="button" class="tab" onclick="switchTab('headers', this)">Headers</button>
+                    <button type="button" class="tab" onclick="switchTab('params', this)">Params</button>
+                    <button type="button" class="tab" onclick="switchTab('body', this)">Body</button>
+                    <button type="button" class="tab" onclick="switchTab('extract', this)">x_extract</button>
+                </div>
+                <div id="tabContent">${renderGeneralTab(req)}</div>
+            `;
+        }
+
+        // Tab Switching
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            const req = state.editBuffer;
+            const content = document.getElementById('tabContent');
+
+            switch(tabName) {
+                case 'general': content.innerHTML = renderGeneralTab(req); break;
+                case 'headers': content.innerHTML = renderKVTab(req.headers || [], 'headers'); break;
+                case 'params': content.innerHTML = renderKVTab(req.params || [], 'params'); break;
+                case 'body': content.innerHTML = renderBodyTab(req); break;
+                case 'extract': content.innerHTML = renderExtractTab(req); break;
+            }
+        }
+
+        // General Tab
+        function renderGeneralTab(req) {
+            return `
+                <div class="field">
+                    <label>接口名称</label>
+                    <input type="text" value="${escapeAttr(req.name || '')}" onchange="updateField('name', this.value)">
+                </div>
+                <div class="field">
+                    <label>请求</label>
+                    <div class="url-row">
+                        <select class="method-select" onchange="updateField('method', this.value)">
+                            ${METHODS.map(m => `<option value="${m}" ${req.method === m ? 'selected' : ''}>${m}</option>`).join('')}
+                        </select>
+                        <input class="url-input" type="text" value="${escapeAttr(req.url || '')}" onchange="updateField('url', this.value)" placeholder="{{baseUrl}}/api/path">
+                        <button type="button" class="btn-send" id="sendBtn" onclick="sendCurrentRequest()" title="发送请求并查看响应">Send</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>描述（可选）</label>
+                    <textarea rows="2" onchange="updateField('description', this.value)">${escapeHtml(req.description || '')}</textarea>
+                </div>
+            `;
+        }
+
+        // KV Tab (Headers/Params)
+        function renderKVTab(kvs, field) {
+            let html = '<div style="margin-bottom:12px;">';
+            for (let i = 0; i < kvs.length; i++) {
+                const kv = kvs[i];
+                html += `<div class="kv-row">
+                    <input type="text" placeholder="Key" value="${escapeAttr(kv.key || '')}" onchange="updateKV('${field}', ${i}, 'key', this.value)">
+                    <input type="text" placeholder="Value" value="${escapeAttr(kv.value || '')}" onchange="updateKV('${field}', ${i}, 'value', this.value)">
+                    <button type="button" onclick="removeKV('${field}', ${i})"></button>
+                </div>`;
+            }
+            html += '</div>';
+            html += `<button type="button" class="btn btn-secondary" onclick="addKV('${field}')" style="font-size:12px;">+ 添加</button>`;
+            return html;
+        }
+
+        // Body Tab
+        function renderBodyTab(req) {
+            const modes = ['none', 'raw', 'urlencoded', 'formdata', 'graphql', 'binary'];
+            const bodyData = req.body_data || {};
+            let content = '';
+
+            if (req.body_mode === 'raw') {
+                content = `<textarea rows="8" onchange="updateBodyContent(this.value)">${escapeHtml(bodyData.content || '')}</textarea>`;
+            } else if (req.body_mode === 'urlencoded' || req.body_mode === 'formdata') {
+                const data = bodyData.data || [];
+                content = '<div style="margin-bottom:12px;">';
+                for (let i = 0; i < data.length; i++) {
+                    content += `<div class="kv-row">
+                        <input type="text" placeholder="Key" value="${escapeAttr(data[i].key || '')}" onchange="updateBodyKV(${i}, 'key', this.value)">
+                        <input type="text" placeholder="Value" value="${escapeAttr(data[i].value || '')}" onchange="updateBodyKV(${i}, 'value', this.value)">
+                        <button type="button" onclick="removeBodyKV(${i})"></button>
+                    </div>`;
+                }
+                content += '</div>';
+                content += `<button type="button" class="btn btn-secondary" onclick="addBodyKV()" style="font-size:12px;">+ 添加</button>`;
+            } else if (req.body_mode === 'graphql') {
+                content = `<label style="font-size:12px;color:#64748b;">Query</label>
+                    <textarea rows="5" onchange="updateGraphqlField('query', this.value)">${escapeHtml(bodyData.query || '')}</textarea>
+                    <label style="font-size:12px;color:#64748b;margin-top:8px;display:block;">Variables</label>
+                    <textarea rows="3" onchange="updateGraphqlField('variables', this.value)">${escapeHtml(bodyData.variables || '')}</textarea>`;
+            }
+
+            return `
+                <div class="field">
+                    <label>Body 模式</label>
+                    <select onchange="updateBodyMode(this.value)">
+                        ${modes.map(m => `<option value="${m}" ${req.body_mode === m ? 'selected' : ''}>${m}</option>`).join('')}
+                    </select>
+                </div>
+                ${req.body_mode !== 'none' ? `<div class="field"><label>内容</label>${content}</div>` : ''}
+            `;
+        }
+
+        // x_extract Tab
+        function renderExtractTab(req) {
+            const extracts = req.x_extract || {};
+            const entries = Object.entries(extracts);
+
+            let html = '<div style="margin-bottom:12px;">';
+            for (let i = 0; i < entries.length; i++) {
+                const [key, value] = entries[i];
+                html += `<div class="kv-row">
+                    <input type="text" placeholder="变量名" value="${escapeAttr(key)}" onchange="updateExtractKey(${i}, this.value, '${escapeAttr(value)}')">
+                    <input type="text" placeholder="JSONPath (如 $.data.token)" value="${escapeAttr(value)}" onchange="updateExtractValue(${i}, '${escapeAttr(key)}', this.value)">
+                    <button type="button" onclick="removeExtract(${i})"></button>
+                </div>`;
+            }
+            html += '</div>';
+            html += `<button type="button" class="btn btn-secondary" onclick="addExtract()" style="font-size:12px;">+ 添加提取规则</button>`;
+
+            // Runtime variables pool
+            const runtimeEntries = Object.entries(state.runtimeVars || {});
+            if (runtimeEntries.length > 0) {
+                html += '<div class="var-panel"><h4>⚡ 运行时变量池（Send 后自动填充，可在后续接口的 {{变量名}} 中使用）</h4>';
+                for (const [rk, rv] of runtimeEntries) {
+                    const displayVal = typeof rv === 'string' && rv.length > 80 ? rv.substring(0, 80) + '...' : String(rv);
+                    html += `<div class="var-item var-ok">✅ ${escapeHtml(rk)} = ${escapeHtml(displayVal)}</div>`;
+                }
+                html += '</div>';
+            }
+
+            // Variable dependency info
+            html += '<div class="var-panel"><h4>📊 变量依赖分析</h4>';
+            html += '<div id="varDependencyInfo">点击"分析变量依赖"按钮加载</div>';
+            html += `<button type="button" class="btn btn-secondary" onclick="analyzeDependencies()" style="font-size:12px;margin-top:8px;"> 分析变量依赖</button>`;
+            html += '</div>';
+
+            return html;
+        }
+
+        // Update Functions
+        function updateField(field, value) {
+            if (state.editBuffer) {
+                state.editBuffer[field] = value;
+                syncToAllRequests();
+                renderTree();
+            }
+        }
+
+        function updateKV(field, index, key, value) {
+            if (state.editBuffer && state.editBuffer[field]) {
+                state.editBuffer[field][index][key] = value;
+                syncToAllRequests();
+            }
+        }
+
+        function addKV(field) {
+            if (state.editBuffer) {
+                if (!state.editBuffer[field]) state.editBuffer[field] = [];
+                state.editBuffer[field].push({key: '', value: ''});
+                renderEditor();
+            }
+        }
+
+        function removeKV(field, index) {
+            if (state.editBuffer && state.editBuffer[field]) {
+                state.editBuffer[field].splice(index, 1);
+                renderEditor();
+                syncToAllRequests();
+            }
+        }
+
+        function updateBodyMode(mode) {
+            if (state.editBuffer) {
+                state.editBuffer.body_mode = mode;
+                state.editBuffer.body_data = mode === 'none' ? null : {};
+                renderEditor();
+            }
+        }
+
+        function updateBodyContent(content) {
+            if (state.editBuffer && state.editBuffer.body_data) {
+                state.editBuffer.body_data.content = content;
+                syncToAllRequests();
+            }
+        }
+
+        function updateBodyKV(index, key, value) {
+            if (state.editBuffer && state.editBuffer.body_data?.data) {
+                state.editBuffer.body_data.data[index][key] = value;
+                syncToAllRequests();
+            }
+        }
+
+        function addBodyKV() {
+            if (state.editBuffer && state.editBuffer.body_data) {
+                if (!state.editBuffer.body_data.data) state.editBuffer.body_data.data = [];
+                state.editBuffer.body_data.data.push({key: '', value: ''});
+                renderEditor();
+            }
+        }
+
+        function removeBodyKV(index) {
+            if (state.editBuffer && state.editBuffer.body_data?.data) {
+                state.editBuffer.body_data.data.splice(index, 1);
+                renderEditor();
+                syncToAllRequests();
+            }
+        }
+
+        function updateGraphqlField(field, value) {
+            if (state.editBuffer && state.editBuffer.body_data) {
+                state.editBuffer.body_data[field] = value;
+                syncToAllRequests();
+            }
+        }
+
+        function updateExtractKey(index, newKey, oldValue) {
+            if (state.editBuffer) {
+                const extracts = state.editBuffer.x_extract || {};
+                const entries = Object.entries(extracts);
+                if (entries[index]) {
+                    delete extracts[entries[index][0]];
+                    extracts[newKey] = oldValue;
+                    state.editBuffer.x_extract = extracts;
+                    syncToAllRequests();
+                    renderEditor();
+                }
+            }
+        }
+
+        function updateExtractValue(index, oldKey, newValue) {
+            if (state.editBuffer && state.editBuffer.x_extract) {
+                state.editBuffer.x_extract[oldKey] = newValue;
+                syncToAllRequests();
+            }
+        }
+
+        function addExtract() {
+            if (state.editBuffer) {
+                if (!state.editBuffer.x_extract) state.editBuffer.x_extract = {};
+                const varName = prompt('变量名：');
+                if (varName) {
+                    const jsonPath = prompt('JSONPath 表达式（如 $.data.token）：');
+                    if (jsonPath) {
+                        state.editBuffer.x_extract[varName] = jsonPath;
+                        syncToAllRequests();
+                        renderEditor();
+                    }
+                }
+            }
+        }
+
+        function removeExtract(index) {
+            if (state.editBuffer && state.editBuffer.x_extract) {
+                const entries = Object.entries(state.editBuffer.x_extract);
+                if (entries[index]) {
+                    delete state.editBuffer.x_extract[entries[index][0]];
+                    syncToAllRequests();
+                    renderEditor();
+                }
+            }
+        }
+
+        // Sync edit buffer back to allRequests
+        function syncToAllRequests() {
+            if (!state.editBuffer) return;
+            const idx = state.allRequests.findIndex(r => r.id === state.editBuffer.id);
+            if (idx >= 0) {
+                state.allRequests[idx] = JSON.parse(JSON.stringify(state.editBuffer));
+            }
+            // Also sync back to collection.groups
+            syncToCollectionGroups();
+        }
+
+        function syncToCollectionGroups() {
+            if (!state.collection) return;
+            function walk(gs) {
+                for (const g of gs) {
+                    for (let i = 0; i < g.requests.length; i++) {
+                        const req = state.allRequests.find(r => r.id === g.requests[i].id);
+                        if (req) g.requests[i] = req;
+                    }
+                    walk(g.subgroups || []);
+                }
+            }
+            walk(state.collection.groups || []);
+        }
+
+        function toggleSelect(reqId, checked) {
+            if (checked) {
+                state.selectedIds.add(reqId);
+            } else {
+                state.selectedIds.delete(reqId);
+            }
+            updateSelectAllState();
+        }
+
+        function toggleSelectAll(checked) {
+            if (checked) {
+                for (const r of state.allRequests) state.selectedIds.add(r.id);
+            } else {
+                state.selectedIds.clear();
+            }
+            renderTree();
+        }
+
+        function updateSelectAllState() {
+            const cb = document.getElementById('selectAllCb');
+            if (cb) cb.checked = state.allRequests.length > 0 && state.selectedIds.size === state.allRequests.length;
+        }
+
+        function deleteSelected() {
+            if (!state.collection || state.selectedIds.size === 0) {
+                setStatus('请先选择要删除的接口', 'error');
+                return;
+            }
+            if (!confirm(`确定删除选中的 ${state.selectedIds.size} 个接口？`)) return;
+
+            const ids = state.selectedIds;
+            state.allRequests = state.allRequests.filter(r => !ids.has(r.id));
+            function removeFromGroups(gs) {
+                for (const g of gs) {
+                    g.requests = g.requests.filter(r => !ids.has(r.id));
+                    removeFromGroups(g.subgroups || []);
+                }
+            }
+            removeFromGroups(state.collection.groups || []);
+
+            if (ids.has(state.currentRequestId)) {
+                state.currentRequestId = null;
+                state.editBuffer = null;
+                renderEditor();
+            }
+            state.selectedIds.clear();
+            renderTree();
+            setStatus(`已删除 ${ids.size} 个接口，剩余 ${state.allRequests.length} 个接口`);
+        }
+
+        // Analyze Dependencies
+        async function analyzeDependencies() {
+            if (!state.collection) return;
+            setStatus('正在分析变量依赖...');
+            try {
+                const resp = await fetch('/api/collection-editor/dependency', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({groups: state.collection.groups}),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    renderDependencyInfo(data);
+                    setStatus('变量依赖分析完成');
+                } else {
+                    setStatus('分析失败：' + (data.details || data.message || ''), 'error');
+                }
+            } catch (e) {
+                setStatus('请求失败：' + e.message, 'error');
+            }
+        }
+
+        // Build request id → {name, method} map
+        function buildRequestMap() {
+            const map = {};
+            function walk(gs) {
+                for (const g of gs) {
+                    for (const r of (g.requests || [])) {
+                        map[r.id] = {name: r.name || r.url || '未命名', method: r.method || ''};
+                    }
+                    walk(g.subgroups || []);
+                }
+            }
+            walk(state.collection?.groups || []);
+            return map;
+        }
+
+        function reqLink(reqId, map) {
+            const info = map[reqId];
+            if (!info) return escapeHtml(reqId);
+            return `<a href="javascript:void(0)" onclick="selectRequest('${reqId}')" style="color:#1d4ed8;text-decoration:none;" title="跳转到该接口">${escapeHtml(info.name)}</a>`;
+        }
+
+        function renderDependencyInfo(result) {
+            const produced = result.produced || {};
+            const consumed = result.consumed || {};
+            const warnings = result.warnings || [];
+            const reqMap = buildRequestMap();
+
+            let html = '';
+            const allVars = new Set([...Object.keys(produced), ...Object.keys(consumed)]);
+
+            if (allVars.size > 0) {
+                html += '<table style="width:100%;font-size:12px;border-collapse:collapse;">';
+                html += '<thead><tr style="color:#64748b;border-bottom:1px solid #e2e8f0;"><th style="text-align:left;padding:4px 6px;">变量</th><th style="text-align:left;padding:4px 6px;">生产接口</th><th style="text-align:left;padding:4px 6px;">消费接口</th></tr></thead><tbody>';
+                for (const v of allVars) {
+                    const producer = produced[v];
+                    const consumer = consumed[v];
+                    const hasWarning = warnings.some(w => w.var_name === v);
+
+                    const producerCell = producer
+                        ? reqLink(producer.by_request, reqMap)
+                        : '<span style="color:#dc2626;">未定义</span>';
+
+                    let consumerCell = '-';
+                    if (consumer && consumer.by_requests.length > 0) {
+                        consumerCell = consumer.by_requests.map(r => reqLink(r.request_id, reqMap)).join('、');
+                    }
+
+                    const rowClass = hasWarning ? 'var-warn' : 'var-ok';
+                    html += `<tr class="${rowClass}" style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:5px 6px;font-weight:600;">${hasWarning ? '⚠️' : '✅'} ${escapeHtml(v)}</td>
+                        <td style="padding:5px 6px;">${producerCell}</td>
+                        <td style="padding:5px 6px;">${consumerCell}</td>
+                    </tr>`;
+                }
+                html += '</tbody></table>';
+            } else {
+                html = '<div style="color:#64748b;">暂无变量依赖关系</div>';
+            }
+
+            document.getElementById('varDependencyInfo').innerHTML = html;
+
+            const producedVars = Object.keys(produced);
+            const consumedVars = Object.keys(consumed);
+            document.getElementById('varStatus').textContent = `变量：${allVars.size} 生产：${producedVars.length} 消费：${consumedVars.length} 警告：${warnings.length}`;
+        }
+
+        // Export Collection
+        async function exportCollection() {
+            if (!state.collection) {
+                setStatus('请先导入 Collection', 'error');
+                return;
+            }
+
+            setStatus('正在导出...');
+            try {
+                const resp = await fetch('/api/collection-editor/save', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(state.collection),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    const jsonStr = JSON.stringify(data.collection_json, null, 2);
+                    const blob = new Blob([jsonStr], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${state.collection.collection_info.name || 'collection'}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setStatus('导出成功');
+                } else {
+                    setStatus('导出失败：' + (data.details || data.message || ''), 'error');
+                }
+            } catch (e) {
+                setStatus('请求失败：' + e.message, 'error');
+            }
+        }
+
+        // Execute Collection
+        async function executeCollection() {
+            if (!state.collection) {
+                setStatus('请先导入 Collection', 'error');
+                return;
+            }
+
+            setStatus('正在提交执行任务...');
+            try {
+                const resp = await fetch('/api/collection-editor/save', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(state.collection),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    const jsonStr = JSON.stringify(data.collection_json);
+                    const blob = new Blob([jsonStr], {type: 'application/json'});
+                    const formData = new FormData();
+                    formData.append('file', blob, 'collection.json');
+
+                    const runResp = await fetch('/api/run-postman', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    const runData = await runResp.json();
+                    if (runResp.ok && runData.job_id) {
+                        setStatus('执行任务已提交，正在跳转到状态页...');
+                        setTimeout(() => {
+                            window.location.href = `/api/run-postman-status/${runData.job_id}`;
+                        }, 1000);
+                    } else {
+                        setStatus('执行提交失败：' + (runData.details || runData.message || ''), 'error');
+                    }
+                } else {
+                    setStatus('保存失败：' + (data.details || data.message || ''), 'error');
+                }
+            } catch (e) {
+                setStatus('请求失败：' + e.message, 'error');
+            }
+        }
+
+        // Evaluate a JSONPath-like expression against data
+        // Supports: $.field.nested, $.array[0], $.arr[-1], $header.Name
+        function evaluateJsonPath(expr, data, headers) {
+            if (!expr || typeof expr !== 'string') return undefined;
+            expr = expr.trim();
+
+            // Header extraction: $header.HeaderName
+            if (expr.startsWith('$header.')) {
+                const hName = expr.substring(8);
+                if (!headers) return undefined;
+                for (const [k, v] of Object.entries(headers)) {
+                    if (k.toLowerCase() === hName.toLowerCase()) return String(v);
+                }
+                return undefined;
+            }
+
+            // Body extraction: $.field.nested[0]
+            if (!expr.startsWith('$.')) return undefined;
+            const path = expr.substring(2);
+            const segments = path.split('.');
+            let current = data;
+            for (const seg of segments) {
+                if (current === null || current === undefined) return undefined;
+                // Handle array index: field[0] or field[-1]
+                const arrMatch = seg.match(/^(.+?)\[(.+?)\]$/);
+                if (arrMatch) {
+                    const key = arrMatch[1];
+                    const idxStr = arrMatch[2];
+                    if (key) current = current[key];
+                    if (current === null || current === undefined) return undefined;
+                    if (!Array.isArray(current)) return undefined;
+                    let idx = parseInt(idxStr, 10);
+                    if (idx < 0) idx = current.length + idx;
+                    current = current[idx];
+                } else {
+                    // Plain key or standalone index like [0]
+                    const idxOnly = seg.match(/^\[(.+?)\]$/);
+                    if (idxOnly) {
+                        if (!Array.isArray(current)) return undefined;
+                        let idx = parseInt(idxOnly[1], 10);
+                        if (idx < 0) idx = current.length + idx;
+                        current = current[idx];
+                    } else {
+                        current = current[seg];
+                    }
+                }
+            }
+            return current;
+        }
+
+        // Apply x_extract rules from the current request to the response
+        function applyExtractRules(responseData) {
+            if (!state.editBuffer?.x_extract) return;
+            const extracts = state.editBuffer.x_extract;
+            const body = responseData.response_body;
+            const headers = responseData.response_headers || {};
+            for (const [varName, expr] of Object.entries(extracts)) {
+                const value = evaluateJsonPath(expr, body, headers);
+                if (value !== undefined && value !== null) {
+                    state.runtimeVars[varName] = typeof value === 'object' ? JSON.stringify(value) : value;
+                }
+            }
+        }
+
+        function clearRuntimeVars() {
+            state.runtimeVars = {};
+            setStatus('运行时变量池已清除');
+            if (state.editBuffer) renderEditor();
+        }
+
+        // Collect variables from collection presets
+        function collectVariables() {
+            const vars = {};
+            const presetVars = state.collection?.collection_info?.variables || [];
+            for (const v of presetVars) {
+                if (v && v.key && v.value !== undefined) {
+                    vars[v.key] = String(v.value);
+                }
+            }
+            for (const [k, v] of Object.entries(state.runtimeVars || {})) {
+                vars[k] = String(v);
+            }
+            return vars;
+        }
+
+        // Send Current Request
+        async function sendCurrentRequest() {
+            if (!state.editBuffer) return;
+
+            const sendBtn = document.getElementById('sendBtn');
+            if (sendBtn) {
+                sendBtn.disabled = true;
+                sendBtn.textContent = '...';
+            }
+            setStatus('正在发送请求...');
+
+            try {
+                const resp = await fetch('/api/collection-editor/send', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        request: state.editBuffer,
+                        variables: collectVariables(),
+                    }),
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    state.lastResponse = data;
+                    state.lastResponseTab = 'body';
+                    showResponsePanel();
+                    applyExtractRules(data);
+                    const extracted = Object.keys(state.runtimeVars).length;
+                    setStatus(`请求完成 ${data.status_code}  ${data.elapsed_ms}ms  ·  运行时变量 ${extracted} 个`);
+                } else {
+                    setStatus('请求失败：' + (data.details || data.message || '未知错误'), 'error');
+                }
+            } catch (e) {
+                setStatus('网络错误：' + e.message, 'error');
+            } finally {
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = 'Send';
+                }
+            }
+        }
+
+        // Show Response Panel
+        function showResponsePanel() {
+            const panel = document.getElementById('responsePanel');
+            panel.classList.remove('hidden');
+            renderResponseContent();
+        }
+
+        // Render Response Content
+        function renderResponseContent() {
+            const data = state.lastResponse;
+            if (!data) return;
+
+            const sc = data.status_code || 0;
+            const statusClass = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : sc >= 300 ? 's3xx' : 's2xx';
+            const bodySize = JSON.stringify(data.response_body || '').length;
+            const sizeStr = bodySize > 1024 ? (bodySize / 1024).toFixed(1) + ' KB' : bodySize + ' B';
+
+            const tab = state.lastResponseTab || 'body';
+            let bodyHtml = '';
+            if (tab === 'body') {
+                bodyHtml = renderResponseBody(data.response_body);
+            } else {
+                bodyHtml = renderResponseHeaders(data.response_headers || {});
+            }
+
+            document.getElementById('responseContent').innerHTML = `
+                <div class="response-summary">
+                    <span>Response</span>
+                    <span class="response-status ${statusClass}">${sc}</span>
+                    <span class="response-meta">${data.elapsed_ms}ms  ·  ${sizeStr}</span>
+                    ${data.actual_request_url ? `<span class="response-meta" title="${escapeAttr(data.actual_request_url)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(data.actual_request_url)}</span>` : ''}
+                </div>
+                <div class="resp-tabs">
+                    <button type="button" class="resp-tab ${tab === 'body' ? 'active' : ''}" onclick="switchResponseTab('body')">Body</button>
+                    <button type="button" class="resp-tab ${tab === 'headers' ? 'active' : ''}" onclick="switchResponseTab('headers')">Headers</button>
+                </div>
+                ${bodyHtml}
+            `;
+        }
+
+        function switchResponseTab(tab) {
+            state.lastResponseTab = tab;
+            renderResponseContent();
+        }
+
+        // Render Response Body
+        function renderResponseBody(body) {
+            if (body === null || body === undefined) {
+                return '<div class="json-tree" style="color:#94a3b8;">(empty body)</div>';
+            }
+            if (typeof body === 'string') {
+                try {
+                    body = JSON.parse(body);
+                } catch (e) {
+                    return `<div class="json-tree">${escapeHtml(body)}</div>`;
+                }
+            }
+            return `<div class="json-tree">${renderJsonNode(body, '$', true)}</div>`;
+        }
+
+        // Render JSON node recursively
+        function renderJsonNode(value, path, isRoot) {
+            if (value === null) {
+                return `<span class="json-null">null</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+            }
+            if (typeof value === 'boolean') {
+                return `<span class="json-bool">${value}</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+            }
+            if (typeof value === 'number') {
+                return `<span class="json-num">${value}</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+            }
+            if (typeof value === 'string') {
+                return `<span class="json-str">"${escapeHtml(value)}"</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+            }
+            if (Array.isArray(value)) {
+                if (value.length === 0) return '<span style="color:#94a3b8;">[]</span>';
+                let html = `<span class="json-toggle" onclick="toggleJsonNode(this)">▼</span>[\n`;
+                html += `<span class="json-children">`;
+                for (let i = 0; i < value.length; i++) {
+                    const childPath = `${path}[${i}]`;
+                    html += `  <span class="json-line">${renderJsonNode(value[i], childPath, false)}</span>${i < value.length - 1 ? ',' : ''}\n`;
+                }
+                html += `</span>]`;
+                html += `<span class="json-ellipsis">[${value.length}]</span>`;
+                return html;
+            }
+            if (typeof value === 'object') {
+                const keys = Object.keys(value);
+                if (keys.length === 0) return '<span style="color:#94a3b8;">{}</span>';
+                let html = `<span class="json-toggle" onclick="toggleJsonNode(this)">▼</span>{\n`;
+                html += `<span class="json-children">`;
+                for (let i = 0; i < keys.length; i++) {
+                    const k = keys[i];
+                    const childPath = `${path}.${k}`;
+                    html += `  <span class="json-line"><span class="json-key">"${escapeHtml(k)}"</span>: ${renderJsonNode(value[k], childPath, false)}</span>${i < keys.length - 1 ? ',' : ''}\n`;
+                }
+                html += `</span>}`;
+                html += `<span class="json-ellipsis">{${keys.length}}</span>`;
+                return html;
+            }
+            return escapeHtml(String(value));
+        }
+
+        function toggleJsonNode(toggleEl) {
+            const parent = toggleEl.parentElement;
+            const isCollapsed = parent.classList.toggle('json-collapsed');
+            toggleEl.textContent = isCollapsed ? '▶' : '▼';
+        }
+
+        // Render Response Headers
+        function renderResponseHeaders(headers) {
+            const entries = Object.entries(headers);
+            if (!entries.length) return '<div style="color:#94a3b8;font-size:12px;padding:10px;">(no headers)</div>';
+            let html = '<table class="resp-headers-table"><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody>';
+            for (const [k, v] of entries) {
+                html += `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(v))}</td></tr>`;
+            }
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // Extract from response: add JSONPath to x_extract
+        function extractFromResponse(jsonPath) {
+            const varName = prompt(`为 ${jsonPath} 输入变量名:`, '');
+            if (!varName || !varName.trim()) return;
+            const name = varName.trim();
+
+            if (!state.editBuffer) return;
+            if (!state.editBuffer.x_extract) state.editBuffer.x_extract = {};
+            state.editBuffer.x_extract[name] = jsonPath;
+
+            syncToAllRequests();
+            syncToCollectionGroups();
+            setStatus(`已添加提取规则：${name} = ${jsonPath}`);
+
+            const panel = document.getElementById('responsePanel');
+            panel.classList.add('hidden');
+            state.lastResponse = null;
+
+            const extractTab = document.querySelector('.tab:last-child');
+            if (extractTab) switchTab('extract', extractTab);
+        }
+
+        // Utility: Set Status
+        function setStatus(msg, type = 'info') {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.style.color = type === 'error' ? '#dc2626' : '#64748b';
+        }
+
+        // Utility: Escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function escapeAttr(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+    </script>
+</body>
+</html>
