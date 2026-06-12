@@ -19,7 +19,9 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Dict, List, Optional, Tuple, TypedDict, Union
+from typing import Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING, Union
+if TYPE_CHECKING:
+    from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.session import RequestTimeout
 
 try:
@@ -42,6 +44,20 @@ JsonObject = Dict[str, object]
 AssertionResult = Dict[str, object]
 
 
+def _safe_int(value: object) -> int:
+    """安全转换值为 int，失败时返回 0。"""
+    if value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (str, bytes, bytearray)):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return 0
+    return 0
+
+
 # === 类型定义 ===
 class TestResultRecord(TypedDict, total=False):
     """单个API测试结果记录（TypedDict 便于外部消费）"""
@@ -62,6 +78,8 @@ class TestResultRecord(TypedDict, total=False):
     assertion_results: List[AssertionResult]
     assertion_engine_error: str
     db_feedback: JsonObject
+    data_index: int
+    extracted_variables: Dict[str, str]
 
 
 class RequestInfo(TypedDict, total=False):
@@ -88,6 +106,7 @@ class PostmanTestExecutor:
         request_timeout: Optional[RequestTimeout] = None,
         assertion_strict_mode: bool = False,
         judgment_config: Optional[Dict[str, object]] = None,
+        variable_context: Optional["VariableContext"] = None,
     ) -> None:
         """
         初始化执行器
@@ -97,12 +116,14 @@ class PostmanTestExecutor:
                         传入时本实例不拥有该 Session，execute_test 结束后不关闭它。
         :param request_timeout: 请求超时配置（connect_timeout, read_timeout）
         :param judgment_config: 任务级结果判定配置（可选），支持覆盖全局与集合配置
+        :param variable_context: 可选的 VariableContext 实例，用于变量提取与替换
         """
         import requests as _requests_mod
         self.api_config = dict(api_config)
         self.http_response: Optional[object] = None
         self.resp_status_code: Optional[int] = None
         self.response_data: Optional[object] = None
+        self.variable_context: Optional["VariableContext"] = variable_context
         # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
         self._owns_session = session is None
         self.session: object = session if session is not None else _requests_mod.Session()
@@ -161,11 +182,20 @@ class PostmanTestExecutor:
             'response_info': response_info or default_response_info,
             'assertion_results': [],
             'assertion_engine_error': '',
+            'data_index': _safe_int(api.get('data_index')),
+            'extracted_variables': {},
         }
 
     def execute_test(self) -> TestResultRecord:
         """执行单个API测试，返回标准化结果记录"""
-        api = self.api_config
+        from typing import cast
+        api: ApiConfig = cast(ApiConfig, self.api_config)
+
+        if self.variable_context is not None:
+            from postman_api_tester.utils.variable_substitution import substitute_in_api_config
+            api = substitute_in_api_config(api, self.variable_context.variables)
+            self.api_config = dict(api)
+
         method = str(api.get('method') or 'GET').lower()
         raw_url = str(api.get('full_url') or '')  # 使用完整URL
         raw_headers = api.get('headers')
@@ -243,6 +273,16 @@ class PostmanTestExecutor:
                 'body': self.response_data
             }
 
+            extracted_variables: Dict[str, str] = {}
+            if self.variable_context is not None:
+                raw_extract = api.get('x_extract')
+                if isinstance(raw_extract, dict) and raw_extract:
+                    extracted_variables = self.variable_context.update_from_extract(
+                        raw_extract,
+                        self.response_data,
+                        dict(response.headers),
+                    )
+
             # 可配置结果判定：优先级 任务级 > 集合接口级 x_* > 全局 config > 内置默认
             task_jcfg = self.judgment_config or {}
 
@@ -310,6 +350,7 @@ class PostmanTestExecutor:
                 )
                 result['assertion_results'] = assertion_results
                 result['assertion_engine_error'] = assertion_engine_error
+                result['extracted_variables'] = extracted_variables
                 return result
             else:
                 db_feedback = build_db_feedback(
@@ -334,6 +375,7 @@ class PostmanTestExecutor:
                     response_info=response_info,
                 )
                 result['db_feedback'] = db_feedback
+                result['extracted_variables'] = extracted_variables
                 return result
 
         except Exception as e:
