@@ -1,12 +1,9 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""报告中心兼容启动器。
+"""报告中心包级启动入口。
 
 用法:
-    python report_server.py
+    python -m postman_api_tester
 
-访问地址:
-    http://127.0.0.1:5000
+等效于原根目录 python report_server.py。
 """
 
 from postman_api_tester.report_server import app

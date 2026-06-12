@@ -54,6 +54,7 @@ files = [
 	"postman_api_tester/exceptions.py",
 	"postman_api_tester/config.py",
 	"postman_api_tester/__init__.py",
+	"postman_api_tester/__main__.py",
 	"postman_api_tester/handlers/__init__.py",
 	"postman_api_tester/services/__init__.py",
 	"postman_api_tester/utils/__init__.py",
