@@ -141,6 +141,16 @@
         .exec-result a:hover { text-decoration: underline; }
         .exec-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
         .exec-modal-actions .btn { padding: 8px 20px; }
+
+        /* Variable Autocomplete */
+        .var-autocomplete { display: none; position: fixed; z-index: 2000; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 220px; overflow-y: auto; min-width: 200px; max-width: 340px; }
+        .var-autocomplete.visible { display: block; }
+        .var-ac-item { padding: 7px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .var-ac-item:hover, .var-ac-item.active { background: #eff6ff; }
+        .var-ac-name { font-family: Consolas, monospace; color: #1d4ed8; font-weight: 600; }
+        .var-ac-value { color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+        .var-ac-source { font-size: 10px; color: #94a3b8; padding: 1px 5px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; }
+        .var-ac-empty { padding: 10px 12px; color: #94a3b8; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -200,6 +210,9 @@
             <span id="varStatus"></span>
         </div>
     </div>
+
+    <!-- Variable Autocomplete -->
+    <div class="var-autocomplete" id="varAutocomplete"></div>
 
     <!-- Execution Modal -->
     <div class="exec-modal-overlay" id="execModal">
@@ -1363,6 +1376,192 @@
             if (!str) return '';
             return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
+
+        // Variable Autocomplete
+        const acState = {
+            active: false,
+            targetEl: null,
+            triggerIdx: -1,
+            items: [],
+            selectedIdx: 0,
+        };
+
+        function collectAllVariables() {
+            const vars = [];
+            const seen = new Set();
+
+            // Collection preset variables
+            const colVars = (state.collection?.collection_info?.variables) || [];
+            if (Array.isArray(colVars)) {
+                for (const v of colVars) {
+                    if (v && v.key && !seen.has(v.key)) {
+                        seen.add(v.key);
+                        vars.push({ name: v.key, value: v.value || '', source: '预置' });
+                    }
+                }
+            }
+
+            // Runtime variables (from x_extract)
+            for (const [k, v] of Object.entries(state.runtimeVars || {})) {
+                if (!seen.has(k)) {
+                    seen.add(k);
+                    vars.push({ name: k, value: String(v), source: '运行时' });
+                }
+            }
+
+            // Variables from x_extract of all requests (not yet extracted)
+            for (const req of state.allRequests || []) {
+                const extracts = req.x_extract || {};
+                if (typeof extracts === 'object') {
+                    for (const varName of Object.keys(extracts)) {
+                        if (!seen.has(varName)) {
+                            seen.add(varName);
+                            vars.push({ name: varName, value: extracts[varName], source: '提取规则' });
+                        }
+                    }
+                }
+            }
+
+            return vars;
+        }
+
+        function getVarAutocompleteVars(filter) {
+            const all = collectAllVariables();
+            if (!filter) return all;
+            const lower = filter.toLowerCase();
+            return all.filter(v => v.name.toLowerCase().includes(lower));
+        }
+
+        function initAutocomplete() {
+            document.addEventListener('input', handleAcInput);
+            document.addEventListener('keydown', handleAcKeydown, true);
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.var-autocomplete')) hideAutocomplete();
+            });
+        }
+
+        function handleAcInput(e) {
+            const el = e.target;
+            if (!el.matches('input[type="text"], textarea')) return;
+
+            const val = el.value;
+            const cursorPos = el.selectionStart;
+            const textBefore = val.substring(0, cursorPos);
+
+            // Find {{ without matching }}
+            const openIdx = textBefore.lastIndexOf('{{');
+            if (openIdx === -1) { hideAutocomplete(); return; }
+
+            const afterOpen = textBefore.substring(openIdx + 2);
+            // If there's a }} after {{, autocomplete is closed
+            if (afterOpen.includes('}}')) { hideAutocomplete(); return; }
+            // Only allow alphanumeric, underscore, dot in the variable name part
+            if (!/^[a-zA-Z_0-9.]*$/.test(afterOpen)) { hideAutocomplete(); return; }
+
+            acState.targetEl = el;
+            acState.triggerIdx = openIdx;
+            const filter = afterOpen;
+            const filtered = getVarAutocompleteVars(filter);
+
+            if (filtered.length === 0) {
+                hideAutocomplete();
+                return;
+            }
+
+            acState.items = filtered;
+            acState.selectedIdx = 0;
+            acState.active = true;
+            showAutocompleteDropdown(el, filtered);
+        }
+
+        function handleAcKeydown(e) {
+            if (!acState.active) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                acState.selectedIdx = Math.min(acState.selectedIdx + 1, acState.items.length - 1);
+                updateAcHighlight();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                acState.selectedIdx = Math.max(acState.selectedIdx - 1, 0);
+                updateAcHighlight();
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                if (acState.items.length > 0) {
+                    e.preventDefault();
+                    applyAcSelection(acState.items[acState.selectedIdx].name);
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                hideAutocomplete();
+            }
+        }
+
+        function showAutocompleteDropdown(anchorEl, items) {
+            const dropdown = document.getElementById('varAutocomplete');
+            const rect = anchorEl.getBoundingClientRect();
+
+            let html = '';
+            for (let i = 0; i < items.length; i++) {
+                const v = items[i];
+                const activeClass = i === acState.selectedIdx ? ' active' : '';
+                html += `<div class="var-ac-item${activeClass}" data-idx="${i}" onclick="applyAcSelection('${escapeAttr(v.name)}')">
+                    <span>
+                        <span class="var-ac-name">{{${escapeHtml(v.name)}}}</span>
+                        <span class="var-ac-value">${escapeHtml(v.value)}</span>
+                    </span>
+                    <span class="var-ac-source">${escapeHtml(v.source)}</span>
+                </div>`;
+            }
+            dropdown.innerHTML = html;
+            dropdown.style.left = rect.left + 'px';
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+            dropdown.style.width = Math.max(rect.width, 200) + 'px';
+            dropdown.classList.add('visible');
+        }
+
+        function updateAcHighlight() {
+            const dropdown = document.getElementById('varAutocomplete');
+            dropdown.querySelectorAll('.var-ac-item').forEach((el, idx) => {
+                el.classList.toggle('active', idx === acState.selectedIdx);
+            });
+            // Scroll active item into view
+            const activeItem = dropdown.querySelector('.var-ac-item.active');
+            if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+        }
+
+        function applyAcSelection(varName) {
+            const el = acState.targetEl;
+            if (!el) return;
+
+            const val = el.value;
+            const openIdx = acState.triggerIdx;
+            const cursorPos = el.selectionStart;
+            const before = val.substring(0, openIdx);
+            const after = val.substring(cursorPos);
+            el.value = before + '{{' + varName + '}}' + after;
+
+            // Trigger change event so state is updated
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // Set cursor after }}
+            const newCursorPos = before.length + 2 + varName.length + 2;
+            el.setSelectionRange(newCursorPos, newCursorPos);
+            el.focus();
+
+            hideAutocomplete();
+        }
+
+        function hideAutocomplete() {
+            acState.active = false;
+            acState.targetEl = null;
+            acState.triggerIdx = -1;
+            acState.items = [];
+            acState.selectedIdx = 0;
+            document.getElementById('varAutocomplete').classList.remove('visible');
+        }
+
+        // Initialize autocomplete on page load
+        initAutocomplete();
     </script>
 </body>
 </html>
