@@ -37,6 +37,7 @@ from postman_api_tester.session import (
 )
 from postman_api_tester.runtime_utils import (
     checkpoint_file_path as _checkpoint_file_path,
+    checkpoint_key as _checkpoint_key,
     compute_collection_fingerprint as _compute_collection_fingerprint,
     item_path_text as _item_path_text,
     load_checkpoint as _load_checkpoint,
@@ -140,6 +141,7 @@ def _prepare_checkpoint_recovery(
     selected_item_paths: Optional[List[List[int]]],
     apis: List[ApiConfig],
     checkpoint_dir: str,
+    data_file: str = "",
 ) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path = ""
     collection_fingerprint = ""
@@ -149,7 +151,9 @@ def _prepare_checkpoint_recovery(
         return checkpoint_path, collection_fingerprint, executed_item_paths, apis
 
     try:
-        collection_fingerprint = _compute_collection_fingerprint(postman_file, parser_base_url, selected_item_paths)
+        collection_fingerprint = _compute_collection_fingerprint(
+            postman_file, parser_base_url, selected_item_paths, data_file=data_file,
+        )
         checkpoint_path = _checkpoint_file_path(output_dir, postman_file, collection_fingerprint, checkpoint_dir=checkpoint_dir)
         checkpoint = _load_checkpoint(checkpoint_path)
         if checkpoint:
@@ -161,7 +165,10 @@ def _prepare_checkpoint_recovery(
                     original_count = len(apis)
                     apis = [
                         api for api in apis
-                        if _item_path_text(api.get("item_path")) not in executed_item_paths
+                        if _checkpoint_key(
+                            api.get("item_path"),
+                            int(api.get("data_index", 0) or 0),
+                        ) not in executed_item_paths
                     ]
                     logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
             else:
@@ -201,6 +208,7 @@ def _resolve_checkpoint_execution_apis(
     selected_item_paths: Optional[List[List[int]]],
     apis: List[ApiConfig],
     checkpoint_dir: str,
+    data_file: str = "",
 ) -> Tuple[str, str, set[str], List[ApiConfig]]:
     apis_before_recovery = list(apis)
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_recovery(
@@ -211,6 +219,7 @@ def _resolve_checkpoint_execution_apis(
         selected_item_paths=selected_item_paths,
         apis=apis,
         checkpoint_dir=checkpoint_dir,
+        data_file=data_file,
     )
     if enable_checkpoint_recovery and not apis:
         # 防止生成空报告：若 checkpoint 覆盖全部接口，则回退为全量执行。
@@ -387,6 +396,7 @@ def _execute_api_suite(
     executed_item_paths: set[str],
     shared_session: SessionLike,
     judgment_config: Optional[Dict[str, Any]] = None,
+    variable_context: Optional[object] = None,
 ) -> Tuple[int, Optional[Exception]]:
     execution_error: Optional[Exception] = None
     completed_count = 0
@@ -402,13 +412,15 @@ def _execute_api_suite(
                 request_timeout=request_timeout,
                 assertion_strict_mode=assertion_strict_mode,
                 judgment_config=judgment_config,
+                variable_context=variable_context,  # type: ignore[arg-type]
             )
             executor.start()
             result: TestResultRecord = executor.execute_test()
             report.add_result(result)
             completed_count = idx
 
-            item_path_key = _item_path_text(api.get("item_path"))
+            data_index = int(api.get("data_index", 0) or 0)
+            item_path_key = _checkpoint_key(api.get("item_path"), data_index)
             if item_path_key:
                 executed_item_paths.add(item_path_key)
             if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
@@ -481,6 +493,7 @@ def _execute_and_finalize_suite(
     executed_item_paths: set[str],
     shared_session: SessionLike,
     judgment_config: Optional[Dict[str, Any]] = None,
+    variable_context: Optional[object] = None,
 ) -> Tuple[int, Optional[Exception]]:
     completed_count = 0
     execution_error: Optional[Exception] = None
@@ -502,6 +515,7 @@ def _execute_and_finalize_suite(
             executed_item_paths=executed_item_paths,
             shared_session=shared_session,
             judgment_config=judgment_config,
+            variable_context=variable_context,
         )
     finally:
         close_session(shared_session)
@@ -542,16 +556,68 @@ def _prepare_execution_context(
     return resolved_token, report, request_timeout, shared_session
 
 
+def _shallow_copy_api(api: ApiConfig) -> ApiConfig:
+    """创建 ApiConfig 浅拷贝，保留 TypedDict 类型。"""
+    result: ApiConfig = {}
+    for key, value in api.items():
+        result[key] = value  # type: ignore[literal-required]
+    return result
+
+
+def _expand_apis_with_data(
+    apis: List[ApiConfig],
+    data_rows: List[Dict[str, str]],
+    data_columns: set[str],
+) -> List[ApiConfig]:
+    """按数据行展开引用了数据变量的接口。
+
+    - 不包含数据变量的 api 保持 1 份（data_index=0）
+    - 包含数据变量的 api 展开为 M 份（每行数据一份）
+    """
+    from postman_api_tester.utils.variable_substitution import (
+        api_references_variables,
+        substitute_in_api_config,
+    )
+
+    if not data_rows:
+        return apis
+
+    expanded: List[ApiConfig] = []
+    for api in apis:
+        if api_references_variables(api, data_columns):
+            for idx, row in enumerate(data_rows):
+                new_api = substitute_in_api_config(api, row)
+                new_api["data_index"] = idx
+                new_api["data_row"] = dict(row)
+                expanded.append(new_api)
+        else:
+            api_copy = _shallow_copy_api(api)
+            api_copy["data_index"] = 0
+            api_copy["data_row"] = {}
+            expanded.append(api_copy)
+
+    logger.info(
+        "数据驱动展开: %d 个接口 → %d 个（数据行 %d）",
+        len(apis), len(expanded), len(data_rows),
+    )
+    return expanded
+
+
 def _prepare_execution_apis(
     *,
     postman_file: str,
     selected_item_paths: Optional[List[List[int]]],
     base_url: Optional[str],
+    data_rows: Optional[List[Dict[str, str]]] = None,
+    data_columns: Optional[set[str]] = None,
 ) -> Tuple[PostmanApiParser, List[ApiConfig], int, int]:
     parser, apis, total_apis_count = _parse_collection_apis(postman_file)
 
     apis, selected_path_set = _filter_selected_apis(apis, selected_item_paths)
     _apply_base_url_override(parser, apis, base_url)
+
+    if data_rows and data_columns:
+        apis = _expand_apis_with_data(apis, data_rows, data_columns)
 
     selected_total_count = len(apis)
     _log_execution_scope(
@@ -611,6 +677,7 @@ def _prepare_checkpoint_and_progress(
     checkpoint_dir: str,
     progress_callback: Optional[ProgressCallback],
     total_apis_count: int,
+    data_file: str = "",
 ) -> Tuple[str, str, set[str], List[ApiConfig]]:
     checkpoint_path, collection_fingerprint, executed_item_paths, apis = _resolve_checkpoint_execution_apis(
         enable_checkpoint_recovery=enable_checkpoint_recovery,
@@ -620,6 +687,7 @@ def _prepare_checkpoint_and_progress(
         selected_item_paths=selected_item_paths,
         apis=apis,
         checkpoint_dir=checkpoint_dir,
+        data_file=data_file,
     )
 
     _emit_start_progress(

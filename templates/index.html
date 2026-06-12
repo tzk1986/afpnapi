@@ -171,6 +171,13 @@
                     <label for="collectionFile">JSON 文件</label>
                     <input id="collectionFile" type="file" accept=".json,application/json">
                 </div>
+                {% if enable_data_driven %}
+                <div class="field">
+                    <label for="dataFileInput">数据文件（CSV/JSON，可选）</label>
+                    <input id="dataFileInput" type="file" accept=".csv,.json">
+                    <span class="selector-tip">每行/每对象作为一组测试数据，替换集合中的 {{变量}}</span>
+                </div>
+                {% endif %}
                 <div class="field">
                     <label for="baseUrlInput">基础 URL（可选）</label>
                     <input id="baseUrlInput" type="text" placeholder="例如: https://api.example.com">
@@ -219,6 +226,33 @@
                     <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
                 </div>
             </details>
+            {% if enable_variable_extraction %}
+            <details class="judgment-config-panel" style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#334155;">预置变量（可选，点击展开）</summary>
+                <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
+                    <div class="field">
+                        <label for="initialVariablesInput" style="display:flex;align-items:center;gap:6px;">
+                            预置变量（JSON 对象，可选）
+                            <button type="button" onclick="toggleVarExample()" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;color:#64748b;" title="查看使用示例">❓</button>
+                        </label>
+                        <textarea id="initialVariablesInput" rows="3" placeholder='例如: {"auth_token": "xxx", "user_id": "123"}' style="width:100%;font-family:monospace;font-size:12px;border:1px solid #cbd5e1;border-radius:4px;padding:6px;"></textarea>
+                        <span class="selector-tip">作为请求串联的初始变量，供后续接口的 {{变量}} 引用</span>
+                        <div id="varExamplePanel" style="display:none;margin-top:10px;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;line-height:1.6;">
+                            <strong>使用示例：</strong>
+                            <div style="margin-top:6px;color:#334155;">
+                                <div><strong>场景 1：跳过登录，直接使用已知 token</strong></div>
+                                <pre style="background:#f1f5f9;padding:8px;border-radius:4px;margin:4px 0;overflow-x:auto;">{"auth_token": "eyJhbGciOiJIUzI1NiIs..."}</pre>
+                                <div>后续接口 headers 中使用 <code>Authorization: Bearer {{auth_token}}</code></div>
+                                <div style="margin-top:8px;"><strong>场景 2：预置变量 + x_extract 组合</strong></div>
+                                <pre style="background:#f1f5f9;padding:8px;border-radius:4px;margin:4px 0;overflow-x:auto;">{"auth_token": "固定token值"}</pre>
+                                <div>Collection 中配置 <code>x_extract: {"user_id": "$.data[0].id"}</code> 动态提取</div>
+                                <div style="margin-top:8px;"><strong>变量优先级：</strong>数据行变量 &gt; x_extract 提取 &gt; 预置变量</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+            {% endif %}
             {% if enable_selective_run %}
             <div class="selector-box">
                 <div class="selector-toolbar">
@@ -330,6 +364,8 @@
         {
             "reports": {{ reports_json|safe }},
             "enableSelectiveRun": {{ enable_selective_run|tojson }},
+            "enableDataDriven": {{ enable_data_driven|tojson }},
+            "enableVariableExtraction": {{ enable_variable_extraction|tojson }},
             "runStatusPollIntervalMs": {{ run_status_poll_interval_ms|tojson }},
             "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }}
         }
@@ -340,6 +376,8 @@ const pageData = JSON.parse(document.getElementById('indexPageData').textContent
 let reports = Array.isArray(pageData.reports) ? pageData.reports : [];
 let runJobTimer = null;
 const ENABLE_SELECTIVE_RUN = Boolean(pageData.enableSelectiveRun);
+const ENABLE_DATA_DRIVEN = Boolean(pageData.enableDataDriven);
+const ENABLE_VARIABLE_EXTRACTION = Boolean(pageData.enableVariableExtraction);
 const RUN_STATUS_POLL_INTERVAL_MS = Number(pageData.runStatusPollIntervalMs || 3000);
 const COLLECTION_PREVIEW_MAX_ITEMS = Number(pageData.collectionPreviewMaxItems || 3000);
 let previewApis = [];
@@ -987,6 +1025,11 @@ document.getElementById('apiFilterInput')?.addEventListener('keydown', (event) =
     }
 });
 
+function toggleVarExample() {
+    const panel = document.getElementById('varExamplePanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
 async function startRunPostmanJob() {
     const fileInput = document.getElementById('collectionFile');
     const file = fileInput.files && fileInput.files[0];
@@ -1014,6 +1057,16 @@ async function startRunPostmanJob() {
     if (jErrCodes && jErrCodes.value.trim()) formData.append('judgment_success_err_codes', jErrCodes.value.trim());
     const jMsgs = document.getElementById('judgmentSuccessMessages');
     if (jMsgs && jMsgs.value.trim()) formData.append('judgment_success_messages', jMsgs.value.trim());
+    // 数据驱动文件（可选）
+    const dataFileInput = document.getElementById('dataFileInput');
+    if (dataFileInput && dataFileInput.files && dataFileInput.files[0]) {
+        formData.append('data_file', dataFileInput.files[0]);
+    }
+    // 预置变量（可选）
+    const initVarsInput = document.getElementById('initialVariablesInput');
+    if (initVarsInput && initVarsInput.value.trim()) {
+        formData.append('initial_variables', initVarsInput.value.trim());
+    }
     if (ENABLE_SELECTIVE_RUN) {
         const selectedOnly = Boolean(document.getElementById('runSelectedOnly')?.checked);
         if (selectedOnly) {

@@ -1818,10 +1818,19 @@ function renderDetailMeta(data) {
     const sourceText = String((data.judgement_source || '')).toLowerCase() === 'manual'
         ? '<span class="retried-badge">人工判定</span>'
         : '自动判定';
+    const dataIdx = Number(data.data_index || 0);
+    const dataBadge = dataIdx > 0 ? ` | <span class="count-badge">数据组 #${dataIdx + 1}</span>` : '';
+    let extractedHtml = '';
+    const ev = data.extracted_variables;
+    if (ev && typeof ev === 'object' && Object.keys(ev).length > 0) {
+        const pairs = Object.entries(ev).map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(String(v).length > 60 ? String(v).slice(0, 60) + '...' : String(v))}`);
+        extractedHtml = `<div class="detail-meta-row" style="color:#0369a1;">提取变量: ${pairs.join(', ')}</div>`;
+    }
     meta.innerHTML = `
-        <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'} | ${sourceText}</div>
+        <div class="detail-meta-row">${escapeHtml(data.method || '-')} | ${escapeHtml(data.status || '-')} | 状态码 ${data.status_code ?? '-'} | ${sourceText}${dataBadge}</div>
         <div class="detail-meta-row detail-meta-url">配置 URL: ${escapeHtml(data.url || '-')}</div>
         <div class="detail-meta-row detail-meta-url">实际请求 URL: ${escapeHtml(actualRequestUrl)}</div>
+        ${extractedHtml}
     `;
 }
 
@@ -2584,9 +2593,11 @@ function renderResults(data) {
         const excludeBtn = item.exclusion_key
             ? `<button class="btn-compact btn-exclude ${excluded ? 'is-excluded' : ''}" onclick="toggleResultExclusion('${exKey}', ${excluded})" title="${excluded ? '取消排除此接口' : '排除此接口'}">${excluded ? '恢' : '排'}</button>`
             : '';
+        const dataIdx = Number(item.data_index || 0);
+        const dataBadge = dataIdx > 0 ? ` <span class="count-badge" title="数据驱动第 ${dataIdx + 1} 组">#${dataIdx + 1}</span>` : '';
         return `
         <tr class="${excluded ? 'excluded-row' : ''}" ${rowTooltip ? `data-tooltip="${escapeHtml(rowTooltip)}"` : ''}>
-            <td class="tooltip-target" data-tooltip="${escapeHtml(item.name)}">${escapeHtml(item.name)}</td>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.name)}">${escapeHtml(item.name)}${dataBadge}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.method)}">${escapeHtml(item.method)}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>

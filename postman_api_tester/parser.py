@@ -52,6 +52,9 @@ class ApiConfig(TypedDict, total=False):
     x_success_messages: Optional[str]
     x_enable_err_code_judgment: Optional[bool]
     x_enable_message_judgment: Optional[bool]
+    x_extract: Optional[Dict[str, str]]
+    data_index: int
+    data_row: Dict[str, str]
 
 
 class PostmanApiParser:
@@ -242,6 +245,13 @@ class PostmanApiParser:
         if x_enable_message is not None and not isinstance(x_enable_message, bool):
             x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
 
+        x_extract_raw = request.get('x_extract')
+        x_extract: Optional[Dict[str, str]] = None
+        if isinstance(x_extract_raw, dict) and x_extract_raw:
+            x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
+            if not x_extract:
+                x_extract = None
+
         result: ApiConfig = {
             'name': name,
             'folder': parent_name,
@@ -265,6 +275,8 @@ class PostmanApiParser:
             result['x_enable_err_code_judgment'] = x_enable_err_code
         if x_enable_message is not None:
             result['x_enable_message_judgment'] = x_enable_message
+        if x_extract is not None:
+            result['x_extract'] = x_extract
 
         return result
 
