@@ -73,27 +73,43 @@ class BaseHandler:
     def error_response(
         error: Exception,
         status_code: int = 500,
+        error_code: str = "",
     ) -> ResponseReturnValue:
         """统一错误响应包装。
 
         Args:
             error: 异常对象
             status_code: HTTP 状态码
+            error_code: 应用级错误码，格式为 模块前缀_序号（如 CE_PARSE_001）
 
         Returns:
             Flask 错误响应
         """
         logger.error(f"Handler error: {type(error).__name__}: {error}")
-        return BaseHandler.json_response(
-            {
+        response_body = {
+            "code": status_code,
+            "message": "Error",
+            "data": {
                 "error": type(error).__name__,
                 "details": str(error),
             },
-            status_code=status_code,
-            message="Error",
-        )
+            "timestamp": datetime.now().isoformat(),
+        }
+        if error_code:
+            response_body["error_code"] = error_code
+        return jsonify(response_body), status_code
 
 
-def json_error(message: str, status_code: int) -> ResponseReturnValue:
-    """快捷 JSON 错误响应，统一各路由文件的 _json_error 实现。"""
-    return BaseHandler.error_response(ValidationError(message), status_code)
+def json_error(message: str, status_code: int, error_code: str = "") -> ResponseReturnValue:
+    """快捷 JSON 错误响应，统一各路由文件的 _json_error 实现。
+
+    错误码命名规则：模块前缀_序号，如 CE_PARSE_001。
+    - CE_  = Collection Editor
+    - COL_ = Collection 预览/导出
+    - JOB_ = 任务执行
+    - RPT_ = 报告相关
+    - HTTP_ = 代理/重发请求
+    - AUTH_ = 认证相关
+    - COM_ = 通用错误
+    """
+    return BaseHandler.error_response(ValidationError(message), status_code, error_code)

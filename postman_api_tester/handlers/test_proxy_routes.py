@@ -48,14 +48,16 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 
 def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
-    """若配置了 PROXY_ALLOWED_HOSTS，校验 url 的域名是否在白名单内。返回 None 表示通过。"""
+    """若配置了 PROXY_ALLOWED_HOSTS，校验 url 的域名是否在白名单内。返回 None 表示通过。
+    错误码：HTTP_PROXY_001
+    """
     from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
     if not PROXY_ALLOWED_HOSTS:
         return None
     parsed = urlparse(url)
     host = (parsed.hostname or "").lower()
     if host and host not in PROXY_ALLOWED_HOSTS:
-        return _json_error(f"proxy 域名不在白名单内: {host}", 403)
+        return _json_error(f"proxy 域名不在白名单内：{host}", 403, "HTTP_PROXY_001")
     return None
 
 
@@ -104,9 +106,9 @@ def re_request_api() -> ResponseReturnValue:
     expected_status = _svc_parse_int_default(source.get("expected_status") or 200, 200)
 
     if not url:
-        return _json_error("url 不能为空", 400)
+        return _json_error("url 不能为空", 400, "HTTP_REREQ_001")
     if not _svc_is_valid_http_url(url):
-        return _json_error("url 仅允许合法的 http/https 地址", 400)
+        return _json_error("url 仅允许合法的 http/https 地址", 400, "HTTP_REREQ_002")
     host_check = _check_proxy_host_allowed(url)
     if host_check is not None:
         return host_check
@@ -233,7 +235,7 @@ def api_proxy_request() -> ResponseReturnValue:
     legacy_body = request_fields["legacy_body"]
 
     if not url:
-        return _json_error("url 不能为空", 400)
+        return _json_error("url 不能为空", 400, "HTTP_PROXY_002")
     host_check = _check_proxy_host_allowed(url)
     if host_check is not None:
         return host_check
@@ -251,7 +253,7 @@ def api_proxy_request() -> ResponseReturnValue:
     )
 
     if not exec_result["success"]:
-        return _json_error(exec_result["error_message"], exec_result.get("error_code", 502))
+        return _json_error(exec_result["error_message"], exec_result.get("error_code", 502), "HTTP_PROXY_003")
 
     return jsonify(
         build_proxy_response_payload(

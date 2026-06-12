@@ -34,19 +34,19 @@ _RUN_POSTMAN_JOB_FN = partial(
 
 
 def api_retry_failures() -> ResponseReturnValue:
-    """重试失败接口 API。"""
+    """重试失败接口 API。错误码：RPT_RETRY_001-005"""
     if not ENABLE_RETRY_FAILURES:
-        return _json_error("当前环境未启用重试失败接口能力。", 403)
+        return _json_error("当前环境未启用重试失败接口能力。", 403, "RPT_RETRY_001")
 
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     if not report_name:
-        return _json_error("缺少 report_name", 400)
+        return _json_error("缺少 report_name", 400, "RPT_RETRY_002")
 
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
-        return _json_error(f"报告不存在: {report_name}", 404)
+        return _json_error(f"报告不存在：{report_name}", 404, "RPT_RETRY_003")
 
     failed_paths, source_runtime_ctx, source_runtime_error = _job_prepare_retry_job_context(
         payload=payload,
@@ -58,10 +58,10 @@ def api_retry_failures() -> ResponseReturnValue:
     )
 
     if not failed_paths:
-        return _json_error("当前报告无失败或错误接口，无需重试。", 400)
+        return _json_error("当前报告无失败或错误接口，无需重试。", 400, "RPT_RETRY_004")
 
     if source_runtime_error:
-        return _json_error(source_runtime_error, 400)
+        return _json_error(source_runtime_error, 400, "RPT_RETRY_005")
     assert source_runtime_ctx is not None
     saved_file = str(source_runtime_ctx["saved_file"])
     runtime = source_runtime_ctx["runtime"]
@@ -85,19 +85,19 @@ def api_retry_failures() -> ResponseReturnValue:
 
 
 def api_retry_all() -> ResponseReturnValue:
-    """全量重试 API。"""
+    """全量重试 API。错误码：RPT_RETRY_006-010"""
     if not ENABLE_RETRY_FAILURES:
-        return _json_error("当前环境未启用重试接口能力。", 403)
+        return _json_error("当前环境未启用重试接口能力。", 403, "RPT_RETRY_006")
 
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
     if not report_name:
-        return _json_error("缺少 report_name", 400)
+        return _json_error("缺少 report_name", 400, "RPT_RETRY_007")
 
     try:
         report = _repo_find_report(report_name)
     except FileNotFoundError:
-        return _json_error(f"报告不存在: {report_name}", 404)
+        return _json_error(f"报告不存在：{report_name}", 404, "RPT_RETRY_008")
 
     all_paths, source_runtime_ctx, source_runtime_error = _job_prepare_retry_job_context(
         payload=payload,
@@ -109,10 +109,10 @@ def api_retry_all() -> ResponseReturnValue:
     )
 
     if not all_paths:
-        return _json_error("当前报告没有可重试的接口。", 400)
+        return _json_error("当前报告没有可重试的接口。", 400, "RPT_RETRY_009")
 
     if source_runtime_error:
-        return _json_error(source_runtime_error, 400)
+        return _json_error(source_runtime_error, 400, "RPT_RETRY_010")
     assert source_runtime_ctx is not None
     saved_file = str(source_runtime_ctx["saved_file"])
     runtime = source_runtime_ctx["runtime"]

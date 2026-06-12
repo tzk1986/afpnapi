@@ -147,20 +147,20 @@ def _enqueue_job(
 
 
 def api_run_postman() -> ResponseReturnValue:
-    """上传 Collection 并执行测试任务 API。"""
+    """上传 Collection 并执行测试任务 API。错误码：JOB_RUN_001-007"""
     collection_file = request.files.get("collection_file")
     if not collection_file or not str(collection_file.filename or "").strip():
-        return _json_error("请上传有效的 Postman JSON 文件", 400)
+        return _json_error("请上传有效的 Postman JSON 文件", 400, "JOB_RUN_001")
 
     original_name = str(collection_file.filename or "").strip()
     if not original_name.lower().endswith(".json"):
-        return _json_error("上传文件必须是 .json 格式", 400)
+        return _json_error("上传文件必须是 .json 格式", 400, "JOB_RUN_002")
 
     original_name = _sanitize_uploaded_name(original_name)
 
     base_url = str(request.form.get("base_url", "")).strip() or None
     if base_url is not None and not _svc_is_valid_http_url(base_url):
-        return _json_error("base_url 仅允许合法的 http/https 地址", 400)
+        return _json_error("base_url 仅允许合法的 http/https 地址", 400, "JOB_RUN_003")
     token = str(request.form.get("token", "")).strip() or None
     env_name = str(request.form.get("env_name", "")).strip()
     if env_name and env_name in ENVIRONMENTS:
@@ -198,9 +198,9 @@ def api_run_postman() -> ResponseReturnValue:
         try:
             selected_item_paths = _parse_selected_item_paths(raw_selected_paths)
         except ValueError as exc:
-            return _json_error(str(exc), 400)
+            return _json_error(str(exc), 400, "JOB_RUN_004")
         if not selected_item_paths:
-            return _json_error("选择了仅执行已选接口，但未提供有效 selected_item_paths", 400)
+            return _json_error("选择了仅执行已选接口，但未提供有效 selected_item_paths", 400, "JOB_RUN_005")
 
     # 解析可配置结果判定（judgment_config）
     judgment_config = _parse_judgment_config_from_form(request.form)
@@ -211,7 +211,7 @@ def api_run_postman() -> ResponseReturnValue:
     if data_file and str(data_file.filename or "").strip():
         data_filename = str(data_file.filename or "").strip().lower()
         if not data_filename.endswith((".csv", ".json")):
-            return _json_error("数据文件仅支持 .csv 或 .json 格式", 400)
+            return _json_error("数据文件仅支持 .csv 或 .json 格式", 400, "JOB_RUN_006")
         data_suffix = Path(str(data_file.filename or ".csv")).suffix or ".csv"
         data_file_path = str(_build_saved_json_path(UPLOADS_DIR, uuid.uuid4().hex, f"_data{data_suffix}"))
         data_file.save(data_file_path)
@@ -225,7 +225,7 @@ def api_run_postman() -> ResponseReturnValue:
             if isinstance(parsed_vars, dict):
                 initial_variables = {str(k): str(v) for k, v in parsed_vars.items()}
         except (json.JSONDecodeError, ValueError):
-            return _json_error("initial_variables 必须是有效的 JSON 对象", 400)
+            return _json_error("initial_variables 必须是有效的 JSON 对象", 400, "JOB_RUN_007")
 
     suffix = Path(original_name).suffix or ".json"
     job_id = uuid.uuid4().hex
@@ -257,20 +257,20 @@ def api_run_postman() -> ResponseReturnValue:
 
 
 def api_run_ad_hoc_tests() -> ResponseReturnValue:
-    """Ad-hoc 接口测试提交 API。"""
+    """Ad-hoc 接口测试提交 API。错误码：JOB_ADHOC_001-005"""
     if not ENABLE_ADHOC_RUN:
-        return _json_error("当前环境未启用直接新增接口测试能力。", 403)
+        return _json_error("当前环境未启用直接新增接口测试能力。", 403, "JOB_ADHOC_001")
 
     payload = request.get_json(silent=True) or {}
     raw_cases = payload.get("cases")
     if not isinstance(raw_cases, list) or not raw_cases:
-        return _json_error("cases 不能为空，且必须是数组。", 400)
+        return _json_error("cases 不能为空，且必须是数组。", 400, "JOB_ADHOC_002")
     if len(raw_cases) > ADHOC_MAX_ITEMS:
-        return _json_error(f"单次最多支持 {ADHOC_MAX_ITEMS} 条接口。", 400)
+        return _json_error(f"单次最多支持 {ADHOC_MAX_ITEMS} 条接口。", 400, "JOB_ADHOC_003")
 
     base_url = str(payload.get("base_url", "")).strip() or None
     if base_url is not None and not _svc_is_valid_http_url(base_url):
-        return _json_error("base_url 仅允许合法的 http/https 地址", 400)
+        return _json_error("base_url 仅允许合法的 http/https 地址", 400, "JOB_ADHOC_004")
 
     token = str(payload.get("token", "")).strip() or None
     output_dir = str(payload.get("output_dir", "")).strip()
@@ -298,7 +298,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         normalized_cases = [_svc_normalize_adhoc_case(item, idx, base_url) for idx, item in enumerate(raw_cases)]
         collection_data = _svc_build_adhoc_collection(normalized_cases, collection_name, base_url)
     except ValueError as exc:
-        return _json_error(str(exc), 400)
+        return _json_error(str(exc), 400, "JOB_ADHOC_005")
 
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id)
@@ -332,8 +332,8 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
 
 
 def api_run_postman_status(job_id: str) -> ResponseReturnValue:
-    """查询任务执行状态 API。"""
+    """查询任务执行状态 API。错误码：JOB_STATUS_001"""
     job = get_run_job(job_id)
     if not job:
-        return _json_error("任务不存在。", 404)
+        return _json_error("任务不存在。", 404, "JOB_STATUS_001")
     return jsonify(job)

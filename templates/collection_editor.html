@@ -216,10 +216,11 @@
                     renderTree();
                     setStatus(`已加载 ${state.allRequests.length} 个接口`);
                 } else {
-                    setStatus('解析失败：' + (data.details || data.message || '未知错误'), 'error');
+                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
+                    setStatus('解析失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
-                setStatus('请求失败：' + e.message, 'error');
+                setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
             }
         }
 
@@ -650,10 +651,11 @@
                     renderDependencyInfo(data);
                     setStatus('变量依赖分析完成');
                 } else {
-                    setStatus('分析失败：' + (data.details || data.message || ''), 'error');
+                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
+                    setStatus('分析失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
-                setStatus('请求失败：' + e.message, 'error');
+                setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
             }
         }
 
@@ -749,10 +751,11 @@
                     URL.revokeObjectURL(url);
                     setStatus('导出成功');
                 } else {
-                    setStatus('导出失败：' + (data.details || data.message || ''), 'error');
+                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
+                    setStatus('导出失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
-                setStatus('请求失败：' + e.message, 'error');
+                setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
             }
         }
 
@@ -788,13 +791,15 @@
                             window.location.href = `/api/run-postman-status/${runData.job_id}`;
                         }, 1000);
                     } else {
-                        setStatus('执行提交失败：' + (runData.details || runData.message || ''), 'error');
+                        const errCode = runData.error_code ? `[${runData.error_code}] ` : '';
+                        setStatus('执行提交失败：' + errCode + (runData.details || runData.message || '请查看错误码联系开发'), 'error');
                     }
                 } else {
-                    setStatus('保存失败：' + (data.details || data.message || ''), 'error');
+                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
+                    setStatus('保存失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
-                setStatus('请求失败：' + e.message, 'error');
+                setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
             }
         }
 
@@ -912,10 +917,11 @@
                     const extracted = Object.keys(state.runtimeVars).length;
                     setStatus(`请求完成 ${data.status_code}  ${data.elapsed_ms}ms  ·  运行时变量 ${extracted} 个`);
                 } else {
-                    setStatus('请求失败：' + (data.details || data.message || '未知错误'), 'error');
+                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
+                    setStatus('请求失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
-                setStatus('网络错误：' + e.message, 'error');
+                setStatus('网络错误：' + e.message + '（COM_NET_001）', 'error');
             } finally {
                 if (sendBtn) {
                     sendBtn.disabled = false;
