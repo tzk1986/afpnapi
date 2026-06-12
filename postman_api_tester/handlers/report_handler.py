@@ -86,6 +86,7 @@ def filter_report_results(
                 "message": item.get("message", ""),
                 "err_code": item.get("err_code", ""),
                 "response_time_ms": item.get("response_time_ms", 0),
+                "data_index": item.get("data_index", 0),
                 "excluded": excluded,
                 "exclusion_key": exclusion_key,
                 "judgement_source": judgement_source,

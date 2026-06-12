@@ -219,6 +219,29 @@
                     <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
                 </div>
             </details>
+            {% if enable_data_driven or enable_variable_extraction %}
+            <details class="judgment-config-panel" style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#334155;">数据驱动与变量提取（可选，点击展开）</summary>
+                <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:8px;">
+                    <div class="upload-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
+                        {% if enable_data_driven %}
+                        <div class="field">
+                            <label for="dataFileInput">数据文件（CSV/JSON，可选）</label>
+                            <input id="dataFileInput" type="file" accept=".csv,.json">
+                            <span class="selector-tip">每行/每对象作为一组测试数据，替换集合中的 {{变量}}</span>
+                        </div>
+                        {% endif %}
+                        {% if enable_variable_extraction %}
+                        <div class="field">
+                            <label for="initialVariablesInput">预置变量（JSON 对象，可选）</label>
+                            <textarea id="initialVariablesInput" rows="3" placeholder='例如: {"auth_token": "xxx", "user_id": "123"}' style="width:100%;font-family:monospace;font-size:12px;border:1px solid #cbd5e1;border-radius:4px;padding:6px;"></textarea>
+                            <span class="selector-tip">作为请求串联的初始变量，供后续接口的 {{变量}} 引用</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </details>
+            {% endif %}
             {% if enable_selective_run %}
             <div class="selector-box">
                 <div class="selector-toolbar">
@@ -330,6 +353,8 @@
         {
             "reports": {{ reports_json|safe }},
             "enableSelectiveRun": {{ enable_selective_run|tojson }},
+            "enableDataDriven": {{ enable_data_driven|tojson }},
+            "enableVariableExtraction": {{ enable_variable_extraction|tojson }},
             "runStatusPollIntervalMs": {{ run_status_poll_interval_ms|tojson }},
             "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }}
         }
@@ -340,6 +365,8 @@ const pageData = JSON.parse(document.getElementById('indexPageData').textContent
 let reports = Array.isArray(pageData.reports) ? pageData.reports : [];
 let runJobTimer = null;
 const ENABLE_SELECTIVE_RUN = Boolean(pageData.enableSelectiveRun);
+const ENABLE_DATA_DRIVEN = Boolean(pageData.enableDataDriven);
+const ENABLE_VARIABLE_EXTRACTION = Boolean(pageData.enableVariableExtraction);
 const RUN_STATUS_POLL_INTERVAL_MS = Number(pageData.runStatusPollIntervalMs || 3000);
 const COLLECTION_PREVIEW_MAX_ITEMS = Number(pageData.collectionPreviewMaxItems || 3000);
 let previewApis = [];
@@ -1014,6 +1041,16 @@ async function startRunPostmanJob() {
     if (jErrCodes && jErrCodes.value.trim()) formData.append('judgment_success_err_codes', jErrCodes.value.trim());
     const jMsgs = document.getElementById('judgmentSuccessMessages');
     if (jMsgs && jMsgs.value.trim()) formData.append('judgment_success_messages', jMsgs.value.trim());
+    // 数据驱动文件（可选）
+    const dataFileInput = document.getElementById('dataFileInput');
+    if (dataFileInput && dataFileInput.files && dataFileInput.files[0]) {
+        formData.append('data_file', dataFileInput.files[0]);
+    }
+    // 预置变量（可选）
+    const initVarsInput = document.getElementById('initialVariablesInput');
+    if (initVarsInput && initVarsInput.value.trim()) {
+        formData.append('initial_variables', initVarsInput.value.trim());
+    }
     if (ENABLE_SELECTIVE_RUN) {
         const selectedOnly = Boolean(document.getElementById('runSelectedOnly')?.checked);
         if (selectedOnly) {

@@ -500,6 +500,13 @@ def normalize_adhoc_case(
     if x_enable_message is not None and not isinstance(x_enable_message, bool):
         x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
 
+    x_extract_raw = raw.get("x_extract")
+    x_extract: Optional[Dict[str, str]] = None
+    if isinstance(x_extract_raw, dict) and x_extract_raw:
+        x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
+        if not x_extract:
+            x_extract = None
+
     logger.info(
         "adhoc case normalized",
         extra={
@@ -530,6 +537,8 @@ def normalize_adhoc_case(
         result["x_enable_err_code_judgment"] = x_enable_err_code
     if x_enable_message is not None:
         result["x_enable_message_judgment"] = x_enable_message
+    if x_extract is not None:
+        result["x_extract"] = x_extract
 
     return result
 
@@ -569,6 +578,8 @@ def build_adhoc_collection(
             request_obj["x_enable_err_code_judgment"] = case["x_enable_err_code_judgment"]
         if case.get("x_enable_message_judgment") is not None:
             request_obj["x_enable_message_judgment"] = case["x_enable_message_judgment"]
+        if case.get("x_extract") is not None:
+            request_obj["x_extract"] = case["x_extract"]
 
         set_request_url(request_obj, case["url"], case["params"])
         set_request_headers(request_obj, case["headers"])

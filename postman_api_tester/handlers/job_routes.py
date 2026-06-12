@@ -205,6 +205,28 @@ def api_run_postman() -> ResponseReturnValue:
     # 解析可配置结果判定（judgment_config）
     judgment_config = _parse_judgment_config_from_form(request.form)
 
+    # 解析数据驱动文件（可选）
+    data_file_path = ""
+    data_file = request.files.get("data_file")
+    if data_file and str(data_file.filename or "").strip():
+        data_filename = str(data_file.filename or "").strip().lower()
+        if not data_filename.endswith((".csv", ".json")):
+            return _json_error("数据文件仅支持 .csv 或 .json 格式", 400)
+        data_suffix = Path(str(data_file.filename or ".csv")).suffix or ".csv"
+        data_file_path = str(_build_saved_json_path(UPLOADS_DIR, uuid.uuid4().hex, f"_data{data_suffix}"))
+        data_file.save(data_file_path)
+
+    # 解析预置变量（可选，JSON 字符串）
+    initial_variables: Optional[Dict[str, str]] = None
+    raw_initial_vars = request.form.get("initial_variables", "")
+    if isinstance(raw_initial_vars, str) and raw_initial_vars.strip():
+        try:
+            parsed_vars = json.loads(raw_initial_vars.strip())
+            if isinstance(parsed_vars, dict):
+                initial_variables = {str(k): str(v) for k, v in parsed_vars.items()}
+        except (json.JSONDecodeError, ValueError):
+            return _json_error("initial_variables 必须是有效的 JSON 对象", 400)
+
     suffix = Path(original_name).suffix or ".json"
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id, suffix)
@@ -219,6 +241,8 @@ def api_run_postman() -> ResponseReturnValue:
         token=token,
         selected_item_paths=selected_item_paths if selected_item_paths else None,
         judgment_config=judgment_config,
+        data_file=data_file_path,
+        initial_variables=initial_variables,
     )
 
     _enqueue_job(

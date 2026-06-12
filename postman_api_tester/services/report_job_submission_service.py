@@ -29,6 +29,8 @@ def build_run_postman_job_params(
     token: Optional[str],
     selected_item_paths: Optional[List[List[int]]],
     judgment_config: Optional[Dict[str, Any]] = None,
+    data_file: str = "",
+    initial_variables: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     selected_count = len(selected_item_paths or [])
     logger.info(
@@ -59,6 +61,10 @@ def build_run_postman_job_params(
     }
     if judgment_config is not None:
         result["judgment_config"] = judgment_config
+    if data_file:
+        result["data_file"] = data_file
+    if initial_variables:
+        result["initial_variables"] = initial_variables
     return result
 
 
