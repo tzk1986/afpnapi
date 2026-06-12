@@ -205,6 +205,14 @@ class PostmanTestExecutor:
         url, params = _normalize_url_and_params(raw_url, params)
         body = api.get('body')
 
+        # 如果 body 是字符串（可能因为包含 {{variable}} 导致 JSON 解析失败），
+        # 在变量替换后尝试重新解析为 JSON 对象
+        if isinstance(body, str) and body.strip().startswith(('{', '[')):
+            try:
+                body = json.loads(body)
+            except (json.JSONDecodeError, ValueError):
+                pass  # 保持原字符串
+
         # 自动添加认证token（如果存在则始终覆盖，确保使用最新token）
         if self._auth_token:
             # 大小写不敏感地查找已有认证头，避免重复键

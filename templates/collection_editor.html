@@ -29,6 +29,9 @@
         .tree-item { padding: 8px 10px; margin: 4px 0; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .tree-item:hover { background: #f1f5f9; }
         .tree-item.selected { background: #dbeafe; }
+        .tree-item.dragging { opacity: 0.5; }
+        .tree-item.drag-over { border-top: 2px solid #3b82f6; }
+        .tree-item[draggable="true"] { cursor: move; }
         .tree-group { margin-left: 12px; }
         .tree-group-title { font-weight: 600; color: #475569; padding: 6px 10px; font-size: 12px; }
         .method-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; color: #fff; min-width: 44px; text-align: center; }
@@ -118,6 +121,26 @@
         .resp-headers-table th, .resp-headers-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         .resp-headers-table th { color: #64748b; font-weight: 600; }
         .resp-headers-table td:first-child { color: #8b5cf6; font-weight: 600; white-space: nowrap; }
+
+        /* Execution Modal */
+        .exec-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .exec-modal-overlay.visible { display: flex; }
+        .exec-modal { background: #fff; border-radius: 16px; padding: 28px 32px; width: 520px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+        .exec-modal h2 { font-size: 18px; color: #0f172a; margin-bottom: 16px; }
+        .exec-progress-bar { width: 100%; height: 20px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+        .exec-progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #1d4ed8); border-radius: 10px; transition: width 0.3s ease; }
+        .exec-progress-text { font-size: 14px; color: #334155; margin-bottom: 8px; }
+        .exec-detail { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+        .exec-result { padding: 12px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; margin-bottom: 16px; }
+        .exec-result.error { background: #fef2f2; border-color: #fecaca; }
+        .exec-result h3 { font-size: 14px; margin-bottom: 8px; }
+        .exec-result.ok h3 { color: #16a34a; }
+        .exec-result.error h3 { color: #dc2626; }
+        .exec-result p { font-size: 13px; color: #334155; margin-bottom: 4px; }
+        .exec-result a { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+        .exec-result a:hover { text-decoration: underline; }
+        .exec-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+        .exec-modal-actions .btn { padding: 8px 20px; }
     </style>
 </head>
 <body>
@@ -175,6 +198,30 @@
         <div class="status-bar">
             <span id="statusMessage">就绪</span>
             <span id="varStatus"></span>
+        </div>
+    </div>
+
+    <!-- Execution Modal -->
+    <div class="exec-modal-overlay" id="execModal">
+        <div class="exec-modal">
+            <h2 id="execModalTitle">执行中...</h2>
+            <div id="execProgressSection">
+                <div class="exec-progress-bar">
+                    <div class="exec-progress-fill" id="execProgressFill" style="width: 0%"></div>
+                </div>
+                <div class="exec-progress-text" id="execProgressText">0%</div>
+                <div class="exec-detail" id="execDetail">等待任务启动...</div>
+            </div>
+            <div id="execResultSection" style="display:none;">
+                <div class="exec-result" id="execResultBox">
+                    <h3 id="execResultTitle"></h3>
+                    <p id="execResultDetail"></p>
+                    <p id="execResultLink"></p>
+                </div>
+            </div>
+            <div class="exec-modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeExecModal()">关闭</button>
+            </div>
         </div>
     </div>
 
@@ -263,7 +310,15 @@
                 const checked = state.selectedIds?.has(req.id) ? 'checked' : '';
                 html += `<div class="tree-item ${state.currentRequestId === req.id ? 'selected' : ''}"
                     style="margin-left:${(depth + 1) * 12}px;"
-                    onclick="selectRequest('${req.id}')">
+                    draggable="true"
+                    data-req-id="${req.id}"
+                    data-group-idx="${group._idx}"
+                    onclick="selectRequest('${req.id}')"
+                    ondragstart="handleDragStart(event)"
+                    ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)"
+                    ondrop="handleDrop(event)"
+                    ondragend="handleDragEnd(event)">
                     <input type="checkbox" ${checked} onclick="event.stopPropagation();toggleSelect('${req.id}', this.checked)" style="margin-right:4px;">
                     <span class="method-badge method-${req.method}">${req.method}</span>
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(req.name || req.url || '未命名')}</span>
@@ -284,6 +339,125 @@
                 state.editBuffer = JSON.parse(JSON.stringify(req));
                 renderEditor();
                 renderTree(); // Update selected highlight
+            }
+        }
+
+        // Drag and Drop for Reordering
+        let draggedReqId = null;
+
+        function handleDragStart(event) {
+            draggedReqId = event.target.dataset.reqId;
+            event.target.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', draggedReqId);
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            const target = event.target.closest('.tree-item');
+            if (target && target.dataset.reqId !== draggedReqId) {
+                target.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(event) {
+            const target = event.target.closest('.tree-item');
+            if (target) {
+                target.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            const target = event.target.closest('.tree-item');
+            if (!target || target.dataset.reqId === draggedReqId) return;
+
+            target.classList.remove('drag-over');
+            const targetReqId = target.dataset.reqId;
+
+            // Reorder in state.collection
+            reorderRequests(draggedReqId, targetReqId);
+
+            // Update allRequests to match new order
+            syncAllRequestsFromCollection();
+
+            // Re-render
+            renderTree();
+            setStatus('接口顺序已调整', 'info');
+        }
+
+        function handleDragEnd(event) {
+            event.target.classList.remove('dragging');
+            document.querySelectorAll('.tree-item').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+            draggedReqId = null;
+        }
+
+        function reorderRequests(draggedId, targetId) {
+            if (!state.collection?.groups) return;
+
+            // Find the dragged request and its group
+            let draggedReq = null;
+            let draggedGroupIdx = -1;
+            let draggedReqIdx = -1;
+
+            for (let g = 0; g < state.collection.groups.length; g++) {
+                const group = state.collection.groups[g];
+                const reqIdx = (group.requests || []).findIndex(r => r.id === draggedId);
+                if (reqIdx !== -1) {
+                    draggedReq = group.requests[reqIdx];
+                    draggedGroupIdx = g;
+                    draggedReqIdx = reqIdx;
+                    break;
+                }
+            }
+
+            if (!draggedReq || draggedGroupIdx === -1) return;
+
+            // Find the target request and its group
+            let targetGroupIdx = -1;
+            let targetReqIdx = -1;
+
+            for (let g = 0; g < state.collection.groups.length; g++) {
+                const group = state.collection.groups[g];
+                const reqIdx = (group.requests || []).findIndex(r => r.id === targetId);
+                if (reqIdx !== -1) {
+                    targetGroupIdx = g;
+                    targetReqIdx = reqIdx;
+                    break;
+                }
+            }
+
+            if (targetGroupIdx === -1) return;
+
+            // Remove from original position
+            state.collection.groups[draggedGroupIdx].requests.splice(draggedReqIdx, 1);
+
+            // Insert at target position
+            if (draggedGroupIdx === targetGroupIdx && draggedReqIdx < targetReqIdx) {
+                targetReqIdx--;
+            }
+            state.collection.groups[targetGroupIdx].requests.splice(targetReqIdx, 0, draggedReq);
+        }
+
+        function syncAllRequestsFromCollection() {
+            state.allRequests = [];
+            for (const group of (state.collection?.groups || [])) {
+                for (const req of (group.requests || [])) {
+                    state.allRequests.push(req);
+                }
+                syncSubgroupRequests(group.subgroups || []);
+            }
+        }
+
+        function syncSubgroupRequests(subgroups) {
+            for (const sg of subgroups) {
+                for (const req of (sg.requests || [])) {
+                    state.allRequests.push(req);
+                }
+                syncSubgroupRequests(sg.subgroups || []);
             }
         }
 
@@ -775,12 +949,15 @@
         }
 
         // Execute Collection
+        let execPollTimer = null;
+
         async function executeCollection() {
             if (!state.collection) {
                 setStatus('请先导入 Collection', 'error');
                 return;
             }
 
+            showExecModal('执行中...', true);
             setStatus('正在提交执行任务...');
             try {
                 const resp = await fetch('/api/collection-editor/save', {
@@ -818,20 +995,84 @@
                     });
                     const runData = await runResp.json();
                     if (runResp.ok && runData.job_id) {
-                        setStatus('执行任务已提交，正在跳转到状态页...');
-                        setTimeout(() => {
-                            window.location.href = `/api/run-postman-status/${runData.job_id}`;
-                        }, 1000);
+                        setStatus('执行任务已提交，正在轮询状态...');
+                        startExecPolling(runData.job_id);
                     } else {
                         const errCode = runData.error_code ? `[${runData.error_code}] ` : '';
-                        setStatus('执行提交失败：' + errCode + (runData.details || runData.message || '请查看错误码联系开发'), 'error');
+                        showExecResult(false, '执行提交失败', errCode + (runData.details || runData.message || '请查看错误码联系开发'), null);
                     }
                 } else {
                     const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    setStatus('保存失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
+                    showExecResult(false, '保存失败', errCode + (data.details || data.message || '请查看错误码联系开发'), null);
                 }
             } catch (e) {
-                setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
+                showExecResult(false, '请求失败', e.message + '（COM_NET_001）', null);
+            }
+        }
+
+        function showExecModal(title, showProgress) {
+            document.getElementById('execModal').classList.add('visible');
+            document.getElementById('execModalTitle').textContent = title;
+            document.getElementById('execProgressSection').style.display = showProgress ? '' : 'none';
+            document.getElementById('execResultSection').style.display = showProgress ? 'none' : '';
+            if (showProgress) {
+                document.getElementById('execProgressFill').style.width = '0%';
+                document.getElementById('execProgressText').textContent = '0%';
+                document.getElementById('execDetail').textContent = '等待任务启动...';
+            }
+        }
+
+        function startExecPolling(jobId) {
+            if (execPollTimer) clearInterval(execPollTimer);
+            execPollTimer = setInterval(async () => {
+                try {
+                    const resp = await fetch(`/api/run-postman-status/${jobId}`);
+                    const data = await resp.json();
+                    const pct = data.percent || 0;
+                    document.getElementById('execProgressFill').style.width = pct + '%';
+                    document.getElementById('execProgressText').textContent = `${pct}%  (${data.completed || 0}/${data.total || 0})`;
+                    document.getElementById('execDetail').textContent = data.message || '执行中...';
+
+                    if (data.status === 'success' || data.status === 'failed') {
+                        clearInterval(execPollTimer);
+                        execPollTimer = null;
+                        const ok = data.status === 'success';
+                        const reportName = data.report_name || '';
+                        const detail = ok
+                            ? `全部完成：${data.completed}/${data.total} 个接口`
+                            : `执行失败：${data.message || '未知错误'}`;
+                        const reportUrl = reportName ? `/report-view?name=${encodeURIComponent(reportName)}` : null;
+                        showExecResult(ok, ok ? '执行完成' : '执行失败', detail, reportUrl);
+                    }
+                } catch (e) {
+                    clearInterval(execPollTimer);
+                    execPollTimer = null;
+                    showExecResult(false, '轮询失败', e.message + '（COM_NET_001）', null);
+                }
+            }, 1500);
+        }
+
+        function showExecResult(ok, title, detail, reportUrl) {
+            document.getElementById('execModalTitle').textContent = ok ? '执行完成' : '执行失败';
+            document.getElementById('execProgressSection').style.display = 'none';
+            document.getElementById('execResultSection').style.display = '';
+            const box = document.getElementById('execResultBox');
+            box.className = 'exec-result' + (ok ? ' ok' : ' error');
+            document.getElementById('execResultTitle').textContent = title;
+            document.getElementById('execResultDetail').textContent = detail;
+            const linkEl = document.getElementById('execResultLink');
+            if (reportUrl) {
+                linkEl.innerHTML = `<a href="${reportUrl}" target="_blank">📊 查看测试报告</a>`;
+            } else {
+                linkEl.innerHTML = '';
+            }
+        }
+
+        function closeExecModal() {
+            document.getElementById('execModal').classList.remove('visible');
+            if (execPollTimer) {
+                clearInterval(execPollTimer);
+                execPollTimer = null;
             }
         }
 
