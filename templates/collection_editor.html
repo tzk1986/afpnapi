@@ -151,6 +151,51 @@
         .var-ac-value { color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
         .var-ac-source { font-size: 10px; color: #94a3b8; padding: 1px 5px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; }
         .var-ac-empty { padding: 10px 12px; color: #94a3b8; font-size: 12px; }
+
+        /* Dropdown Menu */
+        .dropdown-wrap { position: relative; display: inline-block; }
+        .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; z-index: 500; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 200px; padding: 4px 0; margin-top: 4px; }
+        .dropdown-menu.visible { display: block; }
+        .dropdown-item { padding: 8px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: #334155; }
+        .dropdown-item:hover { background: #eff6ff; }
+        .dropdown-item.disabled { color: #94a3b8; cursor: not-allowed; }
+        .dropdown-item.disabled:hover { background: transparent; }
+        .dropdown-sep { height: 1px; background: #e2e8f0; margin: 4px 0; }
+
+        /* Generic Modal (for add/copy/folder/import) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1500; justify-content: center; align-items: center; }
+        .modal-overlay.visible { display: flex; }
+        .modal-box { background: #fff; border-radius: 12px; padding: 24px 28px; width: 460px; max-width: 90vw; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+        .modal-box h2 { font-size: 16px; color: #0f172a; margin-bottom: 16px; }
+        .modal-box .field { margin-bottom: 14px; }
+        .modal-box .field label { font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 5px; display: block; }
+        .modal-box .field input, .modal-box .field select, .modal-box .field textarea { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+        /* Context Menu */
+        .ctx-menu { display: none; position: fixed; z-index: 2500; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.15); min-width: 160px; padding: 4px 0; }
+        .ctx-menu.visible { display: block; }
+        .ctx-menu-item { padding: 7px 14px; cursor: pointer; font-size: 13px; color: #334155; }
+        .ctx-menu-item:hover { background: #eff6ff; }
+        .ctx-menu-sep { height: 1px; background: #e2e8f0; margin: 4px 0; }
+
+        /* Folder Title */
+        .tree-group-title { display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px; padding: 6px 10px; }
+        .tree-group-title:hover { background: #f1f5f9; }
+        .tree-group-title.drag-over-folder { background: #dbeafe; outline: 2px dashed #3b82f6; }
+        .tree-group-title .folder-drag-handle { color: #94a3b8; cursor: move; font-size: 11px; }
+        .tree-group-title .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tree-group-title .folder-name-edit { flex: 1; padding: 2px 6px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 12px; font-weight: 600; outline: none; }
+        .tree-group-title .folder-actions { display: none; gap: 4px; }
+        .tree-group-title:hover .folder-actions { display: flex; }
+        .folder-action-btn { background: none; border: none; cursor: pointer; font-size: 11px; color: #64748b; padding: 2px 4px; border-radius: 3px; }
+        .folder-action-btn:hover { background: #e2e8f0; }
+        .root-drop-zone { min-height: 20px; border: 2px dashed transparent; border-radius: 6px; transition: all 0.15s; }
+        .root-drop-zone.drag-over-root { border-color: #3b82f6; background: #eff6ff; }
+
+        /* Import textarea */
+        .import-textarea { width: 100%; min-height: 140px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: Consolas, monospace; font-size: 12px; resize: vertical; }
+        .import-preview { margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 12px; max-height: 300px; overflow-y: auto; }
     </style>
 </head>
 <body>
@@ -181,6 +226,21 @@
                         <input type="checkbox" id="selectAllCb" onchange="toggleSelectAll(this.checked)"> 全选
                     </label>
                     <button type="button" class="btn btn-secondary" style="font-size:11px;padding:4px 8px;margin-left:auto;" onclick="deleteSelected()">🗑 删除选中</button>
+                </div>
+                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                    <div class="dropdown-wrap" style="flex:1;">
+                        <button type="button" class="btn btn-secondary" style="width:100%;font-size:12px;padding:5px 8px;" onclick="toggleAddDropdown()" id="addDropdownBtn">+ 新增 ▾</button>
+                        <div class="dropdown-menu" id="addDropdown">
+                            <div class="dropdown-item" onclick="showBlankInterfaceModal()">✚ 空白接口</div>
+                            <div class="dropdown-item" id="menuCopyCurrent" onclick="showCopyCurrentModal()">⧉ 复制当前接口</div>
+                            <div class="dropdown-item" id="menuCopySelected" onclick="showCopySelectedModal()">⧉ 复制已选接口</div>
+                            <div class="dropdown-sep"></div>
+                            <div class="dropdown-item" onclick="showCurlImportModal()">⟲ 从 cURL 导入</div>
+                            <div class="dropdown-item" onclick="showHarImportModal()">⟲ 从 HAR 导入</div>
+                            <div class="dropdown-item" onclick="showSnippetImportModal()">⟲ 从 Postman 代码片段导入</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" style="font-size:12px;padding:5px 8px;" onclick="showNewFolderModal()">📁 新建文件夹</button>
                 </div>
                 <div id="treeContainer">
                     <div class="empty-state">
@@ -213,6 +273,118 @@
 
     <!-- Variable Autocomplete -->
     <div class="var-autocomplete" id="varAutocomplete"></div>
+
+    <!-- Context Menu -->
+    <div class="ctx-menu" id="ctxMenu">
+        <div class="ctx-menu-item" onclick="ctxCopyInterface()">⧉ 复制接口</div>
+        <div class="ctx-menu-item" onclick="ctxCopyToGroup()">⧉ 复制到...</div>
+        <div class="ctx-menu-sep"></div>
+        <div class="ctx-menu-item" onclick="ctxDeleteInterface()">🗑 删除接口</div>
+    </div>
+
+    <!-- Blank Interface Modal -->
+    <div class="modal-overlay" id="blankModal">
+        <div class="modal-box">
+            <h2>✚ 新建空白接口</h2>
+            <div class="field"><label>接口名称</label><input type="text" id="blankName" value="新接口"></div>
+            <div class="field"><label>请求方法</label>
+                <select id="blankMethod"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option></select>
+            </div>
+            <div class="field"><label>URL</label><input type="text" id="blankUrl" placeholder="{{baseUrl}}/api/path"></div>
+            <div class="field"><label>描述（可选）</label><textarea id="blankDesc" rows="2"></textarea></div>
+            <div class="field"><label>目标分组</label><select id="blankGroup"></select></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('blankModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmBlankInterface()">确认新增</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Interface Modal -->
+    <div class="modal-overlay" id="copyModal">
+        <div class="modal-box">
+            <h2 id="copyModalTitle">⧉ 复制接口</h2>
+            <div id="copyModalBody"></div>
+            <div class="field"><label>目标分组</label><select id="copyGroup"></select></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('copyModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmCopyInterfaces()">确认复制</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- cURL Import Modal -->
+    <div class="modal-overlay" id="curlModal">
+        <div class="modal-box" style="width:560px;">
+            <h2>⟲ 从 cURL 导入</h2>
+            <div class="field"><label>cURL 命令</label><textarea class="import-textarea" id="curlInput" placeholder="粘贴 cURL 命令，如：&#10;curl -X POST http://api.example.com/login \&#10;  -H 'Content-Type: application/json' \&#10;  -d '{&quot;username&quot;:&quot;admin&quot;}'"></textarea></div>
+            <div class="field"><label>目标分组</label><select id="curlGroup"></select></div>
+            <div id="curlPreview" class="import-preview" style="display:none;"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('curlModal')">取消</button>
+                <button type="button" class="btn btn-secondary" onclick="previewCurl()">解析预览</button>
+                <button type="button" class="btn btn-primary" id="curlConfirmBtn" onclick="confirmCurlImport()" style="display:none;">确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HAR Import Modal -->
+    <div class="modal-overlay" id="harModal">
+        <div class="modal-box" style="width:600px;">
+            <h2>⟲ 从 HAR 导入</h2>
+            <div class="field"><label>HAR JSON（粘贴内容或上传文件）</label>
+                <textarea class="import-textarea" id="harInput" placeholder="粘贴 HAR JSON 内容..." style="min-height:100px;"></textarea>
+                <input type="file" id="harFile" accept=".har" style="margin-top:6px;font-size:12px;" onchange="handleHarFile(event)">
+            </div>
+            <div class="field"><label><input type="checkbox" id="harExtractResponse" checked> 从响应 body 自动提取变量（写入 x_extract）</label></div>
+            <div class="field"><label>目标分组</label><select id="harGroup"></select></div>
+            <div id="harPreview" class="import-preview" style="display:none;"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('harModal')">取消</button>
+                <button type="button" class="btn btn-secondary" onclick="previewHar()">解析预览</button>
+                <button type="button" class="btn btn-primary" id="harConfirmBtn" onclick="confirmHarImport()" style="display:none;">确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Postman Snippet Import Modal -->
+    <div class="modal-overlay" id="snippetModal">
+        <div class="modal-box" style="width:560px;">
+            <h2>⟲ 从 Postman 代码片段导入</h2>
+            <div class="field"><label>语言</label>
+                <select id="snippetLang">
+                    <option value="auto">自动检测</option>
+                    <option value="python">Python (requests)</option>
+                    <option value="fetch">JavaScript (fetch)</option>
+                    <option value="axios">JavaScript (axios)</option>
+                    <option value="go">Go (net/http)</option>
+                    <option value="java">Java (OkHttp)</option>
+                    <option value="curl">cURL</option>
+                </select>
+            </div>
+            <div class="field"><label>代码片段</label><textarea class="import-textarea" id="snippetInput" placeholder="粘贴代码片段..." style="min-height:160px;"></textarea></div>
+            <div class="field"><label>目标分组</label><select id="snippetGroup"></select></div>
+            <div id="snippetPreview" class="import-preview" style="display:none;"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('snippetModal')">取消</button>
+                <button type="button" class="btn btn-secondary" onclick="previewSnippet()">解析预览</button>
+                <button type="button" class="btn btn-primary" id="snippetConfirmBtn" onclick="confirmSnippetImport()" style="display:none;">确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div class="modal-overlay" id="folderModal">
+        <div class="modal-box">
+            <h2>📁 新建文件夹</h2>
+            <div class="field"><label>文件夹名称</label><input type="text" id="folderName" value="新建文件夹"></div>
+            <div class="field"><label>父级分组</label><select id="folderParent"></select></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('folderModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmNewFolder()">确认创建</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Execution Modal -->
     <div class="exec-modal-overlay" id="execModal">
@@ -308,16 +480,38 @@
             document.getElementById('requestCount').textContent = `${state.allRequests.length} 个接口`;
 
             let html = '';
-            for (const g of groups) {
-                html += renderGroup(g, 0);
+            for (let i = 0; i < groups.length; i++) {
+                html += renderGroup(groups[i], 0, String(i));
             }
-            container.innerHTML = html || '<div class="empty-state"><p>暂无接口</p></div>';
+            html += '<div class="root-drop-zone" id="rootDropZone" ondragover="handleRootDragOver(event)" ondragleave="handleRootDragLeave(event)" ondrop="handleRootDrop(event)"></div>';
+            container.innerHTML = html || '<div class="empty-state"><p>📂 点击"+ 新增"创建接口，或"导入 JSON"加载文件</p></div>';
+            updateAddDropdownState();
         }
 
-        function renderGroup(group, depth) {
+        function renderGroup(group, depth, path) {
+            const groupPath = path || '';
             let html = '';
             if (group.group_name) {
-                html += `<div class="tree-group-title" style="margin-left:${depth * 12}px;">📁 ${escapeHtml(group.group_name)}</div>`;
+                const subCount = countRequestsInGroup(group);
+                html += `<div class="tree-group-title" style="margin-left:${depth * 12}px;"
+                    data-group-path="${escapeAttr(groupPath)}"
+                    draggable="true"
+                    ondragstart="handleFolderDragStart(event)"
+                    ondragover="handleFolderDragOver(event)"
+                    ondragleave="handleFolderDragLeave(event)"
+                    ondrop="handleFolderDrop(event)"
+                    ondragend="handleFolderDragEnd(event)"
+                    ondblclick="startRenameFolder(this)"
+                    oncontextmenu="showFolderContextMenu(event, '${escapeAttr(groupPath)}')">
+                    <span class="folder-drag-handle" title="拖拽移动文件夹">⇅</span>
+                    <span>📁</span>
+                    <span class="folder-name">${escapeHtml(group.group_name)}</span>
+                    <span style="font-size:10px;color:#94a3b8;font-weight:400;">(${subCount})</span>
+                    <span class="folder-actions">
+                        <button type="button" class="folder-action-btn" title="重命名" onclick="event.stopPropagation();startRenameFolder(this.closest('.tree-group-title'))">✏️</button>
+                        <button type="button" class="folder-action-btn" title="删除" onclick="event.stopPropagation();deleteFolder('${escapeAttr(groupPath)}')">🗑</button>
+                    </span>
+                </div>`;
             }
             for (const req of (group.requests || [])) {
                 const checked = state.selectedIds?.has(req.id) ? 'checked' : '';
@@ -325,8 +519,9 @@
                     style="margin-left:${(depth + 1) * 12}px;"
                     draggable="true"
                     data-req-id="${req.id}"
-                    data-group-idx="${group._idx}"
+                    data-group-path="${escapeAttr(groupPath)}"
                     onclick="selectRequest('${req.id}')"
+                    oncontextmenu="showInterfaceContextMenu(event, '${req.id}')"
                     ondragstart="handleDragStart(event)"
                     ondragover="handleDragOver(event)"
                     ondragleave="handleDragLeave(event)"
@@ -337,10 +532,19 @@
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(req.name || req.url || '未命名')}</span>
                 </div>`;
             }
-            for (const sg of (group.subgroups || [])) {
-                html += renderGroup(sg, depth + 1);
+            for (let i = 0; i < (group.subgroups || []).length; i++) {
+                const sgPath = groupPath + '.' + i;
+                html += renderGroup(group.subgroups[i], depth + 1, sgPath);
             }
             return html;
+        }
+
+        function countRequestsInGroup(group) {
+            let count = (group.requests || []).length;
+            for (const sg of (group.subgroups || [])) {
+                count += countRequestsInGroup(sg);
+            }
+            return count;
         }
 
         // Select Request
@@ -355,104 +559,339 @@
             }
         }
 
-        // Drag and Drop for Reordering
-        let draggedReqId = null;
+        // Drag and Drop for Reordering / Cross-folder Move
+        let draggedReqIds = [];
+        let dragType = '';  // 'request' or 'folder'
+        let draggedFolderPath = '';
 
         function handleDragStart(event) {
-            draggedReqId = event.target.dataset.reqId;
-            event.target.classList.add('dragging');
+            const el = event.target.closest('.tree-item');
+            if (!el) return;
+            const reqId = el.dataset.reqId;
+            dragType = 'request';
+
+            // If this item is selected, drag all selected; otherwise drag only this
+            if (state.selectedIds.has(reqId)) {
+                draggedReqIds = [...state.selectedIds];
+            } else {
+                draggedReqIds = [reqId];
+            }
+            el.classList.add('dragging');
             event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', draggedReqId);
+            event.dataTransfer.setData('text/plain', reqId);
         }
 
         function handleDragOver(event) {
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
+            if (dragType !== 'request') return;
             const target = event.target.closest('.tree-item');
-            if (target && target.dataset.reqId !== draggedReqId) {
+            if (target && !draggedReqIds.includes(target.dataset.reqId)) {
                 target.classList.add('drag-over');
             }
         }
 
         function handleDragLeave(event) {
             const target = event.target.closest('.tree-item');
-            if (target) {
-                target.classList.remove('drag-over');
-            }
+            if (target) target.classList.remove('drag-over');
         }
 
         function handleDrop(event) {
             event.preventDefault();
+            if (dragType !== 'request') return;
             const target = event.target.closest('.tree-item');
-            if (!target || target.dataset.reqId === draggedReqId) return;
-
+            if (!target || draggedReqIds.includes(target.dataset.reqId)) return;
             target.classList.remove('drag-over');
-            const targetReqId = target.dataset.reqId;
-
-            // Reorder in state.collection
-            reorderRequests(draggedReqId, targetReqId);
-
-            // Update allRequests to match new order
-            syncAllRequestsFromCollection();
-
-            // Re-render
-            renderTree();
-            setStatus('接口顺序已调整', 'info');
+            moveRequestsToRequest(target.dataset.reqId);
         }
 
         function handleDragEnd(event) {
             event.target.classList.remove('dragging');
-            document.querySelectorAll('.tree-item').forEach(item => {
-                item.classList.remove('drag-over');
-            });
-            draggedReqId = null;
+            document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('drag-over'));
+            document.querySelectorAll('.tree-group-title').forEach(i => i.classList.remove('drag-over-folder'));
+            const rz = document.getElementById('rootDropZone');
+            if (rz) rz.classList.remove('drag-over-root');
+            draggedReqIds = [];
+            dragType = '';
+            draggedFolderPath = '';
         }
 
-        function reorderRequests(draggedId, targetId) {
-            if (!state.collection?.groups) return;
+        function moveRequestsToRequest(targetReqId) {
+            if (!state.collection?.groups || draggedReqIds.length === 0) return;
+            const targetLoc = findRequestLocation(targetReqId);
+            if (!targetLoc) return;
+            moveRequestsToGroup(targetLoc.groupPath, targetLoc.reqIndex);
+        }
 
-            // Find the dragged request and its group
-            let draggedReq = null;
-            let draggedGroupIdx = -1;
-            let draggedReqIdx = -1;
+        function moveRequestsToGroup(targetGroupPath, insertAtIndex) {
+            if (!state.collection?.groups || draggedReqIds.length === 0) return;
+            const targetGroup = findGroupByPath(targetGroupPath);
+            if (!targetGroup) return;
 
-            for (let g = 0; g < state.collection.groups.length; g++) {
-                const group = state.collection.groups[g];
-                const reqIdx = (group.requests || []).findIndex(r => r.id === draggedId);
-                if (reqIdx !== -1) {
-                    draggedReq = group.requests[reqIdx];
-                    draggedGroupIdx = g;
-                    draggedReqIdx = reqIdx;
-                    break;
+            // Pre-collect locations before any removal
+            const locations = [];
+            for (const rid of draggedReqIds) {
+                const loc = findRequestLocation(rid);
+                if (loc) locations.push({ ...loc, rid });
+            }
+
+            // Group removals by groupPath, sort descending to avoid index shift
+            const byGroup = {};
+            for (const loc of locations) {
+                if (!byGroup[loc.groupPath]) byGroup[loc.groupPath] = [];
+                byGroup[loc.groupPath].push(loc);
+            }
+            const movedReqs = [];
+            for (const [gPath, locs] of Object.entries(byGroup)) {
+                locs.sort((a, b) => b.reqIndex - a.reqIndex);
+                const group = findGroupByPath(gPath);
+                if (group) {
+                    for (const loc of locs) {
+                        const [req] = group.requests.splice(loc.reqIndex, 1);
+                        movedReqs.unshift(req);
+                    }
                 }
             }
 
-            if (!draggedReq || draggedGroupIdx === -1) return;
+            // Calculate adjusted insert index
+            if (insertAtIndex === undefined || insertAtIndex === null) {
+                insertAtIndex = targetGroup.requests.length;
+            } else {
+                let adjusted = insertAtIndex;
+                for (const loc of locations) {
+                    if (loc.groupPath === targetGroupPath && loc.reqIndex < adjusted) {
+                        adjusted--;
+                    }
+                }
+                insertAtIndex = Math.min(Math.max(0, adjusted), targetGroup.requests.length);
+            }
 
-            // Find the target request and its group
-            let targetGroupIdx = -1;
-            let targetReqIdx = -1;
+            targetGroup.requests.splice(insertAtIndex, 0, ...movedReqs);
+            syncAllRequestsFromCollection();
+            renderTree();
+            setStatus(`已移动 ${movedReqs.length} 个接口`, 'info');
+        }
 
-            for (let g = 0; g < state.collection.groups.length; g++) {
-                const group = state.collection.groups[g];
-                const reqIdx = (group.requests || []).findIndex(r => r.id === targetId);
-                if (reqIdx !== -1) {
-                    targetGroupIdx = g;
-                    targetReqIdx = reqIdx;
+        function findRequestLocation(reqId) {
+            function walk(gs, parentPath) {
+                for (let g = 0; g < gs.length; g++) {
+                    const gPath = parentPath === '' ? String(g) : parentPath + '.' + g;
+                    const idx = (gs[g].requests || []).findIndex(r => r.id === reqId);
+                    if (idx !== -1) return { groupPath: gPath, reqIndex: idx };
+                    const sub = walk(gs[g].subgroups || [], gPath);
+                    if (sub) return sub;
+                }
+                return null;
+            }
+            return walk(state.collection.groups, '');
+        }
+
+        // Root drop zone handlers
+        function handleRootDragOver(event) {
+            if (dragType !== 'request') return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            event.currentTarget.classList.add('drag-over-root');
+        }
+
+        function handleRootDragLeave(event) {
+            event.currentTarget.classList.remove('drag-over-root');
+        }
+
+        function handleRootDrop(event) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over-root');
+            if (dragType !== 'request' || draggedReqIds.length === 0) return;
+            // Move to root (first unnamed group, or create one)
+            let rootGroup = null;
+            let rootPath = '';
+            for (let i = 0; i < state.collection.groups.length; i++) {
+                if (!state.collection.groups[i].group_name) {
+                    rootGroup = state.collection.groups[i];
+                    rootPath = String(i);
                     break;
                 }
             }
-
-            if (targetGroupIdx === -1) return;
-
-            // Remove from original position
-            state.collection.groups[draggedGroupIdx].requests.splice(draggedReqIdx, 1);
-
-            // Insert at target position
-            if (draggedGroupIdx === targetGroupIdx && draggedReqIdx < targetReqIdx) {
-                targetReqIdx--;
+            if (!rootGroup) {
+                rootGroup = { group_name: '', requests: [], subgroups: [] };
+                state.collection.groups.unshift(rootGroup);
+                rootPath = '0';
             }
-            state.collection.groups[targetGroupIdx].requests.splice(targetReqIdx, 0, draggedReq);
+            moveRequestsToGroup(rootPath, rootGroup.requests.length);
+        }
+
+        // Folder drag-and-drop
+        function handleFolderDragStart(event) {
+            const el = event.target.closest('.tree-group-title');
+            if (!el) return;
+            if (event.target.closest('.folder-action-btn')) return;  // Don't drag from buttons
+            dragType = 'folder';
+            draggedFolderPath = el.dataset.groupPath;
+            el.style.opacity = '0.5';
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', 'folder:' + draggedFolderPath);
+        }
+
+        function handleFolderDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.dataTransfer.dropEffect = 'move';
+            const el = event.target.closest('.tree-group-title');
+            if (!el) return;
+            if (dragType === 'folder' && el.dataset.groupPath !== draggedFolderPath) {
+                el.classList.add('drag-over-folder');
+            } else if (dragType === 'request') {
+                el.classList.add('drag-over-folder');
+            }
+        }
+
+        function handleFolderDragLeave(event) {
+            const el = event.target.closest('.tree-group-title');
+            if (el) el.classList.remove('drag-over-folder');
+        }
+
+        function handleFolderDragEnd(event) {
+            const el = event.target.closest('.tree-group-title');
+            if (el) el.style.opacity = '';
+            document.querySelectorAll('.tree-group-title').forEach(i => i.classList.remove('drag-over-folder'));
+            dragType = '';
+            draggedFolderPath = '';
+        }
+
+        function handleFolderDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const el = event.target.closest('.tree-group-title');
+            if (!el) return;
+            el.classList.remove('drag-over-folder');
+
+            if (dragType === 'folder') {
+                if (el.dataset.groupPath === draggedFolderPath) return;
+                const targetPath = el.dataset.groupPath;
+                if (targetPath.startsWith(draggedFolderPath + '.')) {
+                    setStatus('不能将文件夹拖入自己的子文件夹', 'error');
+                    return;
+                }
+                moveFolder(draggedFolderPath, targetPath);
+            } else if (dragType === 'request' && draggedReqIds.length > 0) {
+                // Drop request(s) into this folder (append at end)
+                const targetPath = el.dataset.groupPath;
+                moveRequestsToGroup(targetPath);
+            }
+        }
+
+        function moveFolder(sourcePath, targetPath) {
+            const sourceGroup = findGroupByPath(sourcePath);
+            const targetGroup = findGroupByPath(targetPath);
+            if (!sourceGroup || !targetGroup) return;
+
+            // Remove from source parent
+            removeGroupByPath(sourcePath);
+            // Add as subgroup of target
+            if (!targetGroup.subgroups) targetGroup.subgroups = [];
+            targetGroup.subgroups.push(sourceGroup);
+            syncAllRequestsFromCollection();
+            renderTree();
+            setStatus(`已将"${sourceGroup.group_name}"移入"${targetGroup.group_name}"`, 'info');
+        }
+
+        function findGroupByPath(path) {
+            if (!path || !state.collection?.groups) return null;
+            const parts = path.split('.').map(Number);
+            let current = state.collection.groups[parts[0]];
+            if (!current) return null;
+            for (let i = 1; i < parts.length; i++) {
+                current = (current.subgroups || [])[parts[i]];
+                if (!current) return null;
+            }
+            return current;
+        }
+
+        function removeGroupByPath(path) {
+            const parts = path.split('.').map(Number);
+            if (parts.length === 1) {
+                state.collection.groups.splice(parts[0], 1);
+            } else {
+                const parentParts = parts.slice(0, -1);
+                const parent = findGroupByPath(parentParts.join('.'));
+                if (parent) parent.subgroups.splice(parts[parts.length - 1], 1);
+            }
+        }
+
+        // List all groups for dropdown selection
+        function listAllGroups() {
+            const result = [];
+            function walk(gs, prefix) {
+                for (let i = 0; i < gs.length; i++) {
+                    const g = gs[i];
+                    const path = prefix !== '' ? prefix + '.' + i : String(i);
+                    const label = g.group_name ? g.group_name : '（根目录）';
+                    const depth = path.split('.').length - 1;
+                    result.push({ path, label: ' '.repeat(depth) + label, group: g });
+                    walk(g.subgroups || [], path);
+                }
+            }
+            walk(state.collection?.groups || [], '');
+            return result;
+        }
+
+        function fillGroupSelect(selectId) {
+            const sel = document.getElementById(selectId);
+            if (!sel) return;
+            const groups = listAllGroups();
+            let html = '';
+            for (const g of groups) {
+                html += `<option value="${escapeAttr(g.path)}">${escapeHtml(g.label)}</option>`;
+            }
+            sel.innerHTML = html || '<option value="">（无可用分组）</option>';
+        }
+
+        function getDefaultGroupPath() {
+            // If there's a selected request, return its group path
+            if (state.currentRequestId) {
+                const loc = findRequestLocation(state.currentRequestId);
+                if (loc) return loc.groupPath;
+            }
+            // Otherwise return first group
+            if (state.collection?.groups?.length > 0) return '0';
+            return '';
+        }
+
+        function ensureCollectionInitialized() {
+            if (!state.collection) {
+                state.collection = {
+                    collection_info: {
+                        name: 'Collection',
+                        schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+                        _postman_id: generateId(),
+                        variables: []
+                    },
+                    groups: [{ group_name: '', requests: [], subgroups: [] }]
+                };
+                state.allRequests = [];
+            }
+        }
+
+        function generateId() {
+            return Math.random().toString(16).substring(2, 10);
+        }
+
+        function addRequestToGroup(groupPath, req) {
+            ensureCollectionInitialized();
+            let group;
+            if (groupPath) {
+                group = findGroupByPath(groupPath);
+            }
+            if (!group) {
+                // Fallback: add to first group
+                group = state.collection.groups[0];
+                if (!group) {
+                    group = { group_name: '', requests: [], subgroups: [] };
+                    state.collection.groups.unshift(group);
+                }
+            }
+            group.requests.push(req);
+            state.allRequests.push(req);
         }
 
         function syncAllRequestsFromCollection() {
@@ -1357,6 +1796,888 @@
 
             const extractTab = document.querySelector('.tab:last-child');
             if (extractTab) switchTab('extract', extractTab);
+        }
+
+        // ---- Dropdown Menu ----
+        function toggleAddDropdown() {
+            const dd = document.getElementById('addDropdown');
+            dd.classList.toggle('visible');
+            if (dd.classList.contains('visible')) {
+                updateAddDropdownState();
+                const close = (e) => {
+                    if (!e.target.closest('.dropdown-wrap')) {
+                        dd.classList.remove('visible');
+                        document.removeEventListener('click', close);
+                    }
+                };
+                setTimeout(() => document.addEventListener('click', close), 0);
+            }
+        }
+
+        function closeAddDropdown() {
+            document.getElementById('addDropdown').classList.remove('visible');
+        }
+
+        function updateAddDropdownState() {
+            const hasSelection = state.selectedIds.size > 0;
+            const copyCurrent = document.getElementById('menuCopyCurrent');
+            const copySelected = document.getElementById('menuCopySelected');
+            if (copyCurrent) copyCurrent.classList.toggle('disabled', !state.currentRequestId);
+            if (copySelected) copySelected.classList.toggle('disabled', !hasSelection);
+            if (copySelected && hasSelection) {
+                copySelected.textContent = `⧉ 复制已选接口（${state.selectedIds.size}）`;
+            } else if (copySelected) {
+                copySelected.textContent = '⧉ 复制已选接口';
+            }
+        }
+
+        // ---- Modal Helpers ----
+        function openModal(id) {
+            document.getElementById(id).classList.add('visible');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('visible');
+        }
+
+        // Close modals on overlay click
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                e.target.classList.remove('visible');
+            }
+        });
+
+        // ---- Blank Interface ----
+        function showBlankInterfaceModal() {
+            closeAddDropdown();
+            ensureCollectionInitialized();
+            document.getElementById('blankName').value = '新接口';
+            document.getElementById('blankMethod').value = 'GET';
+            document.getElementById('blankUrl').value = '';
+            document.getElementById('blankDesc').value = '';
+            fillGroupSelect('blankGroup');
+            const defPath = getDefaultGroupPath();
+            if (defPath) document.getElementById('blankGroup').value = defPath;
+            openModal('blankModal');
+        }
+
+        function confirmBlankInterface() {
+            const name = document.getElementById('blankName').value.trim() || '新接口';
+            const method = document.getElementById('blankMethod').value;
+            const url = document.getElementById('blankUrl').value.trim();
+            const desc = document.getElementById('blankDesc').value.trim();
+            const groupPath = document.getElementById('blankGroup').value;
+
+            const req = {
+                id: generateId(),
+                name,
+                method,
+                url: url || '{{baseUrl}}/',
+                headers: [],
+                params: [],
+                body_mode: 'none',
+                body_data: {},
+                x_extract: {},
+                description: desc
+            };
+            addRequestToGroup(groupPath, req);
+            closeModal('blankModal');
+            renderTree();
+            selectRequest(req.id);
+            setStatus(`已新增接口：${name}`);
+        }
+
+        // ---- Copy Interfaces ----
+        let copyMode = '';  // 'single' or 'batch'
+        let copySourceIds = [];
+
+        function showCopyCurrentModal() {
+            closeAddDropdown();
+            if (!state.currentRequestId) return;
+            copyMode = 'single';
+            copySourceIds = [state.currentRequestId];
+            const src = state.allRequests.find(r => r.id === state.currentRequestId);
+            if (!src) return;
+            document.getElementById('copyModalTitle').textContent = '⧉ 复制接口';
+            document.getElementById('copyModalBody').innerHTML =
+                `<div style="padding:10px;background:#f8fafc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+                    <span class="method-badge method-${src.method}" style="margin-right:6px;">${src.method}</span>
+                    ${escapeHtml(src.name || src.url)}
+                    <span style="color:#64748b;margin-left:8px;">→ ${escapeHtml(src.name || src.url)}_副本</span>
+                </div>`;
+            ensureCollectionInitialized();
+            fillGroupSelect('copyGroup');
+            const loc = findRequestLocation(state.currentRequestId);
+            if (loc) document.getElementById('copyGroup').value = loc.groupPath;
+            openModal('copyModal');
+        }
+
+        function showCopySelectedModal() {
+            closeAddDropdown();
+            if (state.selectedIds.size === 0) return;
+            copyMode = 'batch';
+            copySourceIds = [...state.selectedIds];
+            document.getElementById('copyModalTitle').textContent = `⧉ 复制 ${copySourceIds.length} 个接口`;
+            let body = `<div style="padding:10px;background:#f8fafc;border-radius:6px;margin-bottom:12px;font-size:12px;">`;
+            for (const rid of copySourceIds) {
+                const r = state.allRequests.find(x => x.id === rid);
+                if (r) body += `<div><span class="method-badge method-${r.method}" style="margin-right:4px;font-size:9px;">${r.method}</span>${escapeHtml(r.name || r.url)}</div>`;
+            }
+            body += '</div>';
+            document.getElementById('copyModalBody').innerHTML = body;
+            ensureCollectionInitialized();
+            fillGroupSelect('copyGroup');
+            const defPath = getDefaultGroupPath();
+            if (defPath) document.getElementById('copyGroup').value = defPath;
+            openModal('copyModal');
+        }
+
+        function confirmCopyInterfaces() {
+            const targetPath = document.getElementById('copyGroup').value;
+            const copied = [];
+            for (const rid of copySourceIds) {
+                const src = state.allRequests.find(r => r.id === rid);
+                if (!src) continue;
+                const dup = JSON.parse(JSON.stringify(src));
+                dup.id = generateId();
+                dup.name = generateCopyName(src.name || '未命名', targetPath);
+                copied.push(dup);
+            }
+            const targetGroup = findGroupByPath(targetPath);
+            if (targetGroup) {
+                targetGroup.requests.push(...copied);
+                state.allRequests.push(...copied);
+            }
+            closeModal('copyModal');
+            renderTree();
+            if (copied.length === 1) selectRequest(copied[0].id);
+            setStatus(`已复制 ${copied.length} 个接口`);
+        }
+
+        function generateCopyName(baseName, groupPath) {
+            const group = findGroupByPath(groupPath);
+            if (!group) return baseName + '_副本';
+            const existing = new Set((group.requests || []).map(r => r.name));
+            let name = baseName + '_副本';
+            let n = 2;
+            while (existing.has(name)) { name = baseName + '_副本' + n; n++; }
+            return name;
+        }
+
+        // ---- Context Menu (Interface) ----
+        let ctxTargetReqId = '';
+
+        function showInterfaceContextMenu(event, reqId) {
+            event.preventDefault();
+            event.stopPropagation();
+            ctxTargetReqId = reqId;
+            const menu = document.getElementById('ctxMenu');
+            menu.style.left = event.clientX + 'px';
+            menu.style.top = event.clientY + 'px';
+            menu.classList.add('visible');
+            const close = (e) => {
+                if (!e.target.closest('.ctx-menu')) {
+                    menu.classList.remove('visible');
+                    document.removeEventListener('click', close);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        }
+
+        function ctxCopyInterface() {
+            document.getElementById('ctxMenu').classList.remove('visible');
+            if (!ctxTargetReqId) return;
+            const src = state.allRequests.find(r => r.id === ctxTargetReqId);
+            if (!src) return;
+            const loc = findRequestLocation(ctxTargetReqId);
+            const dup = JSON.parse(JSON.stringify(src));
+            dup.id = generateId();
+            dup.name = generateCopyName(src.name || '未命名', loc?.groupPath || '0');
+            const group = findGroupByPath(loc?.groupPath || '0');
+            if (group) { group.requests.push(dup); state.allRequests.push(dup); }
+            renderTree();
+            selectRequest(dup.id);
+            setStatus(`已复制接口：${src.name}`);
+        }
+
+        function ctxCopyToGroup() {
+            document.getElementById('ctxMenu').classList.remove('visible');
+            if (!ctxTargetReqId) return;
+            copyMode = 'single';
+            copySourceIds = [ctxTargetReqId];
+            const src = state.allRequests.find(r => r.id === ctxTargetReqId);
+            if (!src) return;
+            document.getElementById('copyModalTitle').textContent = '⧉ 复制到...';
+            document.getElementById('copyModalBody').innerHTML =
+                `<div style="padding:10px;background:#f8fafc;border-radius:6px;margin-bottom:12px;font-size:13px;">
+                    <span class="method-badge method-${src.method}" style="margin-right:6px;">${src.method}</span>
+                    ${escapeHtml(src.name || src.url)}
+                </div>`;
+            ensureCollectionInitialized();
+            fillGroupSelect('copyGroup');
+            openModal('copyModal');
+        }
+
+        function ctxDeleteInterface() {
+            document.getElementById('ctxMenu').classList.remove('visible');
+            if (!ctxTargetReqId) return;
+            const src = state.allRequests.find(r => r.id === ctxTargetReqId);
+            if (!src || !confirm(`确定删除接口"${src.name}"？`)) return;
+            state.allRequests = state.allRequests.filter(r => r.id !== ctxTargetReqId);
+            function removeFromGroups(gs) {
+                for (const g of gs) {
+                    g.requests = (g.requests || []).filter(r => r.id !== ctxTargetReqId);
+                    removeFromGroups(g.subgroups || []);
+                }
+            }
+            removeFromGroups(state.collection?.groups || []);
+            if (state.currentRequestId === ctxTargetReqId) {
+                state.currentRequestId = null;
+                state.editBuffer = null;
+                renderEditor();
+            }
+            state.selectedIds.delete(ctxTargetReqId);
+            renderTree();
+            setStatus(`已删除接口：${src.name}`);
+        }
+
+        // ---- Folder Context Menu ----
+        let ctxFolderPath = '';
+
+        function showFolderContextMenu(event, groupPath) {
+            event.preventDefault();
+            event.stopPropagation();
+            ctxFolderPath = groupPath;
+            // Reuse the ctx menu with folder-specific items
+            const menu = document.getElementById('ctxMenu');
+            menu.innerHTML = `
+                <div class="ctx-menu-item" onclick="ctxFolderRename()">✏️ 重命名</div>
+                <div class="ctx-menu-item" onclick="ctxFolderDelete()">🗑 删除文件夹</div>`;
+            menu.style.left = event.clientX + 'px';
+            menu.style.top = event.clientY + 'px';
+            menu.classList.add('visible');
+            const close = (e) => {
+                if (!e.target.closest('.ctx-menu')) {
+                    menu.classList.remove('visible');
+                    restoreCtxMenu();
+                    document.removeEventListener('click', close);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        }
+
+        function restoreCtxMenu() {
+            document.getElementById('ctxMenu').innerHTML = `
+                <div class="ctx-menu-item" onclick="ctxCopyInterface()">⧉ 复制接口</div>
+                <div class="ctx-menu-item" onclick="ctxCopyToGroup()">⧉ 复制到...</div>
+                <div class="ctx-menu-sep"></div>
+                <div class="ctx-menu-item" onclick="ctxDeleteInterface()">🗑 删除接口</div>`;
+        }
+
+        function ctxFolderRename() {
+            document.getElementById('ctxMenu').classList.remove('visible');
+            restoreCtxMenu();
+            const el = document.querySelector(`.tree-group-title[data-group-path="${ctxFolderPath}"]`);
+            if (el) startRenameFolder(el);
+        }
+
+        function ctxFolderDelete() {
+            document.getElementById('ctxMenu').classList.remove('visible');
+            restoreCtxMenu();
+            deleteFolder(ctxFolderPath);
+        }
+
+        // ---- New Folder ----
+        function showNewFolderModal() {
+            ensureCollectionInitialized();
+            document.getElementById('folderName').value = '新建文件夹';
+            fillGroupSelect('folderParent');
+            openModal('folderModal');
+        }
+
+        function confirmNewFolder() {
+            const name = document.getElementById('folderName').value.trim() || '新建文件夹';
+            const parentPath = document.getElementById('folderParent').value;
+            const newGroup = { group_name: name, requests: [], subgroups: [] };
+
+            if (!parentPath) {
+                // Add to root
+                state.collection.groups.push(newGroup);
+            } else {
+                const parent = findGroupByPath(parentPath);
+                if (parent) {
+                    if (!parent.subgroups) parent.subgroups = [];
+                    parent.subgroups.push(newGroup);
+                } else {
+                    state.collection.groups.push(newGroup);
+                }
+            }
+            closeModal('folderModal');
+            syncAllRequestsFromCollection();
+            renderTree();
+            setStatus(`已创建文件夹：${name}`);
+        }
+
+        // ---- Folder Rename ----
+        function startRenameFolder(titleEl) {
+            const groupPath = titleEl.dataset.groupPath;
+            const group = findGroupByPath(groupPath);
+            if (!group) return;
+            const nameSpan = titleEl.querySelector('.folder-name');
+            if (!nameSpan) return;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'folder-name-edit';
+            input.value = group.group_name;
+            nameSpan.replaceWith(input);
+            input.focus();
+            input.select();
+
+            const finish = () => {
+                const newName = input.value.trim() || group.group_name;
+                group.group_name = newName;
+                renderTree();
+                setStatus(`文件夹已重命名为：${newName}`);
+            };
+            input.addEventListener('blur', finish);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+                if (e.key === 'Escape') { input.value = group.group_name; input.blur(); }
+            });
+        }
+
+        // ---- Folder Delete ----
+        function deleteFolder(groupPath) {
+            const group = findGroupByPath(groupPath);
+            if (!group) return;
+            const reqCount = countRequestsInGroup(group);
+            if (reqCount > 0) {
+                if (!confirm(`文件夹"${group.group_name}"中有 ${reqCount} 个接口，删除后接口将移到父级分组。确认删除？`)) return;
+                // Move requests to parent group
+                const parts = groupPath.split('.').map(Number);
+                let parentGroup;
+                if (parts.length === 1) {
+                    parentGroup = state.collection.groups[0];
+                    if (!parentGroup || parentGroup === group) {
+                        parentGroup = { group_name: '', requests: [], subgroups: [] };
+                        state.collection.groups.unshift(parentGroup);
+                    }
+                } else {
+                    parentGroup = findGroupByPath(parts.slice(0, -1).join('.'));
+                }
+                if (parentGroup && parentGroup !== group) {
+                    parentGroup.requests.push(...(group.requests || []));
+                }
+            }
+            removeGroupByPath(groupPath);
+            syncAllRequestsFromCollection();
+            renderTree();
+            setStatus(`已删除文件夹：${group.group_name}`);
+        }
+
+        // ---- cURL Import ----
+        let curlParsed = null;
+
+        function showCurlImportModal() {
+            closeAddDropdown();
+            ensureCollectionInitialized();
+            document.getElementById('curlInput').value = '';
+            document.getElementById('curlPreview').style.display = 'none';
+            document.getElementById('curlConfirmBtn').style.display = 'none';
+            fillGroupSelect('curlGroup');
+            const defPath = getDefaultGroupPath();
+            if (defPath) document.getElementById('curlGroup').value = defPath;
+            curlParsed = null;
+            openModal('curlModal');
+        }
+
+        function parseCurlCommand(cmd) {
+            // Normalize: remove line continuations
+            cmd = cmd.replace(/\\\s*\n/g, ' ').trim();
+            // Remove leading 'curl' or path/to/curl
+            cmd = cmd.replace(/^(?:.*\/)?curl(?:\.exe)?\s+/i, '');
+
+            const result = { method: 'GET', url: '', headers: [], params: [], body_mode: 'none', body_data: {}, description: '' };
+            const descParts = [];
+            const tokens = tokenize(cmd);
+            let i = 0;
+            let dataParts = [];
+            let useGetWithParams = false;
+
+            while (i < tokens.length) {
+                const t = tokens[i];
+                if (t === '-X' || t === '--request') {
+                    i++; result.method = (tokens[i] || 'GET').toUpperCase();
+                } else if (t === '-H' || t === '--header') {
+                    i++;
+                    const h = tokens[i] || '';
+                    const colonIdx = h.indexOf(':');
+                    if (colonIdx > 0) result.headers.push({ key: h.substring(0, colonIdx).trim(), value: h.substring(colonIdx + 1).trim() });
+                } else if (t === '-d' || t === '--data' || t === '--data-raw') {
+                    i++; dataParts.push(tokens[i] || '');
+                    if (result.method === 'GET') result.method = 'POST';
+                } else if (t === '--data-urlencode') {
+                    i++; dataParts.push(tokens[i] || '');
+                    result.body_mode = 'urlencoded';
+                    if (result.method === 'GET') result.method = 'POST';
+                } else if (t === '-F' || t === '--form') {
+                    i++;
+                    const f = tokens[i] || '';
+                    const eqIdx = f.indexOf('=');
+                    if (eqIdx > 0) {
+                        result.body_mode = 'formdata';
+                        if (!result.body_data.data) result.body_data.data = [];
+                        result.body_data.data.push({ key: f.substring(0, eqIdx), value: f.substring(eqIdx + 1) });
+                    }
+                    if (result.method === 'GET') result.method = 'POST';
+                } else if (t === '-G' || t === '--get') {
+                    useGetWithParams = true;
+                    result.method = 'GET';
+                } else if (t === '-u' || t === '--user') {
+                    i++;
+                    const cred = tokens[i] || '';
+                    result.headers.push({ key: 'Authorization', value: 'Basic ' + btoa(cred) });
+                } else if (t === '-A' || t === '--user-agent') {
+                    i++; result.headers.push({ key: 'User-Agent', value: tokens[i] || '' });
+                } else if (t === '-e' || t === '--referer') {
+                    i++; result.headers.push({ key: 'Referer', value: tokens[i] || '' });
+                } else if (t === '--compressed') {
+                    result.headers.push({ key: 'Accept-Encoding', value: 'gzip, deflate' });
+                } else if (t === '-b' || t === '--cookie') {
+                    i++; result.headers.push({ key: 'Cookie', value: tokens[i] || '' });
+                } else if (t === '--cookie-jar') {
+                    i++; descParts.push('cookie-jar: ' + tokens[i]);
+                } else if (t === '-x' || t === '--proxy') {
+                    i++; descParts.push('proxy: ' + tokens[i]);
+                } else if (t === '--cert' || t === '--cacert') {
+                    i++; descParts.push('cert: ' + tokens[i]);
+                } else if (t === '-k' || t === '--insecure') {
+                    descParts.push('跳过 SSL 验证');
+                } else if (t === '-L' || t === '--location') {
+                    descParts.push('跟随重定向');
+                } else if (t === '--max-time' || t === '-m') {
+                    i++; descParts.push('超时: ' + tokens[i] + 's');
+                } else if (t === '--connect-timeout') {
+                    i++; descParts.push('连接超时: ' + tokens[i] + 's');
+                } else if (t === '-I' || t === '--head') {
+                    result.method = 'HEAD';
+                } else if (t === '-T' || t === '--upload-file') {
+                    i++; result.method = 'PUT';
+                    descParts.push('upload: ' + tokens[i]);
+                } else if (!t.startsWith('-') && !result.url) {
+                    result.url = t;
+                }
+                i++;
+            }
+
+            if (useGetWithParams && dataParts.length > 0) {
+                const qs = dataParts.join('&');
+                const pairs = qs.split('&');
+                for (const p of pairs) {
+                    const eqIdx = p.indexOf('=');
+                    if (eqIdx > 0) result.params.push({ key: decodeURIComponent(p.substring(0, eqIdx)), value: decodeURIComponent(p.substring(eqIdx + 1)) });
+                    else if (p) result.params.push({ key: decodeURIComponent(p), value: '' });
+                }
+            } else if (dataParts.length > 0) {
+                const body = dataParts.join('&');
+                if (result.body_mode === 'none') {
+                    result.body_mode = 'raw';
+                    result.body_data = { content: body, language: 'json' };
+                } else if (result.body_mode === 'urlencoded') {
+                    const pairs = body.split('&');
+                    result.body_data.data = [];
+                    for (const p of pairs) {
+                        const eqIdx = p.indexOf('=');
+                        if (eqIdx > 0) result.body_data.data.push({ key: decodeURIComponent(p.substring(0, eqIdx)), value: decodeURIComponent(p.substring(eqIdx + 1)) });
+                    }
+                }
+            }
+
+            if (descParts.length > 0) result.description = descParts.join('; ');
+
+            // Auto-detect body language from Content-Type
+            if (result.body_mode === 'raw') {
+                const ct = result.headers.find(h => h.key.toLowerCase() === 'content-type');
+                if (ct) {
+                    const v = ct.value.toLowerCase();
+                    if (v.includes('xml')) result.body_data.language = 'xml';
+                    else if (v.includes('html')) result.body_data.language = 'html';
+                    else if (v.includes('urlencoded')) { result.body_mode = 'urlencoded'; result.body_data = {}; }
+                    else result.body_data.language = 'json';
+                }
+            }
+
+            // Generate name from URL
+            if (result.url && !result._name) {
+                try {
+                    const urlObj = new URL(result.url.replace(/^\{\{/, 'http://_tmp_/').replace(/^\{\{/, 'http://'));
+                    const segs = urlObj.pathname.split('/').filter(Boolean);
+                    result._name = (segs.length > 0 ? segs.slice(-2).join('/') : urlObj.hostname) || 'cURL 导入接口';
+                } catch (e) {
+                    result._name = 'cURL 导入接口';
+                }
+            }
+
+            return result;
+        }
+
+        function tokenize(cmd) {
+            const tokens = [];
+            let current = '';
+            let inQuote = false;
+            let quoteChar = '';
+            for (let i = 0; i < cmd.length; i++) {
+                const c = cmd[i];
+                if (inQuote) {
+                    if (c === quoteChar) { inQuote = false; }
+                    else { current += c; }
+                } else if (c === '"' || c === "'") {
+                    inQuote = true; quoteChar = c;
+                } else if (c === ' ' || c === '\t') {
+                    if (current) { tokens.push(current); current = ''; }
+                } else {
+                    current += c;
+                }
+            }
+            if (current) tokens.push(current);
+            return tokens;
+        }
+
+        function previewCurl() {
+            const cmd = document.getElementById('curlInput').value.trim();
+            if (!cmd) { setStatus('请输入 cURL 命令', 'error'); return; }
+            try {
+                curlParsed = parseCurlCommand(cmd);
+                let html = `<div style="font-weight:600;margin-bottom:6px;">解析结果</div>`;
+                html += `<div><b>方法：</b>${curlParsed.method}</div>`;
+                html += `<div><b>URL：</b>${escapeHtml(curlParsed.url)}</div>`;
+                html += `<div><b>名称：</b>${escapeHtml(curlParsed._name || '')}</div>`;
+                if (curlParsed.headers.length) html += `<div><b>Headers：</b>${curlParsed.headers.map(h => escapeHtml(h.key + ': ' + h.value)).join(', ')}</div>`;
+                if (curlParsed.params.length) html += `<div><b>Params：</b>${curlParsed.params.map(p => escapeHtml(p.key + '=' + p.value)).join('&')}</div>`;
+                if (curlParsed.body_mode !== 'none') html += `<div><b>Body 模式：</b>${curlParsed.body_mode}</div>`;
+                if (curlParsed.description) html += `<div><b>描述：</b>${escapeHtml(curlParsed.description)}</div>`;
+                document.getElementById('curlPreview').innerHTML = html;
+                document.getElementById('curlPreview').style.display = '';
+                document.getElementById('curlConfirmBtn').style.display = '';
+            } catch (e) {
+                setStatus('解析失败：' + e.message, 'error');
+            }
+        }
+
+        function confirmCurlImport() {
+            if (!curlParsed) return;
+            const groupPath = document.getElementById('curlGroup').value;
+            const req = {
+                id: generateId(),
+                name: curlParsed._name || 'cURL 导入接口',
+                method: curlParsed.method,
+                url: curlParsed.url,
+                headers: curlParsed.headers,
+                params: curlParsed.params,
+                body_mode: curlParsed.body_mode,
+                body_data: curlParsed.body_data,
+                x_extract: {},
+                description: curlParsed.description || ''
+            };
+            addRequestToGroup(groupPath, req);
+            closeModal('curlModal');
+            renderTree();
+            selectRequest(req.id);
+            setStatus(`已从 cURL 导入接口：${req.name}`);
+        }
+
+        // ---- HAR Import ----
+        let harParsed = [];
+
+        function showHarImportModal() {
+            closeAddDropdown();
+            ensureCollectionInitialized();
+            document.getElementById('harInput').value = '';
+            document.getElementById('harFile').value = '';
+            document.getElementById('harPreview').style.display = 'none';
+            document.getElementById('harConfirmBtn').style.display = 'none';
+            document.getElementById('harExtractResponse').checked = true;
+            fillGroupSelect('harGroup');
+            const defPath = getDefaultGroupPath();
+            if (defPath) document.getElementById('harGroup').value = defPath;
+            harParsed = [];
+            openModal('harModal');
+        }
+
+        function handleHarFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => { document.getElementById('harInput').value = e.target.result; };
+            reader.readAsText(file);
+        }
+
+        const HAR_SKIP_HEADERS = new Set(['host', 'connection', 'content-length', 'accept-encoding', 'accept-language', ':authority', ':method', ':path', ':scheme']);
+
+        function parseHarEntry(entry) {
+            const req = entry.request;
+            const resp = entry.response;
+            const result = {
+                method: req.method,
+                url: req.url,
+                headers: (req.headers || []).filter(h => !HAR_SKIP_HEADERS.has((h.name || '').toLowerCase())).map(h => ({ key: h.name, value: h.value })),
+                params: (req.queryString || []).map(q => ({ key: q.name, value: q.value })),
+                body_mode: 'none',
+                body_data: {},
+                x_extract: {},
+                _name: '',
+                _responseBody: null,
+            };
+
+            if (req.postData) {
+                const mime = (req.postData.mimeType || '').toLowerCase();
+                if (mime.includes('json')) {
+                    result.body_mode = 'raw';
+                    result.body_data = { content: req.postData.text || '', language: 'json' };
+                } else if (mime.includes('urlencoded')) {
+                    result.body_mode = 'urlencoded';
+                    result.body_data = { data: (req.postData.params || []).map(p => ({ key: p.name, value: p.value })) };
+                } else if (mime.includes('multipart')) {
+                    result.body_mode = 'formdata';
+                    result.body_data = { data: (req.postData.params || []).map(p => ({ key: p.name, value: p.value || '' })) };
+                } else if (req.postData.text) {
+                    result.body_mode = 'raw';
+                    result.body_data = { content: req.postData.text, language: 'text' };
+                }
+            }
+
+            // Generate name
+            try {
+                const urlObj = new URL(req.url);
+                const segs = urlObj.pathname.split('/').filter(Boolean);
+                const path = segs.slice(-1)[0] || urlObj.hostname;
+                result._name = `${req.method} ${path}`;
+            } catch (e) {
+                result._name = `${req.method} 接口`;
+            }
+
+            // Response body for x_extract
+            if (resp?.content?.text) {
+                try {
+                    result._responseBody = JSON.parse(resp.content.text);
+                } catch (e) { /* not JSON */ }
+            }
+
+            return result;
+        }
+
+        function generateExtractFromResponse(body) {
+            const extracts = {};
+            if (body && typeof body === 'object' && !Array.isArray(body)) {
+                for (const key of Object.keys(body)) {
+                    extracts[key] = `$.${key}`;
+                }
+            }
+            return extracts;
+        }
+
+        function previewHar() {
+            const input = document.getElementById('harInput').value.trim();
+            if (!input) { setStatus('请粘贴 HAR JSON 或上传 .har 文件', 'error'); return; }
+            try {
+                const har = JSON.parse(input);
+                const entries = har?.log?.entries || [];
+                if (entries.length === 0) { setStatus('HAR 中无请求记录', 'error'); return; }
+                harParsed = entries.map(parseHarEntry);
+                const extract = document.getElementById('harExtractResponse').checked;
+                let html = `<div style="font-weight:600;margin-bottom:6px;">共 ${harParsed.length} 个接口，选择要导入的：</div>`;
+                html += '<div style="display:flex;flex-direction:column;gap:4px;">';
+                for (let i = 0; i < harParsed.length; i++) {
+                    const p = harParsed[i];
+                    html += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;">
+                        <input type="checkbox" class="har-select-cb" data-idx="${i}" checked>
+                        <span class="method-badge method-${p.method}" style="font-size:9px;">${p.method}</span>
+                        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(p._name)}</span>
+                        ${extract && p._responseBody ? '<span style="color:#16a34a;font-size:10px;">+x_extract</span>' : ''}
+                    </label>`;
+                }
+                html += '</div>';
+                document.getElementById('harPreview').innerHTML = html;
+                document.getElementById('harPreview').style.display = '';
+                document.getElementById('harConfirmBtn').style.display = '';
+            } catch (e) {
+                setStatus('HAR 解析失败：' + e.message, 'error');
+            }
+        }
+
+        function confirmHarImport() {
+            if (harParsed.length === 0) return;
+            const groupPath = document.getElementById('harGroup').value;
+            const extract = document.getElementById('harExtractResponse').checked;
+            const cbs = document.querySelectorAll('.har-select-cb:checked');
+            let count = 0;
+            for (const cb of cbs) {
+                const idx = parseInt(cb.dataset.idx);
+                const p = harParsed[idx];
+                if (!p) continue;
+                const req = {
+                    id: generateId(),
+                    name: p._name,
+                    method: p.method,
+                    url: p.url,
+                    headers: p.headers,
+                    params: p.params,
+                    body_mode: p.body_mode,
+                    body_data: p.body_data,
+                    x_extract: extract && p._responseBody ? generateExtractFromResponse(p._responseBody) : {},
+                    description: ''
+                };
+                addRequestToGroup(groupPath, req);
+                count++;
+            }
+            closeModal('harModal');
+            renderTree();
+            setStatus(`已从 HAR 导入 ${count} 个接口`);
+        }
+
+        // ---- Postman Snippet Import ----
+        let snippetParsed = null;
+
+        function showSnippetImportModal() {
+            closeAddDropdown();
+            ensureCollectionInitialized();
+            document.getElementById('snippetInput').value = '';
+            document.getElementById('snippetLang').value = 'auto';
+            document.getElementById('snippetPreview').style.display = 'none';
+            document.getElementById('snippetConfirmBtn').style.display = 'none';
+            fillGroupSelect('snippetGroup');
+            const defPath = getDefaultGroupPath();
+            if (defPath) document.getElementById('snippetGroup').value = defPath;
+            snippetParsed = null;
+            openModal('snippetModal');
+        }
+
+        function detectSnippetLanguage(code) {
+            if (/curl\s/.test(code)) return 'curl';
+            if (/requests\.(get|post|put|delete|patch|head)\(/.test(code)) return 'python';
+            if (/fetch\s*\(/.test(code)) return 'fetch';
+            if (/axios\.(get|post|put|delete|patch)\(/.test(code)) return 'axios';
+            if (/http\.NewRequest/.test(code)) return 'go';
+            if (/Request\.Builder|HttpClient/.test(code)) return 'java';
+            return null;
+        }
+
+        function parseSnippet(code, lang) {
+            const result = { method: 'GET', url: '', headers: [], params: [], body_mode: 'none', body_data: {}, _name: '代码片段导入' };
+
+            if (lang === 'curl') {
+                return parseCurlCommand(code);
+            }
+            if (lang === 'python') {
+                // requests.post("url", headers={...}, json={...}, params={...})
+                const methodMatch = code.match(/requests\.(get|post|put|delete|patch|head)\s*\(/i);
+                if (methodMatch) result.method = methodMatch[1].toUpperCase();
+                const urlMatch = code.match(/requests\.\w+\s*\(\s*["']([^"']+)["']/);
+                if (urlMatch) result.url = urlMatch[1];
+                const headersMatch = code.match(/headers\s*=\s*\{([^}]+)\}/);
+                if (headersMatch) {
+                    const pairs = headersMatch[1].match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/g);
+                    if (pairs) result.headers = pairs.map(p => { const m = p.match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/); return m ? { key: m[1], value: m[2] } : null; }).filter(Boolean);
+                }
+                const jsonMatch = code.match(/(?:json|data)\s*=\s*(\{[^}]+\}|\[[^\]]+\])/);
+                if (jsonMatch) { result.body_mode = 'raw'; result.body_data = { content: jsonMatch[1], language: 'json' }; }
+                const paramsMatch = code.match(/params\s*=\s*\{([^}]+)\}/);
+                if (paramsMatch) {
+                    const pairs = paramsMatch[1].match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/g);
+                    if (pairs) result.params = pairs.map(p => { const m = p.match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/); return m ? { key: m[1], value: m[2] } : null; }).filter(Boolean);
+                }
+            } else if (lang === 'fetch') {
+                const urlMatch = code.match(/fetch\s*\(\s*["']([^"']+)["']/);
+                if (urlMatch) result.url = urlMatch[1];
+                const methodMatch = code.match(/method\s*:\s*["'](\w+)["']/);
+                if (methodMatch) result.method = methodMatch[1].toUpperCase();
+                const headersMatch = code.match(/headers\s*:\s*\{([^}]+)\}/);
+                if (headersMatch) {
+                    const pairs = headersMatch[1].match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/g);
+                    if (pairs) result.headers = pairs.map(p => { const m = p.match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/); return m ? { key: m[1], value: m[2] } : null; }).filter(Boolean);
+                }
+                const bodyMatch = code.match(/body\s*:\s*(?:JSON\.stringify\()?(\{[^}]+\}|\[[^\]]+\])/);
+                if (bodyMatch) { result.body_mode = 'raw'; result.body_data = { content: bodyMatch[1], language: 'json' }; }
+            } else if (lang === 'axios') {
+                const methodMatch = code.match(/axios\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/i);
+                if (methodMatch) { result.method = methodMatch[1].toUpperCase(); result.url = methodMatch[2]; }
+                const headersMatch = code.match(/headers\s*:\s*\{([^}]+)\}/);
+                if (headersMatch) {
+                    const pairs = headersMatch[1].match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/g);
+                    if (pairs) result.headers = pairs.map(p => { const m = p.match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/); return m ? { key: m[1], value: m[2] } : null; }).filter(Boolean);
+                }
+                const dataMatch = code.match(/data\s*:\s*(\{[^}]+\}|\[[^\]]+\])/);
+                if (dataMatch) { result.body_mode = 'raw'; result.body_data = { content: dataMatch[1], language: 'json' }; }
+            } else if (lang === 'go') {
+                const methodMatch = code.match(/http\.NewRequest\s*\(\s*["'](\w+)["']\s*,\s*["']([^"']+)["']/);
+                if (methodMatch) { result.method = methodMatch[1].toUpperCase(); result.url = methodMatch[2]; }
+                const headerMatches = code.matchAll(/req\.Header\.Set\s*\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)/g);
+                for (const m of headerMatches) result.headers.push({ key: m[1], value: m[2] });
+                const bodyMatch = code.match(/strings\.NewReader\s*\(\s*`([^`]*)`\s*\)/);
+                if (bodyMatch) { result.body_mode = 'raw'; result.body_data = { content: bodyMatch[1], language: 'json' }; }
+            } else if (lang === 'java') {
+                const urlMatch = code.match(/\.url\s*\(\s*["']([^"']+)["']\s*\)/);
+                if (urlMatch) result.url = urlMatch[1];
+                const methodMatch = code.match(/\.(GET|POST|PUT|DELETE|PATCH)\s*\(/);
+                if (methodMatch) result.method = methodMatch[1];
+                const headerMatches = code.matchAll(/\.header\s*\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)/g);
+                for (const m of headerMatches) result.headers.push({ key: m[1], value: m[2] });
+                const bodyMatch = code.match(/\.POST\s*\(\s*[^)]*\.publish\s*\(\s*["']([^"']+)["']|BodyPublisher.*?["']([^"']+)["']/);
+                if (bodyMatch) { result.body_mode = 'raw'; result.body_data = { content: bodyMatch[1] || bodyMatch[2], language: 'json' }; }
+            }
+
+            if (result.url) {
+                try {
+                    const urlObj = new URL(result.url);
+                    const segs = urlObj.pathname.split('/').filter(Boolean);
+                    result._name = segs.slice(-1)[0] || urlObj.hostname || '代码片段导入';
+                } catch (e) { /* keep default */ }
+            }
+            return result;
+        }
+
+        function previewSnippet() {
+            const code = document.getElementById('snippetInput').value.trim();
+            if (!code) { setStatus('请粘贴代码片段', 'error'); return; }
+            const langSel = document.getElementById('snippetLang').value;
+            try {
+                const lang = langSel === 'auto' ? detectSnippetLanguage(code) : langSel;
+                if (!lang) { setStatus('无法自动检测语言，请手动选择', 'error'); return; }
+                snippetParsed = parseSnippet(code, lang);
+                let html = `<div style="font-weight:600;margin-bottom:6px;">解析结果（语言：${lang}）</div>`;
+                html += `<div><b>方法：</b>${snippetParsed.method}</div>`;
+                html += `<div><b>URL：</b>${escapeHtml(snippetParsed.url)}</div>`;
+                if (snippetParsed.headers.length) html += `<div><b>Headers：</b>${snippetParsed.headers.map(h => escapeHtml(h.key + ': ' + h.value)).join(', ')}</div>`;
+                if (snippetParsed.body_mode !== 'none') html += `<div><b>Body 模式：</b>${snippetParsed.body_mode}</div>`;
+                document.getElementById('snippetPreview').innerHTML = html;
+                document.getElementById('snippetPreview').style.display = '';
+                document.getElementById('snippetConfirmBtn').style.display = '';
+            } catch (e) {
+                setStatus('解析失败：' + e.message, 'error');
+            }
+        }
+
+        function confirmSnippetImport() {
+            if (!snippetParsed) return;
+            const groupPath = document.getElementById('snippetGroup').value;
+            const req = {
+                id: generateId(),
+                name: snippetParsed._name || '代码片段导入',
+                method: snippetParsed.method,
+                url: snippetParsed.url,
+                headers: snippetParsed.headers,
+                params: snippetParsed.params,
+                body_mode: snippetParsed.body_mode,
+                body_data: snippetParsed.body_data,
+                x_extract: {},
+                description: ''
+            };
+            addRequestToGroup(groupPath, req);
+            closeModal('snippetModal');
+            renderTree();
+            selectRequest(req.id);
+            setStatus(`已从代码片段导入接口：${req.name}`);
         }
 
         // Utility: Set Status
