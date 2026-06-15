@@ -2205,25 +2205,57 @@
             let dataParts = [];
             let useGetWithParams = false;
 
+            function getNextValue(flag, tokens, idx) {
+                const shortFlag = flag.length === 2;
+                if (tokens[idx + 1] !== undefined) return { value: tokens[idx + 1], consumed: true };
+                return { value: '', consumed: false };
+            }
+
+            function splitCombined(token, shortFlags, longFlags) {
+                for (const sf of shortFlags) {
+                    if (token.startsWith(sf) && token.length > 2) {
+                        return { flag: sf, inlineValue: token.substring(2) };
+                    }
+                }
+                for (const lf of longFlags) {
+                    if (token.startsWith(lf + '=')) {
+                        return { flag: lf, inlineValue: token.substring(lf.length + 1) };
+                    }
+                }
+                return null;
+            }
+
+            const SHORT_VAL_FLAGS = ['-X', '-H', '-d', '-F', '-u', '-A', '-e', '-b', '-m', '-T'];
+            const LONG_VAL_FLAGS = ['--request', '--header', '--data', '--data-raw', '--data-urlencode', '--form', '--user', '--user-agent', '--referer', '--cookie', '--cookie-jar', '--proxy', '--cert', '--cacert', '--max-time', '--connect-timeout', '--upload-file'];
+
             while (i < tokens.length) {
-                const t = tokens[i];
+                let t = tokens[i];
+                let inlineValue = null;
+
+                if (t.startsWith('-')) {
+                    const combined = splitCombined(t, SHORT_VAL_FLAGS, LONG_VAL_FLAGS);
+                    if (combined) {
+                        t = combined.flag;
+                        inlineValue = combined.inlineValue;
+                    }
+                }
+
                 if (t === '-X' || t === '--request') {
-                    i++; result.method = (tokens[i] || 'GET').toUpperCase();
+                    const val = inlineValue !== null ? inlineValue : (tokens[++i] || 'GET');
+                    result.method = val.toUpperCase();
                 } else if (t === '-H' || t === '--header') {
-                    i++;
-                    const h = tokens[i] || '';
+                    const h = inlineValue !== null ? inlineValue : (tokens[++i] || '');
                     const colonIdx = h.indexOf(':');
                     if (colonIdx > 0) result.headers.push({ key: h.substring(0, colonIdx).trim(), value: h.substring(colonIdx + 1).trim() });
                 } else if (t === '-d' || t === '--data' || t === '--data-raw') {
-                    i++; dataParts.push(tokens[i] || '');
+                    dataParts.push(inlineValue !== null ? inlineValue : (tokens[++i] || ''));
                     if (result.method === 'GET') result.method = 'POST';
                 } else if (t === '--data-urlencode') {
-                    i++; dataParts.push(tokens[i] || '');
+                    dataParts.push(inlineValue !== null ? inlineValue : (tokens[++i] || ''));
                     result.body_mode = 'urlencoded';
                     if (result.method === 'GET') result.method = 'POST';
                 } else if (t === '-F' || t === '--form') {
-                    i++;
-                    const f = tokens[i] || '';
+                    const f = inlineValue !== null ? inlineValue : (tokens[++i] || '');
                     const eqIdx = f.indexOf('=');
                     if (eqIdx > 0) {
                         result.body_mode = 'formdata';
@@ -2235,36 +2267,35 @@
                     useGetWithParams = true;
                     result.method = 'GET';
                 } else if (t === '-u' || t === '--user') {
-                    i++;
-                    const cred = tokens[i] || '';
+                    const cred = inlineValue !== null ? inlineValue : (tokens[++i] || '');
                     result.headers.push({ key: 'Authorization', value: 'Basic ' + btoa(cred) });
                 } else if (t === '-A' || t === '--user-agent') {
-                    i++; result.headers.push({ key: 'User-Agent', value: tokens[i] || '' });
+                    result.headers.push({ key: 'User-Agent', value: inlineValue !== null ? inlineValue : (tokens[++i] || '') });
                 } else if (t === '-e' || t === '--referer') {
-                    i++; result.headers.push({ key: 'Referer', value: tokens[i] || '' });
+                    result.headers.push({ key: 'Referer', value: inlineValue !== null ? inlineValue : (tokens[++i] || '') });
                 } else if (t === '--compressed') {
                     result.headers.push({ key: 'Accept-Encoding', value: 'gzip, deflate' });
                 } else if (t === '-b' || t === '--cookie') {
-                    i++; result.headers.push({ key: 'Cookie', value: tokens[i] || '' });
+                    result.headers.push({ key: 'Cookie', value: inlineValue !== null ? inlineValue : (tokens[++i] || '') });
                 } else if (t === '--cookie-jar') {
-                    i++; descParts.push('cookie-jar: ' + tokens[i]);
+                    descParts.push('cookie-jar: ' + (inlineValue !== null ? inlineValue : tokens[++i]));
                 } else if (t === '-x' || t === '--proxy') {
-                    i++; descParts.push('proxy: ' + tokens[i]);
+                    descParts.push('proxy: ' + (inlineValue !== null ? inlineValue : tokens[++i]));
                 } else if (t === '--cert' || t === '--cacert') {
-                    i++; descParts.push('cert: ' + tokens[i]);
+                    descParts.push('cert: ' + (inlineValue !== null ? inlineValue : tokens[++i]));
                 } else if (t === '-k' || t === '--insecure') {
                     descParts.push('跳过 SSL 验证');
                 } else if (t === '-L' || t === '--location') {
                     descParts.push('跟随重定向');
                 } else if (t === '--max-time' || t === '-m') {
-                    i++; descParts.push('超时: ' + tokens[i] + 's');
+                    descParts.push('超时: ' + (inlineValue !== null ? inlineValue : tokens[++i]) + 's');
                 } else if (t === '--connect-timeout') {
-                    i++; descParts.push('连接超时: ' + tokens[i] + 's');
+                    descParts.push('连接超时: ' + (inlineValue !== null ? inlineValue : tokens[++i]) + 's');
                 } else if (t === '-I' || t === '--head') {
                     result.method = 'HEAD';
                 } else if (t === '-T' || t === '--upload-file') {
-                    i++; result.method = 'PUT';
-                    descParts.push('upload: ' + tokens[i]);
+                    result.method = 'PUT';
+                    descParts.push('upload: ' + (inlineValue !== null ? inlineValue : tokens[++i]));
                 } else if (!t.startsWith('-') && !result.url) {
                     result.url = t;
                 }
@@ -2330,6 +2361,14 @@
             for (let i = 0; i < cmd.length; i++) {
                 const c = cmd[i];
                 if (inQuote) {
+                    if (c === '\\' && i + 1 < cmd.length) {
+                        const next = cmd[i + 1];
+                        if (next === quoteChar || next === '\\') {
+                            current += next;
+                            i++;
+                            continue;
+                        }
+                    }
                     if (c === quoteChar) { inQuote = false; }
                     else { current += c; }
                 } else if (c === '"' || c === "'") {
@@ -2482,7 +2521,15 @@
             if (!input) { setStatus('请粘贴 HAR JSON 或上传 .har 文件', 'error'); return; }
             try {
                 const har = JSON.parse(input);
-                const entries = har?.log?.entries || [];
+                if (!har || typeof har !== 'object' || !har.log) {
+                    setStatus('无效 HAR 格式：缺少 log 字段，请确认粘贴的是标准 HAR 文件', 'error');
+                    return;
+                }
+                const entries = har.log.entries || [];
+                if (!Array.isArray(har.log.entries)) {
+                    setStatus('无效 HAR 格式：log.entries 不是数组', 'error');
+                    return;
+                }
                 if (entries.length === 0) { setStatus('HAR 中无请求记录', 'error'); return; }
                 harParsed = entries.map(parseHarEntry);
                 const extract = document.getElementById('harExtractResponse').checked;
@@ -2554,12 +2601,12 @@
         }
 
         function detectSnippetLanguage(code) {
-            if (/curl\s/.test(code)) return 'curl';
-            if (/requests\.(get|post|put|delete|patch|head)\(/.test(code)) return 'python';
-            if (/fetch\s*\(/.test(code)) return 'fetch';
-            if (/axios\.(get|post|put|delete|patch)\(/.test(code)) return 'axios';
-            if (/http\.NewRequest/.test(code)) return 'go';
-            if (/Request\.Builder|HttpClient/.test(code)) return 'java';
+            if (/(?<![.\w])curl\s/.test(code)) return 'curl';
+            if (/(?<![.\w])requests\.(get|post|put|delete|patch|head)\(/.test(code)) return 'python';
+            if (/(?<![.\w])fetch\s*\(/.test(code)) return 'fetch';
+            if (/(?<![.\w])axios\.(get|post|put|delete|patch)\(/.test(code)) return 'axios';
+            if (/(?<![.\w])http\.NewRequest/.test(code)) return 'go';
+            if (/(?<![.\w])(?:Request\.Builder|HttpClient)/.test(code)) return 'java';
             return null;
         }
 
