@@ -1888,13 +1888,11 @@
         }
 
         // ---- Copy Interfaces ----
-        let copyMode = '';  // 'single' or 'batch'
         let copySourceIds = [];
 
         function showCopyCurrentModal() {
             closeAddDropdown();
             if (!state.currentRequestId) return;
-            copyMode = 'single';
             copySourceIds = [state.currentRequestId];
             const src = state.allRequests.find(r => r.id === state.currentRequestId);
             if (!src) return;
@@ -1915,7 +1913,6 @@
         function showCopySelectedModal() {
             closeAddDropdown();
             if (state.selectedIds.size === 0) return;
-            copyMode = 'batch';
             copySourceIds = [...state.selectedIds];
             document.getElementById('copyModalTitle').textContent = `⧉ 复制 ${copySourceIds.length} 个接口`;
             let body = `<div style="padding:10px;background:#f8fafc;border-radius:6px;margin-bottom:12px;font-size:12px;">`;
@@ -2003,7 +2000,6 @@
         function ctxCopyToGroup() {
             document.getElementById('ctxMenu').classList.remove('visible');
             if (!ctxTargetReqId) return;
-            copyMode = 'single';
             copySourceIds = [ctxTargetReqId];
             const src = state.allRequests.find(r => r.id === ctxTargetReqId);
             if (!src) return;
