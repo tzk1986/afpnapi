@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from postman_api_tester.utils.collection_utils import (
     append_manual_cases_to_collection,
@@ -36,20 +36,8 @@ from postman_api_tester.utils.request_builder import (
 logger = logging.getLogger(__name__)
 
 
-def export_collection_with_latest_params(
-    report: Dict[str, Any],
-    *,
-    exports_dir: Path,
-    collection_preview_max_items: int,
-    enable_manual_cases: bool,
-    manual_case_folder_name: str,
-    report_export_allow_report_only: bool,
-    include_auth: bool = False,
-    export_scope: str = "full",
-) -> Dict[str, Any]:
-    """基于报告最新请求参数导出 Postman 集合，支持 full/report_only 范围。"""
-    # 1) 加载源集合；2) 依据报告详情回填最新请求参数；
-    # 3) 按范围裁剪；4) 合并人工用例并剔除排除项；5) 生成导出文件。
+def _validate_export_source(report: Dict[str, Any]) -> Path:
+    """校验并返回源集合文件路径。"""
     source_file = str(report.get("source_file") or "").strip()
     if not source_file:
         raise ValueError("报告缺少 source_file，无法导出集合。")
@@ -58,29 +46,16 @@ def export_collection_with_latest_params(
     if not source_path.exists():
         raise FileNotFoundError(f"源集合文件不存在: {source_file}")
 
-    logger.info(
-        "export started",
-        extra={
-            "event": "report.export.started",
-            "report_name": str(report.get("report_name") or ""),
-            "scope": str(export_scope or "full"),
-            "include_auth": bool(include_auth),
-        },
-    )
+    return source_path
 
-    with source_path.open("r", encoding="utf-8") as file:
-        collection_data = json.load(file)
 
-    scope = str(export_scope or "full").strip().lower()
-    if scope not in {"full", "report_only"}:
-        scope = "full"
-    if scope == "report_only" and not report_export_allow_report_only:
-        scope = "full"
-
-    source_preview_items = extract_collection_preview_items(collection_data, collection_preview_max_items)
-    source_total_count = len(source_preview_items)
-
-    details_map = load_report_details_map(report)
+def _apply_request_details_to_collection(
+    collection_data: Dict[str, Any],
+    report: Dict[str, Any],
+    details_map: Dict[str, Any],
+    include_auth: bool,
+) -> Tuple[int, int, List[str]]:
+    """遍历报告结果，将最新请求参数回填到集合节点，返回 (updated, skipped, warnings)。"""
     updated_count = 0
     skipped_count = 0
     warnings: List[str] = []
@@ -120,20 +95,83 @@ def export_collection_with_latest_params(
         set_request_body(request_obj, body, body_mode=body_mode, body_data=body_data)
         updated_count += 1
 
-    final_collection = collection_data
+    return updated_count, skipped_count, warnings
+
+
+def _apply_scope_pruning(
+    collection_data: Dict[str, Any],
+    scope: str,
+    report: Dict[str, Any],
+    collection_preview_max_items: int,
+    source_total_count: int,
+) -> Tuple[Dict[str, Any], int, bool, List[str]]:
+    """按 scope 裁剪集合（report_only 时裁剪），返回 (final_collection, report_only_count, same_as_full, warnings)。"""
+    warnings: List[str] = []
     report_only_count = 0
     scope_effective_same_as_full = False
-    if scope == "report_only":
-        # report_only 基于 item_path 精确裁剪，确保导出集合与本次报告执行范围一致。
-        selected_paths = collect_report_item_paths(report)
-        if not selected_paths:
-            raise ValueError("导出范围为 report_only 时，报告中缺少可用 item_path。")
-        final_collection = prune_collection_to_paths(collection_data, selected_paths)
-        pruned_items = extract_collection_preview_items(final_collection, collection_preview_max_items)
-        report_only_count = len(pruned_items)
-        scope_effective_same_as_full = report_only_count == source_total_count
-        if scope_effective_same_as_full:
-            warnings.append("当前报告接口与源集合接口一致，report_only 与 full 导出内容相同。")
+
+    if scope != "report_only":
+        return collection_data, 0, False, warnings
+
+    selected_paths = collect_report_item_paths(report)
+    if not selected_paths:
+        raise ValueError("导出范围为 report_only 时，报告中缺少可用 item_path。")
+
+    final_collection = prune_collection_to_paths(collection_data, selected_paths)
+    pruned_items = extract_collection_preview_items(final_collection, collection_preview_max_items)
+    report_only_count = len(pruned_items)
+    scope_effective_same_as_full = report_only_count == source_total_count
+    if scope_effective_same_as_full:
+        warnings.append("当前报告接口与源集合接口一致，report_only 与 full 导出内容相同。")
+
+    return final_collection, report_only_count, scope_effective_same_as_full, warnings
+
+
+def export_collection_with_latest_params(
+    report: Dict[str, Any],
+    *,
+    exports_dir: Path,
+    collection_preview_max_items: int,
+    enable_manual_cases: bool,
+    manual_case_folder_name: str,
+    report_export_allow_report_only: bool,
+    include_auth: bool = False,
+    export_scope: str = "full",
+) -> Dict[str, Any]:
+    """基于报告最新请求参数导出 Postman 集合，支持 full/report_only 范围。"""
+    source_path = _validate_export_source(report)
+
+    logger.info(
+        "export started",
+        extra={
+            "event": "report.export.started",
+            "report_name": str(report.get("report_name") or ""),
+            "scope": str(export_scope or "full"),
+            "include_auth": bool(include_auth),
+        },
+    )
+
+    with source_path.open("r", encoding="utf-8") as file:
+        collection_data = json.load(file)
+
+    scope = str(export_scope or "full").strip().lower()
+    if scope not in {"full", "report_only"}:
+        scope = "full"
+    if scope == "report_only" and not report_export_allow_report_only:
+        scope = "full"
+
+    source_preview_items = extract_collection_preview_items(collection_data, collection_preview_max_items)
+    source_total_count = len(source_preview_items)
+
+    details_map = load_report_details_map(report)
+    updated_count, skipped_count, warnings = _apply_request_details_to_collection(
+        collection_data, report, details_map, include_auth,
+    )
+
+    final_collection, report_only_count, scope_effective_same_as_full, scope_warnings = _apply_scope_pruning(
+        collection_data, scope, report, collection_preview_max_items, source_total_count,
+    )
+    warnings.extend(scope_warnings)
 
     manual_cases: List[Dict[str, Any]] = []
     if enable_manual_cases:
