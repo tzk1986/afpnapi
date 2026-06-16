@@ -401,6 +401,78 @@ def _is_placeholder_case_name(name: str) -> bool:
     return bool(text) and bool(re.fullmatch(r"[?？\s_]+", text))
 
 
+def _validate_adhoc_url(url: str, base_url: Optional[str], index: int) -> None:
+    """校验 ad-hoc 接口 URL 合法性，不合法时抛出 ValueError。"""
+    if not url:
+        raise ValueError(f"第 {index + 1} 条接口缺少 url")
+
+    parsed = urlparse(url)
+    if parsed.scheme:
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(f"第 {index + 1} 条接口 url 仅允许合法 http/https 地址")
+    elif url.startswith("{{"):
+        if not url.startswith("{{baseUrl}}") and not url.startswith("{{base_url}}"):
+            raise ValueError(
+                f"第 {index + 1} 条接口变量 URL 仅支持 {{baseUrl}} 或 {{base_url}}"
+            )
+        if not base_url:
+            raise ValueError(f"第 {index + 1} 条接口使用了变量 URL，但未提供 base_url")
+    elif not base_url:
+        raise ValueError(f"第 {index + 1} 条接口使用相对路径时必须提供 base_url")
+
+
+def _parse_adhoc_body(raw: Dict[str, Any], index: int) -> Tuple[str, Any]:
+    """解析 ad-hoc 接口的 body_mode 和 body_data，返回 (body_mode, body_data)。"""
+    body_mode = str(raw.get("body_mode") or "none").strip().lower() or "none"
+    if body_mode not in {"none", "raw", "urlencoded", "formdata", "graphql", "binary"}:
+        raise ValueError(f"第 {index + 1} 条接口 body_mode 不支持: {body_mode}")
+
+    raw_body_data = raw.get("body_data")
+    if body_mode == "raw":
+        body_data = raw_body_data
+    else:
+        body_data = _parse_json_text(raw_body_data, None)
+
+    body_value = raw.get("body")
+    if body_mode == "raw" and body_data is None and body_value is not None:
+        body_data = body_value
+
+    return body_mode, body_data
+
+
+def _parse_adhoc_judgment_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """解析 ad-hoc 接口的 x_* 扩展字段（结果判定 + 变量提取），返回字段字典。"""
+    fields: Dict[str, Any] = {}
+
+    x_success_err_codes = raw.get("x_success_err_codes")
+    if x_success_err_codes is not None:
+        fields["x_success_err_codes"] = str(x_success_err_codes).strip() or None
+
+    x_success_messages = raw.get("x_success_messages")
+    if x_success_messages is not None:
+        fields["x_success_messages"] = str(x_success_messages).strip() or None
+
+    x_enable_err_code = raw.get("x_enable_err_code_judgment")
+    if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
+        fields["x_enable_err_code_judgment"] = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    elif isinstance(x_enable_err_code, bool):
+        fields["x_enable_err_code_judgment"] = x_enable_err_code
+
+    x_enable_message = raw.get("x_enable_message_judgment")
+    if x_enable_message is not None and not isinstance(x_enable_message, bool):
+        fields["x_enable_message_judgment"] = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+    elif isinstance(x_enable_message, bool):
+        fields["x_enable_message_judgment"] = x_enable_message
+
+    x_extract_raw = raw.get("x_extract")
+    if isinstance(x_extract_raw, dict) and x_extract_raw:
+        x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
+        if x_extract:
+            fields["x_extract"] = x_extract
+
+    return {k: v for k, v in fields.items() if v is not None}
+
+
 def _derive_case_name(raw_name: Any, method: str, url: str, index: int) -> str:
     text = str(raw_name or "").strip()
     if text and not _is_placeholder_case_name(text):
@@ -438,22 +510,7 @@ def normalize_adhoc_case(
         raise ValueError(f"第 {index + 1} 条接口 method 不支持: {method}")
 
     url = str(raw.get("url") or "").strip()
-    if not url:
-        raise ValueError(f"第 {index + 1} 条接口缺少 url")
-
-    parsed = urlparse(url)
-    if parsed.scheme:
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError(f"第 {index + 1} 条接口 url 仅允许合法 http/https 地址")
-    elif url.startswith("{{"):
-        if not url.startswith("{{baseUrl}}") and not url.startswith("{{base_url}}"):
-            raise ValueError(
-                f"第 {index + 1} 条接口变量 URL 仅支持 {{baseUrl}} 或 {{base_url}}"
-            )
-        if not base_url:
-            raise ValueError(f"第 {index + 1} 条接口使用了变量 URL，但未提供 base_url")
-    elif not base_url:
-        raise ValueError(f"第 {index + 1} 条接口使用相对路径时必须提供 base_url")
+    _validate_adhoc_url(url, base_url, index)
 
     name = _derive_case_name(raw.get("name"), method, url, index)
 
@@ -465,47 +522,14 @@ def normalize_adhoc_case(
     if not isinstance(params, dict):
         raise ValueError(f"第 {index + 1} 条接口 params 必须是 JSON 对象")
 
-    body_mode = str(raw.get("body_mode") or "none").strip().lower() or "none"
-    if body_mode not in {"none", "raw", "urlencoded", "formdata", "graphql", "binary"}:
-        raise ValueError(f"第 {index + 1} 条接口 body_mode 不支持: {body_mode}")
-
-    raw_body_data = raw.get("body_data")
-    if body_mode == "raw":
-        body_data = raw_body_data
-    else:
-        body_data = _parse_json_text(raw_body_data, None)
-    body_value = raw.get("body")
-    if body_mode == "raw" and body_data is None and body_value is not None:
-        body_data = body_value
+    body_mode, body_data = _parse_adhoc_body(raw, index)
 
     try:
         expected_status = int(raw.get("expected_status") or 200)
     except (TypeError, ValueError):
         expected_status = 200
 
-    # 解析可配置结果判定扩展字段
-    x_success_err_codes = raw.get("x_success_err_codes")
-    if x_success_err_codes is not None:
-        x_success_err_codes = str(x_success_err_codes).strip() or None
-
-    x_success_messages = raw.get("x_success_messages")
-    if x_success_messages is not None:
-        x_success_messages = str(x_success_messages).strip() or None
-
-    x_enable_err_code = raw.get("x_enable_err_code_judgment")
-    if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
-        x_enable_err_code = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-
-    x_enable_message = raw.get("x_enable_message_judgment")
-    if x_enable_message is not None and not isinstance(x_enable_message, bool):
-        x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-
-    x_extract_raw = raw.get("x_extract")
-    x_extract: Optional[Dict[str, str]] = None
-    if isinstance(x_extract_raw, dict) and x_extract_raw:
-        x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
-        if not x_extract:
-            x_extract = None
+    judgment_fields = _parse_adhoc_judgment_fields(raw)
 
     logger.info(
         "adhoc case normalized",
@@ -527,18 +551,7 @@ def normalize_adhoc_case(
         "body_data": body_data,
         "expected_status": expected_status,
     }
-
-    # 仅在存在时写入 x_* 扩展字段
-    if x_success_err_codes is not None:
-        result["x_success_err_codes"] = x_success_err_codes
-    if x_success_messages is not None:
-        result["x_success_messages"] = x_success_messages
-    if x_enable_err_code is not None:
-        result["x_enable_err_code_judgment"] = x_enable_err_code
-    if x_enable_message is not None:
-        result["x_enable_message_judgment"] = x_enable_message
-    if x_extract is not None:
-        result["x_extract"] = x_extract
+    result.update(judgment_fields)
 
     return result
 
