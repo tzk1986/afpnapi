@@ -186,6 +186,119 @@ class PostmanTestExecutor:
             'extracted_variables': {},
         }
 
+    def _build_passed_result(
+        self,
+        *,
+        actual_request_url: str,
+        response_message: str,
+        err_code: str,
+        status_code: int,
+        response_time_ms: int,
+        request_info: RequestInfo,
+        response_info: ResponseInfo,
+        extracted_variables: Dict[str, str],
+        assertion_results: List[AssertionResult],
+        assertion_engine_error: str,
+    ) -> TestResultRecord:
+        """构建判定通过路径的结果（含断言校验结果）。"""
+        assertion_failed = any(not a.get('passed') for a in assertion_results)
+        if assertion_failed:
+            fail_detail = '; '.join(str(a.get('message', '')) for a in assertion_results if not a.get('passed'))
+            message = f'断言失败: {fail_detail}'
+            status = 'FAILED'
+        else:
+            message = response_message
+            status = 'PASSED'
+        result = self._build_result_base(
+            actual_request_url=actual_request_url,
+            status=status,
+            message=message,
+            err_code=err_code,
+            status_code=status_code,
+            response_time_ms=response_time_ms,
+            request_info=request_info,
+            response_info=response_info,
+        )
+        result['assertion_results'] = assertion_results
+        result['assertion_engine_error'] = assertion_engine_error
+        result['extracted_variables'] = extracted_variables
+        return result
+
+    def _build_judgment_failed_result(
+        self,
+        *,
+        actual_request_url: str,
+        judgment_fail_reason: str,
+        err_code: str,
+        status_code: int,
+        response_time_ms: int,
+        request_info: RequestInfo,
+        response_info: ResponseInfo,
+        response_data: object,
+        response_message: str,
+        extracted_variables: Dict[str, str],
+    ) -> TestResultRecord:
+        """构建判定失败路径的结果（含数据库反馈）。"""
+        db_feedback = build_db_feedback(
+            status='FAILED',
+            status_code=status_code,
+            response_message=response_message,
+            err_code=err_code,
+            response_body=response_data,
+        )
+        fail_message = judgment_fail_reason
+        if db_feedback.get('is_db_related'):
+            fail_message = f"{judgment_fail_reason} | 数据库反馈: {db_feedback.get('title')}"
+        result = self._build_result_base(
+            actual_request_url=actual_request_url,
+            status='FAILED',
+            message=fail_message,
+            err_code=err_code,
+            status_code=status_code,
+            response_time_ms=response_time_ms,
+            request_info=request_info,
+            response_info=response_info,
+        )
+        result['db_feedback'] = db_feedback
+        result['extracted_variables'] = extracted_variables
+        return result
+
+    def _build_request_error_result(
+        self,
+        *,
+        raw_url: str,
+        headers: Dict[str, str],
+        params: JsonObject,
+        body: object,
+        error: Exception,
+    ) -> TestResultRecord:
+        """构建请求异常路径的结果（含数据库反馈）。"""
+        import requests as _requests
+        err_type = '请求超时' if isinstance(error, _requests.exceptions.Timeout) else '请求异常'
+        db_feedback = build_db_feedback(
+            status='ERROR',
+            status_code=None,
+            response_message=str(error),
+            err_code='',
+            response_body=str(error),
+        )
+        error_message = f'[{err_type}] {error}'
+        if db_feedback.get('is_db_related'):
+            error_message = f"{error_message} | 数据库反馈: {db_feedback.get('title')}"
+        error_request_info: RequestInfo = {'headers': headers, 'params': params, 'body': body}
+        result = self._build_result_base(
+            actual_request_url=raw_url,
+            status='ERROR',
+            message=error_message,
+            err_code='',
+            status_code=None,
+            response_time_ms=0,
+            request_info=error_request_info,
+            response_info={'headers': {}, 'body': str(error)},
+        )
+        result['db_feedback'] = db_feedback
+        return result
+
     def execute_test(self) -> TestResultRecord:
         """执行单个API测试，返回标准化结果记录"""
         from typing import cast
@@ -329,90 +442,54 @@ class PostmanTestExecutor:
             if judgment_passed:
                 # 升级五：断言校验
                 assertion_results: List[AssertionResult] = []
-                assertion_failed = False
                 assertion_engine_error = ""
                 raw_assertions = api.get('x_assertions')
                 assertions_rules = [item for item in raw_assertions if isinstance(item, dict)] if isinstance(raw_assertions, list) else []
                 if assertions_rules and _ASSERTIONS_AVAILABLE:
                     try:
                         assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
-                        assertion_failed = any(not a.get('passed') for a in assertion_results)
                     except Exception as assertion_exc:
                         assertion_engine_error = str(assertion_exc)
                         logger.exception("断言引擎执行异常: %s", assertion_exc)
                         if self.assertion_strict_mode:
-                            assertion_failed = True
                             assertion_results = [{
                                 'passed': False,
                                 'message': f'断言引擎异常: {assertion_engine_error}',
                             }]
-                result = self._build_result_base(
+                return self._build_passed_result(
                     actual_request_url=actual_request_url,
-                    status='FAILED' if assertion_failed else 'PASSED',
-                    message=('断言失败: ' + '; '.join(str(a.get('message', '')) for a in assertion_results if not a.get('passed'))) if assertion_failed else response_message,
-                    err_code=err_code,
-                    status_code=self.resp_status_code,
-                    response_time_ms=response_time_ms,
-                    request_info=request_info,
-                    response_info=response_info,
-                )
-                result['assertion_results'] = assertion_results
-                result['assertion_engine_error'] = assertion_engine_error
-                result['extracted_variables'] = extracted_variables
-                return result
-            else:
-                db_feedback = build_db_feedback(
-                    status='FAILED',
-                    status_code=self.resp_status_code,
                     response_message=response_message,
                     err_code=err_code,
-                    response_body=self.response_data,
+                    status_code=self.resp_status_code,
+                    response_time_ms=response_time_ms,
+                    request_info=request_info,
+                    response_info=response_info,
+                    extracted_variables=extracted_variables,
+                    assertion_results=assertion_results,
+                    assertion_engine_error=assertion_engine_error,
                 )
-                fail_message_with_hint = judgment_fail_reason
-                if db_feedback.get('is_db_related'):
-                    fail_message_with_hint = f"{judgment_fail_reason} | 数据库反馈: {db_feedback.get('title')}"
-
-                result = self._build_result_base(
+            else:
+                return self._build_judgment_failed_result(
                     actual_request_url=actual_request_url,
-                    status='FAILED',
-                    message=fail_message_with_hint,
+                    judgment_fail_reason=judgment_fail_reason,
                     err_code=err_code,
                     status_code=self.resp_status_code,
                     response_time_ms=response_time_ms,
                     request_info=request_info,
                     response_info=response_info,
+                    response_data=self.response_data,
+                    response_message=response_message,
+                    extracted_variables=extracted_variables,
                 )
-                result['db_feedback'] = db_feedback
-                result['extracted_variables'] = extracted_variables
-                return result
 
         except Exception as e:
-            import requests as _requests
-            err_type = '请求超时' if isinstance(e, _requests.exceptions.Timeout) else '请求异常'
-
-            db_feedback = build_db_feedback(
-                status='ERROR',
-                status_code=None,
-                response_message=str(e),
-                err_code='',
-                response_body=str(e),
+            return self._build_request_error_result(
+                raw_url=raw_url,
+                headers=headers,
+                params=params,
+                body=body,
+                error=e,
             )
-            error_message = f'[{err_type}] {e}'
-            if db_feedback.get('is_db_related'):
-                error_message = f"{error_message} | 数据库反馈: {db_feedback.get('title')}"
-
-            result = self._build_result_base(
-                actual_request_url=raw_url,
-                status='ERROR',
-                message=error_message,
-                err_code='',
-                status_code=None,
-                response_time_ms=0,
-                request_info={'headers': headers, 'params': params, 'body': body},
-                response_info={'headers': {}, 'body': str(e)},
-            )
-            result['db_feedback'] = db_feedback
-            return result
         finally:
             # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
             if self._owns_session:
