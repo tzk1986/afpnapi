@@ -5,7 +5,7 @@ import logging
 import uuid
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, SupportsInt
+from typing import Any, Dict, List, Optional, SupportsInt, Tuple
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -117,6 +117,31 @@ def _parse_judgment_config_from_payload(payload: Dict[str, Any]) -> Optional[Dic
     return None
 
 
+def _resolve_output_dir(
+    output_dir: str,
+    report_name: Optional[str],
+    *,
+    reports_dir: Path,
+) -> Tuple[str, Optional[str]]:
+    """解析并校验输出目录路径，防止目录遍历。
+
+    若 output_dir 误填为 .html 文件名，则自动移至 report_name。
+    非空 output_dir 必须位于 reports_dir 子树内，否则回退至 reports_dir。
+    """
+    if output_dir.lower().endswith(".html"):
+        if not report_name:
+            report_name = output_dir
+        output_dir = ""
+    if output_dir:
+        resolved = (reports_dir / output_dir).resolve()
+        try:
+            resolved.relative_to(reports_dir)
+            return str(resolved), report_name
+        except ValueError:
+            pass
+    return str(reports_dir), report_name
+
+
 def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
     return _clamp_page_size(
         value,
@@ -174,22 +199,7 @@ def api_run_postman() -> ResponseReturnValue:
                 token = env_cfg["token"].strip()
     output_dir = str(request.form.get("output_dir", "")).strip()
     report_name = str(request.form.get("report_name", "")).strip() or None
-    # 防护：用户可能误将报告名称填入输出目录字段
-    if output_dir.lower().endswith(".html"):
-        if not report_name:
-            report_name = output_dir
-        output_dir = ""
-    # 任何非空的 output_dir 都作为 REPORTS_DIR 的子目录
-    if output_dir:
-        resolved = (REPORTS_DIR / output_dir).resolve()
-        # 确保解析后的路径仍在 REPORTS_DIR 之下，防止目录遍历
-        try:
-            resolved.relative_to(REPORTS_DIR)
-            output_dir = str(resolved)
-        except ValueError:
-            output_dir = str(REPORTS_DIR)
-    else:
-        output_dir = str(REPORTS_DIR)
+    output_dir, report_name = _resolve_output_dir(output_dir, report_name, reports_dir=REPORTS_DIR)
     results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
     run_scope = str(request.form.get("run_scope", "all")).strip().lower() or "all"
     raw_selected_paths = request.form.get("selected_item_paths", "")
@@ -276,22 +286,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
     token = str(payload.get("token", "")).strip() or None
     output_dir = str(payload.get("output_dir", "")).strip()
     report_name = str(payload.get("report_name", "")).strip() or None
-    # 防护：用户可能误将报告名称填入输出目录字段
-    if output_dir.lower().endswith(".html"):
-        if not report_name:
-            report_name = output_dir
-        output_dir = ""
-    # 任何非空的 output_dir 都作为 REPORTS_DIR 的子目录
-    if output_dir:
-        resolved = (REPORTS_DIR / output_dir).resolve()
-        # 确保解析后的路径仍在 REPORTS_DIR 之下，防止目录遍历
-        try:
-            resolved.relative_to(REPORTS_DIR)
-            output_dir = str(resolved)
-        except ValueError:
-            output_dir = str(REPORTS_DIR)
-    else:
-        output_dir = str(REPORTS_DIR)
+    output_dir, report_name = _resolve_output_dir(output_dir, report_name, reports_dir=REPORTS_DIR)
     results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
     collection_name = str(payload.get("collection_name", "")).strip() or ADHOC_DEFAULT_COLLECTION_NAME
 
