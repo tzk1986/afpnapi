@@ -433,6 +433,7 @@
             globalEnvVars: {},
             globalEnvList: [],
             selectedEnv: '',
+            varFunctionNames: [],
         };
 
         // Methods
@@ -1388,6 +1389,12 @@
                     for (const k of Object.keys(state.globalSharedVars || {})) {
                         if (!data.produced[k]) {
                             data.produced[k] = { by_request: '__global__', by_name: '', source: '全局' };
+                        }
+                    }
+                    // 内置变量函数（如 timestamp、uuid）标记为函数来源
+                    for (const fn of state.varFunctionNames || []) {
+                        if (fn && !data.produced[fn]) {
+                            data.produced[fn] = { by_request: '__func__', by_name: '', source: '函数' };
                         }
                     }
                     renderDependencyInfo(data);
@@ -3071,11 +3078,19 @@
             document.getElementById('varAutocomplete').classList.remove('visible');
         }
 
+        function loadVarFunctions() {
+            fetch('/api/variable-functions').then(r => r.json()).then(data => {
+                const fns = (data.data?.functions) || [];
+                state.varFunctionNames = fns.map(f => f.name || '').filter(Boolean);
+            }).catch(() => {});
+        }
+
         // Initialize autocomplete on page load
         initAutocomplete();
         loadGlobalVariables();
+        loadVarFunctions();
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) loadGlobalVariables();
+            if (!document.hidden) { loadGlobalVariables(); loadVarFunctions(); }
         });
     </script>
 </body>
