@@ -3,8 +3,10 @@
 开发导读:
 - 负责解析并执行 JSONPath 断言规则。
 - 输出统一断言结果结构，供执行器汇总到报告层。
+- 支持 13 种操作符: eq/ne/gt/lt/gte/lte/exists/not_exists/contains/regex/length_eq/type/schema。
 """
 import logging as _logging
+import re as _re
 from typing import Any, Dict, List, Tuple
 
 logger = _logging.getLogger(__name__)
@@ -16,7 +18,17 @@ except ImportError:  # pragma: no cover
     _JSONPATH_AVAILABLE = False
     logger.warning("jsonpath_ng 未安装，断言功能不可用。请运行: pip install 'jsonpath-ng>=1.5.3'")
 
-SUPPORTED_OPS = {"eq", "ne", "gt", "lt", "gte", "lte", "exists", "not_exists", "contains"}
+try:
+    import jsonschema as _jsonschema
+    _JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    _JSONSCHEMA_AVAILABLE = False
+
+SUPPORTED_OPS = {
+    "eq", "ne", "gt", "lt", "gte", "lte",
+    "exists", "not_exists", "contains",
+    "regex", "length_eq", "type", "schema",
+}
 
 
 def evaluate_assertions(response_body: Any, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -82,6 +94,55 @@ def _compare(actual: Any, op: str, expected: Any) -> Tuple[bool, str]:
             return (actual <= expected, "")
         if op == "contains":
             return (str(expected) in str(actual), "")
+        if op == "regex":
+            pattern = str(expected)
+            matched = _re.search(pattern, str(actual))
+            return (matched is not None, "" if matched else f"值 {actual!r} 不匹配正则 {pattern!r}")
+        if op == "length_eq":
+            expected_len = int(expected)
+            actual_len = len(actual) if actual is not None else 0
+            return (actual_len == expected_len, "" if actual_len == expected_len else f"实际长度 {actual_len} != 期望 {expected_len}")
+        if op == "type":
+            return _check_type(actual, str(expected))
+        if op == "schema":
+            if not _JSONSCHEMA_AVAILABLE:
+                return (False, "jsonschema 未安装，请运行: pip install jsonschema")
+            try:
+                _jsonschema.validate(instance=actual, schema=expected)
+                return (True, "")
+            except _jsonschema.ValidationError as exc:
+                return (False, f"Schema 验证失败: {exc.message}")
         return (False, f"不支持的操作符: {op}，支持: {', '.join(sorted(SUPPORTED_OPS))}")
     except Exception as exc:
         return (False, f"比较异常: {exc}")
+
+
+_TYPE_MAP: Dict[str, Any] = {
+    "string": str,
+    "integer": int,
+    "number": (int, float),
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def _check_type(actual: Any, expected_type: str) -> Tuple[bool, str]:
+    """检查 actual 是否匹配 expected_type。"""
+    expected_lower = expected_type.lower().strip()
+    if expected_lower == "null":
+        passed = actual is None
+        return (passed, "" if passed else f"期望 null，实际 {type(actual).__name__}")
+    if expected_lower == "integer":
+        passed = isinstance(actual, int) and not isinstance(actual, bool)
+        return (passed, "" if passed else f"期望 integer，实际 {type(actual).__name__}")
+    if expected_lower == "number":
+        passed = isinstance(actual, (int, float)) and not isinstance(actual, bool)
+        return (passed, "" if passed else f"期望 number，实际 {type(actual).__name__}")
+    py_type = _TYPE_MAP.get(expected_lower)
+    if py_type is None:
+        return (False, f"未知类型: {expected_type}，支持: {', '.join(sorted(_TYPE_MAP.keys()))}, null")
+    passed = isinstance(actual, py_type)
+    if not passed:
+        return (False, f"期望 {expected_type}，实际 {type(actual).__name__}")
+    return (True, "")

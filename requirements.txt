@@ -3,3 +3,5 @@ flask==2.3.3
 requests==2.31.0
 jsonpath-ng>=1.5.3
 mypy>=1.10.0,<2.0.0
+# 可选依赖：断言引擎 schema 操作符需要
+# jsonschema>=4.0
