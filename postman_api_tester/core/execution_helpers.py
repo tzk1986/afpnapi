@@ -78,7 +78,7 @@ def _resolve_runtime_config(
         checkpoint_flush_every_n = max(1, int(getattr(cfg, 'CHECKPOINT_FLUSH_EVERY_N', 1)))
         checkpoint_dir = str(getattr(cfg, 'CHECKPOINT_DIR', '') or '').strip()
         assertion_strict_mode = bool(getattr(cfg, 'ENABLE_ASSERTION_STRICT_MODE', False))
-    except Exception:
+    except (ImportError, AttributeError, TypeError, ValueError):
         pass
 
     return (
@@ -173,7 +173,7 @@ def _prepare_checkpoint_recovery(
                     logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
             else:
                 logger.warning("检测到 checkpoint 与当前集合不匹配，已忽略恢复数据。")
-    except Exception as exc:
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
         logger.warning("初始化 checkpoint 失败，已降级为普通执行: %s", exc)
 
     return checkpoint_path, collection_fingerprint, executed_item_paths, apis
@@ -247,6 +247,7 @@ def _emit_progress(progress_callback: Optional[ProgressCallback], payload: Progr
     try:
         progress_callback(payload)
     except Exception:
+        # 外部回调异常不应中断执行流程，保持宽捕获。
         pass
 
 
@@ -374,7 +375,7 @@ def _finalize_checkpoint_state(
             completed=(execution_error is None),
             last_error=str(execution_error or ""),
         )
-    except Exception as exc:
+    except (OSError, IOError, TypeError, ValueError) as exc:
         logger.warning("写入 checkpoint 失败: %s", exc)
 
 
@@ -470,6 +471,7 @@ def _execute_api_suite(
             })
     except Exception as exc:
         execution_error = exc
+        # 单条请求可能抛出任意异常，保持宽捕获以确保部分结果可输出。
         logger.exception("执行过程中发生中断异常，将输出部分成功报告: %s", exc)
 
     return completed_count, execution_error

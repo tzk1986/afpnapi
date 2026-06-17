@@ -106,7 +106,7 @@ def get_auth_token(
                     return token_text
 
                 logger.warning("登录成功但未找到 token 字段, url=%s", url)
-            except Exception as exc:
+            except (requests.RequestException, TimeoutError) as exc:
                 logger.warning("执行登录请求失败: %s, url=%s", exc, url)
 
     finally:

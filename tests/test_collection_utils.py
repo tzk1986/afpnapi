@@ -2,7 +2,12 @@
 
 from typing import Any, Dict, List
 
+import pytest
+
 from postman_api_tester.utils.collection_utils import (
+    _parse_adhoc_body,
+    _parse_adhoc_judgment_fields,
+    _validate_adhoc_url,
     extract_collection_preview_items,
     iter_request_items,
     item_by_path,
@@ -141,3 +146,117 @@ class TestExtractCollectionPreviewItems:
         """缺少 item 字段返回空列表。"""
         items = extract_collection_preview_items({"info": {}}, max_items=100)
         assert items == []
+
+
+class TestValidateAdhocUrl:
+
+    def test_valid_http_url(self) -> None:
+        _validate_adhoc_url("http://example.com/api", None, 0)
+
+    def test_valid_https_url(self) -> None:
+        _validate_adhoc_url("https://example.com/api", None, 0)
+
+    def test_empty_url_raises(self) -> None:
+        with pytest.raises(ValueError, match="缺少 url"):
+            _validate_adhoc_url("", None, 0)
+
+    def test_ftp_scheme_raises(self) -> None:
+        with pytest.raises(ValueError, match="http/https"):
+            _validate_adhoc_url("ftp://example.com", None, 0)
+
+    def test_variable_url_without_base_url_raises(self) -> None:
+        with pytest.raises(ValueError, match="未提供 base_url"):
+            _validate_adhoc_url("{{baseUrl}}/api", None, 0)
+
+    def test_variable_url_with_base_url_ok(self) -> None:
+        _validate_adhoc_url("{{baseUrl}}/api", "http://example.com", 0)
+
+    def test_variable_url_base_url_variant_ok(self) -> None:
+        _validate_adhoc_url("{{base_url}}/api", "http://example.com", 0)
+
+    def test_unsupported_variable_prefix_raises(self) -> None:
+        with pytest.raises(ValueError, match="baseUrl"):
+            _validate_adhoc_url("{{other}}/api", "http://example.com", 0)
+
+    def test_relative_url_without_base_url_raises(self) -> None:
+        with pytest.raises(ValueError, match="相对路径"):
+            _validate_adhoc_url("/api/v1", None, 0)
+
+    def test_relative_url_with_base_url_ok(self) -> None:
+        _validate_adhoc_url("/api/v1", "http://example.com", 0)
+
+
+class TestParseAdhocBody:
+
+    def test_none_mode(self) -> None:
+        mode, data = _parse_adhoc_body({"body_mode": "none"}, 0)
+        assert mode == "none"
+        assert data is None
+
+    def test_raw_mode_passes_through(self) -> None:
+        mode, data = _parse_adhoc_body({"body_mode": "raw", "body_data": '{"x":1}'}, 0)
+        assert mode == "raw"
+        assert data == '{"x":1}'
+
+    def test_raw_mode_falls_back_to_body(self) -> None:
+        mode, data = _parse_adhoc_body({"body_mode": "raw", "body": "fallback"}, 0)
+        assert mode == "raw"
+        assert data == "fallback"
+
+    def test_urlencoded_mode(self) -> None:
+        mode, data = _parse_adhoc_body({"body_mode": "urlencoded", "body_data": '[{"key":"a","value":"1"}]'}, 0)
+        assert mode == "urlencoded"
+        assert isinstance(data, list)
+
+    def test_unsupported_mode_raises(self) -> None:
+        with pytest.raises(ValueError, match="body_mode"):
+            _parse_adhoc_body({"body_mode": "unsupported"}, 0)
+
+    def test_default_mode_is_none(self) -> None:
+        mode, _ = _parse_adhoc_body({}, 0)
+        assert mode == "none"
+
+
+class TestParseAdhocJudgmentFields:
+
+    def test_empty_raw_returns_empty(self) -> None:
+        assert _parse_adhoc_judgment_fields({}) == {}
+
+    def test_x_success_err_codes(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_success_err_codes": "0,200"})
+        assert result["x_success_err_codes"] == "0,200"
+
+    def test_x_success_messages(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_success_messages": "ok,success"})
+        assert result["x_success_messages"] == "ok,success"
+
+    def test_x_enable_err_code_bool_passthrough(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_enable_err_code_judgment": True})
+        assert result["x_enable_err_code_judgment"] is True
+
+    def test_x_enable_err_code_string_conversion(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_enable_err_code_judgment": "true"})
+        assert result["x_enable_err_code_judgment"] is True
+
+    def test_x_enable_err_code_false_string(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_enable_err_code_judgment": "false"})
+        assert result["x_enable_err_code_judgment"] is False
+
+    def test_x_extract_parsed(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_extract": {"token": "$.data.token"}})
+        assert result["x_extract"] == {"token": "$.data.token"}
+
+    def test_x_extract_empty_dict_excluded(self) -> None:
+        result = _parse_adhoc_judgment_fields({"x_extract": {}})
+        assert "x_extract" not in result
+
+    def test_all_fields_combined(self) -> None:
+        raw = {
+            "x_success_err_codes": "0",
+            "x_success_messages": "ok",
+            "x_enable_err_code_judgment": True,
+            "x_enable_message_judgment": True,
+            "x_extract": {"id": "$.id"},
+        }
+        result = _parse_adhoc_judgment_fields(raw)
+        assert len(result) == 5
