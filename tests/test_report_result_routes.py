@@ -36,7 +36,7 @@ def _register_routes(app: Flask) -> None:
 class TestApiReportResults:
     """report-results 端点测试。"""
 
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404。"""
         _register_routes(app)
@@ -47,7 +47,7 @@ class TestApiReportResults:
         "postman_api_tester.handlers.report_result_routes._build_report_results_payload",
         return_value={"results": [], "total": 0, "page": 1},
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     def test_success(self, mock_find: MagicMock, mock_payload: MagicMock, app: Flask) -> None:
         """成功返回结果列表。"""
         _register_routes(app)
@@ -60,7 +60,7 @@ class TestApiReportResults:
         "postman_api_tester.handlers.report_result_routes._build_report_results_payload",
         return_value={"results": [], "total": 0, "page": 2},
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     def test_with_pagination(self, mock_find: MagicMock, mock_payload: MagicMock, app: Flask) -> None:
         """分页参数正确传递。"""
         _register_routes(app)
@@ -79,7 +79,7 @@ class TestApiReportAnalytics:
         assert resp.status_code == 403
 
     @patch("postman_api_tester.handlers.report_result_routes.ENABLE_REPORT_ANALYTICS", True)
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404。"""
         _register_routes(app)
@@ -91,7 +91,7 @@ class TestApiReportAnalytics:
         "postman_api_tester.handlers.report_result_routes._build_analytics_payload",
         return_value={"top_n": [], "trend": []},
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     @patch("postman_api_tester.handlers.report_result_routes.ENABLE_REPORT_ANALYTICS", True)
     def test_success(
         self, mock_find: MagicMock, mock_payload: MagicMock, mock_list: MagicMock, app: Flask
@@ -120,7 +120,7 @@ class TestApiReportAnalyticsCompare:
         assert resp.status_code == 400
 
     @patch("postman_api_tester.handlers.report_result_routes.ENABLE_REPORT_ANALYTICS", True)
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404。"""
         _register_routes(app)
@@ -131,7 +131,7 @@ class TestApiReportAnalyticsCompare:
 class TestApiReportResultDetail:
     """report-result-detail 端点测试。"""
 
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404。"""
         _register_routes(app)
@@ -142,7 +142,7 @@ class TestApiReportResultDetail:
         "postman_api_tester.handlers.report_result_routes.build_result_detail_payload",
         return_value={"request_info": {}, "response_info": {}},
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     def test_success(self, mock_find: MagicMock, mock_detail: MagicMock, app: Flask) -> None:
         """成功返回结果详情。"""
         _register_routes(app)
@@ -155,7 +155,7 @@ class TestApiReportResultDetail:
         "postman_api_tester.handlers.report_result_routes.build_result_detail_payload",
         side_effect=IndexError(),
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     def test_index_not_found(self, mock_find: MagicMock, mock_detail: MagicMock, app: Flask) -> None:
         """结果索引不存在返回 404。"""
         _register_routes(app)
@@ -172,7 +172,7 @@ class TestApiCompare:
         resp = app.test_client().get("/api/compare")
         assert resp.status_code == 400
 
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404。"""
         _register_routes(app)
@@ -183,7 +183,7 @@ class TestApiCompare:
         "postman_api_tester.handlers.report_result_routes.build_compare_payload",
         return_value={"left": {}, "right": {}},
     )
-    @patch("postman_api_tester.handlers.report_result_routes._repo_find_report", return_value={"report_name": "test"})
+    @patch("postman_api_tester.report_repository.find_report", return_value={"report_name": "test"})
     def test_success(self, mock_find: MagicMock, mock_payload: MagicMock, app: Flask) -> None:
         """成功返回对比数据。"""
         _register_routes(app)

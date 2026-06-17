@@ -5,7 +5,10 @@ from functools import partial
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    get_report_or_error,
+    json_error as _json_error,
+)
 from postman_api_tester.services.report_job_execution_service import (
     enqueue_retry_job as _job_enqueue_retry_job,
     prepare_retry_job_context as _job_prepare_retry_job_context,
@@ -43,10 +46,9 @@ def api_retry_failures() -> ResponseReturnValue:
     if not report_name:
         return _json_error("缺少 report_name", 400, "RPT_RETRY_002")
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_RETRY_003")
+    report = get_report_or_error(report_name, "RPT_RETRY_003")
+    if isinstance(report, tuple):
+        return report
 
     failed_paths, source_runtime_ctx, source_runtime_error = _job_prepare_retry_job_context(
         payload=payload,
@@ -94,10 +96,9 @@ def api_retry_all() -> ResponseReturnValue:
     if not report_name:
         return _json_error("缺少 report_name", 400, "RPT_RETRY_007")
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_RETRY_008")
+    report = get_report_or_error(report_name, "RPT_RETRY_008")
+    if isinstance(report, tuple):
+        return report
 
     all_paths, source_runtime_ctx, source_runtime_error = _job_prepare_retry_job_context(
         payload=payload,

@@ -7,7 +7,10 @@ from typing import Iterator
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    get_report_or_error,
+    json_error as _json_error,
+)
 from postman_api_tester.utils.collection_utils import (
     extract_collection_preview_items as _svc_extract_collection_preview_items,
 )
@@ -22,7 +25,6 @@ from postman_api_tester.report_server_config import (
     REPORT_EXPORT_STREAM_THRESHOLD,
 )
 from postman_api_tester.report_server_utils import to_bool as _to_bool
-from postman_api_tester.report_repository import find_report as _repo_find_report
 from postman_api_tester.services.report_export_service import (
     export_collection_with_latest_params as _svc_export_collection_with_latest_params,
 )
@@ -84,10 +86,9 @@ def api_export_collection() -> ResponseReturnValue:
     if not report_name:
         return _json_error("report_name 不能为空", 400, "COL_EXPORT_001")
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "COL_EXPORT_002")
+    report = get_report_or_error(report_name, "COL_EXPORT_002")
+    if isinstance(report, tuple):
+        return report
 
     try:
         exported = _svc_export_collection_with_latest_params(
@@ -125,10 +126,9 @@ def api_export_collection_stream() -> ResponseReturnValue:
     if not report_name:
         return _json_error("report_name 不能为空", 400, "COL_EXPORT_001")
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "COL_EXPORT_002")
+    report = get_report_or_error(report_name, "COL_EXPORT_002")
+    if isinstance(report, tuple):
+        return report
 
     try:
         exported = _svc_export_collection_with_latest_params(

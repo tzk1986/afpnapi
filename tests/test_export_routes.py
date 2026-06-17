@@ -34,7 +34,7 @@ class TestApiExportJUnit:
         with patch(
             "postman_api_tester.handlers.export_routes.ENABLE_JUNIT_EXPORT", True
         ), patch(
-            "postman_api_tester.handlers.export_routes._repo_find_report"
+            "postman_api_tester.report_repository.find_report"
         ) as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_export_junit("missing_report")
@@ -46,7 +46,7 @@ class TestApiExportJUnit:
         with patch(
             "postman_api_tester.handlers.export_routes.ENABLE_JUNIT_EXPORT", True
         ), patch(
-            "postman_api_tester.handlers.export_routes._repo_find_report"
+            "postman_api_tester.report_repository.find_report"
         ) as mock_find, patch(
             "postman_api_tester.handlers.export_routes._svc_build_junit_xml"
         ) as mock_build:
