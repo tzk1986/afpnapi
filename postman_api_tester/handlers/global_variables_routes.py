@@ -62,10 +62,13 @@ def api_global_variables_get() -> ResponseReturnValue:
     data = read_scope(file_path, scope, env_name, _get_max_count())
     if do_mask:
         variables = {k: mask_value(str(v)) for k, v in data["variables"].items()}
+        variables_list = [{"key": k, "value": mask_value(str(v))} for k, v in data["variables"].items()]
     else:
         variables = {k: str(v) for k, v in data["variables"].items()}
+        variables_list = [{"key": k, "value": str(v)} for k, v in data["variables"].items()]
     return BaseHandler.json_response({
         "variables": variables,
+        "variables_list": variables_list,
         "count": data["count"],
         "scope": scope,
         "env_name": env_name if scope == "env" else None,
@@ -87,10 +90,17 @@ def api_global_variables_all() -> ResponseReturnValue:
             return {k: mask_value(str(v)) for k, v in vars_dict.items()}
         return {k: str(v) for k, v in vars_dict.items()}
 
+    def _to_list(vars_dict: dict) -> list:
+        if do_mask:
+            return [{"key": k, "value": mask_value(str(v))} for k, v in vars_dict.items()]
+        return [{"key": k, "value": str(v)} for k, v in vars_dict.items()]
+
     return BaseHandler.json_response({
         "shared": _process_vars(data.get("shared", {})),
+        "shared_list": _to_list(data.get("shared", {})),
         "env_list": data.get("env_list", []),
         "environments": {k: _process_vars(v) for k, v in data.get("environments", {}).items() if isinstance(v, dict)},
+        "environments_list": {k: _to_list(v) for k, v in data.get("environments", {}).items() if isinstance(v, dict)},
         "updated_at": data["updated_at"],
         "total_count": data["total_count"],
         "masked": do_mask,

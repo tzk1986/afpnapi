@@ -449,8 +449,22 @@
         function loadGlobalVariables() {
             fetch('/api/global-variables/all?masked=false').then(r => r.json()).then(data => {
                 const d = data.data || {};
-                state.globalSharedVars = d.shared || {};
-                state.globalEnvVars = d.environments || {};
+                // 使用 _list 数组字段保持插入顺序（JS object 会重排数字 key）
+                const sharedList = d.shared_list;
+                state.globalSharedVars = Array.isArray(sharedList)
+                    ? Object.fromEntries(sharedList.map(e => [e.key, e.value]))
+                    : (d.shared || {});
+                const envsList = d.environments_list;
+                if (Array.isArray(envsList)) {
+                    state.globalEnvVars = {};
+                    for (const [envName, list] of Object.entries(envsList)) {
+                        state.globalEnvVars[envName] = Array.isArray(list)
+                            ? Object.fromEntries(list.map(e => [e.key, e.value]))
+                            : (d.environments?.[envName] || {});
+                    }
+                } else {
+                    state.globalEnvVars = d.environments || {};
+                }
                 state.globalEnvList = d.env_list || [];
                 _renderEditorEnvSelect();
             }).catch(() => {

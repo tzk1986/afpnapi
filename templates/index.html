@@ -1525,8 +1525,9 @@ function loadSharedVariables() {
     container.innerHTML = '<div class="var-empty">加载中...</div>';
     const masked = showVarValues ? 'false' : 'true';
     fetch('/api/global-variables?scope=shared&masked=' + masked).then(r => r.json()).then(data => {
-        const vars = data.data?.variables || {};
-        _renderVarTable('sharedVarTable', Object.entries(vars), 'shared', '');
+        const list = data.data?.variables_list;
+        const entries = Array.isArray(list) ? list.map(e => [e.key, e.value]) : Object.entries(data.data?.variables || {});
+        _renderVarTable('sharedVarTable', entries, 'shared', '');
     }).catch(() => {
         document.getElementById('sharedVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
     });
@@ -1547,8 +1548,9 @@ function loadEnvVariables() {
     container.innerHTML = '<div class="var-empty">加载中...</div>';
     const masked = showVarValues ? 'false' : 'true';
     fetch('/api/global-variables?scope=env&env_name=' + encodeURIComponent(envName) + '&masked=' + masked).then(r => r.json()).then(data => {
-        const vars = data.data?.variables || {};
-        _renderVarTable('envVarTable', Object.entries(vars), 'env', envName);
+        const list = data.data?.variables_list;
+        const entries = Array.isArray(list) ? list.map(e => [e.key, e.value]) : Object.entries(data.data?.variables || {});
+        _renderVarTable('envVarTable', entries, 'env', envName);
     }).catch(() => {
         document.getElementById('envVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
     });
