@@ -5,9 +5,10 @@
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Any, Callable, Dict
+
+from postman_api_tester.utils.file_utils import atomic_write_json
 
 
 def update_report_meta(
@@ -41,10 +42,7 @@ def update_report_meta(
         if not isinstance(updated_meta, dict):
             raise ValueError("meta 更新回调必须返回 dict")
 
-        tmp_meta = meta_path.with_suffix(".tmp")
-        with tmp_meta.open("w", encoding="utf-8") as f:
-            json.dump(updated_meta, f, indent=2, ensure_ascii=False)
-        os.replace(str(tmp_meta), str(meta_path))
+        atomic_write_json(meta_path, updated_meta)
 
         invalidate_reports_cache()
         return updated_meta

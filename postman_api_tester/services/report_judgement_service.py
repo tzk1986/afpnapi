@@ -5,10 +5,11 @@
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
+
+from postman_api_tester.utils.file_utils import atomic_write_json
 
 
 def set_report_result_judgement(
@@ -126,10 +127,7 @@ def set_report_result_judgement(
             "success_rate": new_stats["success_rate"],
         }
 
-        tmp_meta = meta_path.with_suffix(".tmp")
-        with tmp_meta.open("w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2, ensure_ascii=False)
-        os.replace(str(tmp_meta), str(meta_path))
+        atomic_write_json(meta_path, meta)
 
         invalidate_reports_cache()
         return {"summary": meta["summary"], "result": updated_result}

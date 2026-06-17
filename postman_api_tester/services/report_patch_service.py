@@ -5,9 +5,10 @@
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Any, Callable, Dict, List, cast
+
+from postman_api_tester.utils.file_utils import atomic_write_json
 
 
 def patch_report_result(
@@ -90,10 +91,7 @@ def patch_report_result(
             "success_rate": new_stats["success_rate"],
         }
 
-        tmp_meta = meta_path.with_suffix(".tmp")
-        with tmp_meta.open("w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2, ensure_ascii=False)
-        os.replace(str(tmp_meta), str(meta_path))
+        atomic_write_json(meta_path, meta)
 
         details_file_name = str(report.get("details_file") or "").strip()
         if details_file_name:
@@ -109,10 +107,7 @@ def patch_report_result(
                 "request_info": new_request_info,
                 "response_info": new_response_info,
             }
-            tmp_details = details_path.with_suffix(".tmp")
-            with tmp_details.open("w", encoding="utf-8") as f:
-                json.dump(details, f, indent=2, ensure_ascii=False)
-            os.replace(str(tmp_details), str(details_path))
+            atomic_write_json(details_path, details)
 
         invalidate_reports_cache()
         return cast(Dict[str, Any], meta["summary"])
