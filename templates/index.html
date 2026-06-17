@@ -1405,7 +1405,7 @@ function _renderVarTable(containerId, entries, scope, envName) {
             : `'${scope}','${ek}'`;
         html += '<tr>';
         html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
-        html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+        html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" data-last-saved="${ev}" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
         html += `<td><button class="btn-del" onclick="deleteVariable(${delArgs})">删除</button></td>`;
         html += '</tr>';
     });
@@ -1443,6 +1443,7 @@ function _deleteVar(scope, key, envName) {
 }
 
 function saveVarRow(inputEl) {
+    if (!showVarValues) return;
     const row = inputEl.closest('tr');
     if (!row || row.dataset._saving === '1') return;
     const inputs = row.querySelectorAll('input.var-input');
@@ -1471,7 +1472,7 @@ function saveVarRow(inputEl) {
         return;
     }
 
-    const valueChanged = (valInput.dataset._lastVal || '') !== newVal && valInput.value !== valInput.defaultValue;
+    const valueChanged = (valInput.dataset.lastSaved || '') !== newVal && valInput.value !== valInput.defaultValue;
     const keyChanged = newKey !== origKey;
 
     if (!keyChanged && !valueChanged) return;
@@ -1490,7 +1491,7 @@ function saveVarRow(inputEl) {
                 keyInput.dataset.origKey = newKey;
                 keyInput.defaultValue = newKey;
                 valInput.defaultValue = newVal;
-                valInput.dataset._lastVal = newVal;
+                valInput.dataset.lastSaved = newVal;
                 row.dataset._saving = '0';
             } else {
                 alert('保存失败: ' + (data.message || '未知错误'));
