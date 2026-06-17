@@ -1,5 +1,6 @@
 """job_routes 单元测试。"""
 
+from pathlib import Path
 from typing import Generator
 from unittest.mock import MagicMock, patch
 
@@ -7,6 +8,7 @@ import pytest
 from flask import Flask
 
 from postman_api_tester.handlers.job_routes import (
+    _resolve_output_dir,
     api_run_ad_hoc_tests,
     api_run_postman,
     api_run_postman_status,
@@ -14,7 +16,7 @@ from postman_api_tester.handlers.job_routes import (
 )
 
 
-@pytest.fixture  # type: ignore[untyped-decorator]
+@pytest.fixture
 def app_context() -> Generator[None, None, None]:
     """提供 Flask 请求上下文。"""
     app = Flask(__name__)
@@ -130,3 +132,41 @@ class TestApiRunPostmanStatus:
             result = api_run_postman_status("existing_job")
             from flask import Response
             assert isinstance(result, Response)
+
+
+class TestResolveOutputDir:
+    """_resolve_output_dir() 路径安全解析测试。"""
+
+    def test_empty_returns_reports_dir(self, tmp_path: Path) -> None:
+        """空 output_dir 返回 reports_dir。"""
+        output_dir, report_name = _resolve_output_dir("", None, reports_dir=tmp_path)
+        assert output_dir == str(tmp_path)
+        assert report_name is None
+
+    def test_valid_subdir(self, tmp_path: Path) -> None:
+        """有效子目录返回解析后路径。"""
+        subdir = tmp_path / "sub"
+        subdir.mkdir()
+        output_dir, report_name = _resolve_output_dir("sub", None, reports_dir=tmp_path)
+        assert output_dir == str(subdir.resolve())
+
+    def test_path_traversal_falls_back(self, tmp_path: Path) -> None:
+        """路径遍历攻击回退至 reports_dir。"""
+        output_dir, report_name = _resolve_output_dir("../../etc", None, reports_dir=tmp_path)
+        assert output_dir == str(tmp_path)
+
+    def test_html_file_redirects_to_report_name(self, tmp_path: Path) -> None:
+        """output_dir 误填为 .html 文件名时自动移至 report_name。"""
+        output_dir, report_name = _resolve_output_dir(
+            "my_report.html", None, reports_dir=tmp_path,
+        )
+        assert output_dir == str(tmp_path)
+        assert report_name == "my_report.html"
+
+    def test_html_file_preserves_existing_report_name(self, tmp_path: Path) -> None:
+        """output_dir 误填为 .html 但 report_name 已有值时不覆盖。"""
+        output_dir, report_name = _resolve_output_dir(
+            "my_report.html", "existing_name", reports_dir=tmp_path,
+        )
+        assert output_dir == str(tmp_path)
+        assert report_name == "existing_name"

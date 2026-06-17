@@ -33,6 +33,7 @@ def safe_report_artifact(reports_dir: Path, name: str) -> Optional[Path]:
 
 def atomic_write_json(path: Path, data: Any) -> None:
 	"""原子写入 JSON 文件：先写临时文件再 os.replace，避免写入中断损坏原文件。"""
+	path.parent.mkdir(parents=True, exist_ok=True)
 	tmp_fd, tmp_str = tempfile.mkstemp(
 		dir=str(path.parent), suffix=".tmp", prefix=path.name + "."
 	)
