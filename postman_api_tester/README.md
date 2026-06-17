@@ -1,8 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.8.4
-发布日期：2026-06-16
+版本：v1.9.0
+发布日期：2026-06-17
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.9.0）：
+- **并发执行引擎**：基于 ThreadPoolExecutor + 依赖感知分批调度，`ENABLE_CONCURRENT=true` 启用后接口按变量依赖拓扑排序并行执行，预期 5-10x 提速；默认关闭保持串行兼容。
+- **线程安全改造**：PostmanTestReport、VariableContext、ConcurrentProgressTracker 均加锁保护，支持多线程并发写入不丢数据。
 
 本版新增重点（v1.8.1）：
 - **测试覆盖强化**：补充 collection_editor_routes 路由层 19 个测试用例，覆盖全部 4 个路由函数的成功/错误路径和 12 个错误码。
