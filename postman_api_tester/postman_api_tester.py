@@ -214,6 +214,9 @@ def run_postman_tests(
         assertion_strict_mode=assertion_strict_mode,
     )
 
+    enable_concurrent = bool(getattr(_cfg, "ENABLE_CONCURRENT", False))
+    concurrent_workers = int(getattr(_cfg, "CONCURRENT_WORKERS", 10))
+
     completed_count, execution_error = _execute_and_finalize_suite(
         apis=apis,
         total_apis_count=total_apis_count,
@@ -232,6 +235,8 @@ def run_postman_tests(
         shared_session=shared_session,
         judgment_config=judgment_config,
         variable_context=variable_context,
+        enable_concurrent=enable_concurrent,
+        concurrent_workers=concurrent_workers,
     )
 
     _complete_report_output(

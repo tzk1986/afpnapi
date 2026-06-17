@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from postman_api_tester.postman_api_tester import PostmanTestReport
 from urllib.parse import urljoin
 
+from postman_api_tester.core.batch_scheduler import BatchScheduler
+from postman_api_tester.core.concurrent_executor import ConcurrentProgressTracker, execute_batch_concurrently
 from postman_api_tester.core.html_reporter import HtmlReporter
 from postman_api_tester.core.types import ProgressCallback, ProgressPayload
 from postman_api_tester.exceptions import ValidationError
@@ -379,6 +381,104 @@ def _finalize_checkpoint_state(
         logger.warning("写入 checkpoint 失败: %s", exc)
 
 
+def _execute_api_suite_concurrent(
+    *,
+    apis: List[ApiConfig],
+    total_apis_count: int,
+    report: PostmanTestReport,
+    resolved_token: Optional[str],
+    request_timeout: RequestTimeout,
+    assertion_strict_mode: bool,
+    progress_callback: Optional[ProgressCallback],
+    enable_checkpoint_recovery: bool,
+    checkpoint_flush_every_n: int,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set[str],
+    shared_session: SessionLike,
+    concurrent_workers: int,
+    judgment_config: Optional[Dict[str, Any]] = None,
+    variable_context: Optional[object] = None,
+) -> Tuple[int, Optional[Exception]]:
+    """并发执行路径：基于 BatchScheduler 分批 + ThreadPoolExecutor 批次内并行。"""
+    import threading
+
+    execution_error: Optional[Exception] = None
+    completed_count = 0
+    set_lock = threading.Lock()
+    tracker = ConcurrentProgressTracker(total=len(apis), callback=progress_callback)
+
+    scheduler = BatchScheduler(apis)
+    batches = scheduler.compute_batches()
+    total_batches = len(batches)
+
+    logger.info(
+        "并发执行模式：%d 个接口分为 %d 个批次，最大线程数 %d",
+        len(apis), total_batches, concurrent_workers,
+    )
+
+    def _run_single(api: ApiConfig) -> TestResultRecord:
+        executor = PostmanTestExecutor(
+            api,
+            auth_token=resolved_token,
+            session=shared_session,
+            request_timeout=request_timeout,
+            assertion_strict_mode=assertion_strict_mode,
+            judgment_config=judgment_config,
+            variable_context=variable_context,  # type: ignore[arg-type]
+        )
+        executor.start()
+        return executor.execute_test()
+
+    try:
+        for batch_idx, batch_indices in enumerate(batches):
+            batch_apis = [apis[i] for i in batch_indices]
+
+            def _on_done(api: ApiConfig, result: TestResultRecord) -> None:
+                nonlocal completed_count
+                report.add_result(result)
+                data_index = int(api.get("data_index", 0) or 0)
+                item_path_key = _checkpoint_key(api.get("item_path"), data_index)
+                with set_lock:
+                    if item_path_key:
+                        executed_item_paths.add(item_path_key)
+                    completed_count += 1
+                tracker.on_item_done(
+                    name=str(api.get('name', '')),
+                    method=str(api.get('method', '')),
+                    url=str(api.get('url', '')),
+                    status=str(result.get('status', '')),
+                )
+
+            execute_batch_concurrently(
+                batch_apis,
+                _run_single,
+                max_workers=concurrent_workers,
+                on_item_done=_on_done,
+            )
+
+            if enable_checkpoint_recovery:
+                _flush_checkpoint_state(
+                    enable_checkpoint_recovery=enable_checkpoint_recovery,
+                    checkpoint_path=checkpoint_path,
+                    collection_fingerprint=collection_fingerprint,
+                    parser_base_url=parser_base_url,
+                    selected_total_count=selected_total_count,
+                    executed_item_paths=executed_item_paths,
+                    completed=False,
+                )
+
+            logger.info("批次 %d/%d 完成，%d 个接口", batch_idx + 1, total_batches, len(batch_apis))
+
+    except Exception as exc:
+        execution_error = exc
+        logger.exception("并发执行过程中发生中断异常: %s", exc)
+
+    return completed_count, execution_error
+
+
 def _execute_api_suite(
     *,
     apis: List[ApiConfig],
@@ -398,7 +498,31 @@ def _execute_api_suite(
     shared_session: SessionLike,
     judgment_config: Optional[Dict[str, Any]] = None,
     variable_context: Optional[object] = None,
+    enable_concurrent: bool = False,
+    concurrent_workers: int = 10,
 ) -> Tuple[int, Optional[Exception]]:
+    if enable_concurrent and len(apis) > 1:
+        return _execute_api_suite_concurrent(
+            apis=apis,
+            total_apis_count=total_apis_count,
+            report=report,
+            resolved_token=resolved_token,
+            request_timeout=request_timeout,
+            assertion_strict_mode=assertion_strict_mode,
+            progress_callback=progress_callback,
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            checkpoint_flush_every_n=checkpoint_flush_every_n,
+            checkpoint_path=checkpoint_path,
+            collection_fingerprint=collection_fingerprint,
+            parser_base_url=parser_base_url,
+            selected_total_count=selected_total_count,
+            executed_item_paths=executed_item_paths,
+            shared_session=shared_session,
+            concurrent_workers=concurrent_workers,
+            judgment_config=judgment_config,
+            variable_context=variable_context,
+        )
+
     execution_error: Optional[Exception] = None
     completed_count = 0
 
@@ -496,6 +620,8 @@ def _execute_and_finalize_suite(
     shared_session: SessionLike,
     judgment_config: Optional[Dict[str, Any]] = None,
     variable_context: Optional[object] = None,
+    enable_concurrent: bool = False,
+    concurrent_workers: int = 10,
 ) -> Tuple[int, Optional[Exception]]:
     completed_count = 0
     execution_error: Optional[Exception] = None
@@ -518,6 +644,8 @@ def _execute_and_finalize_suite(
             shared_session=shared_session,
             judgment_config=judgment_config,
             variable_context=variable_context,
+            enable_concurrent=enable_concurrent,
+            concurrent_workers=concurrent_workers,
         )
     finally:
         close_session(shared_session)
