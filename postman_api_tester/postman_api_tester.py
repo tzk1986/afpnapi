@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -44,16 +45,19 @@ class PostmanTestReport:
         self.interrupt_reason = ""
         self.assertion_strict_mode = False
         self._summary_cache: Optional[SummaryData] = None
+        self._results_lock = threading.Lock()
 
     def add_result(self, result: TestResultRecord) -> None:
         """添加单条测试结果。"""
-        self.results.append(result)
-        self._summary_cache = None
+        with self._results_lock:
+            self.results.append(result)
+            self._summary_cache = None
 
     def add_results(self, results: List[TestResultRecord]) -> None:
         """批量添加测试结果。"""
-        self.results.extend(results)
-        self._summary_cache = None
+        with self._results_lock:
+            self.results.extend(results)
+            self._summary_cache = None
 
     def generate_summary(self) -> SummaryData:
         """生成测试摘要。"""
