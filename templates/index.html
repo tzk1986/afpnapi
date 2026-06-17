@@ -1443,7 +1443,6 @@ function _deleteVar(scope, key, envName) {
 }
 
 function saveVarRow(inputEl) {
-    if (!showVarValues) return;
     const row = inputEl.closest('tr');
     if (!row || row.dataset._saving === '1') return;
     const inputs = row.querySelectorAll('input.var-input');
@@ -1453,6 +1452,8 @@ function saveVarRow(inputEl) {
     const newKey = keyInput.value.trim();
     const newVal = valInput.value.trim();
     const isNew = keyInput.dataset.isNew === 'true';
+    // 已有行在隐藏值状态下禁止保存（防止脱敏值污染），新增空行不受限（始终为 text）
+    if (!isNew && !showVarValues) return;
     const origKey = keyInput.dataset.origKey || '';
     const scope = keyInput.dataset.scope;
     const envName = keyInput.dataset.env || '';
