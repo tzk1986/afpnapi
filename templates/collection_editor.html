@@ -143,11 +143,17 @@
         .exec-modal-actions .btn { padding: 8px 20px; }
 
         /* Variable Autocomplete */
-        .var-autocomplete { display: none; position: fixed; z-index: 2000; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 220px; overflow-y: auto; min-width: 200px; max-width: 340px; }
+        .var-autocomplete { display: none; position: fixed; z-index: 2000; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; min-width: 200px; max-width: 340px; }
         .var-autocomplete.visible { display: block; }
+        .var-autocomplete::-webkit-scrollbar { width: 5px; }
+        .var-autocomplete::-webkit-scrollbar-track { background: transparent; }
+        .var-autocomplete::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .var-autocomplete::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .var-ac-item { padding: 7px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .var-ac-item:hover, .var-ac-item.active { background: #eff6ff; }
         .var-ac-name { font-family: Consolas, monospace; color: #1d4ed8; font-weight: 600; }
+        .var-ac-fn { font-family: Consolas, monospace; color: #7c3aed; font-weight: 600; }
+        .var-ac-fn-prefix { color: #a78bfa; font-weight: 700; margin-right: 2px; font-style: italic; }
         .var-ac-value { color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
         .var-ac-source { font-size: 10px; color: #94a3b8; padding: 1px 5px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; }
         .var-ac-empty { padding: 10px 12px; color: #94a3b8; font-size: 12px; }
@@ -433,7 +439,7 @@
             globalEnvVars: {},
             globalEnvList: [],
             selectedEnv: '',
-            varFunctionNames: [],
+            varFunctions: [],
         };
 
         // Methods
@@ -1393,9 +1399,9 @@
                     }
                     // 内置变量函数（如 timestamp、uuid）仅在实际被消费时标记为函数来源
                     const consumedVars = new Set(Object.keys(data.consumed || {}));
-                    for (const fn of state.varFunctionNames || []) {
-                        if (fn && consumedVars.has(fn) && !data.produced[fn]) {
-                            data.produced[fn] = { by_request: '__func__', by_name: '', source: '函数' };
+                    for (const fn of state.varFunctions || []) {
+                        if (fn?.name && consumedVars.has(fn.name) && !data.produced[fn.name]) {
+                            data.produced[fn.name] = { by_request: '__func__', by_name: '', source: '函数' };
                         }
                     }
                     renderDependencyInfo(data);
@@ -2941,6 +2947,20 @@
                 }
             }
 
+            // Built-in variable functions
+            for (const fn of state.varFunctions || []) {
+                if (fn?.name && !seen.has(fn.name)) {
+                    seen.add(fn.name);
+                    vars.push({
+                        name: fn.name, value: '', source: '函数',
+                        syntax: fn.syntax || '{{' + fn.name + '()}}',
+                        description: fn.description || '',
+                        example: fn.example || '',
+                        isFunction: true,
+                    });
+                }
+            }
+
             return vars;
         }
 
@@ -3023,10 +3043,19 @@
             for (let i = 0; i < items.length; i++) {
                 const v = items[i];
                 const activeClass = i === acState.selectedIdx ? ' active' : '';
-                html += `<div class="var-ac-item${activeClass}" data-idx="${i}" onclick="applyAcSelection('${escapeAttr(v.name)}')">
-                    <span>
-                        <span class="var-ac-name">{{${escapeHtml(v.name)}}}</span>
-                        <span class="var-ac-value">${escapeHtml(v.value)}</span>
+                const isFn = v.isFunction;
+                const displayName = isFn ? escapeHtml(v.syntax || '{{' + v.name + '()}}')
+                                         : '{{' + escapeHtml(v.name) + '}}';
+                const displayValue = isFn ? escapeHtml(v.description || '')
+                                          : escapeHtml(v.value);
+                const nameClass = isFn ? 'var-ac-fn' : 'var-ac-name';
+                html += `<div class="var-ac-item${activeClass}" data-idx="${i}" onclick="applyAcSelection(${i})">
+                    <span>`;
+                if (isFn) {
+                    html += `<span class="var-ac-fn-prefix">f </span>`;
+                }
+                html += `<span class="${nameClass}">${displayName}</span>
+                        <span class="var-ac-value">${displayValue}</span>
                     </span>
                     <span class="var-ac-source">${escapeHtml(v.source)}</span>
                 </div>`;
@@ -3048,22 +3077,25 @@
             if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
         }
 
-        function applyAcSelection(varName) {
+        function applyAcSelection(idx) {
+            const item = acState.items[idx];
             const el = acState.targetEl;
-            if (!el) return;
+            if (!item || !el) return;
 
             const val = el.value;
             const openIdx = acState.triggerIdx;
             const cursorPos = el.selectionStart;
             const before = val.substring(0, openIdx);
             const after = val.substring(cursorPos);
-            el.value = before + '{{' + varName + '}}' + after;
+            // 函数插入完整语法（如 {{timestamp()}}），变量插入 {{name}}
+            const insertText = item.syntax || ('{{' + item.name + '}}');
+            el.value = before + insertText + after;
 
             // Trigger change event so state is updated
             el.dispatchEvent(new Event('change', { bubbles: true }));
 
-            // Set cursor after }}
-            const newCursorPos = before.length + 2 + varName.length + 2;
+            // Set cursor after inserted text
+            const newCursorPos = before.length + insertText.length;
             el.setSelectionRange(newCursorPos, newCursorPos);
             el.focus();
 
@@ -3081,9 +3113,8 @@
 
         function loadVarFunctions() {
             fetch('/api/variable-functions').then(r => r.json()).then(data => {
-                const fns = (data.data?.functions) || [];
-                state.varFunctionNames = fns.map(f => f.name || '').filter(Boolean);
-            }).catch(() => {});
+                state.varFunctions = (data.data?.functions) || [];
+            }).catch(() => { state.varFunctions = []; });
         }
 
         // Initialize autocomplete on page load
