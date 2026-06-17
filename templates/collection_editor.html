@@ -1378,8 +1378,14 @@
                 const data = await resp.json();
                 if (resp.ok) {
                     // 将全局/环境变量标记为已生产（source=全局/环境），避免显示"未定义"
-                    const mergedVars = getMergedGlobalVars();
-                    for (const k of Object.keys(mergedVars)) {
+                    // 环境优先级高于共享，先注入环境再注入共享（共享不覆盖环境）
+                    if (state.selectedEnv) {
+                        const envVars = state.globalEnvVars[state.selectedEnv] || {};
+                        for (const k of Object.keys(envVars)) {
+                            data.produced[k] = { by_request: '__global__', by_name: '', source: '环境' };
+                        }
+                    }
+                    for (const k of Object.keys(state.globalSharedVars || {})) {
                         if (!data.produced[k]) {
                             data.produced[k] = { by_request: '__global__', by_name: '', source: '全局' };
                         }
