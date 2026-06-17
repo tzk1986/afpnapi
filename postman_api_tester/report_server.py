@@ -12,10 +12,15 @@ import logging
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.global_variables_routes import (
+    api_env_add as _route_api_env_add,
+    api_env_list_get as _route_api_env_list_get,
+    api_env_remove as _route_api_env_remove,
+    api_global_variables_all as _route_api_global_variables_all,
     api_global_variables_clear as _route_api_global_variables_clear,
     api_global_variables_delete as _route_api_global_variables_delete,
     api_global_variables_get as _route_api_global_variables_get,
     api_global_variables_set as _route_api_global_variables_set,
+    api_variable_functions as _route_api_variable_functions,
 )
 from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_dependency as _route_api_collection_dependency,
@@ -331,6 +336,36 @@ def api_global_variables_clear() -> ResponseReturnValue:
 def api_global_variables_delete_key(key: str) -> ResponseReturnValue:
     """删除单个全局变量。"""
     return _route_api_global_variables_delete(key)
+
+
+@app.route("/api/global-variables/all", methods=["GET"])
+def api_global_variables_all() -> ResponseReturnValue:
+    """读取全部多环境变量（shared + 所有 env）。"""
+    return _route_api_global_variables_all()
+
+
+@app.route("/api/variable-functions", methods=["GET"])
+def api_variable_functions() -> ResponseReturnValue:
+    """返回变量函数元数据列表。"""
+    return _route_api_variable_functions()
+
+
+@app.route("/api/environments/list", methods=["GET"])
+def api_env_list() -> ResponseReturnValue:
+    """返回用户可管理的环境列表。"""
+    return _route_api_env_list_get()
+
+
+@app.route("/api/environments", methods=["POST"])
+def api_env_create() -> ResponseReturnValue:
+    """添加新环境。"""
+    return _route_api_env_add()
+
+
+@app.route("/api/environments/<path:env_name>", methods=["DELETE"])
+def api_env_delete(env_name: str) -> ResponseReturnValue:
+    """删除环境。"""
+    return _route_api_env_remove(env_name)
 
 
 @app.route("/favicon.ico")

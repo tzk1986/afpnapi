@@ -93,3 +93,60 @@ def _date(fmt: str = "") -> str:
 def _datetime(fmt: str = "") -> str:
     """当前日期时间，默认格式 ``%Y-%m-%d %H:%M:%S``。"""
     return datetime.now().strftime(fmt or "%Y-%m-%d %H:%M:%S")
+
+
+# ── 函数元数据（用于 UI 展示）──────────────────────────────────────────
+
+_FUNCTION_META: Dict[str, Dict[str, str]] = {
+    "timestamp": {
+        "syntax": "{{timestamp()}}",
+        "params": "无",
+        "description": "Unix 时间戳（秒，10 位）",
+        "example": "1750147200",
+    },
+    "timestamp_ms": {
+        "syntax": "{{timestamp_ms()}}",
+        "params": "无",
+        "description": "Unix 时间戳（毫秒，13 位）",
+        "example": "1750147200123",
+    },
+    "uuid": {
+        "syntax": "{{uuid()}}",
+        "params": "无",
+        "description": "UUID v4 随机字符串",
+        "example": "a3b1c2d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    },
+    "random_int": {
+        "syntax": "{{random_int(low,high)}}",
+        "params": "low=下限(默认0), high=上限(默认100)",
+        "description": "指定范围内的随机整数",
+        "example": "{{random_int(1,100)}} → 42",
+    },
+    "date": {
+        "syntax": "{{date(fmt)}}",
+        "params": "fmt=日期格式(默认%Y-%m-%d)",
+        "description": "当前日期字符串",
+        "example": "{{date(%Y%m%d)}} → 20260617",
+    },
+    "datetime": {
+        "syntax": "{{datetime(fmt)}}",
+        "params": "fmt=日期时间格式(默认%Y-%m-%d %H:%M:%S)",
+        "description": "当前日期时间字符串",
+        "example": "{{datetime(%H:%M)}} → 14:30",
+    },
+}
+
+
+def get_function_metadata() -> list[dict[str, str]]:
+    """返回所有已注册函数的元数据列表（按注册顺序），用于 UI 帮助面板。"""
+    result: list[dict[str, str]] = []
+    for name in _BUILT_IN_FUNCTIONS:
+        meta = _FUNCTION_META.get(name, {})
+        result.append({
+            "name": name,
+            "syntax": meta.get("syntax", "{{" + name + "()}}"),
+            "params": meta.get("params", ""),
+            "description": meta.get("description", ""),
+            "example": meta.get("example", ""),
+        })
+    return result

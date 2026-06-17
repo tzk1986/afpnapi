@@ -393,5 +393,5 @@ CONCURRENT_WORKERS = max(1, int(os.environ.get("CONCURRENT_WORKERS", "10")))
 ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "true")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
-GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "")
+GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
 GLOBAL_VARIABLES_MAX_COUNT = max(1, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000")))

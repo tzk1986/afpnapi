@@ -70,11 +70,15 @@ class VariableContext:
         return extracted
 
     def save_to_file(self, path: str, max_count: int = 1000) -> None:
-        """将当前变量快照持久化到 JSON 文件。
+        """将当前变量快照持久化到 JSON 文件（写入 shared 区域）。
 
         - 最多保存 ``max_count`` 个变量，超出则截断（按插入顺序）。
         - 写入失败时记录警告，不抛出异常。
         """
+        from postman_api_tester.services.global_variables_service import (
+            _read_store,
+            _write_store,
+        )
         with self._lock:
             snapshot = dict(self._variables)
         if len(snapshot) > max_count:
@@ -83,15 +87,10 @@ class VariableContext:
                 len(snapshot), max_count, max_count,
             )
             snapshot = dict(list(snapshot.items())[:max_count])
-        data = {
-            "version": 1,
-            "updated_at": datetime.now().isoformat(timespec="seconds"),
-            "variables": snapshot,
-        }
         try:
-            p = Path(path)
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            store = _read_store(path)
+            store["shared"] = snapshot
+            _write_store(path, store)
         except OSError as exc:
             logger.warning("全局变量文件写入失败: %s (%s)", path, exc)
 
@@ -101,23 +100,16 @@ class VariableContext:
         path: str,
         initial_variables: Optional[Dict[str, str]] = None,
         max_count: int = 1000,
+        env_name: str = "",
     ) -> VariableContext:
-        """从文件加载变量，与 initial_variables 合并（initial_variables 优先）。
+        """从文件加载变量，合并 shared + env + initial_variables。
 
-        - 文件不存在或解析失败时返回空上下文（仅含 initial_variables）。
-        - 合并后变量数量超过 ``max_count`` 时截断。
+        合并优先级（高→低）：initial_variables > environments[env_name] > shared。
+        文件不存在或解析失败时返回空上下文（仅含 initial_variables）。
         """
-        file_vars: Dict[str, str] = {}
-        p = Path(path)
-        if p.exists():
-            try:
-                raw = json.loads(p.read_text(encoding="utf-8"))
-                raw_vars = raw.get("variables", {})
-                if isinstance(raw_vars, dict):
-                    file_vars = {str(k): str(v) for k, v in raw_vars.items()}
-            except (json.JSONDecodeError, OSError, KeyError, TypeError) as exc:
-                logger.warning("全局变量文件读取失败，已忽略: %s (%s)", path, exc)
+        from postman_api_tester.services.global_variables_service import merge_variables_for_env
 
+        file_vars = merge_variables_for_env(path, env_name)
         merged: Dict[str, str] = {**file_vars, **(initial_variables or {})}
         if len(merged) > max_count:
             logger.warning(

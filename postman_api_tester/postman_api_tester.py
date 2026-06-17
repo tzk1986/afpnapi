@@ -142,6 +142,7 @@ def run_postman_tests(
     judgment_config: Optional[Dict[str, Any]] = None,
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
+    env_name: str = "",
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。
@@ -158,6 +159,7 @@ def run_postman_tests(
     :param judgment_config: 任务级结果判定配置（可选）。
     :param data_file: 数据驱动文件路径（CSV/JSON，可选）。
     :param initial_variables: 预置变量（可选，用于请求串联的初始值）。
+    :param env_name: 环境名称（可选，用于合并多环境全局变量）。
     :return: 测试报告对象。
     """
     from postman_api_tester import config as _cfg
@@ -192,6 +194,7 @@ def run_postman_tests(
                 global_variables_file,
                 initial_variables=initial_variables,
                 max_count=global_variables_max_count,
+                env_name=env_name,
             )
             logger.info("全局变量已从文件加载: %s（%d 个变量）", global_variables_file, len(variable_context.variables))
         else:

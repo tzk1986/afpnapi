@@ -56,6 +56,7 @@ def run_postman_job(
     judgment_config: Optional[Dict[str, Any]] = None,
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
+    env_name: str = "",
 ) -> None:
     """执行 Postman 测试任务，包含进度追踪与异常处理。"""
     logger.info(
@@ -127,6 +128,7 @@ def run_postman_job(
             judgment_config=judgment_config,
             data_file=data_file,
             initial_variables=initial_variables,
+            env_name=env_name,
         )
         set_run_job(
             job_id,
@@ -264,6 +266,7 @@ def enqueue_job_with_worker(
     judgment_config = job_params.pop("judgment_config", None)
     data_file = job_params.pop("data_file", "")
     initial_variables = job_params.pop("initial_variables", None)
+    env_name = job_params.pop("env_name", "")
 
     set_run_job(job_id, **job_params)
     logger.info(
@@ -284,6 +287,8 @@ def enqueue_job_with_worker(
         job_kwargs["data_file"] = data_file
     if initial_variables is not None:
         job_kwargs["initial_variables"] = initial_variables
+    if env_name:
+        job_kwargs["env_name"] = env_name
 
     worker = threading.Thread(
         target=_safe_run_job,
