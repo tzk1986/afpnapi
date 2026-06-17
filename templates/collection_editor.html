@@ -1391,9 +1391,10 @@
                             data.produced[k] = { by_request: '__global__', by_name: '', source: '全局' };
                         }
                     }
-                    // 内置变量函数（如 timestamp、uuid）标记为函数来源
+                    // 内置变量函数（如 timestamp、uuid）仅在实际被消费时标记为函数来源
+                    const consumedVars = new Set(Object.keys(data.consumed || {}));
                     for (const fn of state.varFunctionNames || []) {
-                        if (fn && !data.produced[fn]) {
+                        if (fn && consumedVars.has(fn) && !data.produced[fn]) {
                             data.produced[fn] = { by_request: '__func__', by_name: '', source: '函数' };
                         }
                     }
