@@ -1,8 +1,13 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.9.0
+版本：v1.11.0
 发布日期：2026-06-17
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.11.0）：
+- **变量函数**：支持 `{{timestamp()}}`、`{{uuid()}}`、`{{random_int(1,100)}}`、`{{date()}}`、`{{datetime()}}` 等内置函数，由 `ENABLE_VARIABLE_FUNCTIONS` 控制。
+- **全局变量持久化**：`GLOBAL_VARIABLES_FILE` 配置指定 JSON 文件路径后，执行结束自动保存提取的变量，下次执行自动加载。
+- **全局变量 CRUD 路由**：`GET/POST/DELETE /api/global-variables` 接口，支持 Web UI 管理持久化变量。
 
 本版新增重点（v1.9.0）：
 - **并发执行引擎**：基于 ThreadPoolExecutor + 依赖感知分批调度，`ENABLE_CONCURRENT=true` 启用后接口按变量依赖拓扑排序并行执行，预期 5-10x 提速；默认关闭保持串行兼容。

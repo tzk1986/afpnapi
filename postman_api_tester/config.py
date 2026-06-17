@@ -383,3 +383,15 @@ ENABLE_CONCURRENT = str(os.environ.get("ENABLE_CONCURRENT", "false")).strip().lo
     "1", "true", "yes", "y", "on"
 }
 CONCURRENT_WORKERS = max(1, int(os.environ.get("CONCURRENT_WORKERS", "10")))
+
+# ==============================================================
+# P0 功能开关：变量函数与持久化
+# ENABLE_VARIABLE_FUNCTIONS: 是否启用内置变量函数（{{timestamp()}} 等）
+# GLOBAL_VARIABLES_FILE: 全局变量持久化文件路径（空则不启用持久化）
+# GLOBAL_VARIABLES_MAX_COUNT: 全局变量最大数量（默认 1000）
+# ==============================================================
+ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "")
+GLOBAL_VARIABLES_MAX_COUNT = max(1, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000")))

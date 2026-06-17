@@ -11,6 +11,12 @@ import logging
 
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_clear as _route_api_global_variables_clear,
+    api_global_variables_delete as _route_api_global_variables_delete,
+    api_global_variables_get as _route_api_global_variables_get,
+    api_global_variables_set as _route_api_global_variables_set,
+)
 from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_dependency as _route_api_collection_dependency,
     api_collection_parse as _route_api_collection_parse,
@@ -301,6 +307,30 @@ def api_run_postman_status(job_id: str) -> ResponseReturnValue:
 @app.route("/latest")
 def latest_report() -> ResponseReturnValue:
     return _route_latest_report()
+
+
+@app.route("/api/global-variables", methods=["GET"])
+def api_global_variables_get() -> ResponseReturnValue:
+    """读取全局变量列表（值脱敏）。"""
+    return _route_api_global_variables_get()
+
+
+@app.route("/api/global-variables", methods=["POST"])
+def api_global_variables_set() -> ResponseReturnValue:
+    """设置单个全局变量。"""
+    return _route_api_global_variables_set()
+
+
+@app.route("/api/global-variables", methods=["DELETE"])
+def api_global_variables_clear() -> ResponseReturnValue:
+    """清空所有全局变量。"""
+    return _route_api_global_variables_clear()
+
+
+@app.route("/api/global-variables/<path:key>", methods=["DELETE"])
+def api_global_variables_delete_key(key: str) -> ResponseReturnValue:
+    """删除单个全局变量。"""
+    return _route_api_global_variables_delete(key)
 
 
 @app.route("/favicon.ico")

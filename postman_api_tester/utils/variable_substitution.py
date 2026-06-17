@@ -1,6 +1,7 @@
 """变量替换引擎。
 
-支持 {{variable}} 格式的占位符替换，为数据驱动和请求串联两个功能共享使用。
+支持 {{variable}} 和 {{func(arg1,arg2)}} 两种格式的占位符替换，
+为数据驱动和请求串联两个功能共享使用。
 """
 
 from __future__ import annotations
@@ -9,23 +10,53 @@ import re
 from typing import Any, Dict, List, Optional
 
 from postman_api_tester.parser import ApiConfig
+from postman_api_tester.utils.variable_functions import evaluate_function
 
 _VARIABLE_PATTERN = re.compile(r"\{\{(\w+)\}\}")
+_FUNC_PATTERN = re.compile(r"\{\{(\w+)\(([^)]*)\)\}\}")
 _SENTINEL = object()
 _BASE_URL_VARIABLES = frozenset({"baseUrl", "base_url"})
 
 
-def substitute_variables(text: str, variables: Dict[str, str]) -> str:
-    """替换文本中的 ``{{variable}}`` 为对应值。
+def _is_functions_enabled() -> bool:
+    """延迟读取配置，避免循环导入。"""
+    try:
+        from postman_api_tester import config as _cfg
+        return bool(getattr(_cfg, "ENABLE_VARIABLE_FUNCTIONS", True))
+    except (ImportError, AttributeError):
+        return True
 
+
+def substitute_variables(text: str, variables: Dict[str, str]) -> str:
+    """替换文本中的 ``{{variable}}`` 和 ``{{func(args)}}`` 为对应值。
+
+    处理顺序：先替换函数调用（``{{timestamp()}}``），再替换普通变量（``{{token}}``）。
     - 未匹配的变量保持原样（不报错）
+    - 未知函数保持原样（不报错）
+    - ``ENABLE_VARIABLE_FUNCTIONS=false`` 时函数表达式原样保留
     - 不递归替换（替换后的值中若含 ``{{...}}`` 不再处理）
     - ``{{baseUrl}}`` / ``{{base_url}}`` 不在此处理（由 base_url 逻辑专属处理）
     """
-    if not text or not variables:
+    if not text:
         return text
 
-    def _replacer(match: re.Match[str]) -> str:
+    # 第一轮：函数调用替换（仅当 ENABLE_VARIABLE_FUNCTIONS=true 时执行）
+    if _is_functions_enabled():
+        def _func_replacer(match: re.Match[str]) -> str:
+            func_name = match.group(1)
+            args_str = match.group(2)
+            result = evaluate_function(func_name, args_str)
+            if result is not None:
+                return result
+            return match.group(0)  # 未知函数，原样保留
+
+        text = _FUNC_PATTERN.sub(_func_replacer, text)
+
+    if not variables:
+        return text
+
+    # 第二轮：普通变量替换（原有逻辑）
+    def _var_replacer(match: re.Match[str]) -> str:
         var_name = match.group(1)
         if var_name in _BASE_URL_VARIABLES:
             return match.group(0)
@@ -33,7 +64,7 @@ def substitute_variables(text: str, variables: Dict[str, str]) -> str:
             return str(variables[var_name])
         return match.group(0)
 
-    return _VARIABLE_PATTERN.sub(_replacer, text)
+    return _VARIABLE_PATTERN.sub(_var_replacer, text)
 
 
 def _substitute_body(body: Any, variables: Dict[str, str]) -> Any:
@@ -49,7 +80,7 @@ def _substitute_body(body: Any, variables: Dict[str, str]) -> Any:
 
 def _substitute_params(params: Dict[str, object], variables: Dict[str, str]) -> Dict[str, object]:
     """替换请求参数中的键名和字符串值。"""
-    if not variables:
+    if not variables and not _is_functions_enabled():
         return dict(params)
     result: Dict[str, object] = {}
     for key, value in params.items():
