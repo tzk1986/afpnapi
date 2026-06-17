@@ -265,6 +265,20 @@
                 </div>
             </details>
             {% endif %}
+            {% if global_variables_file %}
+            <details style="margin-top:12px;">
+                <summary style="cursor:pointer;font-weight:600;color:#334155;">全局变量管理（已持久化，跨执行复用）</summary>
+                <div style="margin-top:10px;padding:12px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                        <input id="gvNewKey" type="text" placeholder="变量名" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+                        <input id="gvNewValue" type="text" placeholder="变量值" style="flex:1;padding:8px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;">
+                        <button type="button" onclick="addGlobalVariable()" style="padding:8px 14px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;">添加</button>
+                        <button type="button" onclick="clearAllGlobalVariables()" style="padding:8px 14px;background:#fff;color:#b91c1c;border:1px solid #fecaca;border-radius:8px;cursor:pointer;font-size:13px;">清空</button>
+                    </div>
+                    <div id="gvList" style="font-size:13px;color:#475569;">加载中…</div>
+                </div>
+            </details>
+            {% endif %}
             {% if enable_selective_run %}
             <div class="selector-box">
                 <div class="selector-toolbar">
@@ -378,6 +392,8 @@
             "enableSelectiveRun": {{ enable_selective_run|tojson }},
             "enableDataDriven": {{ enable_data_driven|tojson }},
             "enableVariableExtraction": {{ enable_variable_extraction|tojson }},
+            "enableVariableFunctions": {{ enable_variable_functions|tojson }},
+            "globalVariablesFile": {{ global_variables_file|tojson }},
             "runStatusPollIntervalMs": {{ run_status_poll_interval_ms|tojson }},
             "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }}
         }
@@ -390,6 +406,8 @@ let runJobTimer = null;
 const ENABLE_SELECTIVE_RUN = Boolean(pageData.enableSelectiveRun);
 const ENABLE_DATA_DRIVEN = Boolean(pageData.enableDataDriven);
 const ENABLE_VARIABLE_EXTRACTION = Boolean(pageData.enableVariableExtraction);
+const ENABLE_VARIABLE_FUNCTIONS = Boolean(pageData.enableVariableFunctions);
+const GLOBAL_VARIABLES_FILE = pageData.globalVariablesFile || "";
 const RUN_STATUS_POLL_INTERVAL_MS = Number(pageData.runStatusPollIntervalMs || 3000);
 const COLLECTION_PREVIEW_MAX_ITEMS = Number(pageData.collectionPreviewMaxItems || 3000);
 let previewApis = [];
@@ -1201,6 +1219,98 @@ renderReports();
         });
     } catch (_) {}
 })();
+
+// ── 全局变量管理 ──────────────────────────────────────────────
+(async function loadGlobalVariables() {
+    if (!GLOBAL_VARIABLES_FILE) return;
+    const listEl = document.getElementById('gvList');
+    if (!listEl) return;
+    try {
+        const resp = await fetch('/api/global-variables');
+        const data = await resp.json();
+        const vars = data.data?.variables || {};
+        const entries = Object.entries(vars);
+        if (entries.length === 0) {
+            listEl.innerHTML = '<span style="color:#94a3b8;">暂无持久化变量。执行测试后提取的变量将自动保存。</span>';
+            return;
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;">';
+        html += '<tr style="color:#475569;font-size:12px;"><th style="text-align:left;padding:4px 8px;">变量名</th><th style="text-align:left;padding:4px 8px;">值（脱敏）</th><th style="width:60px;"></th></tr>';
+        entries.forEach(([k, v]) => {
+            html += `<tr style="border-top:1px solid #e5e7eb;">`;
+            html += `<td style="padding:4px 8px;font-family:monospace;">${k}</td>`;
+            html += `<td style="padding:4px 8px;font-family:monospace;color:#64748b;">${v}</td>`;
+            html += `<td style="padding:4px 8px;"><button type="button" onclick="deleteGlobalVariable('${k}')" style="padding:2px 8px;background:#fff;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:11px;">删除</button></td>`;
+            html += `</tr>`;
+        });
+        html += '</table>';
+        listEl.innerHTML = html;
+    } catch (_) {
+        listEl.innerHTML = '<span style="color:#94a3b8;">加载失败。</span>';
+    }
+})();
+
+function addGlobalVariable() {
+    const keyInput = document.getElementById('gvNewKey');
+    const valInput = document.getElementById('gvNewValue');
+    const key = (keyInput?.value || '').trim();
+    const value = (valInput?.value || '').trim();
+    if (!key || !value) { alert('请填写变量名和值'); return; }
+    fetch('/api/global-variables', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({key, value}),
+    }).then(r => r.json()).then(data => {
+        if (data.code === 200) {
+            keyInput.value = '';
+            valInput.value = '';
+            loadGlobalVariablesRefresh();
+        } else {
+            alert('添加失败: ' + (data.data?.details || data.message));
+        }
+    }).catch(() => alert('网络错误'));
+}
+
+function deleteGlobalVariable(key) {
+    if (!confirm(`确定删除变量 "${key}"？`)) return;
+    fetch('/api/global-variables/' + encodeURIComponent(key), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.code === 200) loadGlobalVariablesRefresh(); else alert('删除失败'); })
+        .catch(() => alert('网络错误'));
+}
+
+function clearAllGlobalVariables() {
+    if (!confirm('确定清空所有全局变量？此操作不可恢复。')) return;
+    fetch('/api/global-variables', {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => { if (data.code === 200) loadGlobalVariablesRefresh(); else alert('清空失败'); })
+        .catch(() => alert('网络错误'));
+}
+
+function loadGlobalVariablesRefresh() {
+    const listEl = document.getElementById('gvList');
+    if (!listEl) return;
+    listEl.innerHTML = '加载中…';
+    fetch('/api/global-variables').then(r => r.json()).then(data => {
+        const vars = data.data?.variables || {};
+        const entries = Object.entries(vars);
+        if (entries.length === 0) {
+            listEl.innerHTML = '<span style="color:#94a3b8;">暂无持久化变量。</span>';
+            return;
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;">';
+        html += '<tr style="color:#475569;font-size:12px;"><th style="text-align:left;padding:4px 8px;">变量名</th><th style="text-align:left;padding:4px 8px;">值（脱敏）</th><th style="width:60px;"></th></tr>';
+        entries.forEach(([k, v]) => {
+            html += `<tr style="border-top:1px solid #e5e7eb;">`;
+            html += `<td style="padding:4px 8px;font-family:monospace;">${k}</td>`;
+            html += `<td style="padding:4px 8px;font-family:monospace;color:#64748b;">${v}</td>`;
+            html += `<td style="padding:4px 8px;"><button type="button" onclick="deleteGlobalVariable('${k}')" style="padding:2px 8px;background:#fff;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;cursor:pointer;font-size:11px;">删除</button></td>`;
+            html += `</tr>`;
+        });
+        html += '</table>';
+        listEl.innerHTML = html;
+    }).catch(() => { listEl.innerHTML = '<span style="color:#94a3b8;">加载失败。</span>'; });
+}
 </script>
 </body>
 </html>
