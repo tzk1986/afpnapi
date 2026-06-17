@@ -371,3 +371,27 @@ DATA_FILE_MAX_ROWS = int(os.environ.get("DATA_FILE_MAX_ROWS", "10000"))
 
 # DATA_FILE_MAX_SIZE: 数据文件最大字节数（默认 10MB）
 DATA_FILE_MAX_SIZE = int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024)))
+
+# ==============================================================
+# P0 功能开关：并发执行引擎
+# ENABLE_CONCURRENT: 是否启用并发执行（默认 false，保持串行行为）
+# CONCURRENT_WORKERS: 并发执行最大线程数（默认 10）
+# 启用后，无变量依赖的接口将并行执行，显著缩短大批量测试耗时。
+# 依赖变量提取链的接口自动按拓扑序分批，保证正确性。
+# ==============================================================
+ENABLE_CONCURRENT = str(os.environ.get("ENABLE_CONCURRENT", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+CONCURRENT_WORKERS = max(1, int(os.environ.get("CONCURRENT_WORKERS", "10")))
+
+# ==============================================================
+# P0 功能开关：变量函数与持久化
+# ENABLE_VARIABLE_FUNCTIONS: 是否启用内置变量函数（{{timestamp()}} 等）
+# GLOBAL_VARIABLES_FILE: 全局变量持久化文件路径（空则不启用持久化）
+# GLOBAL_VARIABLES_MAX_COUNT: 全局变量最大数量（默认 1000）
+# ==============================================================
+ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "true")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
+GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
+GLOBAL_VARIABLES_MAX_COUNT = max(1, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000")))

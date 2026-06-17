@@ -11,8 +11,12 @@ import json
 import logging
 import os
 import sys
+import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from postman_api_tester.core.variable_context import VariableContext
 
 from postman_api_tester.core.html_reporter import HtmlReporter
 from postman_api_tester.core.types import (
@@ -44,16 +48,19 @@ class PostmanTestReport:
         self.interrupt_reason = ""
         self.assertion_strict_mode = False
         self._summary_cache: Optional[SummaryData] = None
+        self._results_lock = threading.Lock()
 
     def add_result(self, result: TestResultRecord) -> None:
         """添加单条测试结果。"""
-        self.results.append(result)
-        self._summary_cache = None
+        with self._results_lock:
+            self.results.append(result)
+            self._summary_cache = None
 
     def add_results(self, results: List[TestResultRecord]) -> None:
         """批量添加测试结果。"""
-        self.results.extend(results)
-        self._summary_cache = None
+        with self._results_lock:
+            self.results.extend(results)
+            self._summary_cache = None
 
     def generate_summary(self) -> SummaryData:
         """生成测试摘要。"""
@@ -135,6 +142,7 @@ def run_postman_tests(
     judgment_config: Optional[Dict[str, Any]] = None,
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
+    env_name: str = "",
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。
@@ -151,6 +159,7 @@ def run_postman_tests(
     :param judgment_config: 任务级结果判定配置（可选）。
     :param data_file: 数据驱动文件路径（CSV/JSON，可选）。
     :param initial_variables: 预置变量（可选，用于请求串联的初始值）。
+    :param env_name: 环境名称（可选，用于合并多环境全局变量）。
     :return: 测试报告对象。
     """
     from postman_api_tester import config as _cfg
@@ -175,10 +184,21 @@ def run_postman_tests(
         data_columns = get_data_columns(rows)
         logger.info("数据驱动已加载: %s（%d 行，格式 %s）", data_file, len(rows), _fmt)
 
-    variable_context: Optional[object] = None
+    variable_context: Optional["VariableContext"] = None
+    global_variables_file = str(getattr(_cfg, "GLOBAL_VARIABLES_FILE", ""))
+    global_variables_max_count = int(getattr(_cfg, "GLOBAL_VARIABLES_MAX_COUNT", 1000))
     if getattr(_cfg, "ENABLE_VARIABLE_EXTRACTION", False):
         from postman_api_tester.core.variable_context import VariableContext
-        variable_context = VariableContext(initial_variables)
+        if global_variables_file:
+            variable_context = VariableContext.load_from_file(
+                global_variables_file,
+                initial_variables=initial_variables,
+                max_count=global_variables_max_count,
+                env_name=env_name,
+            )
+            logger.info("全局变量已从文件加载: %s（%d 个变量）", global_variables_file, len(variable_context.variables))
+        else:
+            variable_context = VariableContext(initial_variables)
 
     parser, apis, total_apis_count, selected_total_count = _prepare_execution_apis(
         postman_file=postman_file,
@@ -210,6 +230,9 @@ def run_postman_tests(
         assertion_strict_mode=assertion_strict_mode,
     )
 
+    enable_concurrent = bool(getattr(_cfg, "ENABLE_CONCURRENT", False))
+    concurrent_workers = int(getattr(_cfg, "CONCURRENT_WORKERS", 10))
+
     completed_count, execution_error = _execute_and_finalize_suite(
         apis=apis,
         total_apis_count=total_apis_count,
@@ -228,6 +251,8 @@ def run_postman_tests(
         shared_session=shared_session,
         judgment_config=judgment_config,
         variable_context=variable_context,
+        enable_concurrent=enable_concurrent,
+        concurrent_workers=concurrent_workers,
     )
 
     _complete_report_output(
@@ -241,6 +266,10 @@ def run_postman_tests(
         report_name=report_name,
         results_per_page=results_per_page,
     )
+
+    if variable_context is not None and global_variables_file:
+        variable_context.save_to_file(global_variables_file, max_count=global_variables_max_count)
+        logger.info("全局变量已持久化: %s（%d 个变量）", global_variables_file, len(variable_context.variables))
 
     return report
 

@@ -139,11 +139,65 @@
             .selector-preview-list, .selected-apis-list { min-height: 180px; max-height: 220px; }
             .feature-card { flex-direction: column; align-items: flex-start; }
         }
+        .hero { position: relative; }
+        .settings-btn { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .settings-btn:hover { background: rgba(255,255,255,0.25); }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 9000; justify-content: center; align-items: flex-start; padding-top: 48px; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: #fff; border-radius: 16px; width: min(860px, 92vw); max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(15,23,42,0.25); }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
+        .modal-header h2 { margin: 0; font-size: 18px; color: #0f172a; }
+        .modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; font-size: 18px; cursor: pointer; color: #64748b; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #f1f5f9; }
+        .modal-tabs { display: flex; gap: 0; border-bottom: 1px solid #e5e7eb; padding: 0 20px; }
+        .modal-tab { padding: 10px 18px; font-size: 14px; font-weight: 600; color: #64748b; border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .modal-tab.active { color: #1d4ed8; border-bottom-color: #1d4ed8; }
+        .modal-tab:hover { color: #1d4ed8; }
+        .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .modal-section-desc { font-size: 13px; color: #64748b; margin-bottom: 12px; }
+        .var-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+        .var-toolbar select, .var-toolbar input { padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+        .var-toolbar button { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; }
+        .var-btn-add { background: #1d4ed8; color: #fff; }
+        .var-btn-clear { background: #fff; color: #b91c1c; border: 1px solid #fecaca !important; }
+        .var-btn-add:hover, .var-btn-clear:hover { opacity: 0.88; }
+        .var-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .var-table th { text-align: left; padding: 8px 10px; color: #475569; font-size: 12px; font-weight: 600; border-bottom: 2px solid #e5e7eb; }
+        .var-table td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; }
+        .var-table td.mono { font-family: "Cascadia Code", "Consolas", monospace; }
+        .var-table td.masked { color: #64748b; }
+        .var-table .btn-del { padding: 3px 10px; background: #fff; color: #b91c1c; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; font-size: 11px; }
+        .var-table .btn-del:hover { background: #fef2f2; }
+        .var-table input.var-input { width: 100%; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; font-size: 13px; background: transparent; font-family: "Cascadia Code", "Consolas", monospace; color: #1f2937; box-sizing: border-box; }
+        .var-table input.var-input:hover { border-color: #e2e8f0; background: #f8fafc; }
+        .var-table input.var-input:focus { border-color: #3b82f6; background: #fff; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+        .var-table tr.var-new-row input.var-input { border-style: dashed; border-color: #cbd5e1; background: #fafbfc; }
+        .var-table tr.var-new-row input.var-input:focus { border-style: solid; }
+        .var-empty { color: #94a3b8; font-size: 13px; padding: 20px 0; text-align: center; }
+        .fn-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .fn-table th { text-align: left; padding: 8px 10px; color: #475569; font-size: 12px; font-weight: 600; border-bottom: 2px solid #e5e7eb; background: #f8fafc; }
+        .fn-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+        .fn-table code { background: #eff6ff; color: #1d4ed8; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+        .inline-add-row { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+        .inline-add-row input { flex: 1; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+        .inline-add-row button { padding: 7px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none; }
+        .gv-disabled-notice { background: #fef3c7; color: #92400e; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 12px; }
+        .env-section { margin-bottom: 10px; }
+        .env-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .env-select-wrap { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; }
+        .env-select-wrap select { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; }
+        .btn-del-env { padding: 5px 10px; background: #fff; color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+        .btn-del-env:hover { background: #fef2f2; }
+        .btn-toggle-mask { background: #f1f5f9; color: #334155; border: 1px solid #d1d5db !important; font-size: 12px; padding: 5px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+        .btn-toggle-mask:hover { background: #e2e8f0; }
+        .btn-toggle-mask.active { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd !important; }
+        .var-table td.unmasked { color: #1f2937; }
     </style>
 </head>
 <body>
     <div class="page">
         <section class="hero">
+            <button class="settings-btn" onclick="openSettingsModal()" title="环境变量与全局变量设置">&#9881;</button>
             <h1>Postman 报告中心</h1>
             <p>当前主机: {{ host_name }}</p>
             <p>本机访问: <a style="color:#bfdbfe;" href="{{ self_url }}">{{ self_url }}</a></p>
@@ -372,14 +426,69 @@
         </section>
     </div>
     <div id="appTooltip" class="app-tooltip" role="tooltip" aria-hidden="true"></div>
+
+    <div id="settingsOverlay" class="modal-overlay" onclick="if(event.target===this)closeSettingsModal()">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>环境变量设置</h2>
+                <button class="modal-close" onclick="closeSettingsModal()" title="关闭">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="shared" onclick="switchSettingsTab('shared')">全局变量</button>
+                <button class="modal-tab" data-tab="env" onclick="switchSettingsTab('env')">环境变量</button>
+                <button class="modal-tab" data-tab="functions" onclick="switchSettingsTab('functions')">变量函数</button>
+            </div>
+            <div class="modal-body">
+                <div id="settingsTabShared">
+                    <div class="modal-section-desc">跨所有环境共享的变量，执行测试时自动加载。</div>
+                    <div id="sharedVarNotice"></div>
+                    <div class="var-toolbar">
+                        <button class="var-btn-clear" onclick="clearVarScope('shared')">清空</button>
+                        <button class="btn-toggle-mask" id="btnToggleMaskShared" onclick="toggleMask()">👁 显示值</button>
+                    </div>
+                    <div id="sharedVarTable"></div>
+                </div>
+                <div id="settingsTabEnv" style="display:none;">
+                    <div class="modal-section-desc">按环境分组的变量，选择环境后执行时与全局变量合并（环境优先）。</div>
+                    <div id="envVarNotice"></div>
+                    <div style="margin-bottom:10px;">
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                            <label style="font-size:13px;color:#334155;font-weight:600;white-space:nowrap;">环境：</label>
+                            <select id="settingsEnvSelect" onchange="loadEnvVariables()" style="flex:1;padding:7px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;"></select>
+                            <button class="var-btn-clear" onclick="deleteCurrentEnv()" title="删除当前环境" style="white-space:nowrap;">删除环境</button>
+                        </div>
+                        <div id="envInlineAddEnv" style="display:none;" class="inline-add-row">
+                            <input id="newEnvName" type="text" placeholder="环境名称" style="flex:1;">
+                            <button class="var-btn-add" onclick="confirmAddEnv()">确认添加</button>
+                            <button style="background:#f1f5f9;color:#475569;" onclick="hideAddEnvForm()">取消</button>
+                        </div>
+                        <button class="var-btn-add" onclick="showAddEnvForm()" style="font-size:12px;padding:5px 12px;">+ 添加环境</button>
+                    </div>
+                    <div class="var-toolbar" style="margin-top:8px;">
+                        <button class="var-btn-clear" onclick="clearVarScope('env')">清空变量</button>
+                        <button class="btn-toggle-mask" id="btnToggleMaskEnv" onclick="toggleMask()">👁 显示值</button>
+                    </div>
+                    <div id="envVarTable"></div>
+                </div>
+                <div id="settingsTabFunctions" style="display:none;">
+                    <div class="modal-section-desc">可在请求 URL、Headers、Body 等参数中使用 <code>{{"{{"}}函数名(参数){{"}}"}}</code> 语法，执行时实时计算。</div>
+                    <div id="functionsTable"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script id="indexPageData" type="application/json">
         {
             "reports": {{ reports_json|safe }},
             "enableSelectiveRun": {{ enable_selective_run|tojson }},
             "enableDataDriven": {{ enable_data_driven|tojson }},
             "enableVariableExtraction": {{ enable_variable_extraction|tojson }},
+            "enableVariableFunctions": {{ enable_variable_functions|tojson }},
+            "globalVariablesFile": {{ global_variables_file|tojson }},
             "runStatusPollIntervalMs": {{ run_status_poll_interval_ms|tojson }},
-            "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }}
+            "collectionPreviewMaxItems": {{ collection_preview_max_items|tojson }},
+            "environments": {{ environments_json|safe }}
         }
     </script>
 
@@ -390,6 +499,8 @@ let runJobTimer = null;
 const ENABLE_SELECTIVE_RUN = Boolean(pageData.enableSelectiveRun);
 const ENABLE_DATA_DRIVEN = Boolean(pageData.enableDataDriven);
 const ENABLE_VARIABLE_EXTRACTION = Boolean(pageData.enableVariableExtraction);
+const ENABLE_VARIABLE_FUNCTIONS = Boolean(pageData.enableVariableFunctions);
+const GLOBAL_VARIABLES_FILE = pageData.globalVariablesFile || "";
 const RUN_STATUS_POLL_INTERVAL_MS = Number(pageData.runStatusPollIntervalMs || 3000);
 const COLLECTION_PREVIEW_MAX_ITEMS = Number(pageData.collectionPreviewMaxItems || 3000);
 let previewApis = [];
@@ -1182,7 +1293,7 @@ function watchRunPostmanJob(jobId) {
 initCustomTooltip();
 renderReports();
 
-// 升级四：加载环境列表填充 envSelect
+// 升级四：加载环境列表填充 envSelect（合并预设环境 + 自定义环境）
 (async function loadEnvironments() {
     const sel = document.getElementById('envSelect');
     if (!sel) return;
@@ -1192,15 +1303,378 @@ renderReports();
         const data = await resp.json();
         const envs = data.environments || [];
         const defaultEnv = data.default || '';
+        const seenNames = new Set();
         envs.forEach(env => {
+            seenNames.add(env.name);
             const opt = document.createElement('option');
             opt.value = env.name;
             opt.textContent = env.name + (env.base_url ? ` (${env.base_url})` : '') + (env.has_token ? ' 🔑' : '');
             if (env.name === defaultEnv) opt.selected = true;
             sel.appendChild(opt);
         });
+        // 合并自定义环境（不在预设中的）
+        const customResp = await fetch('/api/environments/list');
+        if (customResp.ok) {
+            const customData = await customResp.json();
+            const customList = customData.data?.env_list || [];
+            customList.forEach(name => {
+                if (!seenNames.has(name)) {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name + ' (自定义)';
+                    sel.appendChild(opt);
+                    seenNames.add(name);
+                }
+            });
+        }
     } catch (_) {}
 })();
+
+// ── 环境变量设置模态框 ──────────────────────────────────────────
+let settingsEnvList = [];
+let showVarValues = false;
+
+function openSettingsModal() {
+    document.getElementById('settingsOverlay').classList.add('open');
+    loadEnvListAndInit();
+    switchSettingsTab('shared');
+}
+
+function closeSettingsModal() {
+    document.getElementById('settingsOverlay').classList.remove('open');
+}
+
+function loadEnvListAndInit() {
+    fetch('/api/environments/list').then(r => r.json()).then(data => {
+        const list = data.data?.env_list || [];
+        settingsEnvList = list.length > 0 ? list : ["默认环境"];
+        _renderEnvSelect();
+    }).catch(() => {
+        settingsEnvList = ["默认环境"];
+        _renderEnvSelect();
+    });
+}
+
+function _renderEnvSelect() {
+    const sel = document.getElementById('settingsEnvSelect');
+    if (!sel) return;
+    sel.innerHTML = '';
+    settingsEnvList.forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+    });
+    loadEnvVariables();
+}
+
+function switchSettingsTab(tab) {
+    document.querySelectorAll('.modal-tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    document.getElementById('settingsTabShared').style.display = tab === 'shared' ? '' : 'none';
+    document.getElementById('settingsTabEnv').style.display = tab === 'env' ? '' : 'none';
+    document.getElementById('settingsTabFunctions').style.display = tab === 'functions' ? '' : 'none';
+    if (tab === 'shared') loadSharedVariables();
+    else if (tab === 'env') loadEnvVariables();
+    else if (tab === 'functions') loadVariableFunctions();
+}
+
+function _renderVarNotice(containerId, disabled) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (disabled) {
+        el.innerHTML = '<div class="gv-disabled-notice">全局变量持久化未启用（GLOBAL_VARIABLES_FILE 未配置）。变量仅在执行期间有效，不会跨执行保存。</div>';
+    } else {
+        el.innerHTML = '';
+    }
+}
+
+function _renderVarTable(containerId, entries, scope, envName) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const inputType = showVarValues ? 'text' : 'password';
+    const envAttr = scope === 'env' ? escapeHtml(envName) : '';
+    let html = '<table class="var-table">';
+    html += '<thead><tr><th style="width:38%;">名称</th><th style="width:46%;">值</th><th style="width:16%;"></th></tr></thead><tbody>';
+    entries.forEach(([k, v]) => {
+        const ek = escapeHtml(k);
+        const ev = escapeHtml(v);
+        const delArgs = scope === 'env'
+            ? `'${scope}','${ek}','${envAttr}'`
+            : `'${scope}','${ek}'`;
+        html += '<tr>';
+        html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+        html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" data-last-saved="${ev}" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+        html += `<td><button class="btn-del" onclick="deleteVariable(${delArgs})">删除</button></td>`;
+        html += '</tr>';
+    });
+    html += '<tr class="var-new-row">';
+    html += `<td><input class="var-input" type="text" placeholder="新变量名..." data-scope="${scope}" data-env="${envAttr}" data-is-new="true" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+    html += `<td><input class="var-input" type="${inputType}" placeholder="新变量值..." data-scope="${scope}" data-env="${envAttr}" data-is-new="true" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+    html += '<td></td>';
+    html += '</tr>';
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+function _reloadCurrentVarTab() {
+    if (document.getElementById('settingsTabShared').style.display !== 'none') {
+        loadSharedVariables();
+    } else {
+        loadEnvVariables();
+    }
+}
+
+function _postVar(scope, key, value, envName) {
+    const body = {scope, key, value};
+    if (scope === 'env') body.env_name = envName;
+    return fetch('/api/global-variables', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    }).then(r => r.json());
+}
+
+function _deleteVar(scope, key, envName) {
+    let url = '/api/global-variables/' + encodeURIComponent(key) + '?scope=' + encodeURIComponent(scope);
+    if (scope === 'env' && envName) url += '&env_name=' + encodeURIComponent(envName);
+    return fetch(url, {method: 'DELETE'}).then(r => r.json());
+}
+
+function saveVarRow(inputEl) {
+    if (!showVarValues) return;
+    const row = inputEl.closest('tr');
+    if (!row || row.dataset._saving === '1') return;
+    const inputs = row.querySelectorAll('input.var-input');
+    if (inputs.length < 2) return;
+    const keyInput = inputs[0];
+    const valInput = inputs[1];
+    const newKey = keyInput.value.trim();
+    const newVal = valInput.value.trim();
+    const isNew = keyInput.dataset.isNew === 'true';
+    const origKey = keyInput.dataset.origKey || '';
+    const scope = keyInput.dataset.scope;
+    const envName = keyInput.dataset.env || '';
+
+    if (isNew) {
+        if (!newKey || !newVal) return;
+        row.dataset._saving = '1';
+        _postVar(scope, newKey, newVal, envName).then(data => {
+            if (data.code === 200) { _reloadCurrentVarTab(); }
+            else { alert('添加失败: ' + (data.message || '未知错误')); row.dataset._saving = '0'; }
+        }).catch(() => { alert('网络错误'); row.dataset._saving = '0'; });
+        return;
+    }
+
+    if (!newKey) {
+        keyInput.value = origKey;
+        return;
+    }
+
+    const valueChanged = (valInput.dataset.lastSaved || '') !== newVal && valInput.value !== valInput.defaultValue;
+    const keyChanged = newKey !== origKey;
+
+    if (!keyChanged && !valueChanged) return;
+
+    row.dataset._saving = '1';
+    if (keyChanged) {
+        _deleteVar(scope, origKey, envName).then(() => {
+            return _postVar(scope, newKey, newVal, envName);
+        }).then(data => {
+            if (data.code === 200) { _reloadCurrentVarTab(); }
+            else { alert('保存失败: ' + (data.message || '未知错误')); row.dataset._saving = '0'; _reloadCurrentVarTab(); }
+        }).catch(() => { alert('网络错误'); row.dataset._saving = '0'; });
+    } else {
+        _postVar(scope, newKey, newVal, envName).then(data => {
+            if (data.code === 200) {
+                keyInput.dataset.origKey = newKey;
+                keyInput.defaultValue = newKey;
+                valInput.defaultValue = newVal;
+                valInput.dataset.lastSaved = newVal;
+                row.dataset._saving = '0';
+            } else {
+                alert('保存失败: ' + (data.message || '未知错误'));
+                row.dataset._saving = '0';
+            }
+        }).catch(() => { alert('网络错误'); row.dataset._saving = '0'; });
+    }
+}
+
+function varKeydown(event, inputEl) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        inputEl.blur();
+        const row = inputEl.closest('tr');
+        const allInputs = Array.from(row.closest('tbody').querySelectorAll('input.var-input'));
+        const curIdx = allInputs.indexOf(inputEl);
+        const nextInput = allInputs[curIdx + 2] || allInputs[curIdx + 1];
+        if (nextInput) nextInput.focus();
+    } else if (event.key === 'Escape') {
+        inputEl.value = inputEl.defaultValue || '';
+        inputEl.blur();
+    }
+}
+
+function loadSharedVariables() {
+    const disabled = !GLOBAL_VARIABLES_FILE;
+    _renderVarNotice('sharedVarNotice', disabled);
+    const container = document.getElementById('sharedVarTable');
+    if (!container) return;
+    container.innerHTML = '<div class="var-empty">加载中...</div>';
+    const masked = showVarValues ? 'false' : 'true';
+    fetch('/api/global-variables?scope=shared&masked=' + masked).then(r => r.json()).then(data => {
+        const vars = data.data?.variables || {};
+        _renderVarTable('sharedVarTable', Object.entries(vars), 'shared', '');
+    }).catch(() => {
+        document.getElementById('sharedVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
+    });
+}
+
+function loadEnvVariables() {
+    const disabled = !GLOBAL_VARIABLES_FILE;
+    _renderVarNotice('envVarNotice', disabled);
+    const sel = document.getElementById('settingsEnvSelect');
+    const envName = sel ? sel.value : '';
+    if (!envName) {
+        const el = document.getElementById('envVarTable');
+        if (el) el.innerHTML = '<div class="var-empty">请先选择一个环境，或在系统配置中添加环境。</div>';
+        return;
+    }
+    const container = document.getElementById('envVarTable');
+    if (!container) return;
+    container.innerHTML = '<div class="var-empty">加载中...</div>';
+    const masked = showVarValues ? 'false' : 'true';
+    fetch('/api/global-variables?scope=env&env_name=' + encodeURIComponent(envName) + '&masked=' + masked).then(r => r.json()).then(data => {
+        const vars = data.data?.variables || {};
+        _renderVarTable('envVarTable', Object.entries(vars), 'env', envName);
+    }).catch(() => {
+        document.getElementById('envVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
+    });
+}
+
+function deleteVariable(scope, key, envName) {
+    if (!confirm('确定删除变量 "' + key + '"？')) return;
+    let url = '/api/global-variables/' + encodeURIComponent(key) + '?scope=' + encodeURIComponent(scope);
+    if (scope === 'env' && envName) url += '&env_name=' + encodeURIComponent(envName);
+    fetch(url, {method: 'DELETE'}).then(r => r.json()).then(data => {
+        if (data.code === 200) {
+            if (scope === 'shared') loadSharedVariables(); else loadEnvVariables();
+        } else {
+            alert('删除失败: ' + (data.message || '未知错误'));
+        }
+    }).catch(() => alert('网络错误'));
+}
+
+function clearVarScope(scope) {
+    const label = scope === 'env' ? '当前环境的所有变量' : '所有全局共享变量';
+    if (!confirm('确定清空' + label + '？此操作不可恢复。')) return;
+    let url = '/api/global-variables?scope=' + encodeURIComponent(scope);
+    if (scope === 'env') {
+        const sel = document.getElementById('settingsEnvSelect');
+        const envName = sel ? sel.value : '';
+        if (!envName) { alert('请先选择环境'); return; }
+        url += '&env_name=' + encodeURIComponent(envName);
+    }
+    fetch(url, {method: 'DELETE'}).then(r => r.json()).then(data => {
+        if (data.code === 200) {
+            if (scope === 'shared') loadSharedVariables(); else loadEnvVariables();
+        } else {
+            alert('清空失败: ' + (data.message || '未知错误'));
+        }
+    }).catch(() => alert('网络错误'));
+}
+
+function toggleMask() {
+    showVarValues = !showVarValues;
+    const label = showVarValues ? '🔒 隐藏值' : '👁 显示值';
+    ['btnToggleMaskShared', 'btnToggleMaskEnv'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.textContent = label;
+            btn.classList.toggle('active', showVarValues);
+        }
+    });
+    if (document.getElementById('settingsTabShared').style.display !== 'none') {
+        loadSharedVariables();
+    } else if (document.getElementById('settingsTabEnv').style.display !== 'none') {
+        loadEnvVariables();
+    }
+}
+
+// ── 环境管理 ──────────────────────────────────────────────────────
+function showAddEnvForm() {
+    document.getElementById('envInlineAddEnv').style.display = 'flex';
+    document.getElementById('newEnvName').value = '';
+    document.getElementById('newEnvName').focus();
+}
+
+function hideAddEnvForm() {
+    document.getElementById('envInlineAddEnv').style.display = 'none';
+}
+
+function confirmAddEnv() {
+    const name = document.getElementById('newEnvName').value.trim();
+    if (!name) { alert('请输入环境名称'); return; }
+    fetch('/api/environments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name}),
+    }).then(r => r.json()).then(data => {
+        if (data.code === 200) {
+            hideAddEnvForm();
+            settingsEnvList = data.data?.env_list || settingsEnvList;
+            _renderEnvSelect();
+        } else {
+            alert('添加失败: ' + (data.message || '未知错误'));
+        }
+    }).catch(() => alert('网络错误'));
+}
+
+function deleteCurrentEnv() {
+    const sel = document.getElementById('settingsEnvSelect');
+    const envName = sel ? sel.value : '';
+    if (!envName) { alert('请先选择环境'); return; }
+    if (envName === '默认环境') { alert('默认环境不可删除'); return; }
+    if (!confirm('确定删除环境 "' + envName + '" 及其所有变量？')) return;
+    fetch('/api/environments/' + encodeURIComponent(envName), {method: 'DELETE'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.code === 200) {
+                settingsEnvList = data.data?.env_list || settingsEnvList;
+                _renderEnvSelect();
+            } else {
+                alert('删除失败: ' + (data.message || '未知错误'));
+            }
+        })
+        .catch(() => alert('网络错误'));
+}
+
+function loadVariableFunctions() {
+    const container = document.getElementById('functionsTable');
+    if (!container) return;
+    container.innerHTML = '<div class="var-empty">加载中...</div>';
+    fetch('/api/variable-functions').then(r => r.json()).then(data => {
+        const fns = data.data?.functions || [];
+        if (fns.length === 0) {
+            container.innerHTML = '<div class="var-empty">变量函数未启用。</div>';
+            return;
+        }
+        let html = '<table class="fn-table">';
+        html += '<thead><tr><th style="width:22%;">函数</th><th style="width:22%;">参数</th><th>说明 / 示例</th></tr></thead><tbody>';
+        fns.forEach(fn => {
+            html += '<tr>';
+            html += `<td><code>${escapeHtml(fn.syntax)}</code></td>`;
+            html += `<td style="font-size:12px;color:#64748b;">${escapeHtml(fn.params)}</td>`;
+            html += `<td>${escapeHtml(fn.description)}<br><code style="font-size:11px;background:#f8fafc;color:#334155;">${escapeHtml(fn.example)}</code></td>`;
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }).catch(() => {
+        container.innerHTML = '<div class="var-empty">加载失败。</div>';
+    });
+}
 </script>
 </body>
 </html>

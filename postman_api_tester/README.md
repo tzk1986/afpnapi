@@ -1,8 +1,26 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.8.4
-发布日期：2026-06-16
+版本：v1.12.0
+发布日期：2026-06-17
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.12.0）：
+- **多环境变量管理**：全局变量支持多环境作用域（shared + 按环境分组），首页右上角齿轮按钮打开设置面板，支持环境增删、行内编辑（Hoppscotch 风格）、显示/隐藏切换。
+- **变量覆盖顺序**：执行时变量合并优先级为 initial_variables > 环境变量 > 全局共享变量（shared），同名 key 后者覆盖前者。
+- **可视化编辑器集成**：Collection 编辑器自动加载全局/环境变量，执行和导出时自动合并嵌入。
+- **变量函数帮助入口**：设置面板新增"变量函数"Tab，展示 6 个内置函数的语法和示例。
+
+本版新增重点（v1.10.0）：
+- **断言引擎扩展**：新增 4 种断言操作符 — `regex`（正则匹配）、`length_eq`（数组/字符串长度）、`type`（类型检查）、`schema`（JSON Schema 验证，需安装 jsonschema）。总计支持 13 种操作符。
+
+本版新增重点（v1.11.0）：
+- **变量函数**：支持 `{{timestamp()}}`、`{{uuid()}}`、`{{random_int(1,100)}}`、`{{date()}}`、`{{datetime()}}` 等内置函数，由 `ENABLE_VARIABLE_FUNCTIONS` 控制。
+- **全局变量持久化**：`GLOBAL_VARIABLES_FILE` 配置指定 JSON 文件路径后，执行结束自动保存提取的变量，下次执行自动加载。
+- **全局变量 CRUD 路由**：`GET/POST/DELETE /api/global-variables` 接口，支持 Web UI 管理持久化变量。
+
+本版新增重点（v1.9.0）：
+- **并发执行引擎**：基于 ThreadPoolExecutor + 依赖感知分批调度，`ENABLE_CONCURRENT=true` 启用后接口按变量依赖拓扑排序并行执行，预期 5-10x 提速；默认关闭保持串行兼容。
+- **线程安全改造**：PostmanTestReport、VariableContext、ConcurrentProgressTracker 均加锁保护，支持多线程并发写入不丢数据。
 
 本版新增重点（v1.8.1）：
 - **测试覆盖强化**：补充 collection_editor_routes 路由层 19 个测试用例，覆盖全部 4 个路由函数的成功/错误路径和 12 个错误码。

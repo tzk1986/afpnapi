@@ -143,11 +143,17 @@
         .exec-modal-actions .btn { padding: 8px 20px; }
 
         /* Variable Autocomplete */
-        .var-autocomplete { display: none; position: fixed; z-index: 2000; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 220px; overflow-y: auto; min-width: 200px; max-width: 340px; }
+        .var-autocomplete { display: none; position: fixed; z-index: 2000; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; min-width: 200px; max-width: 340px; }
         .var-autocomplete.visible { display: block; }
+        .var-autocomplete::-webkit-scrollbar { width: 5px; }
+        .var-autocomplete::-webkit-scrollbar-track { background: transparent; }
+        .var-autocomplete::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .var-autocomplete::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .var-ac-item { padding: 7px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .var-ac-item:hover, .var-ac-item.active { background: #eff6ff; }
         .var-ac-name { font-family: Consolas, monospace; color: #1d4ed8; font-weight: 600; }
+        .var-ac-fn { font-family: Consolas, monospace; color: #7c3aed; font-weight: 600; }
+        .var-ac-fn-prefix { color: #a78bfa; font-weight: 700; margin-right: 2px; font-style: italic; }
         .var-ac-value { color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
         .var-ac-source { font-size: 10px; color: #94a3b8; padding: 1px 5px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; }
         .var-ac-empty { padding: 10px 12px; color: #94a3b8; font-size: 12px; }
@@ -202,7 +208,14 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>Collection 可视化编辑器</h1>
+            <div style="display:flex;align-items:center;gap:16px;">
+                <h1>Collection 可视化编辑器</h1>
+                <div id="editorEnvBar" style="display:none;align-items:center;gap:6px;font-size:13px;color:#475569;">
+                    <span>环境:</span>
+                    <select id="editorEnvSelect" onchange="onEditorEnvChange()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;min-width:120px;"></select>
+                    <span id="editorGlobalVarCount" style="font-size:11px;color:#64748b;"></span>
+                </div>
+            </div>
             <div class="header-actions">
                 <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileUpload(event)">
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📂 导入 JSON</button>
@@ -422,10 +435,92 @@
             selectedIds: new Set(),
             runtimeVars: {},
             activeTab: 'general',
+            globalSharedVars: {},
+            globalEnvVars: {},
+            globalEnvList: [],
+            selectedEnv: '',
+            varFunctions: [],
         };
 
         // Methods
         const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+        // ── 全局/环境变量集成 ─────────────────────────────────────────
+        function loadGlobalVariables() {
+            fetch('/api/global-variables/all?masked=false').then(r => r.json()).then(data => {
+                const d = data.data || {};
+                state.globalSharedVars = d.shared || {};
+                state.globalEnvVars = d.environments || {};
+                state.globalEnvList = d.env_list || [];
+                _renderEditorEnvSelect();
+            }).catch(() => {
+                state.globalSharedVars = {};
+                state.globalEnvVars = {};
+                state.globalEnvList = [];
+                _renderEditorEnvSelect();
+            });
+        }
+
+        function _renderEditorEnvSelect() {
+            const bar = document.getElementById('editorEnvBar');
+            const sel = document.getElementById('editorEnvSelect');
+            if (!bar || !sel) return;
+            if (state.globalEnvList.length === 0) {
+                bar.style.display = 'none';
+                return;
+            }
+            bar.style.display = 'flex';
+            sel.innerHTML = '';
+            const noneOpt = document.createElement('option');
+            noneOpt.value = '';
+            noneOpt.textContent = '（不使用环境变量）';
+            sel.appendChild(noneOpt);
+            state.globalEnvList.forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if (name === state.selectedEnv) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!state.selectedEnv && state.globalEnvList.length > 0) {
+                state.selectedEnv = state.globalEnvList[0];
+                sel.value = state.selectedEnv;
+            }
+            _updateGlobalVarCount();
+        }
+
+        function _updateGlobalVarCount() {
+            const el = document.getElementById('editorGlobalVarCount');
+            if (!el) return;
+            const sharedCount = Object.keys(state.globalSharedVars || {}).length;
+            const envVars = state.selectedEnv ? (state.globalEnvVars[state.selectedEnv] || {}) : {};
+            const envCount = Object.keys(envVars).length;
+            const total = sharedCount + envCount;
+            if (total === 0) { el.textContent = ''; return; }
+            let text = `已合并 ${total} 个全局变量`;
+            if (envCount > 0) text += `（含 ${state.selectedEnv} ${envCount} 个）`;
+            el.textContent = text;
+        }
+
+        function onEditorEnvChange() {
+            const sel = document.getElementById('editorEnvSelect');
+            state.selectedEnv = sel ? sel.value : '';
+            _updateGlobalVarCount();
+        }
+
+        function getMergedGlobalVars() {
+            const merged = {};
+            for (const [k, v] of Object.entries(state.globalSharedVars || {})) {
+                merged[k] = String(v);
+            }
+            if (state.selectedEnv) {
+                const envVars = state.globalEnvVars[state.selectedEnv] || {};
+                for (const [k, v] of Object.entries(envVars)) {
+                    merged[k] = String(v);
+                }
+            }
+            return merged;
+        }
 
         // File Upload
         async function handleFileUpload(event) {
@@ -1289,6 +1384,26 @@
                 });
                 const data = await resp.json();
                 if (resp.ok) {
+                    // 将全局/环境变量标记为已生产（source=全局/环境），避免显示"未定义"
+                    // 环境优先级高于共享，先注入环境再注入共享（共享不覆盖环境）
+                    if (state.selectedEnv) {
+                        const envVars = state.globalEnvVars[state.selectedEnv] || {};
+                        for (const k of Object.keys(envVars)) {
+                            data.produced[k] = { by_request: '__global__', by_name: '', source: '环境' };
+                        }
+                    }
+                    for (const k of Object.keys(state.globalSharedVars || {})) {
+                        if (!data.produced[k]) {
+                            data.produced[k] = { by_request: '__global__', by_name: '', source: '全局' };
+                        }
+                    }
+                    // 内置变量函数（如 timestamp、uuid）仅在实际被消费时标记为函数来源
+                    const consumedVars = new Set(Object.keys(data.consumed || {}));
+                    for (const fn of state.varFunctions || []) {
+                        if (fn?.name && consumedVars.has(fn.name) && !data.produced[fn.name]) {
+                            data.produced[fn.name] = { by_request: '__func__', by_name: '', source: '函数' };
+                        }
+                    }
                     renderDependencyInfo(data);
                     setStatus('变量依赖分析完成');
                 } else {
@@ -1324,7 +1439,8 @@
         function renderDependencyInfo(result) {
             const produced = result.produced || {};
             const consumed = result.consumed || {};
-            const warnings = result.warnings || [];
+            // 全局/环境变量已在前端注入 produced（带 source），从 warnings 中排除
+            const warnings = (result.warnings || []).filter(w => !produced[w.var_name]?.source);
             const reqMap = buildRequestMap();
 
             let html = '';
@@ -1338,9 +1454,16 @@
                     const consumer = consumed[v];
                     const hasWarning = warnings.some(w => w.var_name === v);
 
-                    const producerCell = producer
-                        ? reqLink(producer.by_request, reqMap)
-                        : '<span style="color:#dc2626;">未定义</span>';
+                    let producerCell = '-';
+                    if (producer) {
+                        if (producer.source) {
+                            producerCell = `<span style="color:#059669;">${escapeHtml(producer.source)}</span>`;
+                        } else {
+                            producerCell = reqLink(producer.by_request, reqMap);
+                        }
+                    } else {
+                        producerCell = '<span style="color:#dc2626;">未定义</span>';
+                    }
 
                     let consumerCell = '-';
                     if (consumer && consumer.by_requests.length > 0) {
@@ -1366,7 +1489,7 @@
             document.getElementById('varStatus').textContent = `变量：${allVars.size} 生产：${producedVars.length} 消费：${consumedVars.length} 警告：${warnings.length}`;
         }
 
-        // Export Collection
+        // Export Collection (embeds global + env vars into collection_info.variables)
         async function exportCollection() {
             if (!state.collection) {
                 setStatus('请先导入 Collection', 'error');
@@ -1375,10 +1498,25 @@
 
             setStatus('正在导出...');
             try {
+                const exportPayload = JSON.parse(JSON.stringify(state.collection));
+                const globalVars = getMergedGlobalVars();
+                if (!exportPayload.collection_info) exportPayload.collection_info = {};
+                const existingVars = exportPayload.collection_info.variables || [];
+                const existingKeys = new Set();
+                if (Array.isArray(existingVars)) {
+                    for (const v of existingVars) { if (v && v.key) existingKeys.add(v.key); }
+                }
+                const merged = [];
+                for (const [k, v] of Object.entries(globalVars)) {
+                    if (!existingKeys.has(k)) merged.push({key: k, value: v, enabled: true});
+                }
+                if (Array.isArray(existingVars)) merged.push(...existingVars);
+                exportPayload.collection_info.variables = merged;
+
                 const resp = await fetch('/api/collection-editor/save', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(state.collection),
+                    body: JSON.stringify(exportPayload),
                 });
                 const data = await resp.json();
                 if (resp.ok) {
@@ -1424,8 +1562,8 @@
                     const formData = new FormData();
                     formData.append('collection_file', blob, 'collection.json');
 
-                    // 合并 Collection 预置变量 + 运行时变量池作为 initial_variables
-                    const mergedVars = {};
+                    // 合并全局变量 + Collection 预置变量 + 运行时变量池作为 initial_variables
+                    const mergedVars = getMergedGlobalVars();
                     const colVars = (state.collection.collection_info && state.collection.collection_info.variables) || [];
                     if (Array.isArray(colVars)) {
                         for (const v of colVars) {
@@ -1435,6 +1573,10 @@
                     Object.assign(mergedVars, state.runtimeVars || {});
                     if (Object.keys(mergedVars).length > 0) {
                         formData.append('initial_variables', JSON.stringify(mergedVars));
+                    }
+
+                    if (state.selectedEnv) {
+                        formData.append('env_name', state.selectedEnv);
                     }
 
                     // 使用 Collection 名称作为报告名
@@ -1598,9 +1740,9 @@
             if (state.editBuffer) renderEditor();
         }
 
-        // Collect variables from collection presets
+        // Collect variables: global shared → global env → collection presets → runtime
         function collectVariables() {
-            const vars = {};
+            const vars = getMergedGlobalVars();
             const presetVars = state.collection?.collection_info?.variables || [];
             for (const v of presetVars) {
                 if (v && v.key && v.value !== undefined) {
@@ -2754,6 +2896,25 @@
             const vars = [];
             const seen = new Set();
 
+            // Global shared variables
+            for (const [k, v] of Object.entries(state.globalSharedVars || {})) {
+                if (!seen.has(k)) {
+                    seen.add(k);
+                    vars.push({ name: k, value: String(v), source: '全局' });
+                }
+            }
+
+            // Global env variables (for selected env)
+            if (state.selectedEnv) {
+                const envVars = state.globalEnvVars[state.selectedEnv] || {};
+                for (const [k, v] of Object.entries(envVars)) {
+                    if (!seen.has(k)) {
+                        seen.add(k);
+                        vars.push({ name: k, value: String(v), source: '环境' });
+                    }
+                }
+            }
+
             // Collection preset variables
             const colVars = (state.collection?.collection_info?.variables) || [];
             if (Array.isArray(colVars)) {
@@ -2783,6 +2944,20 @@
                             vars.push({ name: varName, value: extracts[varName], source: '提取规则' });
                         }
                     }
+                }
+            }
+
+            // Built-in variable functions
+            for (const fn of state.varFunctions || []) {
+                if (fn?.name && !seen.has(fn.name)) {
+                    seen.add(fn.name);
+                    vars.push({
+                        name: fn.name, value: '', source: '函数',
+                        syntax: fn.syntax || '{{' + fn.name + '()}}',
+                        description: fn.description || '',
+                        example: fn.example || '',
+                        isFunction: true,
+                    });
                 }
             }
 
@@ -2868,10 +3043,19 @@
             for (let i = 0; i < items.length; i++) {
                 const v = items[i];
                 const activeClass = i === acState.selectedIdx ? ' active' : '';
-                html += `<div class="var-ac-item${activeClass}" data-idx="${i}" onclick="applyAcSelection('${escapeAttr(v.name)}')">
-                    <span>
-                        <span class="var-ac-name">{{${escapeHtml(v.name)}}}</span>
-                        <span class="var-ac-value">${escapeHtml(v.value)}</span>
+                const isFn = v.isFunction;
+                const displayName = isFn ? escapeHtml(v.syntax || '{{' + v.name + '()}}')
+                                         : '{{' + escapeHtml(v.name) + '}}';
+                const displayValue = isFn ? escapeHtml(v.description || '')
+                                          : escapeHtml(v.value);
+                const nameClass = isFn ? 'var-ac-fn' : 'var-ac-name';
+                html += `<div class="var-ac-item${activeClass}" data-idx="${i}" onclick="applyAcSelection(${i})">
+                    <span>`;
+                if (isFn) {
+                    html += `<span class="var-ac-fn-prefix">f </span>`;
+                }
+                html += `<span class="${nameClass}">${displayName}</span>
+                        <span class="var-ac-value">${displayValue}</span>
                     </span>
                     <span class="var-ac-source">${escapeHtml(v.source)}</span>
                 </div>`;
@@ -2893,22 +3077,25 @@
             if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
         }
 
-        function applyAcSelection(varName) {
+        function applyAcSelection(idx) {
+            const item = acState.items[idx];
             const el = acState.targetEl;
-            if (!el) return;
+            if (!item || !el) return;
 
             const val = el.value;
             const openIdx = acState.triggerIdx;
             const cursorPos = el.selectionStart;
             const before = val.substring(0, openIdx);
             const after = val.substring(cursorPos);
-            el.value = before + '{{' + varName + '}}' + after;
+            // 函数插入完整语法（如 {{timestamp()}}），变量插入 {{name}}
+            const insertText = item.syntax || ('{{' + item.name + '}}');
+            el.value = before + insertText + after;
 
             // Trigger change event so state is updated
             el.dispatchEvent(new Event('change', { bubbles: true }));
 
-            // Set cursor after }}
-            const newCursorPos = before.length + 2 + varName.length + 2;
+            // Set cursor after inserted text
+            const newCursorPos = before.length + insertText.length;
             el.setSelectionRange(newCursorPos, newCursorPos);
             el.focus();
 
@@ -2924,8 +3111,19 @@
             document.getElementById('varAutocomplete').classList.remove('visible');
         }
 
+        function loadVarFunctions() {
+            fetch('/api/variable-functions').then(r => r.json()).then(data => {
+                state.varFunctions = (data.data?.functions) || [];
+            }).catch(() => { state.varFunctions = []; });
+        }
+
         // Initialize autocomplete on page load
         initAutocomplete();
+        loadGlobalVariables();
+        loadVarFunctions();
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) { loadGlobalVariables(); loadVarFunctions(); }
+        });
     </script>
 </body>
 </html>

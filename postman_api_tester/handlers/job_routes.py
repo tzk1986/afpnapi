@@ -243,6 +243,7 @@ def api_run_postman() -> ResponseReturnValue:
         judgment_config=judgment_config,
         data_file=data_file_path,
         initial_variables=initial_variables,
+        env_name=env_name,
     )
 
     _enqueue_job(
