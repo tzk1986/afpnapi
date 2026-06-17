@@ -1377,6 +1377,13 @@
                 });
                 const data = await resp.json();
                 if (resp.ok) {
+                    // 将全局/环境变量标记为已生产（source=全局/环境），避免显示"未定义"
+                    const mergedVars = getMergedGlobalVars();
+                    for (const k of Object.keys(mergedVars)) {
+                        if (!data.produced[k]) {
+                            data.produced[k] = { by_request: '__global__', by_name: '', source: '全局' };
+                        }
+                    }
                     renderDependencyInfo(data);
                     setStatus('变量依赖分析完成');
                 } else {
@@ -1412,7 +1419,8 @@
         function renderDependencyInfo(result) {
             const produced = result.produced || {};
             const consumed = result.consumed || {};
-            const warnings = result.warnings || [];
+            // 全局/环境变量已在前端注入 produced（带 source），从 warnings 中排除
+            const warnings = (result.warnings || []).filter(w => !produced[w.var_name]?.source);
             const reqMap = buildRequestMap();
 
             let html = '';
@@ -1426,9 +1434,16 @@
                     const consumer = consumed[v];
                     const hasWarning = warnings.some(w => w.var_name === v);
 
-                    const producerCell = producer
-                        ? reqLink(producer.by_request, reqMap)
-                        : '<span style="color:#dc2626;">未定义</span>';
+                    let producerCell = '-';
+                    if (producer) {
+                        if (producer.source) {
+                            producerCell = `<span style="color:#059669;">${escapeHtml(producer.source)}</span>`;
+                        } else {
+                            producerCell = reqLink(producer.by_request, reqMap);
+                        }
+                    } else {
+                        producerCell = '<span style="color:#dc2626;">未定义</span>';
+                    }
 
                     let consumerCell = '-';
                     if (consumer && consumer.by_requests.length > 0) {
