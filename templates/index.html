@@ -444,7 +444,7 @@
                     <div id="sharedVarNotice"></div>
                     <div class="var-toolbar">
                         <button class="var-btn-clear" onclick="clearVarScope('shared')">清空</button>
-                        <button class="btn-toggle-mask" id="btnToggleMaskShared" onclick="toggleMask()">👁 显示值</button>
+                        <button class="btn-toggle-mask" id="btnToggleMaskShared" onclick="toggleMask()">👁 显示值（编辑）</button>
                     </div>
                     <div id="sharedVarTable"></div>
                 </div>
@@ -466,7 +466,7 @@
                     </div>
                     <div class="var-toolbar" style="margin-top:8px;">
                         <button class="var-btn-clear" onclick="clearVarScope('env')">清空变量</button>
-                        <button class="btn-toggle-mask" id="btnToggleMaskEnv" onclick="toggleMask()">👁 显示值</button>
+                        <button class="btn-toggle-mask" id="btnToggleMaskEnv" onclick="toggleMask()">👁 显示值（编辑）</button>
                     </div>
                     <div id="envVarTable"></div>
                 </div>
@@ -1404,8 +1404,13 @@ function _renderVarTable(containerId, entries, scope, envName) {
             ? `'${scope}','${ek}','${envAttr}'`
             : `'${scope}','${ek}'`;
         html += '<tr>';
-        html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
-        html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" data-last-saved="${ev}" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+        if (showVarValues) {
+            html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+            html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" data-last-saved="${ev}" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+        } else {
+            html += `<td style="padding:5px 8px;font-size:13px;">${ek}</td>`;
+            html += `<td style="padding:5px 8px;font-size:13px;font-family:Consolas,monospace;color:#64748b;">${ev}</td>`;
+        }
         html += `<td><button class="btn-del" onclick="deleteVariable(${delArgs})">删除</button></td>`;
         html += '</tr>';
     });
@@ -1590,7 +1595,7 @@ function clearVarScope(scope) {
 
 function toggleMask() {
     showVarValues = !showVarValues;
-    const label = showVarValues ? '🔒 隐藏值' : '👁 显示值';
+    const label = showVarValues ? '🔒 隐藏值' : '👁 显示值（编辑）';
     ['btnToggleMaskShared', 'btnToggleMaskEnv'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) {
