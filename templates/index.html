@@ -192,6 +192,14 @@
         .btn-toggle-mask:hover { background: #e2e8f0; }
         .btn-toggle-mask.active { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd !important; }
         .var-table td.unmasked { color: #1f2937; }
+        /* Variable override indicators */
+        .var-override-bar { margin-top: 10px; padding: 8px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 12px; color: #92400e; }
+        .var-override-bar strong { color: #78350f; }
+        .var-override-item { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-family: Consolas, monospace; font-size: 11px; }
+        .var-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; font-family: "Microsoft YaHei", sans-serif; vertical-align: middle; margin-left: 4px; font-weight: 600; }
+        .var-badge-overridden { background: #fef3c7; color: #92400e; }
+        .var-badge-overrides { background: #dbeafe; color: #1e40af; }
+        .var-effective-val { color: #059669; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -447,6 +455,7 @@
                         <button class="btn-toggle-mask" id="btnToggleMaskShared" onclick="toggleMask()">👁 显示值（编辑）</button>
                     </div>
                     <div id="sharedVarTable"></div>
+                    <div id="sharedOverrideInfo"></div>
                 </div>
                 <div id="settingsTabEnv" style="display:none;">
                     <div class="modal-section-desc">按环境分组的变量，选择环境后执行时与全局变量合并（环境优先）。</div>
@@ -469,6 +478,7 @@
                         <button class="btn-toggle-mask" id="btnToggleMaskEnv" onclick="toggleMask()">👁 显示值（编辑）</button>
                     </div>
                     <div id="envVarTable"></div>
+                    <div id="envOverrideInfo"></div>
                 </div>
                 <div id="settingsTabFunctions" style="display:none;">
                     <div class="modal-section-desc">可在请求 URL、Headers、Body 等参数中使用 <code>{{"{{"}}函数名(参数){{"}}"}}</code> 语法，执行时实时计算。</div>
@@ -1390,11 +1400,17 @@ function _renderVarNotice(containerId, disabled) {
     }
 }
 
-function _renderVarTable(containerId, entries, scope, envName) {
+function _renderVarTable(containerId, entries, scope, envName, overrideCtx) {
     const el = document.getElementById(containerId);
     if (!el) return;
     const inputType = showVarValues ? 'text' : 'password';
     const envAttr = scope === 'env' ? escapeHtml(envName) : '';
+    const ctx = overrideCtx || {};
+    // 跨 scope 变量覆盖上下文
+    const envVars = ctx.envVars || {};
+    const sharedVars = ctx.sharedVars || {};
+    const presetVars = ctx.presetVars || {};
+
     let html = '<table class="var-table">';
     html += '<thead><tr><th style="width:38%;">名称</th><th style="width:46%;">值</th><th style="width:16%;"></th></tr></thead><tbody>';
     entries.forEach(([k, v]) => {
@@ -1403,12 +1419,32 @@ function _renderVarTable(containerId, entries, scope, envName) {
         const delArgs = scope === 'env'
             ? `'${scope}','${ek}','${envAttr}'`
             : `'${scope}','${ek}'`;
+        // 计算覆盖标记
+        let badge = '';
+        let effVal = '';
+        if (scope === 'shared') {
+            if (envVars[k] !== undefined) {
+                badge = `<span class="var-badge var-badge-overridden">被环境覆盖</span>`;
+                effVal = envVars[k];
+            } else if (presetVars[k] !== undefined) {
+                badge = `<span class="var-badge var-badge-overridden">被预置覆盖</span>`;
+                effVal = presetVars[k];
+            }
+        } else if (scope === 'env') {
+            if (sharedVars[k] !== undefined) {
+                badge = `<span class="var-badge var-badge-overrides">覆盖全局</span>`;
+            }
+            if (presetVars[k] !== undefined) {
+                badge = `<span class="var-badge var-badge-overridden">被预置覆盖</span>`;
+                effVal = presetVars[k];
+            }
+        }
         html += '<tr>';
         if (showVarValues) {
-            html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
+            html += `<td><input class="var-input" type="text" value="${ek}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)">${badge}</td>`;
             html += `<td><input class="var-input" type="${inputType}" value="${ev}" data-orig-key="${ek}" data-scope="${scope}" data-env="${envAttr}" data-is-new="false" data-last-saved="${ev}" onblur="saveVarRow(this)" onkeydown="varKeydown(event,this)"></td>`;
         } else {
-            html += `<td style="padding:5px 8px;font-size:13px;">${ek}</td>`;
+            html += `<td style="padding:5px 8px;font-size:13px;">${ek}${badge}</td>`;
             html += `<td style="padding:5px 8px;font-size:13px;font-family:Consolas,monospace;color:#64748b;">${ev}</td>`;
         }
         html += `<td><button class="btn-del" onclick="deleteVariable(${delArgs})">删除</button></td>`;
@@ -1420,6 +1456,35 @@ function _renderVarTable(containerId, entries, scope, envName) {
     html += '<td></td>';
     html += '</tr>';
     html += '</tbody></table>';
+
+    // 渲染覆盖摘要
+    const overrideId = containerId === 'sharedVarTable' ? 'sharedOverrideInfo' : 'envOverrideInfo';
+    const overrideEl = document.getElementById(overrideId);
+    if (overrideEl) {
+        let barHtml = '';
+        if (scope === 'shared') {
+            const overridden = entries.filter(([k]) => envVars[k] !== undefined || presetVars[k] !== undefined);
+            if (overridden.length > 0) {
+                barHtml = '<div class="var-override-bar"><strong>⚡ 变量覆盖提示</strong>（以下变量在执行时被更高优先级覆盖）';
+                overridden.forEach(([k, v]) => {
+                    const finalVal = presetVars[k] !== undefined ? presetVars[k] : envVars[k];
+                    const source = presetVars[k] !== undefined ? '预置' : '环境';
+                    barHtml += `<div class="var-override-item"><span>${escapeHtml(k)}</span> → 最终值由<span class="var-badge var-badge-overridden">${source}</span>提供: <span class="var-effective-val">${escapeHtml(String(finalVal))}</span></div>`;
+                });
+                barHtml += '</div>';
+            }
+        } else if (scope === 'env') {
+            const overrides = entries.filter(([k]) => sharedVars[k] !== undefined);
+            if (overrides.length > 0) {
+                barHtml = '<div class="var-override-bar"><strong>⚡ 变量覆盖提示</strong>（以下变量覆盖了全局同名变量）';
+                overrides.forEach(([k, v]) => {
+                    barHtml += `<div class="var-override-item"><span>${escapeHtml(k)}</span>: 全局=<span style="color:#64748b;">${escapeHtml(String(sharedVars[k]))}</span> → 最终=<span class="var-effective-val">${escapeHtml(v)}</span></div>`;
+                });
+                barHtml += '</div>';
+            }
+        }
+        overrideEl.innerHTML = barHtml;
+    }
     el.innerHTML = html;
 }
 
@@ -1522,17 +1587,43 @@ function varKeydown(event, inputEl) {
     }
 }
 
+function _getCollectionPresetVars() {
+    // 从 Collection 编辑器页面获取预置变量（如果在 iframe 或同域中）
+    // 这里用简单方式：尝试从 session storage 或全局变量读取
+    try {
+        const stored = sessionStorage.getItem('editorPresetVars');
+        if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return {};
+}
+
+function _parseEntries(data, scope) {
+    const key = scope === 'shared' ? 'shared_list' : 'variables_list';
+    const list = data.data?.[key];
+    if (Array.isArray(list)) return list.map(e => [e.key, e.value]);
+    const fallback = scope === 'shared' ? data.data?.shared : data.data?.variables;
+    return Object.entries(fallback || {});
+}
+
 function loadSharedVariables() {
     const disabled = !GLOBAL_VARIABLES_FILE;
     _renderVarNotice('sharedVarNotice', disabled);
     const container = document.getElementById('sharedVarTable');
     if (!container) return;
     container.innerHTML = '<div class="var-empty">加载中...</div>';
+    document.getElementById('sharedOverrideInfo').innerHTML = '';
     const masked = showVarValues ? 'false' : 'true';
-    fetch('/api/global-variables?scope=shared&masked=' + masked).then(r => r.json()).then(data => {
-        const list = data.data?.variables_list;
-        const entries = Array.isArray(list) ? list.map(e => [e.key, e.value]) : Object.entries(data.data?.variables || {});
-        _renderVarTable('sharedVarTable', entries, 'shared', '');
+    const sel = document.getElementById('settingsEnvSelect');
+    const envName = sel ? sel.value : '';
+    fetch('/api/global-variables/all?masked=' + masked).then(r => r.json()).then(data => {
+        const d = data.data || {};
+        const sharedList = d.shared_list;
+        const entries = Array.isArray(sharedList) ? sharedList.map(e => [e.key, e.value]) : Object.entries(d.shared || {});
+        // 获取当前环境的变量作为覆盖上下文
+        const envVars = envName ? (d.environments?.[envName] || {}) : {};
+        // 获取 collection 预置变量（从 localStorage 或 DOM）
+        const presetVars = _getCollectionPresetVars();
+        _renderVarTable('sharedVarTable', entries, 'shared', '', { envVars, presetVars, activeEnv: envName });
     }).catch(() => {
         document.getElementById('sharedVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
     });
@@ -1551,11 +1642,21 @@ function loadEnvVariables() {
     const container = document.getElementById('envVarTable');
     if (!container) return;
     container.innerHTML = '<div class="var-empty">加载中...</div>';
+    document.getElementById('envOverrideInfo').innerHTML = '';
     const masked = showVarValues ? 'false' : 'true';
-    fetch('/api/global-variables?scope=env&env_name=' + encodeURIComponent(envName) + '&masked=' + masked).then(r => r.json()).then(data => {
-        const list = data.data?.variables_list;
-        const entries = Array.isArray(list) ? list.map(e => [e.key, e.value]) : Object.entries(data.data?.variables || {});
-        _renderVarTable('envVarTable', entries, 'env', envName);
+    fetch('/api/global-variables/all?masked=' + masked).then(r => r.json()).then(data => {
+        const d = data.data || {};
+        const envsList = d.environments_list;
+        let entries;
+        if (Array.isArray(envsList) && envsList[envName]) {
+            entries = envsList[envName].map(e => [e.key, e.value]);
+        } else {
+            const envVars = d.environments?.[envName] || {};
+            entries = Object.entries(envVars);
+        }
+        const sharedVars = d.shared || {};
+        const presetVars = _getCollectionPresetVars();
+        _renderVarTable('envVarTable', entries, 'env', envName, { sharedVars, presetVars });
     }).catch(() => {
         document.getElementById('envVarTable').innerHTML = '<div class="var-empty">加载失败。</div>';
     });
