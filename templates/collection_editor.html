@@ -212,12 +212,14 @@
         .copy-snippet-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #64748b; cursor: pointer; padding: 0; transition: all 0.15s; }
         .copy-snippet-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
         .copy-snippet-btn svg { width: 16px; height: 16px; }
-        .copy-snippet-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 200px; padding: 4px 0; margin-top: 4px; }
+        .copy-snippet-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 220px; padding: 4px 0; margin-top: 4px; }
         .copy-snippet-menu.visible { display: block; }
-        .copy-snippet-item { padding: 8px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: #334155; }
+        .copy-snippet-group { padding: 4px 0; }
+        .copy-snippet-group-title { font-size: 11px; color: #64748b; font-weight: 600; padding: 4px 14px; cursor: default; text-transform: uppercase; letter-spacing: 0.5px; }
+        .copy-snippet-item { padding: 6px 14px 6px 28px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: #334155; }
         .copy-snippet-item:hover { background: #eff6ff; }
-        .copy-snippet-lang { font-weight: 600; min-width: 100px; }
-        .copy-snippet-desc { font-size: 11px; color: #94a3b8; }
+        .copy-snippet-lang { font-weight: 500; min-width: 90px; }
+        .copy-snippet-desc { font-size: 11px; color: #94a3b8; margin-left: auto; }
         .copy-snippet-sep { height: 1px; background: #e2e8f0; margin: 4px 0; }
 
         /* Response Copy Button */
@@ -1105,29 +1107,106 @@
                         <button type="button" class="copy-snippet-btn" onclick="toggleSnippetMenu(event)" title="复制为代码片段">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
-                        <div class="copy-snippet-menu" id="snippetMenu">
-                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">Shell</div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
-                            <div class="copy-snippet-sep"></div>
-                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">Python</div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('python')"><span class="copy-snippet-lang">Requests</span><span class="copy-snippet-desc">requests 库</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('python_http')"><span class="copy-snippet-lang">http.client</span><span class="copy-snippet-desc">标准库</span></div>
-                            <div class="copy-snippet-sep"></div>
-                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">JavaScript</div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('javascript_fetch')"><span class="copy-snippet-lang">fetch</span><span class="copy-snippet-desc">浏览器原生</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('javascript_axios')"><span class="copy-snippet-lang">axios</span><span class="copy-snippet-desc">HTTP 客户端</span></div>
-                            <div class="copy-snippet-sep"></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('java_okhttp')"><span class="copy-snippet-lang">Java</span><span class="copy-snippet-desc">OkHttp</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('go')"><span class="copy-snippet-lang">Go</span><span class="copy-snippet-desc">net/http</span></div>
-                            <div class="copy-snippet-sep"></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('r_httr')"><span class="copy-snippet-lang">R</span><span class="copy-snippet-desc">httr</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">Ruby</span><span class="copy-snippet-desc">net::http</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('powershell')"><span class="copy-snippet-lang">PowerShell</span><span class="copy-snippet-desc">Invoke-RestMethod</span></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('swift')"><span class="copy-snippet-lang">Swift</span><span class="copy-snippet-desc">URLSession</span></div>
-                            <div class="copy-snippet-sep"></div>
-                            <div class="copy-snippet-item" onclick="showCodePreview('http')"><span class="copy-snippet-lang">HTTP</span><span class="copy-snippet-desc">原始报文</span></div>
+                        <div class="copy-snippet-menu" id="snippetMenu" style="max-height:70vh;overflow-y:auto;">
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Shell</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Python</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('python')"><span class="copy-snippet-lang">Requests</span><span class="copy-snippet-desc">requests 库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('python_http')"><span class="copy-snippet-lang">http.client</span><span class="copy-snippet-desc">标准库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">JavaScript</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('javascript_fetch')"><span class="copy-snippet-lang">fetch</span><span class="copy-snippet-desc">浏览器原生</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('javascript_axios')"><span class="copy-snippet-lang">Axios</span><span class="copy-snippet-desc">axios 库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('javascript_jquery')"><span class="copy-snippet-lang">jQuery</span><span class="copy-snippet-desc">jQuery.ajax</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('javascript_xhr')"><span class="copy-snippet-lang">XMLHttpRequest</span><span class="copy-snippet-desc">XHR</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Node.js</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('node_fetch')"><span class="copy-snippet-lang">Fetch</span><span class="copy-snippet-desc">fetch API</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('node_axios')"><span class="copy-snippet-lang">Axios</span><span class="copy-snippet-desc">axios 库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('node_http')"><span class="copy-snippet-lang">HTTP</span><span class="copy-snippet-desc">原生 http 模块</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('node_request')"><span class="copy-snippet-lang">Request</span><span class="copy-snippet-desc">request 库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('node_unirest')"><span class="copy-snippet-lang">Unirest</span><span class="copy-snippet-desc">Unirest</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Java</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_nethttp')"><span class="copy-snippet-lang">java.net.http</span><span class="copy-snippet-desc">Java 11+ 标准库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_unirest')"><span class="copy-snippet-lang">Unirest</span><span class="copy-snippet-desc">Unirest</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_asynchttp')"><span class="copy-snippet-lang">AsyncHttp</span><span class="copy-snippet-desc">AsyncHttpClient</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Go</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('go')"><span class="copy-snippet-lang">NewRequest</span><span class="copy-snippet-desc">net/http</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">C#</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_httpclient')"><span class="copy-snippet-lang">HttpClient</span><span class="copy-snippet-desc">标准库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_restsharp')"><span class="copy-snippet-lang">RestSharp</span><span class="copy-snippet-desc">RestSharp 库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">C</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('c_libcurl')"><span class="copy-snippet-lang">Libcurl</span><span class="copy-snippet-desc">C 语言</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">PHP</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('php_curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">curl 扩展</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('php_http_v1')"><span class="copy-snippet-lang">HTTP v1</span><span class="copy-snippet-desc">pecl/http v1</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('php_http_v2')"><span class="copy-snippet-lang">HTTP v2</span><span class="copy-snippet-desc">pecl/http v2</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Ruby</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">net::http</span><span class="copy-snippet-desc">标准库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">R</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('r_httr')"><span class="copy-snippet-lang">httr</span><span class="copy-snippet-desc">httr 库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Kotlin</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('kotlin_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Swift</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('swift')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Objective-C</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('objc')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Clojure</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('clojure')"><span class="copy-snippet-lang">clj-http</span><span class="copy-snippet-desc">Clojure</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">OCaml</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('ocaml')"><span class="copy-snippet-lang">CoHTTP</span><span class="copy-snippet-desc">cohttp 库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">PowerShell</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('powershell')"><span class="copy-snippet-lang">Invoke-RestMethod</span><span class="copy-snippet-desc">RestMethod</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('powershell_webrequest')"><span class="copy-snippet-lang">Invoke-WebRequest</span><span class="copy-snippet-desc">WebRequest</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Raw / HTTP</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('raw_text')"><span class="copy-snippet-lang">Raw</span><span class="copy-snippet-desc">原始文本</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('http')"><span class="copy-snippet-lang">HTTP</span><span class="copy-snippet-desc">原始报文</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">HTTPie</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_cli')"><span class="copy-snippet-lang">HTTPie CLI</span><span class="copy-snippet-desc">命令行</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_desktop')"><span class="copy-snippet-lang">HTTPie Desktop</span><span class="copy-snippet-desc">桌面文件</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Data</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('har')"><span class="copy-snippet-lang">HAR</span><span class="copy-snippet-desc">HTTP Archive</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3459,19 +3538,44 @@
 
         // ── Code Snippet Generator ─────────────────────────────────────
         const SNIPPET_LANGS = {
+            raw_text: { label: 'Raw', desc: '原始文本' },
+            httpie_cli: { label: 'HTTPie CLI', desc: '命令行' },
+            httpie_desktop: { label: 'HTTPie Desktop', desc: '桌面文件' },
+            har: { label: 'HAR', desc: 'HTTP Archive' },
             curl: { label: 'cURL', desc: '终端命令' },
-            httpie: { label: 'HTTPie', desc: '简洁格式' },
-            wget: { label: 'Wget', desc: '下载工具' },
-            python: { label: 'Python', desc: 'requests' },
-            python_http: { label: 'Python', desc: 'http.client' },
-            javascript_fetch: { label: 'JavaScript', desc: 'fetch' },
-            javascript_axios: { label: 'JavaScript', desc: 'axios' },
-            java_okhttp: { label: 'Java', desc: 'OkHttp' },
+            c_libcurl: { label: 'C', desc: 'Libcurl' },
+            clojure: { label: 'Clojure', desc: 'clj-http' },
+            csharp_restsharp: { label: 'C#', desc: 'RestSharp' },
+            csharp_httpclient: { label: 'C#', desc: 'HttpClient' },
             go: { label: 'Go', desc: 'net/http' },
+            java_okhttp: { label: 'Java', desc: 'OkHttp' },
+            java_unirest: { label: 'Java', desc: 'Unirest' },
+            java_asynchttp: { label: 'Java', desc: 'AsyncHttpClient' },
+            java_nethttp: { label: 'Java', desc: 'java.net.http' },
+            javascript_jquery: { label: 'JavaScript', desc: 'jQuery.ajax' },
+            javascript_fetch: { label: 'JavaScript', desc: 'fetch' },
+            javascript_xhr: { label: 'JavaScript', desc: 'XMLHttpRequest' },
+            javascript_axios: { label: 'JavaScript', desc: 'axios' },
+            kotlin_okhttp: { label: 'Kotlin', desc: 'OkHttp' },
+            node_http: { label: 'Node.js', desc: 'http' },
+            node_request: { label: 'Node.js', desc: 'request' },
+            node_unirest: { label: 'Node.js', desc: 'Unirest' },
+            node_axios: { label: 'Node.js', desc: 'axios' },
+            node_fetch: { label: 'Node.js', desc: 'fetch' },
+            objc: { label: 'Objective-C', desc: 'NSURLSession' },
+            ocaml: { label: 'OCaml', desc: 'CoHTTP' },
+            php_curl: { label: 'PHP', desc: 'cURL' },
+            php_http_v1: { label: 'PHP', desc: 'HTTP v1' },
+            php_http_v2: { label: 'PHP', desc: 'HTTP v2' },
+            powershell_webrequest: { label: 'PowerShell', desc: 'Invoke-WebRequest' },
+            powershell: { label: 'PowerShell', desc: 'Invoke-RestMethod' },
+            python_http: { label: 'Python', desc: 'http.client' },
+            python: { label: 'Python', desc: 'requests' },
             r_httr: { label: 'R', desc: 'httr' },
             ruby: { label: 'Ruby', desc: 'net::http' },
-            powershell: { label: 'PowerShell', desc: 'Invoke-RestMethod' },
-            swift: { label: 'Swift', desc: 'URLSession' },
+            httpie: { label: 'HTTPie', desc: '简洁格式' },
+            wget: { label: 'Wget', desc: '下载工具' },
+            swift: { label: 'Swift', desc: 'NSURLSession' },
             http: { label: 'HTTP', desc: '原始报文' },
         };
 
@@ -3606,18 +3710,43 @@
             }
 
             switch (lang) {
+                case 'raw_text': return genRawText(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'httpie_cli': return genHttpieCli(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'httpie_desktop': return genHttpieDesktop(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'har': return genHar(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'curl': return genCurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'httpie': return genHttpie(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'wget': return genWget(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'python': return genPython(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'python_http': return genPythonHttpClient(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'javascript_fetch': return genFetch(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'javascript_axios': return genAxios(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'java_okhttp': return genOkHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'c_libcurl': return genCLibcurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'clojure': return genClojure(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'csharp_restsharp': return genCSharpRestSharp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'csharp_httpclient': return genCSharpHttpClient(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'go': return genGo(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'java_okhttp': return genOkHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'java_unirest': return genJavaUnirest(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'java_asynchttp': return genJavaAsyncHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'java_nethttp': return genJavaNetHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_jquery': return genJQuery(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_fetch': return genFetch(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_xhr': return genXHR(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_axios': return genAxios(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'kotlin_okhttp': return genKotlinOkHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'node_http': return genNodeHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'node_request': return genNodeRequest(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'node_unirest': return genNodeUnirest(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'node_axios': return genNodeAxios(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'node_fetch': return genNodeFetch(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'objc': return genObjC(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'ocaml': return genOCaml(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'php_curl': return genPhpCurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'php_http_v1': return genPhpHttpV1(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'php_http_v2': return genPhpHttpV2(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'powershell_webrequest': return genPowerShellWebRequest(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'powershell': return genPowerShell(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'python_http': return genPythonHttpClient(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'python': return genPython(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'r_httr': return genRhttr(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'ruby': return genRuby(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
-                case 'powershell': return genPowerShell(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'httpie': return genHttpie(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'wget': return genWget(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'swift': return genSwift(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'http': return genHttp(method, fullUrl, headers, bodyContent);
                 default: return `// Unknown language: ${lang}`;
@@ -4116,6 +4245,773 @@
             lines.push('    }');
             lines.push('}');
             lines.push('task.resume()');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Raw Text ──────────────────────────────────────────────────
+        function genRawText(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [`${method} ${url}`];
+            for (const h of headers) lines.push(`${h.key}: ${h.value}`);
+            if (bodyContent !== null) { lines.push(''); lines.push(bodyContent); }
+            return lines.join('\n') + '\n';
+        }
+
+        // ── HTTPie CLI (full command with options) ───────────────────
+        function genHttpieCli(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parts = [`http ${method.toLowerCase()} '${url}'`];
+            for (const h of headers) parts.push(`'${h.key}:${h.value}'`);
+            if (bodyContent !== null) {
+                if (bodyMode === 'formdata') {
+                    for (const d of (bodyData.data || []).filter(d => d.key)) parts.push(`'${d.key}=${d.value}'`);
+                } else if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    try { const obj = JSON.parse(bodyContent); for (const [k, v] of Object.entries(obj)) parts.push(`'${k}=${JSON.stringify(v)}'`); }
+                    catch (e) { parts.push(`'${bodyContent.replace(/'/g, "'\\''")}'`); }
+                } else { parts.push(`'${bodyContent.replace(/'/g, "'\\''")}'`); }
+            }
+            return parts.join(' \\\n  ') + '\n';
+        }
+
+        // ── HTTPie Desktop (.httpie file format) ─────────────────────
+        function genHttpieDesktop(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [`# HTTPie Desktop request file`, `# Save as request.httpie and open in HTTPie Desktop`, ''];
+            lines.push(`${method} ${url}`);
+            for (const h of headers) lines.push(`${h.key}: ${h.value}`);
+            if (bodyContent !== null) { lines.push(''); lines.push(bodyContent); }
+            return lines.join('\n') + '\n';
+        }
+
+        // ── HAR (HTTP Archive) ───────────────────────────────────────
+        function genHar(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+            let harMimeType = 'text/plain';
+            if (bodyMode === 'raw' && bodyData && bodyData.language === 'json') harMimeType = 'application/json';
+            else if (bodyMode === 'urlencoded') harMimeType = 'application/x-www-form-urlencoded';
+            else if (bodyMode === 'graphql') harMimeType = 'application/json';
+            const harObj = {
+                log: {
+                    version: '1.2',
+                    creator: { name: 'Postman API Tester', version: '1.15.0' },
+                    entries: [{
+                        startedDateTime: new Date().toISOString(),
+                        time: 0,
+                        request: {
+                            method: method,
+                            url: url,
+                            httpVersion: 'HTTP/1.1',
+                            headers: headers.map(h => ({ name: h.key, value: h.value })),
+                            queryString: parsedUrl ? Array.from(parsedUrl.searchParams).map(([k, v]) => ({ name: k, value: v })) : [],
+                            cookies: [],
+                            headersSize: -1,
+                            bodySize: bodyContent !== null ? bodyContent.length : 0,
+                            postData: bodyContent !== null ? { mimeType: harMimeType, text: bodyContent } : undefined,
+                        },
+                        response: { status: 0, statusText: '', httpVersion: 'HTTP/1.1', headers: [], cookies: [], content: { size: 0, mimeType: '' }, redirectURL: '', headersSize: -1, bodySize: -1 },
+                        cache: {},
+                        timings: { send: 0, wait: 0, receive: 0 },
+                    }],
+                },
+            };
+            return JSON.stringify(harObj, null, 2) + '\n';
+        }
+
+        // ─ C (Libcurl) ──────────────────────────────────────────────
+        function genCLibcurl(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+            const host = parsedUrl ? parsedUrl.hostname : 'localhost';
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : '/';
+
+            let lines = ['#include <stdio.h>', '#include <curl/curl.h>', ''];
+            lines.push('int main(void) {');
+            lines.push('  CURL *curl;');
+            lines.push('  CURLcode res;');
+            lines.push('');
+            lines.push('  curl_global_init(CURL_GLOBAL_DEFAULT);');
+            lines.push('  curl = curl_easy_init();');
+            lines.push('  if (curl) {');
+            lines.push(`    curl_easy_setopt(curl, CURLOPT_URL, "${url.replace(/"/g, '\\"')}");`);
+            lines.push(`    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "${method}");`);
+
+            const headerLines = headers.map(h => `"${h.key}: ${h.value.replace(/"/g, '\\"')}"`);
+            if (headerLines.length > 0) {
+                lines.push('    struct curl_slist *headers = NULL;');
+                for (const hl of headerLines) lines.push(`    headers = curl_slist_append(headers, "${hl}");`);
+                lines.push('    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);');
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "${escaped}");`);
+            }
+
+            lines.push('');
+            lines.push('    res = curl_easy_perform(curl);');
+            lines.push('    if (res != CURLE_OK)');
+            lines.push('      fprintf(stderr, "curl_easy_perform() failed: %s\\n", curl_easy_strerror(res));');
+            lines.push('');
+            if (headerLines.length > 0) lines.push('    curl_slist_free_all(headers);');
+            lines.push('    curl_easy_cleanup(curl);');
+            lines.push('  }');
+            lines.push('  curl_global_cleanup();');
+            lines.push('  return 0;');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Clojure (clj-http) ───────────────────────────────────────
+        function genClojure(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const m = method.toLowerCase();
+            let lines = ['(require [clj-http.client :as client])', ''];
+
+            const headerMap = headers.length > 0 ? '{' + headers.map(h => `:"${h.key}" "${h.value.replace(/"/g, '\\"')}"`).join(', ') + '}' : '{}';
+
+            let bodyArg = '';
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    bodyArg = ` :body "${escaped}" :content-type :json`;
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    bodyArg = ` :body "${escaped}"`;
+                }
+            }
+
+            lines.push(`(client/${m} "${url}"`);
+            if (headers.length > 0) lines.push(`  :headers ${headerMap}`);
+            if (bodyArg) lines.push(`  ${bodyArg.trim()}`);
+            lines.push(')');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── C# (RestSharp) ───────────────────────────────────────────
+        function genCSharpRestSharp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// NuGet: Install-Package RestSharp',
+                'using RestSharp;',
+                '',
+                'var client = new RestClient("' + url.replace(/"/g, '\\"') + '");',
+                `var request = new RestRequest("", Method.${method.toUpperCase()});`,
+                '',
+            ];
+
+            for (const h of headers) {
+                lines.push(`request.AddHeader("${h.key}", "${h.value.replace(/"/g, '\\"')}");`);
+            }
+            if (headers.length > 0) lines.push('');
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`request.AddParameter("application/json", "${escaped}", ParameterType.RequestBody);`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`request.AddParameter("text/plain", "${escaped}", ParameterType.RequestBody);`);
+                }
+            }
+
+            lines.push('');
+            lines.push('RestResponse response = client.Execute(request);');
+            lines.push('Console.WriteLine(response.Content);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── C# (HttpClient) ──────────────────────────────────────────
+        function genCSharpHttpClient(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                'using System.Net.Http;',
+                'using System.Text;',
+                '',
+                'using var client = new HttpClient();',
+                '',
+            ];
+
+            for (const h of headers) {
+                lines.push(`client.DefaultRequestHeaders.Add("${h.key}", "${h.value.replace(/"/g, '\\"')}");`);
+            }
+            if (headers.length > 0) lines.push('');
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                const contentType = (bodyMode === 'raw' && bodyData.language === 'json') ? 'application/json' : 'text/plain';
+                lines.push(`var content = new StringContent("${escaped}", Encoding.UTF8, "${contentType}");`);
+            }
+
+            const contentArg = bodyContent !== null ? ', content' : '';
+            lines.push(`var response = await client.${method.charAt(0) + method.slice(1).toLowerCase()}Async("${url}"${contentArg});`);
+            lines.push('var result = await response.Content.ReadAsStringAsync();');
+            lines.push('Console.WriteLine(result);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Java (Unirest) ───────────────────────────────────────────
+        function genJavaUnirest(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// Maven: com.konghq:unirest-java:3.14.5',
+                'import kong.unirest.*;',
+                '',
+                `HttpResponse<${bodyContent !== null ? 'String' : 'String'}> response = Unirest.${method.toLowerCase()}("${url.replace(/"/g, '\\"')}")`,
+            ];
+
+            for (const h of headers) {
+                lines.push(`  .header("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`  .body("${escaped}")`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`  .body("${escaped}")`);
+                }
+            }
+
+            lines.push('  .asString();');
+            lines.push('');
+            lines.push('System.out.println(response.getStatus());');
+            lines.push('System.out.println(response.getBody());');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Java (AsyncHttpClient) ───────────────────────────────────
+        function genJavaAsyncHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// Maven: org.asynchttpclient:async-http-client:2.12.3',
+                'import org.asynchttpclient.*;',
+                '',
+                'try (AsyncHttpClient client = Dsl.asyncHttpClient()) {',
+                `  BoundRequestBuilder req = client.prepare${method.charAt(0) + method.slice(1)}("${url.replace(/"/g, '\\"')}")`,
+            ];
+
+            for (const h of headers) {
+                lines.push(`    .setHeader("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`    .setBody("${escaped}")`);
+            }
+
+            lines.push('    ;');
+            lines.push('  Response response = req.execute().get();');
+            lines.push('  System.out.println(response.getStatusCode());');
+            lines.push('  System.out.println(response.getResponseBody());');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Java (java.net.http, Java 11+) ───────────────────────────
+        function genJavaNetHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// Java 11+ standard library',
+                'import java.net.http.*;',
+                'import java.net.URI;',
+                '',
+                'HttpClient client = HttpClient.newHttpClient();',
+                '',
+                'HttpRequest.Builder builder = HttpRequest.newBuilder()',
+                `    .uri(URI.create("${url.replace(/"/g, '\\"')}"))`,
+            ];
+
+            for (const h of headers) {
+                lines.push(`    .header("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`    .method("${method}", HttpRequest.BodyPublishers.ofString("${escaped}"))`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`    .method("${method}", HttpRequest.BodyPublishers.ofString("${escaped}"))`);
+                }
+            } else {
+                lines.push(`    .method("${method}", HttpRequest.BodyPublishers.noBody())`);
+            }
+
+            lines.push('    ;');
+            lines.push('');
+            lines.push('HttpResponse<String> response = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());');
+            lines.push('System.out.println(response.statusCode());');
+            lines.push('System.out.println(response.body());');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── JavaScript (jQuery) ──────────────────────────────────────
+        function genJQuery(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = ['// Requires jQuery', ''];
+
+            const settings = {
+                url: url,
+                method: method,
+            };
+            if (headers.length > 0) {
+                settings.headers = {};
+                for (const h of headers) settings.headers[h.key] = h.value;
+            }
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    settings.data = bodyContent;
+                    settings.contentType = 'application/json';
+                } else {
+                    settings.data = bodyContent;
+                }
+            }
+
+            const json = JSON.stringify(settings, null, 2).replace(/"(\w+)":/g, '$1:').replace(/"/g, "'");
+            lines.push(`$.ajax(${json}).done(function(response) {`);
+            lines.push('  console.log(response);');
+            lines.push('});');
+            return lines.join('\n') + '\n';
+        }
+
+        // ─ JavaScript (XMLHttpRequest) ──────────────────────────────
+        function genXHR(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = ['var xhr = new XMLHttpRequest();', ''];
+            lines.push(`xhr.open("${method}", "${url.replace(/"/g, '\\"')}", true);`);
+            for (const h of headers) {
+                lines.push(`xhr.setRequestHeader("${h.key}", "${h.value.replace(/"/g, '\\"')}");`);
+            }
+            lines.push('');
+            lines.push('xhr.onload = function() {');
+            lines.push('  console.log(xhr.status);');
+            lines.push('  console.log(xhr.responseText);');
+            lines.push('};');
+            lines.push('');
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`xhr.send("${escaped}");`);
+            } else {
+                lines.push('xhr.send();');
+            }
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Kotlin (OkHttp) ──────────────────────────────────────────
+        function genKotlinOkHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// dependencies: com.squareup.okhttp3:okhttp:4.12.0',
+                'import okhttp3.*',
+                '',
+                'val client = OkHttpClient()',
+                '',
+            ];
+
+            if (bodyContent !== null) {
+                let mediaType = 'MediaType.parse("text/plain")';
+                if (bodyMode === 'raw' && bodyData.language === 'json') mediaType = 'MediaType.parse("application/json")';
+                else if (bodyMode === 'urlencoded') mediaType = 'MediaType.parse("application/x-www-form-urlencoded")';
+
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`val body = "${escaped}".toRequestBody(${mediaType})`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`val body = "${escaped}".toRequestBody(${mediaType})`);
+                }
+                lines.push('');
+            }
+
+            lines.push('val request = Request.Builder()');
+            lines.push(`    .url("${url.replace(/"/g, '\\"')}")`);
+            for (const h of headers) {
+                lines.push(`    .header("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+            if (bodyContent !== null) {
+                lines.push(`    .method("${method}", body)`);
+            } else {
+                lines.push(`    .method("${method}", null)`);
+            }
+            lines.push('    .build()');
+            lines.push('');
+            lines.push('val response = client.newCall(request).execute()');
+            lines.push('println(response.code)');
+            lines.push('println(response.body?.string())');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Node.js (http) ───────────────────────────────────────────
+        function genNodeHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+            const hostname = parsedUrl ? parsedUrl.hostname : 'localhost';
+            const port = parsedUrl ? (parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80')) : '80';
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : '/';
+            const isHttps = parsedUrl ? parsedUrl.protocol === 'https:' : false;
+
+            let lines = [isHttps ? "const https = require('https');" : "const http = require('http');", ''];
+
+            const opts = {
+                hostname: hostname,
+                port: parseInt(port),
+                path: path,
+                method: method,
+            };
+            if (headers.length > 0) {
+                opts.headers = {};
+                for (const h of headers) opts.headers[h.key] = h.value;
+            }
+
+            lines.push(`const options = ${JSON.stringify(opts, null, 2).replace(/"(\w+)":/g, '$1:')};`);
+            lines.push('');
+
+            if (isHttps) lines.push('const req = https.request(options, (res) => {');
+            else lines.push('const req = http.request(options, (res) => {');
+
+            lines.push("  let data = '';");
+            lines.push("  res.on('data', (chunk) => { data += chunk; });");
+            lines.push("  res.on('end', () => {");
+            lines.push('    console.log(res.statusCode);');
+            lines.push('    console.log(data);');
+            lines.push('  });');
+            lines.push('});');
+            lines.push('');
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`req.write("${escaped}");`);
+            }
+            lines.push('req.end();');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Node.js (request) ────────────────────────────────────────
+        function genNodeRequest(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// npm install request (deprecated, use axios/node-fetch)',
+                "const request = require('request');",
+                '',
+            ];
+
+            const opts = { uri: url, method: method };
+            if (headers.length > 0) {
+                opts.headers = {};
+                for (const h of headers) opts.headers[h.key] = h.value;
+            }
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    opts.body = tryParseJson(bodyContent);
+                    opts.json = true;
+                } else {
+                    opts.body = bodyContent;
+                }
+            }
+
+            const json = JSON.stringify(opts, null, 2).replace(/"(\w+)":/g, '$1:');
+            lines.push(`request(${json}, (error, response, body) => {`);
+            lines.push('  if (error) console.error(error);');
+            lines.push('  console.log(response.statusCode);');
+            lines.push('  console.log(body);');
+            lines.push('});');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Node.js (Unirest) ────────────────────────────────────────
+        function genNodeUnirest(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                "// npm install unirest",
+                "const unirest = require('unirest');",
+                '',
+                `unirest.${method.toLowerCase()}("${url.replace(/"/g, '\\"')}")`,
+            ];
+
+            for (const h of headers) {
+                lines.push(`  .header("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    lines.push(`  .send(${bodyContent})`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`  .send("${escaped}")`);
+                }
+            }
+
+            lines.push('  .end((response) => {');
+            lines.push('    console.log(response.status);');
+            lines.push('    console.log(response.body);');
+            lines.push('  });');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Node.js (Axios) ──────────────────────────────────────────
+        function genNodeAxios(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const m = method.toLowerCase();
+            let lines = [
+                "// npm install axios",
+                "const axios = require('axios');",
+                '',
+            ];
+
+            const config = {};
+            if (headers.length > 0) {
+                config.headers = {};
+                for (const h of headers) config.headers[h.key] = h.value;
+            }
+
+            if (['post', 'put', 'patch'].includes(m)) {
+                let dataArg = '{}';
+                if (bodyContent !== null) {
+                    if (bodyMode === 'raw' && bodyData.language === 'json') {
+                        dataArg = formatJson(bodyContent);
+                    } else {
+                        dataArg = `'${bodyContent.replace(/'/g, "\\'")}'`;
+                    }
+                }
+                const configStr = Object.keys(config).length > 0 ? `, ${JSON.stringify(config, null, 2).replace(/"(\w+)":/g, '$1:')}` : '';
+                lines.push(`const response = await axios.${m}('${url}', ${dataArg}${configStr});`);
+            } else {
+                const configStr = Object.keys(config).length > 0 ? `, ${JSON.stringify(config, null, 2).replace(/"(\w+)":/g, '$1:')}` : '';
+                lines.push(`const response = await axios.${m}('${url}'${configStr});`);
+            }
+            lines.push('console.log(response.data);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Node.js (Fetch) ──────────────────────────────────────────
+        function genNodeFetch(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                "// Node 18+ has built-in fetch",
+                '',
+            ];
+            if (headers.length > 0) {
+                const headerObj = {};
+                for (const h of headers) headerObj[h.key] = h.value;
+                lines.push(`const headers = ${JSON.stringify(headerObj, null, 2)};`);
+            }
+            lines.push('');
+            const fetchOpts = [`method: '${method}'`];
+            if (headers.length > 0) fetchOpts.push('headers');
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    fetchOpts.push(`body: JSON.stringify(${formatJson(bodyContent)})`);
+                } else {
+                    fetchOpts.push(`body: '${bodyContent.replace(/'/g, "\\'")}'`);
+                }
+            }
+            lines.push(`const response = await fetch('${url}', {`);
+            for (let i = 0; i < fetchOpts.length; i++) {
+                lines.push(`  ${fetchOpts[i]}${i < fetchOpts.length - 1 ? ',' : ''}`);
+            }
+            lines.push('});');
+            lines.push('const data = await response.json();');
+            lines.push('console.log(data);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Objective-C (NSURLSession) ───────────────────────────────
+        function genObjC(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '#import <Foundation/Foundation.h>',
+                '',
+                'int main(int argc, const char * argv[]) {',
+                '    @autoreleasepool {',
+                '        NSURL *url = [NSURL URLWithString:@"' + url.replace(/"/g, '\\"') + '"];',
+                '        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];',
+                `        [request setHTTPMethod:@"${method}"];`,
+                '',
+            ];
+
+            for (const h of headers) {
+                lines.push(`        [request setValue:@"${h.value.replace(/"/g, '\\"')}" forHTTPHeaderField:@"${h.key}"];`);
+            }
+            if (headers.length > 0) lines.push('');
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`        NSString *body = @"${escaped}";`);
+                lines.push('        [request setHTTPBody:[body dataUsingEncoding:NSUTF8StringEncoding]];');
+            }
+            lines.push('');
+            lines.push('        NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request');
+            lines.push('            completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {');
+            lines.push('            if (error) { NSLog(@"Error: %@", error); return; }');
+            lines.push('            NSLog(@"Response: %@", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);');
+            lines.push('        }];');
+            lines.push('        [task resume];');
+            lines.push('        [[NSRunLoop mainRunLoop] run];');
+            lines.push('    }');
+            lines.push('    return 0;');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── OCaml (CoHTTP) ───────────────────────────────────────────
+        function genOCaml(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '(* opam install cohttp cohttp-lwt-unix *)',
+                'open Cohttp',
+                'open Cohttp_lwt_unix',
+                '',
+                'let () =',
+                '  let headers = Header.init ()',
+            ];
+
+            for (const h of headers) {
+                lines.push(`    |> fun h -> Header.add h "${h.key}" "${h.value.replace(/"/g, '\\"')}"`);
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`  in`);
+                lines.push(`  let body = Body.of_string "${escaped}" in`);
+            } else {
+                lines.push('  in');
+            }
+
+            const codeMethod = method.toUpperCase();
+            lines.push(`  Client.call ${codeMethod} (Uri.of_string "${url.replace(/"/g, '\\"')}")`);
+            if (bodyContent !== null) lines.push('    ~body');
+            lines.push('  >>= fun (resp, body) ->');
+            lines.push('  Body.to_string body >>= fun body_str ->');
+            lines.push('  let code = Code.code_of_status (Response.status resp) in');
+            lines.push('  Printf.printf "Status: %d\\n" code;');
+            lines.push('  Printf.printf "Body: %s\\n" body_str;');
+            lines.push('  Lwt.return ()');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── PHP (cURL) ───────────────────────────────────────────────
+        function genPhpCurl(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '<?php',
+                '$ch = curl_init();',
+                '',
+                `curl_setopt($ch, CURLOPT_URL, '${url.replace(/'/g, "\\'")}');`,
+                `curl_setopt($ch, CURLOPT_CUSTOMREQUEST, '${method}');`,
+                'curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);',
+            ];
+
+            if (headers.length > 0) {
+                const headerArr = headers.map(h => `'${h.key}: ${h.value.replace(/'/g, "\\'")}'`);
+                lines.push(`curl_setopt($ch, CURLOPT_HTTPHEADER, [${headerArr.join(', ')}]);`);
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                lines.push(`curl_setopt($ch, CURLOPT_POSTFIELDS, '${escaped}');`);
+            }
+
+            lines.push('');
+            lines.push('$response = curl_exec($ch);');
+            lines.push('$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);');
+            lines.push('curl_close($ch);');
+            lines.push('');
+            lines.push('echo $httpCode . "\\n";');
+            lines.push('echo $response;');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── PHP (HTTP v1) ────────────────────────────────────────────
+        function genPhpHttpV1(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '<?php',
+                '// Requires pecl/http v1',
+                '',
+                '$request = new HttpRequest();',
+                `$request->setUrl('${url.replace(/'/g, "\\'")}');`,
+                `$request->setMethod(HTTP_METH_${method.toUpperCase()});`,
+            ];
+
+            if (headers.length > 0) {
+                const headerArr = headers.map(h => `'${h.key}' => '${h.value.replace(/'/g, "\\'")}'`);
+                lines.push(`$request->setHeaders([${headerArr.join(', ')}]);`);
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                lines.push(`$request->setBody('${escaped}');`);
+            }
+
+            lines.push('');
+            lines.push('try {');
+            lines.push('  $response = $request->send();');
+            lines.push('  echo $response->getResponseCode() . "\\n";');
+            lines.push('  echo $response->getBody();');
+            lines.push('} catch (HttpException $ex) {');
+            lines.push('  echo $ex;');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── PHP (HTTP v2 / pecl/http) ────────────────────────────────
+        function genPhpHttpV2(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const escUrl = url.replace(/'/g, "\\'");
+            let lines = [
+                '<?php',
+                '// Requires pecl/http v2 (ext-http)',
+                '',
+                `$client = new http\\Client;`,
+                `$request = new http\\Client\\Request;`,
+                '',
+                `$request->setRequestMethod('${method}');`,
+                `$request->setRequestUrl('${escUrl}');`,
+            ];
+
+            if (headers.length > 0) {
+                lines.push('');
+                lines.push('$request->setHeaders([');
+                for (const h of headers) {
+                    const k = h.key.replace(/'/g, "\\'");
+                    const v = h.value.replace(/'/g, "\\'");
+                    lines.push(`  '${k}' => '${v}',`);
+                }
+                lines.push(']);');
+            }
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                lines.push('');
+                lines.push('$body = new http\\Message\\Body;');
+                lines.push(`$body->append('${escaped}');`);
+                lines.push('$request->setBody($body);');
+            }
+
+            lines.push('');
+            lines.push('$client->enqueue($request)->send();');
+            lines.push('$response = $client->getResponse();');
+            lines.push('');
+            lines.push('echo $response->getStatus() . "\\n";');
+            lines.push('echo $response->getBody()->toString();');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── PowerShell (Invoke-WebRequest) ──────────────────────────
+        function genPowerShellWebRequest(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [];
+
+            if (headers.length > 0) {
+                lines.push('$headers = @{');
+                for (const h of headers) {
+                    lines.push(`    "${h.key}" = "${h.value.replace(/"/g, '`"')}"`);
+                }
+                lines.push('}');
+                lines.push('');
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    lines.push('$body = @"');
+                    lines.push(bodyContent);
+                    lines.push('"@');
+                } else {
+                    const escaped = bodyContent.replace(/"/g, '`"');
+                    lines.push(`$body = "${escaped}"`);
+                }
+                lines.push('');
+            }
+
+            const parts = [`-Uri "${url}"`, `-Method "${method}"`];
+            if (headers.length > 0) parts.push('-Headers $headers');
+            if (bodyContent !== null) parts.push('-Body $body');
+            if (bodyMode === 'raw' && bodyData.language === 'json') parts.push('-ContentType "application/json"');
+            parts.push('-UseBasicParsing');
+
+            lines.push(`$response = Invoke-WebRequest ${parts.join(' ')}`);
+            lines.push('$response.StatusCode');
+            lines.push('$response.Content');
             return lines.join('\n') + '\n';
         }
 

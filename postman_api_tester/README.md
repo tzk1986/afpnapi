@@ -5,7 +5,7 @@
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
 本版新增重点（v1.15.0）：
-- **代码片段生成（14 种语言）**：编辑器 Tab 栏新增复制图标按钮，支持 cURL/HTTPie/Wget/Python(Requests+http.client)/JS(fetch+axios)/Java(OkHttp)/Go/R(httr)/Ruby/PowerShell/Swift/HTTP 报文，按语言家族分组下拉。
+- **代码片段生成（39 种语言/格式）**：编辑器 Tab 栏新增复制图标按钮，支持 Shell(cURL/HTTPie/Wget)、Python(Requests/http.client)、JavaScript(fetch/Axios/jQuery/XHR)、Node.js(Fetch/Axios/HTTP/Request/Unirest)、Java(OkHttp/java.net.http/Unirest/AsyncHttp)、Go、C#(HttpClient/RestSharp)、C(Libcurl)、PHP(cURL/HTTP v1/v2)、Ruby、R(httr)、Kotlin(OkHttp)、Swift、Objective-C、Clojure、OCaml、PowerShell、Raw/HTTP、HTTPie CLI/Desktop、HAR，按语言家族分组缩进下拉。
 - **响应格式化（5 种格式）**：Response 面板新增格式下拉（Raw/JSON/YAML/XML/HTML），即时切换，复制按钮同步格式输出。
 - **请求预览**：Body Tab 新增 Code/Preview 切换，Preview 展示完整 HTTP 请求报文（URL/Header/Body 均替换为实际变量值），可一键关闭。
 
