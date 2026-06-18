@@ -8,7 +8,10 @@ from typing import Any, Dict
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    get_report_or_error,
+    json_error as _json_error,
+)
 from postman_api_tester.services.report_manual_case_service import (
     add_manual_case as _svc_add_manual_case,
     delete_manual_case as _svc_delete_manual_case,
@@ -68,18 +71,17 @@ def api_reports() -> ResponseReturnValue:
 
 def api_report_detail(report_name: str) -> ResponseReturnValue:
     """报告元数据详情 API。错误码：RPT_META_001"""
-    try:
-        return jsonify(build_report_meta_payload(_repo_find_report(report_name)))
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_META_001")
+    report = get_report_or_error(report_name, "RPT_META_001")
+    if isinstance(report, tuple):
+        return report
+    return jsonify(build_report_meta_payload(report))
 
 
 def api_manual_cases(report_name: str) -> ResponseReturnValue:
     """人工用例列表 API。错误码：RPT_META_002"""
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_META_002")
+    report = get_report_or_error(report_name, "RPT_META_002")
+    if isinstance(report, tuple):
+        return report
 
     payload = build_manual_cases_payload(
         report_name=report_name,

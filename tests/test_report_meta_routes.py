@@ -45,7 +45,7 @@ class TestApiReportDetail:
     def test_report_not_found(self, app_context: None) -> None:
         """报告不存在返回 404。"""
         with patch(
-            "postman_api_tester.handlers.report_meta_routes._repo_find_report"
+            "postman_api_tester.report_repository.find_report"
         ) as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_report_detail("missing")
@@ -59,7 +59,7 @@ class TestApiManualCases:
     def test_report_not_found(self, app_context: None) -> None:
         """报告不存在返回 404。"""
         with patch(
-            "postman_api_tester.handlers.report_meta_routes._repo_find_report"
+            "postman_api_tester.report_repository.find_report"
         ) as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_manual_cases("missing")

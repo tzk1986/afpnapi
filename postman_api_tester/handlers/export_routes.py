@@ -7,9 +7,11 @@ from pathlib import Path
 from flask import make_response
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    get_report_or_error,
+    json_error as _json_error,
+)
 from postman_api_tester.report_server_config import ENABLE_JUNIT_EXPORT
-from postman_api_tester.report_repository import find_report as _repo_find_report
 from postman_api_tester.services.report_junit_service import build_junit_xml as _svc_build_junit_xml
 
 logger = logging.getLogger(__name__)
@@ -20,10 +22,9 @@ def api_export_junit(report_name: str) -> ResponseReturnValue:
     if not ENABLE_JUNIT_EXPORT:
         return _json_error("当前环境未启用 JUnit XML 导出能力。", 403, "COL_JUNIT_001")
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "COL_JUNIT_002")
+    report = get_report_or_error(report_name, "COL_JUNIT_002")
+    if isinstance(report, tuple):
+        return report
 
     try:
         xml_content = _svc_build_junit_xml(report)

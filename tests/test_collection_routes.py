@@ -128,7 +128,7 @@ class TestApiExportCollection:
         data = resp.get_json()
         assert data["error_code"] == "COL_EXPORT_001"
 
-    @patch("postman_api_tester.handlers.collection_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found_returns_col_export_002(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404 + COL_EXPORT_002。"""
         _register_routes(app)
@@ -141,7 +141,7 @@ class TestApiExportCollection:
         data = resp.get_json()
         assert data["error_code"] == "COL_EXPORT_002"
 
-    @patch("postman_api_tester.handlers.collection_routes._repo_find_report", return_value=MagicMock())
+    @patch("postman_api_tester.report_repository.find_report", return_value=MagicMock())
     @patch(
         "postman_api_tester.handlers.collection_routes._svc_export_collection_with_latest_params",
         side_effect=ValueError("export failed"),
@@ -160,7 +160,7 @@ class TestApiExportCollection:
         data = resp.get_json()
         assert data["error_code"] == "COL_EXPORT_003"
 
-    @patch("postman_api_tester.handlers.collection_routes._repo_find_report", return_value=MagicMock())
+    @patch("postman_api_tester.report_repository.find_report", return_value=MagicMock())
     @patch(
         "postman_api_tester.handlers.collection_routes._svc_export_collection_with_latest_params",
         return_value={
@@ -199,7 +199,7 @@ class TestApiExportCollectionStream:
         data = resp.get_json()
         assert data["error_code"] == "COL_EXPORT_001"
 
-    @patch("postman_api_tester.handlers.collection_routes._repo_find_report", side_effect=FileNotFoundError())
+    @patch("postman_api_tester.report_repository.find_report", side_effect=FileNotFoundError())
     def test_report_not_found_returns_col_export_002(self, mock_find: MagicMock, app: Flask) -> None:
         """报告不存在返回 404 + COL_EXPORT_002。"""
         _register_routes(app)
@@ -212,7 +212,7 @@ class TestApiExportCollectionStream:
         data = resp.get_json()
         assert data["error_code"] == "COL_EXPORT_002"
 
-    @patch("postman_api_tester.handlers.collection_routes._repo_find_report", return_value=MagicMock())
+    @patch("postman_api_tester.report_repository.find_report", return_value=MagicMock())
     @patch(
         "postman_api_tester.handlers.collection_routes._svc_export_collection_with_latest_params",
         side_effect=ValueError("export failed"),

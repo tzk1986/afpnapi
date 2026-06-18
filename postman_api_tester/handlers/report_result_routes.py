@@ -22,7 +22,7 @@ from postman_api_tester.report_server_config import (
     REPORT_VIEW_PAGE_SIZE_MAX,
     REPORT_VIEW_PAGE_SIZE_MIN,
 )
-from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.handlers.base_handler import BaseHandler, get_report_or_error
 from postman_api_tester.handlers.report_handler import (
     normalize_status_filter as _normalize_status_filter,
 )
@@ -35,7 +35,6 @@ from postman_api_tester.utils.analytics_utils import (
     parse_histogram_buckets as _parse_histogram_buckets,
 )
 from postman_api_tester.report_repository import (
-    find_report as _repo_find_report,
     list_reports as _repo_list_reports,
 )
 from postman_api_tester.report_server_utils import to_bool as _to_bool
@@ -50,11 +49,9 @@ from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page
 
 def api_report_results(report_name: str) -> ResponseReturnValue:
     """报告结果列表（分页+筛选）API。"""
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {report_name}"), 404)
+    report = get_report_or_error(report_name, "")
+    if isinstance(report, tuple):
+        return report
 
     page = _clamp_page(request.args.get("page", 1))
     page_size = _clamp_page_size(
@@ -87,11 +84,9 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
         from postman_api_tester.exceptions import ValidationError
         return BaseHandler.error_response(ValidationError("当前环境未启用测试结果分析能力。"), 403)
 
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {report_name}"), 404)
+    report = get_report_or_error(report_name, "")
+    if isinstance(report, tuple):
+        return report
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -131,12 +126,12 @@ def api_report_analytics_compare() -> ResponseReturnValue:
         from postman_api_tester.exceptions import ValidationError
         return BaseHandler.error_response(ValidationError("left 和 right 参数不能为空"), 400)
 
-    try:
-        left_report = _repo_find_report(left_name)
-        right_report = _repo_find_report(right_name)
-    except FileNotFoundError as exc:
-        from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {exc}"), 404)
+    left_report = get_report_or_error(left_name, "")
+    if isinstance(left_report, tuple):
+        return left_report
+    right_report = get_report_or_error(right_name, "")
+    if isinstance(right_report, tuple):
+        return right_report
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -167,11 +162,9 @@ def api_report_analytics_compare() -> ResponseReturnValue:
 
 def api_report_result_detail(report_name: str, result_index: int) -> ResponseReturnValue:
     """单条结果详情 API。"""
-    try:
-        report = _repo_find_report(report_name)
-    except FileNotFoundError:
-        from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {report_name}"), 404)
+    report = get_report_or_error(report_name, "")
+    if isinstance(report, tuple):
+        return report
 
     try:
         return jsonify(build_result_detail_payload(report, result_index))
@@ -187,10 +180,10 @@ def api_compare() -> ResponseReturnValue:
     if not left_name or not right_name:
         from postman_api_tester.exceptions import ValidationError
         return BaseHandler.error_response(ValidationError("left 和 right 参数不能为空"), 400)
-    try:
-        left = _repo_find_report(left_name)
-        right = _repo_find_report(right_name)
-    except FileNotFoundError as exc:
-        from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {exc}"), 404)
+    left = get_report_or_error(left_name, "")
+    if isinstance(left, tuple):
+        return left
+    right = get_report_or_error(right_name, "")
+    if isinstance(right, tuple):
+        return right
     return jsonify(build_compare_payload(left, right))

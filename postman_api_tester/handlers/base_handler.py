@@ -5,7 +5,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Optional, Type, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 from flask import jsonify
 from flask.typing import ResponseReturnValue
 from postman_api_tester.exceptions import PostmanTestException, ValidationError
@@ -113,3 +113,31 @@ def json_error(message: str, status_code: int, error_code: str = "") -> Response
     - COM_ = 通用错误
     """
     return BaseHandler.error_response(ValidationError(message), status_code, error_code)
+
+
+def get_report_or_error(
+    report_name: str,
+    error_code: str,
+    find_report: Optional[Callable[[str], Dict[str, Any]]] = None,
+) -> Any:
+    """查找报告，不存在时返回 JSON 错误响应。
+
+    消除各路由文件中重复的 ``_repo_find_report + FileNotFoundError`` 模式。
+    调用方应检查返回值是否为 tuple（Flask 响应），是则直接 return。
+
+    Args:
+        report_name: 报告名称
+        error_code: 应用级错误码，如 COL_EXPORT_002
+        find_report: 查找函数，默认使用 report_repository.find_report
+
+    Returns:
+        报告 dict（成功时），或 Flask 错误响应（失败时）
+    """
+    finder = find_report
+    if finder is None:
+        from postman_api_tester.report_repository import find_report as _default_finder
+        finder = _default_finder
+    try:
+        return finder(report_name)
+    except FileNotFoundError:
+        return json_error(f"报告不存在：{report_name}", 404, error_code)

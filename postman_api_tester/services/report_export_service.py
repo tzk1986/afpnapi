@@ -98,6 +98,20 @@ def _apply_request_details_to_collection(
     return updated_count, skipped_count, warnings
 
 
+def _build_export_filename(
+    report: Dict[str, Any],
+    source_path: Path,
+    scope: str,
+) -> str:
+    """生成导出文件名：{stem}_{latest|report_only}_{timestamp}.json。"""
+    preferred_name = report.get("source_original_file") or source_path.name
+    source_name = sanitize_export_name(preferred_name)
+    stem = Path(source_name).stem
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    suffix = "latest" if scope == "full" else "report_only"
+    return f"{stem}_{suffix}_{timestamp}.json"
+
+
 def _apply_scope_pruning(
     collection_data: Dict[str, Any],
     scope: str,
@@ -192,12 +206,7 @@ def export_collection_with_latest_params(
     removed_excluded_count = remove_excluded_items(final_collection, manual_exclusions)
 
     exports_dir.mkdir(parents=True, exist_ok=True)
-    preferred_name = report.get("source_original_file") or source_path.name
-    source_name = sanitize_export_name(preferred_name)
-    stem = Path(source_name).stem
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    suffix = "latest" if scope == "full" else "report_only"
-    export_name = f"{stem}_{suffix}_{timestamp}.json"
+    export_name = _build_export_filename(report, source_path, scope)
     export_path = exports_dir / export_name
 
     with export_path.open("w", encoding="utf-8") as file:
