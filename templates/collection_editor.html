@@ -1108,6 +1108,9 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
                         <div class="copy-snippet-menu" id="snippetMenu" style="max-height:70vh;overflow-y:auto;">
+                            <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('har')"><span class="copy-snippet-lang">HAR</span><span class="copy-snippet-desc">HTTP Archive</span></div>
+                            <div class="copy-snippet-sep"></div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">C</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('c_libcurl')"><span class="copy-snippet-lang">Libcurl</span><span class="copy-snippet-desc">C 语言</span></div>
@@ -1120,10 +1123,6 @@
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Clojure</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('clojure')"><span class="copy-snippet-lang">clj-http</span><span class="copy-snippet-desc">Clojure</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Data</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('har')"><span class="copy-snippet-lang">HAR</span><span class="copy-snippet-desc">HTTP Archive</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Go</div>
@@ -1199,7 +1198,6 @@
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Shell</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
                             </div>
