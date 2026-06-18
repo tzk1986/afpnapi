@@ -149,13 +149,13 @@
         .var-autocomplete::-webkit-scrollbar-track { background: transparent; }
         .var-autocomplete::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .var-autocomplete::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .var-ac-item { padding: 7px 12px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .var-ac-item { padding: 8px 14px; cursor: pointer; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .var-ac-item:hover, .var-ac-item.active { background: #eff6ff; }
         .var-ac-name { font-family: Consolas, monospace; color: #1d4ed8; font-weight: 600; }
         .var-ac-fn { font-family: Consolas, monospace; color: #7c3aed; font-weight: 600; }
         .var-ac-fn-prefix { color: #a78bfa; font-weight: 700; margin-right: 2px; font-style: italic; }
-        .var-ac-value { color: #64748b; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
-        .var-ac-source { font-size: 10px; color: #94a3b8; padding: 1px 5px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; }
+        .var-ac-value { color: #64748b; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+        .var-ac-source { font-size: 11px; color: #94a3b8; padding: 2px 7px; background: #f1f5f9; border-radius: 3px; flex-shrink: 0; white-space: nowrap; }
         .var-ac-source-effective { color: #059669; font-weight: 700; }
         .var-ac-override { font-size: 9px; color: #92400e; padding: 0 4px; margin-left: 4px; background: #fef3c7; border-radius: 3px; flex-shrink: 0; white-space: nowrap; }
         .var-ac-override-line { font-size: 10px; color: #78350f; padding: 0 12px 4px; line-height: 1.3; white-space: nowrap; overflow-x: auto; }
@@ -206,6 +206,60 @@
         /* Import textarea */
         .import-textarea { width: 100%; min-height: 140px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: Consolas, monospace; font-size: 12px; resize: vertical; }
         .import-preview { margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 12px; max-height: 300px; overflow-y: auto; }
+
+        /* Copy Snippet Button & Dropdown */
+        .copy-snippet-wrap { position: relative; display: inline-block; }
+        .copy-snippet-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #64748b; cursor: pointer; padding: 0; transition: all 0.15s; }
+        .copy-snippet-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+        .copy-snippet-btn svg { width: 16px; height: 16px; }
+        .copy-snippet-menu { display: none; position: absolute; top: 100%; right: 0; z-index: 600; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 200px; padding: 4px 0; margin-top: 4px; }
+        .copy-snippet-menu.visible { display: block; }
+        .copy-snippet-item { padding: 8px 14px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; color: #334155; }
+        .copy-snippet-item:hover { background: #eff6ff; }
+        .copy-snippet-lang { font-weight: 600; min-width: 100px; }
+        .copy-snippet-desc { font-size: 11px; color: #94a3b8; }
+        .copy-snippet-sep { height: 1px; background: #e2e8f0; margin: 4px 0; }
+
+        /* Response Copy Button */
+        .resp-copy-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #94a3b8; cursor: pointer; padding: 0; transition: all 0.15s; margin-left: 8px; }
+        .resp-copy-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+        .resp-copy-btn svg { width: 14px; height: 14px; }
+
+        /* Toast Notification */
+        .toast-container { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); z-index: 9999; pointer-events: none; }
+        .toast-msg { background: #1e293b; color: #fff; padding: 10px 24px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity 0.3s, transform 0.3s; transform: translateY(8px); white-space: nowrap; }
+        .toast-msg.visible { opacity: 1; transform: translateY(0); }
+
+        /* Code Preview Modal */
+        .code-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2000; justify-content: center; align-items: center; }
+        .code-modal-overlay.visible { display: flex; }
+        .code-modal-box { background: #fff; border-radius: 12px; width: 700px; max-width: 90vw; max-height: 80vh; box-shadow: 0 8px 32px rgba(0,0,0,0.18); display: flex; flex-direction: column; }
+        .code-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
+        .code-modal-header h2 { font-size: 15px; color: #0f172a; margin: 0; }
+        .code-modal-close { background: none; border: none; cursor: pointer; color: #64748b; font-size: 18px; padding: 4px 8px; border-radius: 4px; }
+        .code-modal-close:hover { background: #f1f5f9; }
+        .code-modal-body { padding: 0; overflow: auto; flex: 1; }
+        .code-modal-body pre { margin: 0; padding: 20px; font-family: "Cascadia Code", Consolas, monospace; font-size: 13px; line-height: 1.6; background: #f8fafc; white-space: pre; overflow-x: auto; tab-size: 4; }
+        .code-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 12px 20px; border-top: 1px solid #e2e8f0; }
+
+        /* Preview Toggle Buttons */
+        .preview-toggle { display: flex; gap: 2px; background: #f1f5f9; border-radius: 6px; padding: 2px; }
+        .preview-toggle-btn { padding: 5px 12px; border: none; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; border-radius: 5px; transition: all 0.15s; }
+        .preview-toggle-btn.active { background: #fff; color: #1d4ed8; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .preview-toggle-btn:hover:not(.active) { color: #334155; }
+        .preview-toggle-btn svg { width: 14px; height: 14px; vertical-align: middle; }
+
+        /* Preview Panel */
+        .preview-panel { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; }
+        .preview-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #64748b; font-weight: 600; }
+        .preview-panel-close { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 16px; padding: 0 4px; line-height: 1; }
+        .preview-panel-close:hover { color: #dc2626; }
+        .preview-panel-body { padding: 14px; font-family: "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.7; background: #f8fafc; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+        .preview-panel-body .pp-method { font-weight: 700; }
+        .preview-panel-body .pp-url { color: #1d4ed8; }
+        .preview-panel-body .pp-header-key { color: #8b5cf6; font-weight: 600; }
+        .preview-panel-body .pp-header-val { color: #16a34a; }
+        .preview-panel-body .pp-body { color: #334155; margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
     </style>
 </head>
 <body>
@@ -436,6 +490,8 @@
             editBuffer: null,
             lastResponse: null,
             lastResponseTab: 'body',
+            responseFormat: 'json',
+            previewMode: false,
             selectedIds: new Set(),
             runtimeVars: {},
             activeTab: 'general',
@@ -1043,7 +1099,38 @@
 
             const container = document.getElementById('editorContent');
             container.innerHTML = `
-                <div class="editor-tabs">${tabsHtml}</div>
+                <div class="editor-tabs" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;gap:4px;">${tabsHtml}</div>
+                    <div class="copy-snippet-wrap">
+                        <button type="button" class="copy-snippet-btn" onclick="toggleSnippetMenu(event)" title="复制为代码片段">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </button>
+                        <div class="copy-snippet-menu" id="snippetMenu">
+                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">Shell</div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
+                            <div class="copy-snippet-sep"></div>
+                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">Python</div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('python')"><span class="copy-snippet-lang">Requests</span><span class="copy-snippet-desc">requests 库</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('python_http')"><span class="copy-snippet-lang">http.client</span><span class="copy-snippet-desc">标准库</span></div>
+                            <div class="copy-snippet-sep"></div>
+                            <div class="copy-snippet-item" style="font-size:11px;color:#94a3b8;cursor:default;font-weight:600;padding:4px 14px;">JavaScript</div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('javascript_fetch')"><span class="copy-snippet-lang">fetch</span><span class="copy-snippet-desc">浏览器原生</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('javascript_axios')"><span class="copy-snippet-lang">axios</span><span class="copy-snippet-desc">HTTP 客户端</span></div>
+                            <div class="copy-snippet-sep"></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('java_okhttp')"><span class="copy-snippet-lang">Java</span><span class="copy-snippet-desc">OkHttp</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('go')"><span class="copy-snippet-lang">Go</span><span class="copy-snippet-desc">net/http</span></div>
+                            <div class="copy-snippet-sep"></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('r_httr')"><span class="copy-snippet-lang">R</span><span class="copy-snippet-desc">httr</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">Ruby</span><span class="copy-snippet-desc">net::http</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('powershell')"><span class="copy-snippet-lang">PowerShell</span><span class="copy-snippet-desc">Invoke-RestMethod</span></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('swift')"><span class="copy-snippet-lang">Swift</span><span class="copy-snippet-desc">URLSession</span></div>
+                            <div class="copy-snippet-sep"></div>
+                            <div class="copy-snippet-item" onclick="showCodePreview('http')"><span class="copy-snippet-lang">HTTP</span><span class="copy-snippet-desc">原始报文</span></div>
+                        </div>
+                    </div>
+                </div>
                 <div id="tabContent">${renderTabContent(tab, req)}</div>
             `;
         }
@@ -1143,15 +1230,36 @@
                     <textarea rows="3" onchange="updateGraphqlField('variables', this.value)">${escapeHtml(bodyData.variables || '')}</textarea>`;
             }
 
-            return `
-                <div class="field">
-                    <label>Body 模式</label>
-                    <select onchange="updateBodyMode(this.value)">
-                        ${modes.map(m => `<option value="${m}" ${req.body_mode === m ? 'selected' : ''}>${m}</option>`).join('')}
-                    </select>
+            const previewMode = state.previewMode || false;
+            const previewBtns = `
+                <div class="preview-toggle">
+                    <button type="button" class="preview-toggle-btn ${!previewMode ? 'active' : ''}" onclick="togglePreview(false)" title="编辑模式">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        Code
+                    </button>
+                    <button type="button" class="preview-toggle-btn ${previewMode ? 'active' : ''}" onclick="togglePreview(true)" title="预览请求报文">Preview</button>
                 </div>
-                ${req.body_mode !== 'none' ? `<div class="field"><label>内容</label>${content}</div>` : ''}
             `;
+
+            let bodyHtml = `
+                <div class="field" style="display:flex;justify-content:space-between;align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label>Body 模式</label>
+                        <select onchange="updateBodyMode(this.value)">
+                            ${modes.map(m => `<option value="${m}" ${req.body_mode === m ? 'selected' : ''}>${m}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="flex-shrink:0;margin-left:12px;">${previewBtns}</div>
+                </div>
+            `;
+
+            if (previewMode) {
+                bodyHtml += renderRequestPreview(req);
+            } else {
+                bodyHtml += req.body_mode !== 'none' ? `<div class="field"><label>内容</label>${content}</div>` : '';
+            }
+
+            return bodyHtml;
         }
 
         // x_extract Tab
@@ -1833,12 +1941,18 @@
             const sizeStr = bodySize > 1024 ? (bodySize / 1024).toFixed(1) + ' KB' : bodySize + ' B';
 
             const tab = state.lastResponseTab || 'body';
+            const fmt = state.responseFormat || 'json';
             let bodyHtml = '';
             if (tab === 'body') {
-                bodyHtml = renderResponseBody(data.response_body);
+                bodyHtml = renderResponseBody(data.response_body, fmt);
             } else {
                 bodyHtml = renderResponseHeaders(data.response_headers || {});
             }
+
+            const fmtOptions = ['raw', 'json', 'yaml', 'xml', 'html'];
+            const fmtSelect = fmtOptions.map(f =>
+                `<option value="${f}" ${f === fmt ? 'selected' : ''}>${f.toUpperCase()}</option>`
+            ).join('');
 
             document.getElementById('responseContent').innerHTML = `
                 <div class="response-summary">
@@ -1847,9 +1961,19 @@
                     <span class="response-meta">${data.elapsed_ms}ms  ·  ${sizeStr}</span>
                     ${data.actual_request_url ? `<span class="response-meta" title="${escapeAttr(data.actual_request_url)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(data.actual_request_url)}</span>` : ''}
                 </div>
-                <div class="resp-tabs">
-                    <button type="button" class="resp-tab ${tab === 'body' ? 'active' : ''}" onclick="switchResponseTab('body')">Body</button>
-                    <button type="button" class="resp-tab ${tab === 'headers' ? 'active' : ''}" onclick="switchResponseTab('headers')">Headers</button>
+                <div class="resp-tabs" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;gap:4px;align-items:center;">
+                        <button type="button" class="resp-tab ${tab === 'body' ? 'active' : ''}" onclick="switchResponseTab('body')">Body</button>
+                        <button type="button" class="resp-tab ${tab === 'headers' ? 'active' : ''}" onclick="switchResponseTab('headers')">Headers</button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <select id="respFormatSelect" onchange="switchResponseFormat(this.value)" style="padding:3px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;color:#64748b;background:#fff;cursor:pointer;">
+                            ${fmtSelect}
+                        </select>
+                        <button type="button" class="resp-copy-btn" onclick="copyResponseContent()" title="复制响应内容">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        </button>
+                    </div>
                 </div>
                 ${bodyHtml}
             `;
@@ -1860,19 +1984,219 @@
             renderResponseContent();
         }
 
-        // Render Response Body
-        function renderResponseBody(body) {
+        function switchResponseFormat(fmt) {
+            state.responseFormat = fmt;
+            renderResponseContent();
+        }
+
+        // ── Request Preview ──────────────────────────────────────────
+        function substituteVars(text) {
+            if (!text || typeof text !== 'string') return text;
+            const vars = { ...getMergedGlobalVars(), ...state.runtimeVars };
+            return text.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+                return vars.hasOwnProperty(key) ? String(vars[key]) : match;
+            });
+        }
+
+        function togglePreview(on) {
+            state.previewMode = on;
+            renderEditor();
+        }
+
+        function renderRequestPreview(req) {
+            const method = (req.method || 'GET').toUpperCase();
+            const url = substituteVars(req.url || '');
+            const headers = (req.headers || []).filter(h => h.key).map(h => ({ key: h.key, value: substituteVars(h.value) }));
+            const params = (req.params || []).filter(p => p.key).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
+            const bodyMode = req.body_mode || 'none';
+            const bodyData = req.body_data || {};
+
+            // Resolve full URL
+            let fullUrl = url;
+            if (params.length > 0 && !url.includes('?')) {
+                const qs = params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+                fullUrl = url + '?' + qs;
+            }
+
+            // Parse URL for path + host
+            let parsedUrl;
+            try { parsedUrl = new URL(fullUrl); } catch (e) { parsedUrl = null; }
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : fullUrl;
+            const host = parsedUrl ? parsedUrl.host : '';
+
+            // Resolve body
+            let bodyContent = null;
+            let bodyContentType = null;
+            if (bodyMode === 'raw') {
+                bodyContent = substituteVars(bodyData.content || '');
+                bodyContentType = bodyData.language === 'json' ? 'application/json' : 'text/plain';
+            } else if (bodyMode === 'urlencoded') {
+                const pairs = (bodyData.data || []).filter(d => d.key);
+                bodyContent = pairs.map(d => `${encodeURIComponent(substituteVars(d.key))}=${encodeURIComponent(substituteVars(d.value))}`).join('&');
+                bodyContentType = 'application/x-www-form-urlencoded';
+            } else if (bodyMode === 'graphql') {
+                const gqlBody = { query: substituteVars(bodyData.query || ''), variables: tryParseJson(substituteVars(bodyData.variables || '{}')) };
+                bodyContent = JSON.stringify(gqlBody, null, 2);
+                bodyContentType = 'application/json';
+            }
+
+            // Auto Content-Type
+            const headerKeys = new Set(headers.map(h => h.key.toLowerCase()));
+            const allHeaders = [...headers];
+            if (bodyContent !== null && !headerKeys.has('content-type') && bodyContentType) {
+                allHeaders.unshift({ key: 'Content-Type', value: bodyContentType });
+            }
+
+            // Build preview HTML
+            let html = `<div class="preview-panel">`;
+            html += `<div class="preview-panel-header"><span>Request Preview</span>`;
+            html += `<button type="button" class="preview-panel-close" onclick="togglePreview(false)" title="关闭预览">&times;</button>`;
+            html += `</div>`;
+            html += `<div class="preview-panel-body">`;
+            html += `<span class="pp-method">${escapeHtml(method)}</span> <span class="pp-url">${escapeHtml(path)}</span> <span style="color:#94a3b8;">HTTP/1.1</span>\n`;
+            if (host) html += `<span class="pp-header-key">Host</span>: <span class="pp-header-val">${escapeHtml(host)}</span>\n`;
+            for (const h of allHeaders) {
+                html += `<span class="pp-header-key">${escapeHtml(h.key)}</span>: <span class="pp-header-val">${escapeHtml(h.value)}</span>\n`;
+            }
+            if (bodyContent !== null) {
+                html += `\n<span class="pp-body">`;
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    try {
+                        const formatted = JSON.stringify(JSON.parse(bodyContent), null, 2);
+                        html += escapeHtml(formatted);
+                    } catch (e) {
+                        html += escapeHtml(bodyContent);
+                    }
+                } else {
+                    html += escapeHtml(bodyContent);
+                }
+                html += `</span>`;
+            }
+            html += `</div></div>`;
+            return html;
+        }
+
+        // Render Response Body (multi-format)
+        function renderResponseBody(body, fmt) {
             if (body === null || body === undefined) {
                 return '<div class="json-tree" style="color:#94a3b8;">(empty body)</div>';
             }
+
+            let jsonObj = body;
             if (typeof body === 'string') {
-                try {
-                    body = JSON.parse(body);
-                } catch (e) {
-                    return `<div class="json-tree">${escapeHtml(body)}</div>`;
-                }
+                try { jsonObj = JSON.parse(body); } catch (e) { jsonObj = body; }
             }
-            return `<div class="json-tree">${renderJsonNode(body, '$', true)}</div>`;
+
+            const format = fmt || 'json';
+
+            if (format === 'raw') {
+                const raw = typeof body === 'string' ? body : JSON.stringify(body);
+                return `<div class="json-tree">${escapeHtml(raw)}</div>`;
+            }
+
+            if (format === 'json') {
+                if (typeof jsonObj === 'object' && jsonObj !== null) {
+                    return `<div class="json-tree">${renderJsonNode(jsonObj, '$', true)}</div>`;
+                }
+                return `<div class="json-tree">${escapeHtml(JSON.stringify(jsonObj, null, 2))}</div>`;
+            }
+
+            if (format === 'yaml') {
+                const yaml = jsonToYaml(jsonObj);
+                return `<div class="json-tree">${escapeHtml(yaml)}</div>`;
+            }
+
+            if (format === 'xml') {
+                const xml = jsonToXml(jsonObj);
+                return `<div class="json-tree">${escapeHtml(xml)}</div>`;
+            }
+
+            if (format === 'html') {
+                const htmlContent = typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+                return `<iframe srcdoc="${escapeAttr(htmlContent)}" style="width:100%;height:400px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;"></iframe>`;
+            }
+
+            return `<div class="json-tree">${renderJsonNode(jsonObj, '$', true)}</div>`;
+        }
+
+        // JSON → YAML (simple converter)
+        function jsonToYaml(obj, indent) {
+            if (indent === undefined) indent = 0;
+            const pad = '  '.repeat(indent);
+            if (obj === null) return 'null';
+            if (obj === undefined) return '~';
+            if (typeof obj === 'boolean') return obj ? 'true' : 'false';
+            if (typeof obj === 'number') return String(obj);
+            if (typeof obj === 'string') {
+                if (obj.includes('\n') || obj.includes(':') || obj.includes('#') || obj === '') {
+                    return '|' + '\n' + obj.split('\n').map(l => pad + '  ' + l).join('\n');
+                }
+                return obj;
+            }
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                return obj.map(item => {
+                    const val = jsonToYaml(item, indent + 1);
+                    if (typeof item === 'object' && item !== null) {
+                        const lines = val.split('\n');
+                        return pad + '- ' + lines[0].trim() + (lines.length > 1 ? '\n' + lines.slice(1).map(l => pad + '  ' + l).join('\n') : '');
+                    }
+                    return pad + '- ' + val;
+                }).join('\n');
+            }
+            if (typeof obj === 'object') {
+                const keys = Object.keys(obj);
+                if (keys.length === 0) return '{}';
+                return keys.map(k => {
+                    const val = jsonToYaml(obj[k], indent + 1);
+                    if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+                        return pad + k + ':\n' + val.split('\n').map((l, i) => i === 0 ? l : l).join('\n');
+                    }
+                    if (Array.isArray(obj[k])) {
+                        const lines = val.split('\n');
+                        return pad + k + ':\n' + lines.map(l => l).join('\n');
+                    }
+                    return pad + k + ': ' + val;
+                }).join('\n');
+            }
+            return String(obj);
+        }
+
+        // JSON → XML (simple converter)
+        function jsonToXml(obj, rootName, indent) {
+            if (indent === undefined) indent = 0;
+            if (rootName === undefined) rootName = 'root';
+            const pad = '  '.repeat(indent);
+
+            if (obj === null) return `${pad}<${rootName}/>`;
+            if (typeof obj !== 'object' || Array.isArray(obj)) {
+                if (Array.isArray(obj)) {
+                    return obj.map(item => jsonToXml(item, 'item', indent)).join('\n');
+                }
+                const val = escapeXml(String(obj));
+                return `${pad}<${rootName}>${val}</${rootName}>`;
+            }
+
+            const keys = Object.keys(obj);
+            if (keys.length === 0) return `${pad}<${rootName}/>`;
+
+            const children = keys.map(k => {
+                const safeKey = k.replace(/[^a-zA-Z0-9_-]/g, '_');
+                if (typeof obj[k] === 'object' && obj[k] !== null) {
+                    if (Array.isArray(obj[k])) {
+                        return obj[k].map(item => jsonToXml(item, safeKey, indent + 1)).join('\n');
+                    }
+                    return jsonToXml(obj[k], safeKey, indent + 1);
+                }
+                const val = escapeXml(String(obj[k]));
+                return `${pad}  <${safeKey}>${val}</${safeKey}>`;
+            }).join('\n');
+
+            return `${pad}<${rootName}>\n${children}\n${pad}</${rootName}>`;
+        }
+
+        function escapeXml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         // Render JSON node recursively
@@ -3133,6 +3457,668 @@
             }).catch(() => { state.varFunctions = []; });
         }
 
+        // ── Code Snippet Generator ─────────────────────────────────────
+        const SNIPPET_LANGS = {
+            curl: { label: 'cURL', desc: '终端命令' },
+            httpie: { label: 'HTTPie', desc: '简洁格式' },
+            wget: { label: 'Wget', desc: '下载工具' },
+            python: { label: 'Python', desc: 'requests' },
+            python_http: { label: 'Python', desc: 'http.client' },
+            javascript_fetch: { label: 'JavaScript', desc: 'fetch' },
+            javascript_axios: { label: 'JavaScript', desc: 'axios' },
+            java_okhttp: { label: 'Java', desc: 'OkHttp' },
+            go: { label: 'Go', desc: 'net/http' },
+            r_httr: { label: 'R', desc: 'httr' },
+            ruby: { label: 'Ruby', desc: 'net::http' },
+            powershell: { label: 'PowerShell', desc: 'Invoke-RestMethod' },
+            swift: { label: 'Swift', desc: 'URLSession' },
+            http: { label: 'HTTP', desc: '原始报文' },
+        };
+
+        function toggleSnippetMenu(event) {
+            event.stopPropagation();
+            const menu = document.getElementById('snippetMenu');
+            if (menu.classList.contains('visible')) {
+                menu.classList.remove('visible');
+            } else {
+                menu.classList.add('visible');
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('snippetMenu');
+            if (menu && !e.target.closest('.copy-snippet-wrap')) {
+                menu.classList.remove('visible');
+            }
+        });
+
+        function showCodePreview(lang) {
+            if (!state.editBuffer) return;
+            const menu = document.getElementById('snippetMenu');
+            if (menu) menu.classList.remove('visible');
+
+            const code = generateCodeSnippet(state.editBuffer, lang);
+            const langInfo = SNIPPET_LANGS[lang] || { label: lang, desc: '' };
+            document.getElementById('codeModalTitle').textContent = `${langInfo.label} (${langInfo.desc})`;
+            document.getElementById('codeModalContent').textContent = code;
+            document.getElementById('codeModal').classList.add('visible');
+        }
+
+        function closeCodeModal() {
+            document.getElementById('codeModal').classList.remove('visible');
+        }
+
+        function copyCodeModalContent() {
+            const code = document.getElementById('codeModalContent').textContent;
+            copyToClipboard(code);
+            showToast('已复制到剪贴板');
+        }
+
+        function copyResponseContent() {
+            const data = state.lastResponse;
+            if (!data) return;
+            const tab = state.lastResponseTab || 'body';
+            const fmt = state.responseFormat || 'json';
+            let text = '';
+            if (tab === 'body') {
+                const body = data.response_body;
+                let jsonObj = body;
+                if (typeof body === 'string') { try { jsonObj = JSON.parse(body); } catch (e) { jsonObj = body; } }
+                if (fmt === 'yaml') { text = jsonToYaml(jsonObj); }
+                else if (fmt === 'xml') { text = jsonToXml(jsonObj); }
+                else if (fmt === 'raw') { text = typeof body === 'string' ? body : JSON.stringify(body); }
+                else if (typeof jsonObj === 'object' && jsonObj !== null) { text = JSON.stringify(jsonObj, null, 2); }
+                else { text = String(body ?? ''); }
+            } else {
+                const headers = data.response_headers || {};
+                text = Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('\r\n');
+            }
+            copyToClipboard(text);
+            const fmtLabel = fmt.toUpperCase();
+            showToast(`已复制${tab === 'body' ? '响应 Body (' + fmtLabel + ')' : '响应 Headers'}`);
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+
+        function showToast(msg) {
+            const el = document.getElementById('toastMsg');
+            el.textContent = msg;
+            el.classList.add('visible');
+            setTimeout(() => el.classList.remove('visible'), 2200);
+        }
+
+        // ── Code Generation Engine ─────────────────────────────────────
+        function generateCodeSnippet(req, lang) {
+            const method = (req.method || 'GET').toUpperCase();
+            const url = substituteVars(req.url || '');
+            const headers = (req.headers || []).filter(h => h.key).map(h => ({ key: h.key, value: substituteVars(h.value) }));
+            const params = (req.params || []).filter(p => p.key).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
+            const bodyMode = req.body_mode || 'none';
+            const bodyData = req.body_data || {};
+
+            // Build full URL with query params
+            let fullUrl = url;
+            if (params.length > 0 && !url.includes('?')) {
+                const qs = params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+                fullUrl = url + '?' + qs;
+            }
+
+            // Resolve body content
+            let bodyContent = null;
+            let bodyContentType = null;
+            if (bodyMode === 'raw') {
+                bodyContent = substituteVars(bodyData.content || '');
+                bodyContentType = bodyData.language === 'json' ? 'application/json' : 'text/plain';
+            } else if (bodyMode === 'urlencoded') {
+                const pairs = (bodyData.data || []).filter(d => d.key);
+                bodyContent = pairs.map(d => `${encodeURIComponent(substituteVars(d.key))}=${encodeURIComponent(substituteVars(d.value))}`).join('&');
+                bodyContentType = 'application/x-www-form-urlencoded';
+            } else if (bodyMode === 'graphql') {
+                const gqlBody = {
+                    query: substituteVars(bodyData.query || ''),
+                    variables: tryParseJson(substituteVars(bodyData.variables || '{}')),
+                };
+                bodyContent = JSON.stringify(gqlBody, null, 2);
+                bodyContentType = 'application/json';
+            }
+
+            // Auto-add Content-Type header if body present and not already set
+            const headerKeys = new Set(headers.map(h => h.key.toLowerCase()));
+            if (bodyContent !== null && !headerKeys.has('content-type') && bodyContentType) {
+                headers.unshift({ key: 'Content-Type', value: bodyContentType });
+            }
+
+            switch (lang) {
+                case 'curl': return genCurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'httpie': return genHttpie(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'wget': return genWget(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'python': return genPython(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'python_http': return genPythonHttpClient(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_fetch': return genFetch(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'javascript_axios': return genAxios(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'java_okhttp': return genOkHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'go': return genGo(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'r_httr': return genRhttr(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'ruby': return genRuby(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'powershell': return genPowerShell(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'swift': return genSwift(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'http': return genHttp(method, fullUrl, headers, bodyContent);
+                default: return `// Unknown language: ${lang}`;
+            }
+        }
+
+        function tryParseJson(str) {
+            try { return JSON.parse(str); } catch (e) { return str; }
+        }
+
+        function formatJson(obj) {
+            if (typeof obj === 'string') {
+                try { return JSON.stringify(JSON.parse(obj), null, 2); } catch (e) { return obj; }
+            }
+            return JSON.stringify(obj, null, 2);
+        }
+
+        // ── cURL ───────────────────────────────────────────────────────
+        function genCurl(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [`curl -X ${method} '${url}'`];
+            for (const h of headers) {
+                lines.push(`  -H '${h.key}: ${h.value}'`);
+            }
+            if (bodyContent !== null) {
+                if (bodyMode === 'formdata') {
+                    for (const d of (bodyData.data || []).filter(d => d.key)) {
+                        lines.push(`  -F '${d.key}=${d.value}'`);
+                    }
+                } else if (bodyMode === 'urlencoded') {
+                    lines.push(`  --data-urlencode '${bodyContent}'`);
+                } else {
+                    const escaped = bodyContent.replace(/'/g, "'\\''");
+                    lines.push(`  -d '${escaped}'`);
+                }
+            }
+            return lines.join(' \\\n') + '\n';
+        }
+
+        // ── Python (requests) ─────────────────────────────────────────
+        function genPython(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const m = method.toLowerCase();
+            let lines = ['import requests', ''];
+            if (headers.length > 0) {
+                const headerObj = {};
+                for (const h of headers) headerObj[h.key] = h.value;
+                lines.push(`headers = ${formatPyObj(headerObj)}`);
+            }
+            if (bodyContent !== null && bodyMode === 'raw' && bodyData.language === 'json') {
+                lines.push(`payload = ${formatPyObj(tryParseJson(bodyContent))}`);
+            } else if (bodyContent !== null && bodyMode === 'urlencoded') {
+                const pairs = (bodyData.data || []).filter(d => d.key);
+                const dataObj = {};
+                for (const d of pairs) dataObj[d.key] = d.value;
+                lines.push(`data = ${formatPyObj(dataObj)}`);
+            }
+
+            const parts = [`'${url}'`];
+            if (headers.length > 0) parts.push('headers=headers');
+            if (bodyContent !== null && bodyMode === 'raw' && bodyData.language === 'json') parts.push('json=payload');
+            else if (bodyContent !== null && bodyMode === 'urlencoded') parts.push('data=data');
+            else if (bodyContent !== null) parts.push(`data='${bodyContent.replace(/'/g, "\\'")}'`);
+
+            lines.push(`response = requests.${m}(${parts.join(', ')})`);
+            lines.push('print(response.status_code)');
+            lines.push('print(response.json())');
+            return lines.join('\n') + '\n';
+        }
+
+        function formatPyObj(obj, indent = 0) {
+            if (obj === null) return 'None';
+            if (typeof obj === 'boolean') return String(obj).toUpperCase();
+            if (typeof obj !== 'object') return JSON.stringify(obj);
+            const pad = '    '.repeat(indent);
+            const padInner = '    '.repeat(indent + 1);
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                const items = obj.map(v => padInner + formatPyObj(v, indent + 1));
+                return '[\n' + items.join(',\n') + '\n' + pad + ']';
+            }
+            const keys = Object.keys(obj);
+            if (keys.length === 0) return '{}';
+            const entries = keys.map(k => padInner + `'${k}': ${formatPyObj(obj[k], indent + 1)}`);
+            return '{\n' + entries.join(',\n') + '\n' + pad + '}';
+        }
+
+        // ── JavaScript (fetch) ────────────────────────────────────────
+        function genFetch(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [];
+            if (headers.length > 0) {
+                const headerObj = {};
+                for (const h of headers) headerObj[h.key] = h.value;
+                lines.push(`const headers = ${JSON.stringify(headerObj, null, 2)};`);
+            }
+            lines.push('');
+            const fetchOpts = [`method: '${method}'`];
+            if (headers.length > 0) fetchOpts.push('headers');
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    fetchOpts.push(`body: JSON.stringify(${formatJson(bodyContent)})`);
+                } else {
+                    fetchOpts.push(`body: '${bodyContent.replace(/'/g, "\\'")}'`);
+                }
+            }
+            lines.push(`const response = await fetch('${url}', {`);
+            for (let i = 0; i < fetchOpts.length; i++) {
+                lines.push(`  ${fetchOpts[i]}${i < fetchOpts.length - 1 ? ',' : ''}`);
+            }
+            lines.push('});');
+            lines.push('');
+            lines.push('const data = await response.json();');
+            lines.push('console.log(data);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── JavaScript (axios) ────────────────────────────────────────
+        function genAxios(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const m = method.toLowerCase();
+            let lines = ['// npm install axios', "const axios = require('axios');", ''];
+            if (headers.length > 0) {
+                const headerObj = {};
+                for (const h of headers) headerObj[h.key] = h.value;
+                lines.push(`const headers = ${JSON.stringify(headerObj, null, 2)};`);
+            }
+
+            if (['post', 'put', 'patch'].includes(m)) {
+                const parts = [`'${url}'`];
+                if (bodyContent !== null && bodyMode === 'raw' && bodyData.language === 'json') {
+                    parts.push(formatJson(bodyContent));
+                } else if (bodyContent !== null) {
+                    parts.push(`'${bodyContent.replace(/'/g, "\\'")}'`);
+                } else {
+                    parts.push('{}');
+                }
+                if (headers.length > 0) parts.push('{ headers }');
+                lines.push(`const response = await axios.${m}(${parts.join(', ')});`);
+            } else {
+                const opts = [];
+                if (headers.length > 0) opts.push('headers');
+                const optsStr = opts.length > 0 ? `, { ${opts.join(', ')} }` : '';
+                lines.push(`const response = await axios.${m}('${url}'${optsStr});`);
+            }
+            lines.push('console.log(response.data);');
+            return lines.join('\n') + '\n';
+        }
+
+        // ─ Java (OkHttp) ─────────────────────────────────────────────
+        function genOkHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                '// dependencies: com.squareup.okhttp3:okhttp:4.12.0',
+                "import okhttp3.*;",
+                'import java.io.IOException;',
+                '',
+                'public class ApiRequest {',
+                '  public static void main(String[] args) throws IOException {',
+                '    OkHttpClient client = new OkHttpClient();',
+                '',
+            ];
+
+            if (bodyContent !== null) {
+                let mediaType = 'MediaType.parse("text/plain")';
+                if (bodyMode === 'raw' && bodyData.language === 'json') mediaType = 'MediaType.parse("application/json")';
+                else if (bodyMode === 'urlencoded') mediaType = 'MediaType.parse("application/x-www-form-urlencoded")';
+
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`    String body = "${escaped}";`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`    String body = "${escaped}";`);
+                }
+                lines.push(`    RequestBody requestBody = RequestBody.create(body, ${mediaType});`);
+                lines.push('');
+            }
+
+            lines.push('    Request request = new Request.Builder()');
+            lines.push(`        .url("${url}")`);
+            for (const h of headers) {
+                lines.push(`        .header("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+            if (bodyContent !== null) {
+                lines.push(`        .method("${method}", requestBody)`);
+            } else {
+                lines.push(`        .method("${method}", null)`);
+            }
+            lines.push('        .build();');
+            lines.push('');
+            lines.push('    try (Response response = client.newCall(request).execute()) {');
+            lines.push('      System.out.println(response.code());');
+            lines.push('      System.out.println(response.body().string());');
+            lines.push('    }');
+            lines.push('  }');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Go (net/http) ─────────────────────────────────────────────
+        function genGo(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [
+                'package main',
+                '',
+                'import (',
+                '  "fmt"',
+                '  "io"',
+                '  "net/http"',
+                '  "strings"',
+                ')',
+                '',
+                'func main() {',
+            ];
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+                lines.push(`  body := strings.NewReader(\`${escaped}\`)`);
+                lines.push('');
+            }
+
+            let reqVar = 'req';
+            if (bodyContent !== null) {
+                lines.push(`  ${reqVar}, err := http.NewRequest("${method}", "${url}", body)`);
+            } else {
+                lines.push(`  ${reqVar}, err := http.NewRequest("${method}", "${url}", nil)`);
+            }
+            lines.push('  if err != nil {');
+            lines.push('    panic(err)');
+            lines.push('  }');
+            lines.push('');
+
+            for (const h of headers) {
+                lines.push(`  ${reqVar}.Header.Set("${h.key}", "${h.value.replace(/"/g, '\\"')}")`);
+            }
+            if (headers.length > 0) lines.push('');
+
+            lines.push('  client := &http.Client{}');
+            lines.push('  resp, err := client.Do(req)');
+            lines.push('  if err != nil {');
+            lines.push('    panic(err)');
+            lines.push('  }');
+            lines.push('  defer resp.Body.Close()');
+            lines.push('');
+            lines.push('  respBody, _ := io.ReadAll(resp.Body)');
+            lines.push('  fmt.Println(resp.Status)');
+            lines.push('  fmt.Println(string(respBody))');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Raw HTTP ──────────────────────────────────────────────────
+        function genHttp(method, url, headers, bodyContent) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : url;
+            const host = parsedUrl ? parsedUrl.host : '';
+
+            let lines = [`${method} ${path} HTTP/1.1`];
+            if (host) lines.push(`Host: ${host}`);
+            for (const h of headers) {
+                lines.push(`${h.key}: ${h.value}`);
+            }
+            if (bodyContent !== null) {
+                lines.push('');
+                lines.push(bodyContent);
+            }
+            return lines.join('\r\n') + '\n';
+        }
+
+        // ── HTTPie ────────────────────────────────────────────────────
+        function genHttpie(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parts = [`http ${method.toLowerCase()} '${url}'`];
+            for (const h of headers) {
+                parts.push(`'${h.key}:${h.value}'`);
+            }
+            if (bodyContent !== null) {
+                if (bodyMode === 'formdata') {
+                    for (const d of (bodyData.data || []).filter(d => d.key)) {
+                        parts.push(`'${d.key}=${d.value}'`);
+                    }
+                } else if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    try {
+                        const obj = JSON.parse(bodyContent);
+                        for (const [k, v] of Object.entries(obj)) {
+                            parts.push(`'${k}=${JSON.stringify(v)}'`);
+                        }
+                    } catch (e) {
+                        parts.push(`'${bodyContent.replace(/'/g, "'\\''")}'`);
+                    }
+                } else {
+                    parts.push(`'${bodyContent.replace(/'/g, "'\\''")}'`);
+                }
+            }
+            return parts.join(' \\\n  ') + '\n';
+        }
+
+        // ─ Wget ──────────────────────────────────────────────────────
+        function genWget(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [`wget --method=${method} '--header=`];
+            const headerStrs = headers.map(h => `${h.key}: ${h.value}`);
+            const parts = [`wget --method=${method}`];
+            for (const h of headers) {
+                parts.push(`  --header='${h.key}: ${h.value}'`);
+            }
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/'/g, "'\\''");
+                parts.push(`  --body-data='${escaped}'`);
+            }
+            parts.push(`  '${url}'`);
+            return parts.join(' \\\n') + '\n';
+        }
+
+        // ── Python (http.client) ──────────────────────────────────────
+        function genPythonHttpClient(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+            const host = parsedUrl ? parsedUrl.hostname : 'localhost';
+            const port = parsedUrl ? (parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80')) : '80';
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : '/';
+            const useHttps = parsedUrl ? parsedUrl.protocol === 'https:' : false;
+
+            let lines = ['import http.client', 'import json', ''];
+            lines.push(`conn = http.client.HTTP${useHttps ? 'S' : ''}Connection("${host}", ${port})`);
+            lines.push('');
+
+            if (headers.length > 0) {
+                const headerObj = {};
+                for (const h of headers) headerObj[h.key] = h.value;
+                lines.push(`headers = ${formatPyObj(headerObj)}`);
+            }
+
+            if (bodyContent !== null && bodyMode === 'raw' && bodyData.language === 'json') {
+                lines.push(`body = json.dumps(${formatPyObj(tryParseJson(bodyContent))})`);
+            } else if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`body = "${escaped}"`);
+            }
+
+            const headerArg = headers.length > 0 ? ', headers=headers' : '';
+            const bodyArg = bodyContent !== null ? ', body=body' : '';
+            lines.push(`conn.request("${method}", "${path}"${headerArg}${bodyArg})`);
+            lines.push('');
+            lines.push('response = conn.getresponse()');
+            lines.push('print(response.status, response.reason)');
+            lines.push('data = response.read()');
+            lines.push('print(data.decode("utf-8"))');
+            lines.push('');
+            lines.push('conn.close()');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── R (httr) ──────────────────────────────────────────────────
+        function genRhttr(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const m = method.toLowerCase();
+            let lines = ['library(httr)', ''];
+
+            if (headers.length > 0) {
+                const headerPairs = headers.map(h => `"${h.key}" = "${h.value.replace(/"/g, '\\"')}"`);
+                lines.push(`headers = add_headers(${headerPairs.join(', ')})`);
+            }
+
+            let bodyArg = '';
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    bodyArg = `, body = "${escaped}", encode = "raw"`;
+                } else if (bodyMode === 'urlencoded') {
+                    const pairs = (bodyData.data || []).filter(d => d.key);
+                    const args = pairs.map(d => `"${d.key}" = "${d.value.replace(/"/g, '\\"')}"`);
+                    bodyArg = `, body = list(${args.join(', ')}), encode = "form"`;
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    bodyArg = `, body = "${escaped}"`;
+                }
+            }
+
+            const headerArg = headers.length > 0 ? ', headers' : '';
+            lines.push(`response <- ${m}("${url}"${headerArg}${bodyArg})`);
+            lines.push('');
+            lines.push('print(status_code(response))');
+            lines.push('print(content(response, "text"))');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Ruby (net/http) ───────────────────────────────────────────
+        function genRuby(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let parsedUrl;
+            try { parsedUrl = new URL(url); } catch (e) { parsedUrl = null; }
+            const host = parsedUrl ? parsedUrl.hostname : 'localhost';
+            const port = parsedUrl ? (parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80')) : '80';
+            const path = parsedUrl ? (parsedUrl.pathname + parsedUrl.search) : '/';
+            const useHttps = parsedUrl ? parsedUrl.protocol === 'https:' : false;
+
+            let lines = ["require 'net/http'", "require 'json'", "require 'uri'", ''];
+            lines.push(`uri = URI("${url}")`);
+            lines.push('');
+
+            if (useHttps) {
+                lines.push('http = Net::HTTP.new(uri.host, uri.port)');
+                lines.push('http.use_ssl = true');
+            } else {
+                lines.push('http = Net::HTTP.new(uri.host, uri.port)');
+            }
+            lines.push('');
+
+            lines.push(`request = Net::HTTP::${method.toUpperCase()}.new(uri.request_uri)`);
+            for (const h of headers) {
+                lines.push(`request["${h.key}"] = "${h.value.replace(/"/g, '\\"')}"`);
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`request.body = "${escaped}"`);
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`request.body = "${escaped}"`);
+                }
+            }
+            lines.push('');
+            lines.push('response = http.request(request)');
+            lines.push('puts response.code');
+            lines.push('puts response.body');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── PowerShell (Invoke-RestMethod) ────────────────────────────
+        function genPowerShell(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = [];
+
+            if (headers.length > 0) {
+                lines.push('$headers = @{');
+                for (const h of headers) {
+                    lines.push(`    "${h.key}" = "${h.value.replace(/"/g, '`"')}"`);
+                }
+                lines.push('}');
+                lines.push('');
+            }
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/"/g, '`"');
+                    lines.push(`$body = @"`);
+                    lines.push(bodyContent);
+                    lines.push('"@');
+                } else {
+                    const escaped = bodyContent.replace(/"/g, '`"');
+                    lines.push(`$body = "${escaped}"`);
+                }
+                lines.push('');
+            }
+
+            const parts = [`-Uri "${url}"`, `-Method "${method}"`];
+            if (headers.length > 0) parts.push('-Headers $headers');
+            if (bodyContent !== null) parts.push('-Body $body');
+            if (bodyMode === 'raw' && bodyData.language === 'json') parts.push('-ContentType "application/json"');
+
+            lines.push(`$response = Invoke-RestMethod ${parts.join(' ')}`);
+            lines.push('$response | ConvertTo-Json -Depth 10');
+            return lines.join('\n') + '\n';
+        }
+
+        // ─ Swift (URLSession) ────────────────────────────────────────
+        function genSwift(method, url, headers, bodyContent, bodyMode, bodyData) {
+            let lines = ['import Foundation', ''];
+            lines.push('guard let url = URL(string: "' + url.replace(/"/g, '\\"') + '") else {');
+            lines.push('    fatalError("Invalid URL")');
+            lines.push('}');
+            lines.push('');
+            lines.push('var request = URLRequest(url: url)');
+            lines.push(`request.httpMethod = "${method}"`);
+            lines.push('');
+
+            for (const h of headers) {
+                lines.push(`request.addValue("${h.value.replace(/"/g, '\\"')}", forHTTPHeaderField: "${h.key}")`);
+            }
+            if (headers.length > 0) lines.push('');
+
+            if (bodyContent !== null) {
+                if (bodyMode === 'raw' && bodyData.language === 'json') {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`let jsonString = """`);
+                    lines.push(bodyContent);
+                    lines.push('"""');
+                    lines.push('request.httpBody = jsonString.data(using: .utf8)');
+                } else {
+                    const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                    lines.push(`request.httpBody = "${escaped}".data(using: .utf8)`);
+                }
+            }
+            lines.push('');
+            lines.push('let task = URLSession.shared.dataTask(with: request) { data, response, error in');
+            lines.push('    guard let data = data, error == nil else {');
+            lines.push('        print(error?.localizedDescription ?? "Unknown error")');
+            lines.push('        return');
+            lines.push('    }');
+            lines.push('    if let json = try? JSONSerialization.jsonObject(with: data) {');
+            lines.push('        print(json)');
+            lines.push('    }');
+            lines.push('}');
+            lines.push('task.resume()');
+            return lines.join('\n') + '\n';
+        }
+
         // Initialize autocomplete on page load
         initAutocomplete();
         loadGlobalVariables();
@@ -3141,6 +4127,24 @@
             if (!document.hidden) { loadGlobalVariables(); loadVarFunctions(); }
         });
     </script>
+
+    <!-- Toast Container -->
+    <div class="toast-container"><div class="toast-msg" id="toastMsg"></div></div>
+
+    <!-- Code Preview Modal -->
+    <div class="code-modal-overlay" id="codeModal">
+        <div class="code-modal-box">
+            <div class="code-modal-header">
+                <h2 id="codeModalTitle">代码预览</h2>
+                <button type="button" class="code-modal-close" onclick="closeCodeModal()">&times;</button>
+            </div>
+            <div class="code-modal-body"><pre id="codeModalContent"></pre></div>
+            <div class="code-modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeCodeModal()">关闭</button>
+                <button type="button" class="btn btn-primary" id="codeModalCopyBtn" onclick="copyCodeModalContent()">📋 复制到剪贴板</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
 {% endraw %}
