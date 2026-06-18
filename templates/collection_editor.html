@@ -96,6 +96,10 @@
         .response-status.s4xx { background: #d97706; }
         .response-status.s5xx { background: #dc2626; }
         .response-meta { color: #64748b; font-size: 12px; }
+        .resp-meta-row { display: flex; gap: 20px; font-size: 11px; color: #94a3b8; padding: 6px 0; border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; }
+        .resp-meta-item { display: flex; gap: 4px; align-items: center; }
+        .resp-meta-item .label { color: #64748b; font-weight: 500; }
+        .resp-meta-item .value { color: #475569; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* Response Tabs */
         .resp-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px; }
@@ -1121,6 +1125,10 @@
                                 <div class="copy-snippet-item" onclick="showCodePreview('csharp_restsharp')"><span class="copy-snippet-lang">RestSharp</span><span class="copy-snippet-desc">RestSharp 库</span></div>
                             </div>
                             <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Dart</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('dart_http')"><span class="copy-snippet-lang">http</span><span class="copy-snippet-desc">http 库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Clojure</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('clojure')"><span class="copy-snippet-lang">clj-http</span><span class="copy-snippet-desc">Clojure</span></div>
                             </div>
@@ -1195,6 +1203,10 @@
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Ruby</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">net::http</span><span class="copy-snippet-desc">标准库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Rust</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('rust_reqwest')"><span class="copy-snippet-lang">reqwest</span><span class="copy-snippet-desc">reqwest 库</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Shell</div>
@@ -2014,16 +2026,20 @@
 
             const sc = data.status_code || 0;
             const statusClass = sc >= 500 ? 's5xx' : sc >= 400 ? 's4xx' : sc >= 300 ? 's3xx' : 's2xx';
+            const statusText = getStatusText(sc);
             const bodySize = JSON.stringify(data.response_body || '').length;
             const sizeStr = bodySize > 1024 ? (bodySize / 1024).toFixed(1) + ' KB' : bodySize + ' B';
+            const respHeaders = data.response_headers || {};
+            const contentType = respHeaders['content-type'] || respHeaders['Content-Type'] || '';
+            const server = respHeaders['server'] || respHeaders['Server'] || '';
 
             const tab = state.lastResponseTab || 'body';
             const fmt = state.responseFormat || 'json';
             let bodyHtml = '';
             if (tab === 'body') {
-                bodyHtml = renderResponseBody(data.response_body, fmt);
+                bodyHtml = renderResponseBody(data.response_body, fmt, respHeaders);
             } else {
-                bodyHtml = renderResponseHeaders(data.response_headers || {});
+                bodyHtml = renderResponseHeaders(respHeaders);
             }
 
             const fmtOptions = ['raw', 'json', 'yaml', 'xml', 'html'];
@@ -2037,6 +2053,13 @@
                     <span class="response-status ${statusClass}">${sc}</span>
                     <span class="response-meta">${data.elapsed_ms}ms  ·  ${sizeStr}</span>
                     ${data.actual_request_url ? `<span class="response-meta" title="${escapeAttr(data.actual_request_url)}" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(data.actual_request_url)}</span>` : ''}
+                </div>
+                <div class="resp-meta-row">
+                    <div class="resp-meta-item"><span class="label">Status:</span><span class="value">${sc} ${escapeHtml(statusText)}</span></div>
+                    <div class="resp-meta-item"><span class="label">Time:</span><span class="value">${data.elapsed_ms}ms</span></div>
+                    <div class="resp-meta-item"><span class="label">Size:</span><span class="value">${sizeStr}</span></div>
+                    ${contentType ? `<div class="resp-meta-item"><span class="label">Type:</span><span class="value" title="${escapeAttr(contentType)}">${escapeHtml(contentType)}</span></div>` : ''}
+                    ${server ? `<div class="resp-meta-item"><span class="label">Server:</span><span class="value">${escapeHtml(server)}</span></div>` : ''}
                 </div>
                 <div class="resp-tabs" style="display:flex;justify-content:space-between;align-items:center;">
                     <div style="display:flex;gap:4px;align-items:center;">
@@ -2154,9 +2177,18 @@
         }
 
         // Render Response Body (multi-format)
-        function renderResponseBody(body, fmt) {
+        function renderResponseBody(body, fmt, headers) {
             if (body === null || body === undefined) {
                 return '<div class="json-tree" style="color:#94a3b8;">(empty body)</div>';
+            }
+
+            // Binary / image detection
+            const ct = (headers && (headers['content-type'] || headers['Content-Type'])) || '';
+            if (ct.startsWith('image/') && typeof body === 'string') {
+                return `<img src="data:${ct};base64,${body}" style="max-width:100%;border-radius:6px;border:1px solid #e2e8f0;" />`;
+            }
+            if (ct === 'application/pdf') {
+                return `<div class="json-tree" style="color:#94a3b8;">PDF 响应 (${typeof body === 'string' ? body.length + ' chars' : 'binary'})，请通过复制按钮保存文件</div>`;
             }
 
             let jsonObj = body;
@@ -2326,6 +2358,19 @@
         }
 
         // Render Response Headers
+        function getStatusText(code) {
+            const map = {
+                200: 'OK', 201: 'Created', 204: 'No Content',
+                301: 'Moved Permanently', 302: 'Found', 304: 'Not Modified',
+                400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden',
+                404: 'Not Found', 405: 'Method Not Allowed', 409: 'Conflict',
+                422: 'Unprocessable Entity', 429: 'Too Many Requests',
+                500: 'Internal Server Error', 502: 'Bad Gateway',
+                503: 'Service Unavailable', 504: 'Gateway Timeout',
+            };
+            return map[code] || (code >= 200 && code < 300 ? 'Success' : code >= 300 && code < 400 ? 'Redirect' : code >= 400 && code < 500 ? 'Client Error' : code >= 500 ? 'Server Error' : '');
+        }
+
         function renderResponseHeaders(headers) {
             const entries = Object.entries(headers);
             if (!entries.length) return '<div style="color:#94a3b8;font-size:12px;padding:10px;">(no headers)</div>';
@@ -3545,6 +3590,7 @@
             clojure: { label: 'Clojure', desc: 'clj-http' },
             csharp_restsharp: { label: 'C#', desc: 'RestSharp' },
             csharp_httpclient: { label: 'C#', desc: 'HttpClient' },
+            dart_http: { label: 'Dart', desc: 'http 库' },
             go: { label: 'Go', desc: 'net/http' },
             java_okhttp: { label: 'Java', desc: 'OkHttp' },
             java_unirest: { label: 'Java', desc: 'Unirest' },
@@ -3571,6 +3617,7 @@
             python: { label: 'Python', desc: 'requests' },
             r_httr: { label: 'R', desc: 'httr' },
             ruby: { label: 'Ruby', desc: 'net::http' },
+            rust_reqwest: { label: 'Rust', desc: 'reqwest' },
             httpie: { label: 'HTTPie', desc: '简洁格式' },
             wget: { label: 'Wget', desc: '下载工具' },
             swift: { label: 'Swift', desc: 'NSURLSession' },
@@ -3715,6 +3762,7 @@
                 case 'curl': return genCurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'c_libcurl': return genCLibcurl(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'clojure': return genClojure(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'dart_http': return genDartHttp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'csharp_restsharp': return genCSharpRestSharp(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'csharp_httpclient': return genCSharpHttpClient(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'go': return genGo(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
@@ -3743,6 +3791,7 @@
                 case 'python': return genPython(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'r_httr': return genRhttr(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'ruby': return genRuby(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
+                case 'rust_reqwest': return genRustReqwest(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'httpie': return genHttpie(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'wget': return genWget(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
                 case 'swift': return genSwift(method, fullUrl, headers, bodyContent, bodyMode, bodyData);
@@ -4168,6 +4217,54 @@
             return lines.join('\n') + '\n';
         }
 
+        // ── Rust (reqwest) ───────────────────────────────────────────
+        function genRustReqwest(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const escUrl = url.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+            let lines = [
+                '// Cargo.toml: reqwest = { version = "0.11", features = ["json"] }',
+                '//                tokio = { version = "1", features = ["full"] }',
+                'use reqwest::header::{HeaderMap, HeaderValue};',
+                '',
+                '#[tokio::main]',
+                'async fn main() -> Result<(), Box<dyn std::error::Error>> {',
+                '    let client = reqwest::Client::new();',
+                `    let url = "${escUrl}";`,
+                '',
+                '    let mut headers = HeaderMap::new();',
+            ];
+            for (const h of headers) {
+                const k = h.key.replace(/"/g, '\\"');
+                const v = h.value.replace(/"/g, '\\"');
+                lines.push(`    headers.insert("${k}", "${v}".parse()?);`);
+            }
+            lines.push('');
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                lines.push(`    let body = "${escaped}";`);
+                lines.push('');
+                lines.push(`    let response = client.${method.toLowerCase()}(url)`);
+                lines.push('        .headers(headers)');
+                lines.push('        .body(body)');
+                lines.push('        .send()');
+                lines.push('        .await?;');
+            } else {
+                lines.push(`    let response = client.${method.toLowerCase()}(url)`);
+                lines.push('        .headers(headers)');
+                lines.push('        .send()');
+                lines.push('        .await?;');
+            }
+
+            lines.push('');
+            lines.push('    println!("Status: {}", response.status());');
+            lines.push('    let body = response.text().await?;');
+            lines.push('    println!("{}", body);');
+            lines.push('');
+            lines.push('    Ok(())');
+            lines.push('}');
+            return lines.join('\n') + '\n';
+        }
+
         // ── PowerShell (Invoke-RestMethod) ────────────────────────────
         function genPowerShell(method, url, headers, bodyContent, bodyMode, bodyData) {
             let lines = [];
@@ -4379,6 +4476,44 @@
             if (headers.length > 0) lines.push(`  :headers ${headerMap}`);
             if (bodyArg) lines.push(`  ${bodyArg.trim()}`);
             lines.push(')');
+            return lines.join('\n') + '\n';
+        }
+
+        // ── Dart (http) ─────────────────────────────────────────────
+        function genDartHttp(method, url, headers, bodyContent, bodyMode, bodyData) {
+            const escUrl = url.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            let lines = [
+                "// pub: add http",
+                "import 'package:http/http.dart' as http;",
+                '',
+                'void main() async {',
+                `  final uri = Uri.parse('${escUrl}');`,
+                '  final headers = <String, String>{',
+            ];
+            for (const h of headers) {
+                const k = h.key.replace(/'/g, "\\'");
+                const v = h.value.replace(/'/g, "\\'");
+                lines.push(`    '${k}': '${v}',`);
+            }
+            lines.push('  };');
+            lines.push('');
+
+            if (bodyContent !== null) {
+                const escaped = bodyContent.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+                lines.push(`  final body = '${escaped}';`);
+                lines.push('');
+            }
+
+            const m = method.toLowerCase();
+            lines.push(`  final response = await http.${m}(`);
+            lines.push('    uri,');
+            lines.push('    headers: headers,');
+            if (bodyContent !== null) lines.push('    body: body,');
+            lines.push('  );');
+            lines.push('');
+            lines.push('  print(response.statusCode);');
+            lines.push('  print(response.body);');
+            lines.push('}');
             return lines.join('\n') + '\n';
         }
 

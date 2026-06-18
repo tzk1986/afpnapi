@@ -111,8 +111,17 @@ def execute_http_request(
 		)
 		elapsed_ms = round((_time.time() - t0) * 1000)
 
+		content_type = response.headers.get('content-type', '')
+		response_body_is_binary = False
 		try:
-			response_body: Any = response.json()
+			if 'application/json' in content_type:
+				response_body: Any = response.json()
+			elif content_type.startswith('image/'):
+				import base64 as _base64
+				response_body = _base64.b64encode(response.content).decode('ascii')
+				response_body_is_binary = True
+			else:
+				response_body = response.text
 		except ValueError:
 			response_body = response.text
 
@@ -134,6 +143,8 @@ def execute_http_request(
 			"status_code": response.status_code,
 			"response_body": response_body,
 			"response_headers": dict(response.headers),
+			"response_content_type": content_type,
+			"response_body_is_binary": response_body_is_binary,
 			"elapsed_ms": elapsed_ms,
 			"normalized_url": normalized_url,
 			"normalized_params": normalized_params,
