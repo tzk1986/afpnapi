@@ -1,8 +1,13 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.15.0
+版本：v1.16.0
 发布日期：2026-06-18
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.16.0）：
+- **代码生成扩展至 41 种语言**：新增 Dart（http 库）和 Rust（reqwest）代码生成器，总计 41 种语言/格式，覆盖主流后端与移动端技术栈。
+- **响应元信息行**：Response 面板顶部新增 Status/Time/Size/Content-Type/Server 五项元信息，一眼掌握响应关键指标。
+- **二进制/图片响应预览**：图片类型响应（image/*）自动以 base64 内联预览；PDF 等二进制类型给出明确提示，不再显示乱码。
 
 本版新增重点（v1.15.0）：
 - **代码片段生成（39 种语言/格式）**：编辑器 Tab 栏新增复制图标按钮，支持 Shell(cURL/HTTPie/Wget)、Python(Requests/http.client)、JavaScript(fetch/Axios/jQuery/XHR)、Node.js(Fetch/Axios/HTTP/Request/Unirest)、Java(OkHttp/java.net.http/Unirest/AsyncHttp)、Go、C#(HttpClient/RestSharp)、C(Libcurl)、PHP(cURL/HTTP v1/v2)、Ruby、R(httr)、Kotlin(OkHttp)、Swift、Objective-C、Clojure、OCaml、PowerShell、Raw/HTTP、HTTPie CLI/Desktop、HAR，按语言家族分组缩进下拉。
