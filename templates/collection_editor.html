@@ -1109,15 +1109,37 @@
                         </button>
                         <div class="copy-snippet-menu" id="snippetMenu" style="max-height:70vh;overflow-y:auto;">
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Shell</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
+                                <div class="copy-snippet-group-title">C</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('c_libcurl')"><span class="copy-snippet-lang">Libcurl</span><span class="copy-snippet-desc">C 语言</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Python</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('python')"><span class="copy-snippet-lang">Requests</span><span class="copy-snippet-desc">requests 库</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('python_http')"><span class="copy-snippet-lang">http.client</span><span class="copy-snippet-desc">标准库</span></div>
+                                <div class="copy-snippet-group-title">C#</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_httpclient')"><span class="copy-snippet-lang">HttpClient</span><span class="copy-snippet-desc">标准库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_restsharp')"><span class="copy-snippet-lang">RestSharp</span><span class="copy-snippet-desc">RestSharp 库</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Clojure</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('clojure')"><span class="copy-snippet-lang">clj-http</span><span class="copy-snippet-desc">Clojure</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Data</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('har')"><span class="copy-snippet-lang">HAR</span><span class="copy-snippet-desc">HTTP Archive</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Go</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('go')"><span class="copy-snippet-lang">NewRequest</span><span class="copy-snippet-desc">net/http</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">HTTPie</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_cli')"><span class="copy-snippet-lang">HTTPie CLI</span><span class="copy-snippet-desc">命令行</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_desktop')"><span class="copy-snippet-lang">HTTPie Desktop</span><span class="copy-snippet-desc">桌面文件</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Java</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_nethttp')"><span class="copy-snippet-lang">java.net.http</span><span class="copy-snippet-desc">Java 11+ 标准库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_unirest')"><span class="copy-snippet-lang">Unirest</span><span class="copy-snippet-desc">Unirest</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('java_asynchttp')"><span class="copy-snippet-lang">AsyncHttp</span><span class="copy-snippet-desc">AsyncHttpClient</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">JavaScript</div>
@@ -1125,6 +1147,10 @@
                                 <div class="copy-snippet-item" onclick="showCodePreview('javascript_axios')"><span class="copy-snippet-lang">Axios</span><span class="copy-snippet-desc">axios 库</span></div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('javascript_jquery')"><span class="copy-snippet-lang">jQuery</span><span class="copy-snippet-desc">jQuery.ajax</span></div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('javascript_xhr')"><span class="copy-snippet-lang">XMLHttpRequest</span><span class="copy-snippet-desc">XHR</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Kotlin</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('kotlin_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">Node.js</div>
@@ -1135,24 +1161,12 @@
                                 <div class="copy-snippet-item" onclick="showCodePreview('node_unirest')"><span class="copy-snippet-lang">Unirest</span><span class="copy-snippet-desc">Unirest</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Java</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('java_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('java_nethttp')"><span class="copy-snippet-lang">java.net.http</span><span class="copy-snippet-desc">Java 11+ 标准库</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('java_unirest')"><span class="copy-snippet-lang">Unirest</span><span class="copy-snippet-desc">Unirest</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('java_asynchttp')"><span class="copy-snippet-lang">AsyncHttp</span><span class="copy-snippet-desc">AsyncHttpClient</span></div>
+                                <div class="copy-snippet-group-title">OCaml</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('ocaml')"><span class="copy-snippet-lang">CoHTTP</span><span class="copy-snippet-desc">cohttp 库</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Go</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('go')"><span class="copy-snippet-lang">NewRequest</span><span class="copy-snippet-desc">net/http</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">C#</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_httpclient')"><span class="copy-snippet-lang">HttpClient</span><span class="copy-snippet-desc">标准库</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('csharp_restsharp')"><span class="copy-snippet-lang">RestSharp</span><span class="copy-snippet-desc">RestSharp 库</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">C</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('c_libcurl')"><span class="copy-snippet-lang">Libcurl</span><span class="copy-snippet-desc">C 语言</span></div>
+                                <div class="copy-snippet-group-title">Objective-C</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('objc')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">PHP</div>
@@ -1161,51 +1175,37 @@
                                 <div class="copy-snippet-item" onclick="showCodePreview('php_http_v2')"><span class="copy-snippet-lang">HTTP v2</span><span class="copy-snippet-desc">pecl/http v2</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Ruby</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">net::http</span><span class="copy-snippet-desc">标准库</span></div>
+                                <div class="copy-snippet-group-title">PowerShell</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('powershell')"><span class="copy-snippet-lang">Invoke-RestMethod</span><span class="copy-snippet-desc">RestMethod</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('powershell_webrequest')"><span class="copy-snippet-lang">Invoke-WebRequest</span><span class="copy-snippet-desc">WebRequest</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Python</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('python')"><span class="copy-snippet-lang">Requests</span><span class="copy-snippet-desc">requests 库</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('python_http')"><span class="copy-snippet-lang">http.client</span><span class="copy-snippet-desc">标准库</span></div>
                             </div>
                             <div class="copy-snippet-group">
                                 <div class="copy-snippet-group-title">R</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('r_httr')"><span class="copy-snippet-lang">httr</span><span class="copy-snippet-desc">httr 库</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Kotlin</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('kotlin_okhttp')"><span class="copy-snippet-lang">OkHttp</span><span class="copy-snippet-desc">OkHttp</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Swift</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('swift')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Objective-C</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('objc')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Clojure</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('clojure')"><span class="copy-snippet-lang">clj-http</span><span class="copy-snippet-desc">Clojure</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">OCaml</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('ocaml')"><span class="copy-snippet-lang">CoHTTP</span><span class="copy-snippet-desc">cohttp 库</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">PowerShell</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('powershell')"><span class="copy-snippet-lang">Invoke-RestMethod</span><span class="copy-snippet-desc">RestMethod</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('powershell_webrequest')"><span class="copy-snippet-lang">Invoke-WebRequest</span><span class="copy-snippet-desc">WebRequest</span></div>
-                            </div>
-                            <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Raw / HTTP</div>
+                                <div class="copy-snippet-group-title">Raw/HTTP</div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('raw_text')"><span class="copy-snippet-lang">Raw</span><span class="copy-snippet-desc">原始文本</span></div>
                                 <div class="copy-snippet-item" onclick="showCodePreview('http')"><span class="copy-snippet-lang">HTTP</span><span class="copy-snippet-desc">原始报文</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">HTTPie</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_cli')"><span class="copy-snippet-lang">HTTPie CLI</span><span class="copy-snippet-desc">命令行</span></div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('httpie_desktop')"><span class="copy-snippet-lang">HTTPie Desktop</span><span class="copy-snippet-desc">桌面文件</span></div>
+                                <div class="copy-snippet-group-title">Ruby</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('ruby')"><span class="copy-snippet-lang">net::http</span><span class="copy-snippet-desc">标准库</span></div>
                             </div>
                             <div class="copy-snippet-group">
-                                <div class="copy-snippet-group-title">Data</div>
-                                <div class="copy-snippet-item" onclick="showCodePreview('har')"><span class="copy-snippet-lang">HAR</span><span class="copy-snippet-desc">HTTP Archive</span></div>
+                                <div class="copy-snippet-group-title">Shell</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('httpie')"><span class="copy-snippet-lang">HTTPie</span><span class="copy-snippet-desc">简洁格式</span></div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('wget')"><span class="copy-snippet-lang">Wget</span><span class="copy-snippet-desc">下载工具</span></div>
+                            </div>
+                            <div class="copy-snippet-group">
+                                <div class="copy-snippet-group-title">Swift</div>
+                                <div class="copy-snippet-item" onclick="showCodePreview('swift')"><span class="copy-snippet-lang">NSURLSession</span><span class="copy-snippet-desc">Foundation</span></div>
                             </div>
                         </div>
                     </div>
