@@ -85,7 +85,12 @@ class BaseHandler:
         Returns:
             Flask 错误响应
         """
-        logger.error(f"Handler error: {type(error).__name__}: {error}")
+        logger.error(
+            "handler error: %s: %s",
+            type(error).__name__,
+            error,
+            extra={"event": "handler.error", "error_type": type(error).__name__, "error_code": error_code},
+        )
         response_body = {
             "code": status_code,
             "message": "Error",
