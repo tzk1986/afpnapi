@@ -41,8 +41,8 @@ REPORT_OUTPUT_DIR = ""
 # REQUEST_CONNECT_TIMEOUT: 与服务器建立连接的最长等待时间
 # REQUEST_READ_TIMEOUT:    等待服务器响应数据的最长时间
 # ==============================================================
-REQUEST_CONNECT_TIMEOUT = max(1, int(os.environ.get("REQUEST_CONNECT_TIMEOUT", "10")))
-REQUEST_READ_TIMEOUT = max(1, int(os.environ.get("REQUEST_READ_TIMEOUT", "30")))
+REQUEST_CONNECT_TIMEOUT = max(1, min(300, int(os.environ.get("REQUEST_CONNECT_TIMEOUT", "10"))))
+REQUEST_READ_TIMEOUT = max(1, min(300, int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))))
 
 # ==============================================================
 # 日志系统配置
@@ -72,7 +72,7 @@ LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, LOG_ALERT_ERROR_RATE_THRESHOLD
 # 任务历史记录上限
 # 超出上限时最早的任务记录会被淘汰（已在 report_server.py 中实现）
 # ==============================================================
-RUN_JOBS_MAX = max(1, int(os.environ.get("RUN_JOBS_MAX", "200")))
+RUN_JOBS_MAX = max(1, min(100000, int(os.environ.get("RUN_JOBS_MAX", "200"))))
 
 # ==============================================================
 # 运行页与结果页分页配置（集中管理）
@@ -367,10 +367,10 @@ ENABLE_VARIABLE_EXTRACTION = str(os.environ.get("ENABLE_VARIABLE_EXTRACTION", "t
 }
 
 # DATA_FILE_MAX_ROWS: 数据文件最大行数限制
-DATA_FILE_MAX_ROWS = max(1, int(os.environ.get("DATA_FILE_MAX_ROWS", "10000")))
+DATA_FILE_MAX_ROWS = max(1, min(1000000, int(os.environ.get("DATA_FILE_MAX_ROWS", "10000"))))
 
 # DATA_FILE_MAX_SIZE: 数据文件最大字节数（默认 10MB）
-DATA_FILE_MAX_SIZE = max(1024, int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024))))
+DATA_FILE_MAX_SIZE = max(1024, min(100 * 1024 * 1024, int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024)))))
 
 # ==============================================================
 # P0 功能开关：并发执行引擎
@@ -382,7 +382,7 @@ DATA_FILE_MAX_SIZE = max(1024, int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 *
 ENABLE_CONCURRENT = str(os.environ.get("ENABLE_CONCURRENT", "false")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
-CONCURRENT_WORKERS = max(1, int(os.environ.get("CONCURRENT_WORKERS", "10")))
+CONCURRENT_WORKERS = max(1, min(100, int(os.environ.get("CONCURRENT_WORKERS", "10"))))
 
 # ==============================================================
 # P0 功能开关：变量函数与持久化
@@ -394,4 +394,4 @@ ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "tru
     "1", "true", "yes", "y", "on"
 }
 GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
-GLOBAL_VARIABLES_MAX_COUNT = max(1, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000")))
+GLOBAL_VARIABLES_MAX_COUNT = max(1, min(100000, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000"))))
