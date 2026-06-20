@@ -149,10 +149,19 @@ def latest_report() -> ResponseReturnValue:
     return redirect(url_for("report_view", name=reports[0]["report_name"]))
 
 
+def _safe_report_path(candidate: Path) -> bool:
+    """校验路径是否安全位于 REPORTS_DIR 内，防止目录穿越攻击（CWE-22）。"""
+    try:
+        resolved = candidate.resolve()
+        return str(resolved).startswith(str(REPORTS_DIR.resolve()) + os.sep) or resolved == REPORTS_DIR.resolve()
+    except (OSError, ValueError):
+        return False
+
+
 def serve_report(filename: str) -> ResponseReturnValue:
     """服务报告文件。支持子目录中的报告。"""
     filepath = REPORTS_DIR / filename
-    if filepath.exists():
+    if filepath.exists() and _safe_report_path(filepath):
         return send_file(filepath)
     # 如果直接路径不存在，尝试查找报告并获取实际路径
     try:
@@ -162,19 +171,19 @@ def serve_report(filename: str) -> ResponseReturnValue:
                 if meta_file:
                     meta_path = REPORTS_DIR / meta_file
                     report_path = meta_path.with_name(meta_path.name.replace("_meta.json", ".html"))
-                    if report_path.exists():
+                    if report_path.exists() and _safe_report_path(report_path):
                         return send_file(report_path)
                 # 无 meta 文件的 legacy 报告：尝试 source_file 或 details_file 推导
                 source_file = str(report.get("source_file") or "").strip()
                 if source_file:
                     source_path = Path(source_file)
-                    if source_path.exists():
+                    if source_path.exists() and _safe_report_path(source_path):
                         return send_file(source_path)
                 details_file = str(report.get("details_file") or "").strip()
                 if details_file:
                     details_path = REPORTS_DIR / details_file
                     report_path = details_path.with_name(details_path.name.replace("_details.json", ".html"))
-                    if report_path.exists():
+                    if report_path.exists() and _safe_report_path(report_path):
                         return send_file(report_path)
     except OSError:
         pass
