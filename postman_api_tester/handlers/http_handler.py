@@ -1,4 +1,4 @@
-﻿"""HTTP handler real implementations for re-request/proxy flows."""
+"""HTTP handler real implementations for re-request/proxy flows."""
 
 """开发导读：
 - 职责：执行重试/代理请求前的 URL 安全校验、请求参数归一化与统一响应封装。

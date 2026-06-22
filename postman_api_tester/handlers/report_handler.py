@@ -1,4 +1,4 @@
-﻿"""Report handler real implementations for filtering/comparison/result payloads."""
+"""Report handler real implementations for filtering/comparison/result payloads."""
 
 """开发导读：
 - 职责：报告结果筛选、分页、历史对比等"展示侧聚合逻辑"。
