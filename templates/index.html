@@ -378,6 +378,7 @@
             <div class="toolbar">
                 <input id="searchInput" type="text" placeholder="搜索报告名、集合名、源文件" oninput="renderReports()">
                 <button class="secondary" onclick="window.location.href='/'">刷新列表</button>
+                <span id="reportCount" style="font-size:12px;color:#64748b;margin-left:auto;"></span>
             </div>
             {% if enable_report_list_filter %}
             <div class="toolbar" id="filterPanel" style="flex-wrap:wrap;gap:8px;margin-top:6px;">
@@ -420,7 +421,7 @@
                         <th>操作</th>
                     </tr>
                 </thead>
-                <tbody id="reportTable"></tbody>
+                <tbody id="reportTable"><tr><td colspan="6" class="empty">加载报告中...</td></tr></tbody>
             </table>
         </section>
 
@@ -953,6 +954,13 @@ function renderReports() {
             </td>
         </tr>
     `).join('');
+    const countEl = document.getElementById('reportCount');
+    if (countEl) {
+        const isFiltered = filtered.length !== reports.length;
+        countEl.textContent = isFiltered
+            ? `显示 ${filtered.length} / ${reports.length} 条`
+            : `共 ${reports.length} 条报告`;
+    }
     renderSelects(filtered);
 }
 
@@ -1784,6 +1792,16 @@ function loadVariableFunctions() {
         container.innerHTML = '<div class="var-empty">加载失败。</div>';
     });
 }
+
+// ---- 全局 ESC 关闭模态框（WAI-ARIA 规范） ----
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const overlay = document.getElementById('settingsOverlay');
+        if (overlay && overlay.classList.contains('open')) {
+            closeSettingsModal();
+        }
+    }
+});
 </script>
 </body>
 </html>

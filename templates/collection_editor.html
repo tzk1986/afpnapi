@@ -5155,6 +5155,48 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) { loadGlobalVariables(); loadVarFunctions(); }
         });
+
+        // ---- Keyboard Shortcuts ----
+        document.addEventListener('keydown', (e) => {
+            const mod = e.ctrlKey || e.metaKey;
+            const tag = (e.target.tagName || '').toLowerCase();
+            const isTyping = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+
+            if (e.key === 'Escape') {
+                const modals = document.querySelectorAll('.modal-overlay.visible, .code-modal-overlay.visible');
+                if (modals.length > 0) {
+                    modals[modals.length - 1].classList.remove('visible');
+                    e.preventDefault();
+                }
+                return;
+            }
+
+            if (mod && e.key === 's') {
+                e.preventDefault();
+                exportCollection();
+                return;
+            }
+
+            if (mod && e.key === 'Enter') {
+                e.preventDefault();
+                executeCollection();
+                return;
+            }
+
+            if (mod && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+                e.preventDefault();
+                document.getElementById('fileInput').click();
+                return;
+            }
+
+            if (e.key === 'Delete' && !isTyping) {
+                const checked = document.querySelectorAll('.item-check:checked');
+                if (checked.length > 0) {
+                    deleteSelected();
+                    e.preventDefault();
+                }
+            }
+        });
     </script>
 
     <!-- Toast Container -->

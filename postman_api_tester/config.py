@@ -41,8 +41,8 @@ REPORT_OUTPUT_DIR = ""
 # REQUEST_CONNECT_TIMEOUT: 与服务器建立连接的最长等待时间
 # REQUEST_READ_TIMEOUT:    等待服务器响应数据的最长时间
 # ==============================================================
-REQUEST_CONNECT_TIMEOUT = int(os.environ.get("REQUEST_CONNECT_TIMEOUT", "10"))
-REQUEST_READ_TIMEOUT = int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))
+REQUEST_CONNECT_TIMEOUT = max(1, min(300, int(os.environ.get("REQUEST_CONNECT_TIMEOUT", "10"))))
+REQUEST_READ_TIMEOUT = max(1, min(300, int(os.environ.get("REQUEST_READ_TIMEOUT", "30"))))
 
 # ==============================================================
 # 日志系统配置
@@ -72,7 +72,7 @@ LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, LOG_ALERT_ERROR_RATE_THRESHOLD
 # 任务历史记录上限
 # 超出上限时最早的任务记录会被淘汰（已在 report_server.py 中实现）
 # ==============================================================
-RUN_JOBS_MAX = int(os.environ.get("RUN_JOBS_MAX", "200"))
+RUN_JOBS_MAX = max(1, min(100000, int(os.environ.get("RUN_JOBS_MAX", "200"))))
 
 # ==============================================================
 # 运行页与结果页分页配置（集中管理）
@@ -88,7 +88,7 @@ REPORT_VIEW_PAGE_SIZE_MAX = int(os.environ.get("REPORT_VIEW_PAGE_SIZE_MAX", "100
 # ==============================================================
 # 上传执行任务轮询配置
 # ============================================================== 
-RUN_STATUS_POLL_INTERVAL_MS = int(os.environ.get("RUN_STATUS_POLL_INTERVAL_MS", "3000"))
+RUN_STATUS_POLL_INTERVAL_MS = max(100, int(os.environ.get("RUN_STATUS_POLL_INTERVAL_MS", "3000")))
 
 # ==============================================================
 # 可选接口执行（导入后选择接口再执行）
@@ -281,7 +281,7 @@ QUALITY_SCORE_ASSERTION_MISSING_PENALTY = int(os.environ.get("QUALITY_SCORE_ASSE
 # REPORT_SERVER_PORT: Flask 服务监听端口
 # REPORT_SERVER_HOST: Flask 服务监听地址
 # ==============================================================
-REPORT_SERVER_PORT = int(os.environ.get("REPORT_SERVER_PORT", "5000"))
+REPORT_SERVER_PORT = max(1, min(65535, int(os.environ.get("REPORT_SERVER_PORT", "5000"))))
 REPORT_SERVER_HOST = str(os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")).strip() or "0.0.0.0"
 
 # ==============================================================
@@ -367,10 +367,10 @@ ENABLE_VARIABLE_EXTRACTION = str(os.environ.get("ENABLE_VARIABLE_EXTRACTION", "t
 }
 
 # DATA_FILE_MAX_ROWS: 数据文件最大行数限制
-DATA_FILE_MAX_ROWS = int(os.environ.get("DATA_FILE_MAX_ROWS", "10000"))
+DATA_FILE_MAX_ROWS = max(1, min(1000000, int(os.environ.get("DATA_FILE_MAX_ROWS", "10000"))))
 
 # DATA_FILE_MAX_SIZE: 数据文件最大字节数（默认 10MB）
-DATA_FILE_MAX_SIZE = int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024)))
+DATA_FILE_MAX_SIZE = max(1024, min(100 * 1024 * 1024, int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 1024)))))
 
 # ==============================================================
 # P0 功能开关：并发执行引擎
@@ -382,7 +382,7 @@ DATA_FILE_MAX_SIZE = int(os.environ.get("DATA_FILE_MAX_SIZE", str(10 * 1024 * 10
 ENABLE_CONCURRENT = str(os.environ.get("ENABLE_CONCURRENT", "false")).strip().lower() in {
     "1", "true", "yes", "y", "on"
 }
-CONCURRENT_WORKERS = max(1, int(os.environ.get("CONCURRENT_WORKERS", "10")))
+CONCURRENT_WORKERS = max(1, min(100, int(os.environ.get("CONCURRENT_WORKERS", "10"))))
 
 # ==============================================================
 # P0 功能开关：变量函数与持久化
@@ -394,4 +394,4 @@ ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "tru
     "1", "true", "yes", "y", "on"
 }
 GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
-GLOBAL_VARIABLES_MAX_COUNT = max(1, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000")))
+GLOBAL_VARIABLES_MAX_COUNT = max(1, min(100000, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000"))))
