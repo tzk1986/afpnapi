@@ -1,4 +1,4 @@
-﻿"""开发导读：
+"""开发导读：
 - 职责：基于报告最新请求参数导出集合，支持 full/report_only 两种范围。
 - 入口：export_collection_with_latest_params()。
 - 关键行为：回填最新请求、可选剔除鉴权头、合并人工用例并移除排除项。

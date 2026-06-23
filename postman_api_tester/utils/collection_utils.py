@@ -1,4 +1,4 @@
-﻿"""Collection utility implementations used by export/query flows.
+"""Collection utility implementations used by export/query flows.
 
 开发导读：
 - 职责：collection 树遍历、路径裁剪、人工用例追加、排除项剔除、ad-hoc 用例归一化、预览项提取。

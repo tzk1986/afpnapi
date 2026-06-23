@@ -119,7 +119,7 @@ class CheckpointManager:
             )
             return data
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning(f"Corrupted checkpoint, removing: {e}")
+            logger.warning("Corrupted checkpoint, removing: %s", e, extra={"event": "checkpoint.corrupted", "error": str(e)})
             checkpoint_path.unlink(missing_ok=True)
             return None
 
