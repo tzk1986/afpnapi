@@ -7,9 +7,10 @@
 - 安全：仅允许 http/https，超时配置从 config 动态读取，避免硬编码。
 """
 
+import base64 as _base64
 import logging
 import time as _time
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
@@ -19,6 +20,27 @@ from postman_api_tester.utils.request_builder import build_request_kwargs
 
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_url(normalized_url: str) -> Optional[str]:
+	"""校验 URL 仅允许 http/https 协议。返回错误信息，合法则返回 None。"""
+	parsed = urlparse(normalized_url)
+	if parsed.scheme not in ("http", "https") or not parsed.netloc:
+		return "url 仅允许合法的 http/https 地址"
+	return None
+
+
+def _parse_response_body(response: requests.Response) -> Tuple[Any, bool, str]:
+	"""根据 Content-Type 解析响应体，返回 (body, is_binary, content_type)。"""
+	content_type = response.headers.get("content-type", "")
+	if "application/json" in content_type:
+		try:
+			return response.json(), False, content_type
+		except ValueError:
+			return response.text, False, content_type
+	if content_type.startswith("image/"):
+		return _base64.b64encode(response.content).decode("ascii"), True, content_type
+	return response.text, False, content_type
 
 
 def execute_http_request(
@@ -47,8 +69,8 @@ def execute_http_request(
 	try:
 		normalized_url, normalized_params = normalize_url_and_params(url, params)
 
-		parsed = urlparse(normalized_url)
-		if parsed.scheme not in ("http", "https") or not parsed.netloc:
+		url_error = _validate_url(normalized_url)
+		if url_error is not None:
 			logger.warning(
 				"http request validation failed",
 				extra={
@@ -58,7 +80,7 @@ def execute_http_request(
 			)
 			return {
 				"success": False,
-				"error_message": "url 仅允许合法的 http/https 地址",
+				"error_message": url_error,
 				"error_code": 400,
 			}
 
@@ -111,20 +133,7 @@ def execute_http_request(
 		)
 		elapsed_ms = round((_time.time() - t0) * 1000)
 
-		content_type = response.headers.get('content-type', '')
-		response_body_is_binary = False
-		try:
-			if 'application/json' in content_type:
-				response_body: Any = response.json()
-			elif content_type.startswith('image/'):
-				import base64 as _base64
-				response_body = _base64.b64encode(response.content).decode('ascii')
-				response_body_is_binary = True
-			else:
-				response_body = response.text
-		except ValueError:
-			response_body = response.text
-
+		response_body, response_body_is_binary, content_type = _parse_response_body(response)
 		actual_request_url = str(getattr(response.request, "url", "") or "")
 		# 返回统一结构，供重试编辑、代理调试、报告写入链路复用。
 		logger.info(

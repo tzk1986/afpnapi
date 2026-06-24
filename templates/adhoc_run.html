@@ -258,7 +258,7 @@
                     </div>
                 </div>
                 <div class="adhoc-actions">
-                    <button type="button" class="btn-mini" onclick="addAdhocCase()">加入待测列表</button>
+                    <button type="button" class="btn-mini" onclick="addAdhocCase()" title="快捷键: Ctrl+Enter">加入待测列表</button>
                     <button type="button" class="btn-mini secondary" onclick="clearAdhocEditor()">清空当前输入</button>
                 </div>
                 <div class="adhoc-tip">单次最多 {{ adhoc_max_items }} 条接口。建议先整理一小批接口验证通过后，再追加更大范围。</div>
@@ -284,7 +284,7 @@
             </details>
 
             <div class="adhoc-actions">
-                <button id="runAdhocBtn" type="button" onclick="startRunAdhocJob()">执行并生成报告</button>
+                <button id="runAdhocBtn" type="button" onclick="startRunAdhocJob()" title="快捷键: Ctrl+Shift+Enter">执行并生成报告</button>
                 <button class="secondary" type="button" onclick="clearAdhocCases()">清空待测列表</button>
             </div>
             <div id="adhocRunStatus" class="run-status">新增接口后点击“执行并生成报告”，执行完成会自动跳转到最新报告。</div>
@@ -1051,6 +1051,20 @@ renderAdhocCaseList();
         });
     } catch (_) {}
 })();
+
+// 快捷键：Ctrl+Enter 加入待测列表，Ctrl+Shift+Enter 执行并生成报告
+document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key !== 'Enter') return;
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') return;
+    e.preventDefault();
+    if (e.shiftKey) {
+        const runBtn = document.getElementById('runAdhocBtn');
+        if (runBtn && !runBtn.disabled) startRunAdhocJob();
+    } else {
+        addAdhocCase();
+    }
+});
 </script>
 </body>
 </html>
