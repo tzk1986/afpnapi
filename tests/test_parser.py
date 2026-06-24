@@ -97,7 +97,7 @@ class TestExtractBaseUrl:
 
 	def test_empty_items(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser.extract_base_url() == ""
@@ -181,7 +181,7 @@ class TestExtractApis:
 
 	def test_empty_collection(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser.extract_apis() == []
@@ -346,35 +346,35 @@ class TestNormalizeApiName:
 
 	def test_normal_name(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser._normalize_api_name("Get Users", "GET", "/users") == "Get Users"
 
 	def test_empty_name_from_url(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser._normalize_api_name("", "GET", "/users") == "GET /users"
 
 	def test_question_mark_name_from_url(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser._normalize_api_name("?", "POST", "/api/data") == "POST /api/data"
 
 	def test_empty_name_and_url(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			assert parser._normalize_api_name("", "GET", "") == "GET 接口"
 
 	def test_baseUrl_prefix_stripped(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			result = parser._normalize_api_name("", "GET", "{{baseUrl}}/users")
@@ -386,7 +386,7 @@ class TestBuildUrlFromDict:
 
 	def test_path_with_query(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
 			url_dict = {
@@ -397,17 +397,17 @@ class TestBuildUrlFromDict:
 
 	def test_raw_url_fallback(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
-			url_dict = {"raw": "https://api.example.com/users", "path": []}
+			url_dict: Dict[str, Any] = {"raw": "https://api.example.com/users", "path": []}
 			assert parser._build_url_from_dict(url_dict) == "https://api.example.com/users"
 
 	def test_raw_variable_url(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			data = {"item": []}
+			data: Dict[str, Any] = {"item": []}
 			path = _write_collection(tmpdir, data)
 			parser = PostmanApiParser(path)
-			url_dict = {"raw": "{{baseUrl}}/users", "path": []}
+			url_dict: Dict[str, Any] = {"raw": "{{baseUrl}}/users", "path": []}
 			result = parser._build_url_from_dict(url_dict)
 			assert result == "/users"
