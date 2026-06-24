@@ -479,6 +479,96 @@ def _execute_api_suite_concurrent(
     return completed_count, execution_error
 
 
+def _execute_single_api(
+    idx: int,
+    total: int,
+    api: ApiConfig,
+    *,
+    report: PostmanTestReport,
+    resolved_token: Optional[str],
+    request_timeout: RequestTimeout,
+    assertion_strict_mode: bool,
+    judgment_config: Optional[Dict[str, Any]],
+    variable_context: Optional[object],
+    shared_session: SessionLike,
+    enable_checkpoint_recovery: bool,
+    checkpoint_flush_every_n: int,
+    checkpoint_path: str,
+    collection_fingerprint: str,
+    parser_base_url: str,
+    selected_total_count: int,
+    executed_item_paths: set[str],
+    total_apis_count: int,
+    progress_callback: Optional[ProgressCallback],
+) -> TestResultRecord:
+	"""执行单个 API 并将结果写入 report，同时处理 checkpoint 与进度回调。"""
+	logger.debug("[%d/%d] 测试: %s (%s %s)", idx, total, api['name'], api['method'], api['url'])
+
+	executor = PostmanTestExecutor(
+		api,
+		auth_token=resolved_token,
+		session=shared_session,
+		request_timeout=request_timeout,
+		assertion_strict_mode=assertion_strict_mode,
+		judgment_config=judgment_config,
+		variable_context=variable_context,  # type: ignore[arg-type]
+	)
+	executor.start()
+	result: TestResultRecord = executor.execute_test()
+	report.add_result(result)
+
+	data_index = int(api.get("data_index", 0) or 0)
+	item_path_key = _checkpoint_key(api.get("item_path"), data_index)
+	if item_path_key:
+		executed_item_paths.add(item_path_key)
+	if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
+		_flush_checkpoint_state(
+			enable_checkpoint_recovery=enable_checkpoint_recovery,
+			checkpoint_path=checkpoint_path,
+			collection_fingerprint=collection_fingerprint,
+			parser_base_url=parser_base_url,
+			selected_total_count=selected_total_count,
+			executed_item_paths=executed_item_paths,
+			completed=False,
+		)
+
+	event_payload = {
+		'event': 'test.run.executed',
+		'api_name': str(api.get('name', '')),
+		'method': str(api.get('method', '')),
+		'status': str(result.get('status', '')),
+		'response_time_ms': int(result.get('response_time_ms', 0) or 0),
+	}
+	if result['status'] == 'PASSED':
+		log_sampled(
+			logger,
+			logging.INFO,
+			"[%d/%d] %s %s → %s",
+			idx,
+			total,
+			api['method'],
+			api['name'],
+			result['status'],
+			sample_rate=PASSED_TEST_LOG_SAMPLE_RATE,
+			extra=event_payload,
+		)
+	else:
+		logger.warning("[%d/%d] %s %s → %s", idx, total, api['method'], api['name'], result['status'], extra=event_payload)
+
+	_emit_progress(progress_callback, {
+		'stage': 'running',
+		'total': total,
+		'total_all': total_apis_count,
+		'completed': idx,
+		'percent': int(idx * 100 / total) if total > 0 else 100,
+		'current_name': str(api.get('name', '')),
+		'current_method': str(api.get('method', '')),
+		'current_url': str(api.get('url', '')),
+		'last_status': str(result.get('status', '')),
+	})
+	return result
+
+
 def _execute_api_suite(
     *,
     apis: List[ApiConfig],
@@ -525,77 +615,32 @@ def _execute_api_suite(
 
     execution_error: Optional[Exception] = None
     completed_count = 0
+    total = len(apis)
 
     try:
         for idx, api in enumerate(apis, 1):
-            logger.debug("[%d/%d] 测试: %s (%s %s)", idx, len(apis), api['name'], api['method'], api['url'])
-
-            executor = PostmanTestExecutor(
-                api,
-                auth_token=resolved_token,
-                session=shared_session,
+            _execute_single_api(
+                idx, total, api,
+                report=report,
+                resolved_token=resolved_token,
                 request_timeout=request_timeout,
                 assertion_strict_mode=assertion_strict_mode,
                 judgment_config=judgment_config,
-                variable_context=variable_context,  # type: ignore[arg-type]
+                variable_context=variable_context,
+                shared_session=shared_session,
+                enable_checkpoint_recovery=enable_checkpoint_recovery,
+                checkpoint_flush_every_n=checkpoint_flush_every_n,
+                checkpoint_path=checkpoint_path,
+                collection_fingerprint=collection_fingerprint,
+                parser_base_url=parser_base_url,
+                selected_total_count=selected_total_count,
+                executed_item_paths=executed_item_paths,
+                total_apis_count=total_apis_count,
+                progress_callback=progress_callback,
             )
-            executor.start()
-            result: TestResultRecord = executor.execute_test()
-            report.add_result(result)
             completed_count = idx
-
-            data_index = int(api.get("data_index", 0) or 0)
-            item_path_key = _checkpoint_key(api.get("item_path"), data_index)
-            if item_path_key:
-                executed_item_paths.add(item_path_key)
-            if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
-                _flush_checkpoint_state(
-                    enable_checkpoint_recovery=enable_checkpoint_recovery,
-                    checkpoint_path=checkpoint_path,
-                    collection_fingerprint=collection_fingerprint,
-                    parser_base_url=parser_base_url,
-                    selected_total_count=selected_total_count,
-                    executed_item_paths=executed_item_paths,
-                    completed=False,
-                )
-
-            event_payload = {
-                'event': 'test.run.executed',
-                'api_name': str(api.get('name', '')),
-                'method': str(api.get('method', '')),
-                'status': str(result.get('status', '')),
-                'response_time_ms': int(result.get('response_time_ms', 0) or 0),
-            }
-            if result['status'] == 'PASSED':
-                log_sampled(
-                    logger,
-                    logging.INFO,
-                    "[%d/%d] %s %s 鈫?%s",
-                    idx,
-                    len(apis),
-                    api['method'],
-                    api['name'],
-                    result['status'],
-                    sample_rate=PASSED_TEST_LOG_SAMPLE_RATE,
-                    extra=event_payload,
-                )
-            else:
-                logger.warning("[%d/%d] %s %s 鈫?%s", idx, len(apis), api['method'], api['name'], result['status'], extra=event_payload)
-
-            _emit_progress(progress_callback, {
-                'stage': 'running',
-                'total': len(apis),
-                'total_all': total_apis_count,
-                'completed': idx,
-                'percent': int(idx * 100 / len(apis)) if len(apis) > 0 else 100,
-                'current_name': str(api.get('name', '')),
-                'current_method': str(api.get('method', '')),
-                'current_url': str(api.get('url', '')),
-                'last_status': str(result.get('status', '')),
-            })
     except Exception as exc:
         execution_error = exc
-        # 单条请求可能抛出任意异常，保持宽捕获以确保部分结果可输出。
         logger.exception("执行过程中发生中断异常，将输出部分成功报告: %s", exc)
 
     return completed_count, execution_error
