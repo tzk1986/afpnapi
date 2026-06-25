@@ -113,8 +113,11 @@ def api_manual_case_add() -> ResponseReturnValue:
         )
     except FileNotFoundError:
         return _json_error(f"报告不存在：{report_name}", 404, "RPT_MANUAL_003")
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "RPT_MANUAL_004")
+    except Exception as exc:
+        logger.exception("add_manual_case error")
+        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_004")
     return jsonify(build_manual_case_upsert_payload(report_name=report_name, result=result))
 
 
@@ -140,8 +143,11 @@ def api_manual_case_update() -> ResponseReturnValue:
         )
     except FileNotFoundError as exc:
         return _json_error(str(exc), 404, "RPT_MANUAL_007")
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "RPT_MANUAL_008")
+    except Exception as exc:
+        logger.exception("update_manual_case error")
+        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_008")
     return jsonify(build_manual_case_upsert_payload(report_name=report_name, result=result))
 
 
@@ -165,8 +171,11 @@ def api_manual_case_delete() -> ResponseReturnValue:
         )
     except FileNotFoundError as exc:
         return _json_error(str(exc), 404, "RPT_MANUAL_011")
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "RPT_MANUAL_012")
+    except Exception as exc:
+        logger.exception("delete_manual_case error")
+        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_012")
     return jsonify(build_manual_case_delete_payload(report_name=report_name, result=result))
 
 
@@ -192,8 +201,11 @@ def api_report_case_exclusion() -> ResponseReturnValue:
         )
     except FileNotFoundError:
         return _json_error(f"报告不存在：{report_name}", 404, "RPT_EXCL_003")
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "RPT_EXCL_004")
+    except Exception as exc:
+        logger.exception("set_case_exclusion error")
+        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_EXCL_004")
     return jsonify(build_case_exclusion_payload(report_name=report_name, excluded=excluded, result=result))
 
 
@@ -233,8 +245,11 @@ def api_report_result_judgement() -> ResponseReturnValue:
         return _json_error(f"报告不存在：{report_name}", 404, "RPT_JUDGE_003")
     except IndexError:
         return _json_error(f"结果索引不存在：{result_index}", 404, "RPT_JUDGE_004")
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "RPT_JUDGE_005")
+    except Exception as exc:
+        logger.exception("set_result_judgement error")
+        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_JUDGE_005")
 
     return jsonify(
         build_result_judgement_payload(
