@@ -120,6 +120,16 @@
         .json-extract-btn { display: none; margin-left: 8px; padding: 1px 6px; font-size: 10px; background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; border-radius: 3px; cursor: pointer; vertical-align: middle; }
         .json-line:hover > .json-extract-btn { display: inline; }
 
+        /* JSON Search */
+        .json-search-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; padding: 6px 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .json-search-bar input { flex: 1; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; outline: none; }
+        .json-search-bar input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+        .json-search-btn { padding: 4px 8px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; font-size: 11px; color: #475569; }
+        .json-search-btn:hover { background: #e2e8f0; }
+        .json-search-count { font-size: 11px; color: #64748b; min-width: 60px; text-align: right; }
+        .json-highlight { background: #fef08a; border-radius: 2px; }
+        .json-highlight-current { background: #fbbf24; border-radius: 2px; }
+
         /* Response Headers Table */
         .resp-headers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .resp-headers-table th, .resp-headers-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
@@ -2288,7 +2298,14 @@
 
             if (format === 'json') {
                 if (typeof jsonObj === 'object' && jsonObj !== null) {
-                    return `<div class="json-tree">${renderJsonNode(jsonObj, '$', true)}</div>`;
+                    return `
+                        <div class="json-search-bar">
+                            <input type="text" id="jsonSearchInput" placeholder="搜索 JSON..." onkeyup="handleJsonSearch(event)" />
+                            <button type="button" class="json-search-btn" onclick="searchJsonPrev()" title="上一个">▲</button>
+                            <button type="button" class="json-search-btn" onclick="searchJsonNext()" title="下一个">▼</button>
+                            <span id="jsonSearchCount" class="json-search-count"></span>
+                        </div>
+                        <div class="json-tree">${renderJsonNode(jsonObj, '$', true)}</div>`;
                 }
                 return `<div class="json-tree">${escapeHtml(JSON.stringify(jsonObj, null, 2))}</div>`;
             }
@@ -2444,6 +2461,147 @@
             const parent = toggleEl.parentElement;
             const isCollapsed = parent.classList.toggle('json-collapsed');
             toggleEl.textContent = isCollapsed ? '▶' : '▼';
+        }
+
+        // JSON Search functionality
+        let jsonSearchMatches = [];
+        let jsonSearchCurrentIndex = -1;
+
+        function handleJsonSearch(event) {
+            if (event.key === 'Enter') {
+                if (event.shiftKey) {
+                    searchJsonPrev();
+                } else {
+                    searchJsonNext();
+                }
+            } else {
+                searchJsonTree(event.target.value);
+            }
+        }
+
+        function searchJsonTree(keyword) {
+            jsonSearchMatches = [];
+            jsonSearchCurrentIndex = -1;
+            clearJsonHighlights();
+
+            if (!keyword || !keyword.trim()) {
+                updateSearchCount();
+                return;
+            }
+
+            keyword = keyword.toLowerCase();
+            const treeEl = document.querySelector('.json-tree');
+            if (!treeEl) return;
+
+            const walker = document.createTreeWalker(treeEl, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                const text = node.textContent.toLowerCase();
+                if (text.includes(keyword)) {
+                    const parent = node.parentElement;
+                    if (parent && !parent.classList.contains('json-toggle')) {
+                        highlightTextNode(node, keyword);
+                    }
+                }
+            }
+
+            updateSearchCount();
+            if (jsonSearchMatches.length > 0) {
+                searchJsonNext();
+            }
+        }
+
+        function highlightTextNode(textNode, keyword) {
+            const text = textNode.textContent;
+            const lowerText = text.toLowerCase();
+            const lowerKeyword = keyword.toLowerCase();
+            let lastIndex = 0;
+            const fragment = document.createDocumentFragment();
+            let index;
+
+            while ((index = lowerText.indexOf(lowerKeyword, lastIndex)) !== -1) {
+                if (index > lastIndex) {
+                    fragment.appendChild(document.createTextNode(text.slice(lastIndex, index)));
+                }
+                const matchSpan = document.createElement('span');
+                matchSpan.className = 'json-highlight';
+                matchSpan.textContent = text.slice(index, index + keyword.length);
+                fragment.appendChild(matchSpan);
+                jsonSearchMatches.push(matchSpan);
+                lastIndex = index + keyword.length;
+            }
+
+            if (lastIndex < text.length) {
+                fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+            }
+
+            textNode.parentNode.replaceChild(fragment, textNode);
+        }
+
+        function clearJsonHighlights() {
+            const highlights = document.querySelectorAll('.json-highlight, .json-highlight-current');
+            highlights.forEach(el => {
+                const parent = el.parentNode;
+                parent.replaceChild(document.createTextNode(el.textContent), el);
+                parent.normalize();
+            });
+            jsonSearchMatches = [];
+            jsonSearchCurrentIndex = -1;
+        }
+
+        function updateSearchCount() {
+            const countEl = document.getElementById('jsonSearchCount');
+            if (countEl) {
+                if (jsonSearchMatches.length === 0) {
+                    countEl.textContent = document.getElementById('jsonSearchInput').value ? '0 结果' : '';
+                } else {
+                    countEl.textContent = `${jsonSearchCurrentIndex + 1}/${jsonSearchMatches.length}`;
+                }
+            }
+        }
+
+        function searchJsonNext() {
+            if (jsonSearchMatches.length === 0) return;
+            if (jsonSearchCurrentIndex >= 0) {
+                jsonSearchMatches[jsonSearchCurrentIndex].classList.remove('json-highlight-current');
+                jsonSearchMatches[jsonSearchCurrentIndex].classList.add('json-highlight');
+            }
+            jsonSearchCurrentIndex = (jsonSearchCurrentIndex + 1) % jsonSearchMatches.length;
+            scrollToMatch();
+        }
+
+        function searchJsonPrev() {
+            if (jsonSearchMatches.length === 0) return;
+            if (jsonSearchCurrentIndex >= 0) {
+                jsonSearchMatches[jsonSearchCurrentIndex].classList.remove('json-highlight-current');
+                jsonSearchMatches[jsonSearchCurrentIndex].classList.add('json-highlight');
+            }
+            jsonSearchCurrentIndex = (jsonSearchCurrentIndex - 1 + jsonSearchMatches.length) % jsonSearchMatches.length;
+            scrollToMatch();
+        }
+
+        function scrollToMatch() {
+            if (jsonSearchCurrentIndex < 0 || jsonSearchCurrentIndex >= jsonSearchMatches.length) return;
+            const match = jsonSearchMatches[jsonSearchCurrentIndex];
+            match.classList.remove('json-highlight');
+            match.classList.add('json-highlight-current');
+
+            expandAncestors(match);
+
+            match.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            updateSearchCount();
+        }
+
+        function expandAncestors(el) {
+            let parent = el.parentElement;
+            while (parent && !parent.classList.contains('json-tree')) {
+                if (parent.classList.contains('json-collapsed')) {
+                    parent.classList.remove('json-collapsed');
+                    const toggle = parent.querySelector(':scope > .json-toggle');
+                    if (toggle) toggle.textContent = '▼';
+                }
+                parent = parent.parentElement;
+            }
         }
 
         // Render Response Headers

@@ -80,6 +80,17 @@ class TestApiManualCaseAdd:
             assert isinstance(result, tuple)
             assert result[1] == 400
 
+    def test_report_name_too_long(self, app_context: None) -> None:
+        """report_name 超长返回 400。"""
+        with patch(
+            "postman_api_tester.handlers.report_meta_routes.request"
+        ) as mock_request:
+            long_name = "x" * 300
+            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "case": {}})
+            result = api_manual_case_add()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+
     def test_missing_case(self, app_context: None) -> None:
         """缺少 case 返回 400。"""
         with patch(
@@ -104,6 +115,28 @@ class TestApiManualCaseDelete:
             assert isinstance(result, tuple)
             assert result[1] == 400
 
+    def test_report_name_too_long(self, app_context: None) -> None:
+        """report_name 超长返回 400。"""
+        with patch(
+            "postman_api_tester.handlers.report_meta_routes.request"
+        ) as mock_request:
+            long_name = "x" * 300
+            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "case_id": "c1"})
+            result = api_manual_case_delete()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+
+    def test_case_id_too_long(self, app_context: None) -> None:
+        """case_id 超长返回 400。"""
+        with patch(
+            "postman_api_tester.handlers.report_meta_routes.request"
+        ) as mock_request:
+            long_id = "x" * 150
+            mock_request.get_json = MagicMock(return_value={"report_name": "test", "case_id": long_id})
+            result = api_manual_case_delete()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+
 
 class TestApiReportCaseExclusion:
     """api_report_case_exclusion 端点测试。"""
@@ -114,6 +147,28 @@ class TestApiReportCaseExclusion:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             mock_request.get_json = MagicMock(return_value={})
+            result = api_report_case_exclusion()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+
+    def test_report_name_too_long(self, app_context: None) -> None:
+        """report_name 超长返回 400。"""
+        with patch(
+            "postman_api_tester.handlers.report_meta_routes.request"
+        ) as mock_request:
+            long_name = "x" * 300
+            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "exclusion_key": "key"})
+            result = api_report_case_exclusion()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+
+    def test_exclusion_key_too_long(self, app_context: None) -> None:
+        """exclusion_key 超长返回 400。"""
+        with patch(
+            "postman_api_tester.handlers.report_meta_routes.request"
+        ) as mock_request:
+            long_key = "x" * 600
+            mock_request.get_json = MagicMock(return_value={"report_name": "test", "exclusion_key": long_key})
             result = api_report_case_exclusion()
             assert isinstance(result, tuple)
             assert result[1] == 400
