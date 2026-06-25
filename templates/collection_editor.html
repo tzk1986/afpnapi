@@ -2245,8 +2245,8 @@
                 html += `\n<span class="pp-body">`;
                 if (bodyMode === 'raw' && bodyData.language === 'json') {
                     try {
-                        const formatted = JSON.stringify(JSON.parse(bodyContent), null, 2);
-                        html += escapeHtml(formatted);
+                        const jsonObj = JSON.parse(bodyContent);
+                        html += `<div class="json-tree" style="background:transparent;padding:0;">${renderJsonNode(jsonObj, '$', true, 0, false)}</div>`;
                     } catch (e) {
                         html += escapeHtml(bodyContent);
                     }
@@ -2391,19 +2391,25 @@
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        // Render JSON node recursively
-        function renderJsonNode(value, path, isRoot) {
+        // Render JSON node recursively with depth-based indentation
+        // showExtract: true for response body (with Extract buttons), false for request preview
+        function renderJsonNode(value, path, isRoot, depth, showExtract) {
+            if (depth === undefined) depth = 0;
+            if (showExtract === undefined) showExtract = true;
+            const indent = '  '.repeat(depth + 1);
+            const closingIndent = '  '.repeat(depth);
+            const extractBtn = showExtract ? `<button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>` : '';
             if (value === null) {
-                return `<span class="json-null">null</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+                return `<span class="json-null">null</span>${extractBtn}`;
             }
             if (typeof value === 'boolean') {
-                return `<span class="json-bool">${value}</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+                return `<span class="json-bool">${value}</span>${extractBtn}`;
             }
             if (typeof value === 'number') {
-                return `<span class="json-num">${value}</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+                return `<span class="json-num">${value}</span>${extractBtn}`;
             }
             if (typeof value === 'string') {
-                return `<span class="json-str">"${escapeHtml(value)}"</span><button type="button" class="json-extract-btn" onclick="extractFromResponse('${escapeAttr(path)}')">Extract</button>`;
+                return `<span class="json-str">"${escapeHtml(value)}"</span>${extractBtn}`;
             }
             if (Array.isArray(value)) {
                 if (value.length === 0) return '<span style="color:#94a3b8;">[]</span>';
@@ -2411,9 +2417,9 @@
                 html += `<span class="json-children">`;
                 for (let i = 0; i < value.length; i++) {
                     const childPath = `${path}[${i}]`;
-                    html += `  <span class="json-line">${renderJsonNode(value[i], childPath, false)}</span>${i < value.length - 1 ? ',' : ''}\n`;
+                    html += `${indent}<span class="json-line">${renderJsonNode(value[i], childPath, false, depth + 1, showExtract)}</span>${i < value.length - 1 ? ',' : ''}\n`;
                 }
-                html += `</span>]`;
+                html += `</span>${closingIndent}]`;
                 html += `<span class="json-ellipsis">[${value.length}]</span>`;
                 return html;
             }
@@ -2425,9 +2431,9 @@
                 for (let i = 0; i < keys.length; i++) {
                     const k = keys[i];
                     const childPath = `${path}.${k}`;
-                    html += `  <span class="json-line"><span class="json-key">"${escapeHtml(k)}"</span>: ${renderJsonNode(value[k], childPath, false)}</span>${i < keys.length - 1 ? ',' : ''}\n`;
+                    html += `${indent}<span class="json-line"><span class="json-key">"${escapeHtml(k)}"</span>: ${renderJsonNode(value[k], childPath, false, depth + 1, showExtract)}</span>${i < keys.length - 1 ? ',' : ''}\n`;
                 }
-                html += `</span>}`;
+                html += `</span>${closingIndent}}`;
                 html += `<span class="json-ellipsis">{${keys.length}}</span>`;
                 return html;
             }
