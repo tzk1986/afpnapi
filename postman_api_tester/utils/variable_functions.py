@@ -10,11 +10,16 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import random
+import string
 import time
 import uuid
 from datetime import datetime
 from typing import Callable, Dict
+from urllib.parse import quote
 
 VariableFunc = Callable[..., str]
 
@@ -95,6 +100,68 @@ def _datetime(fmt: str = "") -> str:
     return datetime.now().strftime(fmt or "%Y-%m-%d %H:%M:%S")
 
 
+@register("hmac_sha256")
+def _hmac_sha256(data: str = "", key: str = "") -> str:
+    """HMAC-SHA256 签名，返回十六进制字符串。"""
+    if not data or not key:
+        return ""
+    return hmac.new(key.encode("utf-8"), data.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+@register("md5")
+def _md5(text: str = "") -> str:
+    """MD5 哈希，返回十六进制字符串。"""
+    if not text:
+        return ""
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+
+@register("base64_encode")
+def _base64_encode(text: str = "") -> str:
+    """Base64 编码。"""
+    if not text:
+        return ""
+    return base64.b64encode(text.encode("utf-8")).decode("utf-8")
+
+
+@register("base64_decode")
+def _base64_decode(text: str = "") -> str:
+    """Base64 解码。"""
+    if not text:
+        return ""
+    try:
+        return base64.b64decode(text.encode("utf-8")).decode("utf-8")
+    except Exception:
+        return ""
+
+
+@register("random_string")
+def _random_string(length: str = "8", charset: str = "alphanumeric") -> str:
+    """随机字符串。charset 可选：alpha/alphanumeric/numeric/hex。"""
+    charset_map = {
+        "alpha": string.ascii_letters,
+        "alphanumeric": string.ascii_letters + string.digits,
+        "numeric": string.digits,
+        "hex": string.hexdigits[:16],
+    }
+    chars = charset_map.get(charset, charset_map["alphanumeric"])
+    try:
+        n = int(length)
+    except (ValueError, TypeError):
+        return ""
+    if n <= 0:
+        return ""
+    return "".join(random.choice(chars) for _ in range(n))
+
+
+@register("url_encode")
+def _url_encode(text: str = "") -> str:
+    """URL 编码。"""
+    if not text:
+        return ""
+    return quote(text, safe="")
+
+
 # ── 函数元数据（用于 UI 展示）──────────────────────────────────────────
 
 _FUNCTION_META: Dict[str, Dict[str, str]] = {
@@ -133,6 +200,42 @@ _FUNCTION_META: Dict[str, Dict[str, str]] = {
         "params": "fmt=日期时间格式(默认%Y-%m-%d %H:%M:%S)",
         "description": "当前日期时间字符串",
         "example": "{{datetime(%H:%M)}} → 14:30",
+    },
+    "hmac_sha256": {
+        "syntax": "{{hmac_sha256(data,key)}}",
+        "params": "data=待签名数据, key=密钥",
+        "description": "HMAC-SHA256 签名（十六进制）",
+        "example": "{{hmac_sha256(order123,secret)}} → a3f5...",
+    },
+    "md5": {
+        "syntax": "{{md5(text)}}",
+        "params": "text=待哈希文本",
+        "description": "MD5 哈希（十六进制）",
+        "example": "{{md5(password)}} → 5f4d...",
+    },
+    "base64_encode": {
+        "syntax": "{{base64_encode(text)}}",
+        "params": "text=待编码文本",
+        "description": "Base64 编码",
+        "example": "{{base64_encode(user:pass)}} → dXNlcjpwYXNz",
+    },
+    "base64_decode": {
+        "syntax": "{{base64_decode(text)}}",
+        "params": "text=Base64 字符串",
+        "description": "Base64 解码",
+        "example": "{{base64_decode(dXNlcjpwYXNz)}} → user:pass",
+    },
+    "random_string": {
+        "syntax": "{{random_string(length,charset)}}",
+        "params": "length=长度(默认8), charset=字符集(alpha/alphanumeric/numeric/hex)",
+        "description": "随机字符串",
+        "example": "{{random_string(16,alpha)}} → abcXYZ...",
+    },
+    "url_encode": {
+        "syntax": "{{url_encode(text)}}",
+        "params": "text=待编码文本",
+        "description": "URL 编码",
+        "example": "{{url_encode(hello world)}} → hello%20world",
     },
 }
 

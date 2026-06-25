@@ -306,7 +306,19 @@ class PostmanTestExecutor:
 
         if self.variable_context is not None:
             from postman_api_tester.utils.variable_substitution import substitute_in_api_config
-            api = substitute_in_api_config(api, self.variable_context.variables)
+
+            local_vars: Dict[str, str] = {}
+            pre_request_expr = api.get("x_pre_request")
+            if pre_request_expr:
+                from postman_api_tester.config import ENABLE_PRE_REQUEST_SCRIPT
+                if ENABLE_PRE_REQUEST_SCRIPT:
+                    from postman_api_tester.utils.pre_request_executor import execute_pre_request
+                    local_vars = execute_pre_request(pre_request_expr, self.variable_context.variables)
+                    if local_vars:
+                        logging.getLogger(__name__).debug("pre-request variables set: %s", list(local_vars.keys()))
+
+            merged_vars = {**self.variable_context.variables, **local_vars}
+            api = substitute_in_api_config(api, merged_vars)
             self.api_config = dict(api)
 
         method = str(api.get('method') or 'GET').lower()

@@ -395,3 +395,6 @@ ENABLE_VARIABLE_FUNCTIONS = str(os.environ.get("ENABLE_VARIABLE_FUNCTIONS", "tru
 }
 GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
 GLOBAL_VARIABLES_MAX_COUNT = max(1, min(100000, int(os.environ.get("GLOBAL_VARIABLES_MAX_COUNT", "1000"))))
+ENABLE_PRE_REQUEST_SCRIPT = str(os.environ.get("ENABLE_PRE_REQUEST_SCRIPT", "false")).strip().lower() in {
+    "1", "true", "yes", "y", "on"
+}
