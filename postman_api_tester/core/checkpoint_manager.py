@@ -8,13 +8,12 @@
 
 import json
 import logging
-import os
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from postman_api_tester.exceptions import CheckpointRecoveryFailed
+from postman_api_tester.utils.file_utils import atomic_write_json
 
 logger = logging.getLogger(__name__)
 
@@ -76,17 +75,7 @@ class CheckpointManager:
         }
 
         try:
-            # 原子写入：先写临时文件，再重命名
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=str(self.checkpoint_dir),
-                delete=False,
-                suffix=".tmp",
-            ) as f:
-                json.dump(data, f, ensure_ascii=False)
-                temp_path = f.name
-
-            os.replace(temp_path, checkpoint_path)
+            atomic_write_json(checkpoint_path, data)
             logger.debug(
                 "checkpoint_saved",
                 extra={"fingerprint": fingerprint, "count": len(executed_item_paths)},

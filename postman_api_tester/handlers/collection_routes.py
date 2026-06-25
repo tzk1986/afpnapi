@@ -1,8 +1,11 @@
 """集合预览与导出路由处理函数。"""
 
 import json
+import logging
 from pathlib import Path
 from typing import Iterator
+
+logger = logging.getLogger(__name__)
 
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
@@ -101,8 +104,11 @@ def api_export_collection() -> ResponseReturnValue:
             include_auth=include_auth,
             export_scope=export_scope,
         )
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "COL_EXPORT_003")
+    except Exception as exc:
+        logger.exception("export_collection error")
+        return _json_error(f"导出异常：{type(exc).__name__}", 500, "COL_EXPORT_003")
 
     return jsonify(
         build_export_collection_payload(
@@ -141,8 +147,11 @@ def api_export_collection_stream() -> ResponseReturnValue:
             include_auth=include_auth,
             export_scope=export_scope,
         )
-    except Exception as exc:
+    except ValueError as exc:
         return _json_error(str(exc), 400, "COL_EXPORT_003")
+    except Exception as exc:
+        logger.exception("export_collection_stream error")
+        return _json_error(f"导出异常：{type(exc).__name__}", 500, "COL_EXPORT_003")
 
     export_path = Path(str(exported.get("file_path") or ""))
     if not export_path.exists():
