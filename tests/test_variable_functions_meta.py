@@ -11,9 +11,9 @@ class TestGetFunctionMetadata:
         result = get_function_metadata()
         assert isinstance(result, list)
 
-    def test_six_functions(self) -> None:
+    def test_twelve_functions(self) -> None:
         result = get_function_metadata()
-        assert len(result) == 6
+        assert len(result) == 12
 
     def test_each_has_required_keys(self) -> None:
         result = get_function_metadata()

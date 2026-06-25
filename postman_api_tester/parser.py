@@ -53,6 +53,7 @@ class ApiConfig(TypedDict, total=False):
     x_enable_err_code_judgment: Optional[bool]
     x_enable_message_judgment: Optional[bool]
     x_extract: Optional[Dict[str, str]]
+    x_pre_request: Optional[Dict[str, str]]
     data_index: int
     data_row: Dict[str, str]
 
@@ -252,6 +253,13 @@ class PostmanApiParser:
             if not x_extract:
                 x_extract = None
 
+        x_pre_request_raw = request.get('x_pre_request')
+        x_pre_request: Optional[Dict[str, str]] = None
+        if isinstance(x_pre_request_raw, dict) and x_pre_request_raw:
+            x_pre_request = {str(k): str(v) for k, v in x_pre_request_raw.items() if isinstance(v, str)}
+            if not x_pre_request:
+                x_pre_request = None
+
         result: ApiConfig = {
             'name': name,
             'folder': parent_name,
@@ -277,6 +285,8 @@ class PostmanApiParser:
             result['x_enable_message_judgment'] = x_enable_message
         if x_extract is not None:
             result['x_extract'] = x_extract
+        if x_pre_request is not None:
+            result['x_pre_request'] = x_pre_request
 
         return result
 

@@ -1097,8 +1097,8 @@
             }
 
             const tab = state.activeTab || 'general';
-            const tabs = ['general', 'headers', 'params', 'body', 'extract'];
-            const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', extract: 'x_extract'};
+            const tabs = ['general', 'headers', 'params', 'body', 'pre_request', 'extract'];
+            const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', pre_request: 'Pre-request', extract: 'x_extract'};
             const tabsHtml = tabs.map(t =>
                 `<button type="button" class="tab ${t === tab ? 'active' : ''}" onclick="switchTab('${t}', this)">${tabLabels[t]}</button>`
             ).join('');
@@ -1239,6 +1239,7 @@
                 case 'params': content.innerHTML = renderKVTab(req.params || [], 'params'); break;
                 case 'body': content.innerHTML = renderBodyTab(req); break;
                 case 'extract': content.innerHTML = renderExtractTab(req); break;
+                case 'pre_request': content.innerHTML = renderPreRequestTab(req); break;
             }
         }
 
@@ -1248,6 +1249,7 @@
                 case 'params': return renderKVTab(req.params || [], 'params');
                 case 'body': return renderBodyTab(req);
                 case 'extract': return renderExtractTab(req);
+                case 'pre_request': return renderPreRequestTab(req);
                 default: return renderGeneralTab(req);
             }
         }
@@ -1388,6 +1390,37 @@
             return html;
         }
 
+        // Pre-request Tab
+        function renderPreRequestTab(req) {
+            const preReqs = req.x_pre_request || {};
+            const entries = Object.entries(preReqs);
+
+            let html = '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
+            html += 'Pre-request 脚本：在请求发出前执行 Python 表达式，动态设置变量。需启用 ENABLE_PRE_REQUEST_SCRIPT=true。';
+            html += '</div>';
+            html += '<div style="margin-bottom:12px;">';
+            for (let i = 0; i < entries.length; i++) {
+                const [key, value] = entries[i];
+                html += `<div class="kv-row">
+                    <input type="text" placeholder="变量名" value="${escapeAttr(key)}" onchange="updatePreRequestKey(${i}, this.value, '${escapeAttr(value)}')" style="flex:0 0 140px;">
+                    <input type="text" placeholder="Python 表达式（如 hashlib.md5(b'test').hexdigest()）" value="${escapeAttr(value)}" onchange="updatePreRequestValue(${i}, '${escapeAttr(key)}', this.value)">
+                    <button type="button" onclick="removePreRequest(${i})"></button>
+                </div>`;
+            }
+            html += '</div>';
+            html += `<button type="button" class="btn btn-secondary" onclick="addPreRequest()" style="font-size:12px;">+ 添加表达式</button>`;
+
+            html += '<div class="var-panel" style="margin-top:12px;"><h4>可用模块与变量</h4>';
+            html += '<div style="font-size:12px;color:#666;line-height:1.8;">';
+            html += '<b>模块</b>: hashlib, hmac, base64, time, json, re<br>';
+            html += '<b>变量引用</b>: variables.get(\'name\', \'default\')<br>';
+            html += '<b>前置结果</b>: result.get(\'var_name\', \'\')<br>';
+            html += '<b>示例</b>: <code>hmac.new(b\'secret\', b\'data\', hashlib.sha256).hexdigest()</code>';
+            html += '</div></div>';
+
+            return html;
+        }
+
         // Update Functions
         function updateField(field, value) {
             if (state.editBuffer) {
@@ -1506,6 +1539,56 @@
                 const entries = Object.entries(state.editBuffer.x_extract);
                 if (entries[index]) {
                     delete state.editBuffer.x_extract[entries[index][0]];
+                    syncToAllRequests();
+                    renderEditor();
+                }
+            }
+        }
+
+        function updatePreRequestKey(index, newKey, oldValue) {
+            if (state.editBuffer) {
+                const preReqs = state.editBuffer.x_pre_request || {};
+                const entries = Object.entries(preReqs);
+                if (entries[index]) {
+                    delete preReqs[entries[index][0]];
+                    preReqs[newKey] = oldValue;
+                    state.editBuffer.x_pre_request = preReqs;
+                    syncToAllRequests();
+                    renderEditor();
+                }
+            }
+        }
+
+        function updatePreRequestValue(index, oldKey, newValue) {
+            if (state.editBuffer && state.editBuffer.x_pre_request) {
+                state.editBuffer.x_pre_request[oldKey] = newValue;
+                syncToAllRequests();
+            }
+        }
+
+        function addPreRequest() {
+            if (state.editBuffer) {
+                if (!state.editBuffer.x_pre_request) state.editBuffer.x_pre_request = {};
+                const varName = prompt('变量名：');
+                if (varName) {
+                    const expr = prompt('Python 表达式（如 hashlib.md5(b\'test\').hexdigest()）：');
+                    if (expr !== null) {
+                        state.editBuffer.x_pre_request[varName] = expr;
+                        syncToAllRequests();
+                        renderEditor();
+                    }
+                }
+            }
+        }
+
+        function removePreRequest(index) {
+            if (state.editBuffer && state.editBuffer.x_pre_request) {
+                const entries = Object.entries(state.editBuffer.x_pre_request);
+                if (entries[index]) {
+                    delete state.editBuffer.x_pre_request[entries[index][0]];
+                    if (Object.keys(state.editBuffer.x_pre_request).length === 0) {
+                        delete state.editBuffer.x_pre_request;
+                    }
                     syncToAllRequests();
                     renderEditor();
                 }
@@ -4386,7 +4469,7 @@
             const harObj = {
                 log: {
                     version: '1.2',
-                    creator: { name: 'Postman API Tester', version: '1.17.5' },
+                    creator: { name: 'Postman API Tester', version: '1.18.0' },
                     entries: [{
                         startedDateTime: new Date().toISOString(),
                         time: 0,
