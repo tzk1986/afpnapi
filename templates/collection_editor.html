@@ -130,6 +130,55 @@
         .json-highlight { background: #fef08a; border-radius: 2px; }
         .json-highlight-current { background: #fbbf24; border-radius: 2px; }
 
+        /* Compare History Panel */
+        .compare-history-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .compare-history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; font-weight: 600; color: #334155; }
+        .compare-start-btn { padding: 4px 12px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        .compare-start-btn:hover { background: #2563eb; }
+        .compare-clear-btn { padding: 4px 8px; background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; cursor: pointer; margin-left: 6px; }
+        .compare-clear-btn:hover { background: #e2e8f0; }
+        .compare-history-empty { color: #94a3b8; font-size: 12px; text-align: center; padding: 20px; }
+        .compare-history-list { max-height: 300px; overflow-y: auto; }
+        .compare-history-item { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+        .compare-history-item:hover { background: #f8fafc; }
+        .compare-history-item.selected { background: #eff6ff; border: 1px solid #93c5fd; }
+        .compare-history-item input[type="checkbox"] { flex-shrink: 0; }
+        .compare-item-info { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+        .compare-item-time { color: #94a3b8; flex-shrink: 0; }
+        .compare-item-status { padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+        .compare-item-status.ok { background: #dcfce7; color: #16a34a; }
+        .compare-item-status.warn { background: #fef3c7; color: #d97706; }
+        .compare-item-status.error { background: #fee2e2; color: #dc2626; }
+        .compare-item-url { color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Compare Modal */
+        .compare-modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
+        .compare-modal-overlay.visible { display: flex; }
+        .compare-modal { background: #fff; border-radius: 12px; width: 95vw; height: 90vh; display: flex; flex-direction: column; box-shadow: 0 12px 48px rgba(0,0,0,0.2); }
+        .compare-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #e2e8f0; }
+        .compare-modal-header h2 { font-size: 18px; color: #0f172a; margin: 0; }
+        .compare-modal-close { background: none; border: none; font-size: 24px; color: #64748b; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+        .compare-modal-close:hover { background: #f1f5f9; }
+        .compare-modal-tabs { display: flex; gap: 4px; padding: 12px 24px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+        .compare-tab { padding: 6px 14px; border: none; background: transparent; color: #64748b; cursor: pointer; font-size: 12px; border-radius: 5px; }
+        .compare-tab.active { background: #fff; color: #0f172a; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .compare-modal-body { flex: 1; display: flex; overflow: hidden; }
+        .compare-pane { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #e2e8f0; overflow: hidden; }
+        .compare-pane:last-child { border-right: none; }
+        .compare-pane-header { padding: 10px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #475569; display: flex; justify-content: space-between; align-items: center; }
+        .compare-pane-content { flex: 1; overflow: auto; padding: 12px 16px; font-family: Consolas, "Courier New", monospace; font-size: 12px; line-height: 1.6; }
+        .compare-diff-line { display: flex; }
+        .compare-diff-line.added { background: #e6ffed; }
+        .compare-diff-line.removed { background: #ffeef0; }
+        .compare-diff-line.unchanged { background: transparent; }
+        .compare-diff-line .line-num { color: #94a3b8; width: 40px; text-align: right; padding-right: 8px; flex-shrink: 0; user-select: none; }
+        .compare-diff-line .line-content { flex: 1; white-space: pre-wrap; word-break: break-all; }
+        .compare-diff-line.added .line-content { color: #22863a; }
+        .compare-diff-line.removed .line-content { color: #cb2431; }
+        .compare-diff-stats { padding: 12px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; color: #64748b; display: flex; gap: 16px; }
+        .compare-stat-added { color: #16a34a; }
+        .compare-stat-removed { color: #dc2626; }
+
         /* Response Headers Table */
         .resp-headers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .resp-headers-table th, .resp-headers-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
@@ -516,6 +565,8 @@
             globalEnvList: [],
             selectedEnv: '',
             varFunctions: [],
+            compareHistory: [],  // 对比历史：最多保存 20 条请求/响应记录
+            compareSelectedIds: new Set(),  // 对比视图选中的历史 ID
         };
 
         // Methods
@@ -2091,6 +2142,8 @@
                     applyExtractRules(data);
                     const extracted = Object.keys(state.runtimeVars).length;
                     setStatus(`请求完成 ${data.status_code}  ${data.elapsed_ms}ms  ·  运行时变量 ${extracted} 个`);
+                    // 保存到对比历史
+                    saveToCompareHistory(state.editBuffer, data);
                 } else {
                     const errCode = data.error_code ? `[${data.error_code}] ` : '';
                     setStatus('请求失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
@@ -2102,6 +2155,403 @@
                     sendBtn.disabled = false;
                     sendBtn.textContent = 'Send';
                 }
+            }
+        }
+
+        // 切换对比历史下拉面板
+        function toggleCompareHistory() {
+            const existing = document.getElementById('compareHistoryPanel');
+            if (existing) {
+                existing.remove();
+                return;
+            }
+
+            const panel = document.createElement('div');
+            panel.id = 'compareHistoryPanel';
+            panel.className = 'compare-history-panel';
+
+            const history = state.compareHistory;
+            const selectedCount = state.compareSelectedIds.size;
+
+            let html = '<div class="compare-history-header">';
+            html += '<span>对比历史（' + selectedCount + '/2 已选）</span>';
+            if (selectedCount === 2) {
+                html += '<button type="button" class="compare-start-btn" onclick="openCompareView()">开始对比</button>';
+            }
+            html += '<button type="button" class="compare-clear-btn" onclick="clearCompareSelection()">清除选择</button>';
+            html += '</div>';
+
+            if (history.length === 0) {
+                html += '<div class="compare-history-empty">暂无历史记录，发送请求后自动保存</div>';
+            } else {
+                html += '<div class="compare-history-list">';
+                // 倒序显示（最新在上）
+                for (let i = history.length - 1; i >= 0; i--) {
+                    const entry = history[i];
+                    const isSelected = state.compareSelectedIds.has(entry.id);
+                    const time = new Date(entry.timestamp).toLocaleTimeString();
+                    const status = entry.response.status_code;
+                    const statusClass = status >= 400 ? 'error' : status >= 300 ? 'warn' : 'ok';
+                    const url = entry.request.url || '(empty)';
+                    const urlShort = url.length > 40 ? url.substring(0, 37) + '...' : url;
+
+                    html += '<div class="compare-history-item ' + (isSelected ? 'selected' : '') + '" onclick="toggleCompareSelect(\'' + entry.id + '\')">';
+                    html += '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleCompareSelect(\'' + entry.id + '\')" />';
+                    html += '<div class="compare-item-info">';
+                    html += '<span class="compare-item-time">' + time + '</span>';
+                    html += '<span class="compare-item-status ' + statusClass + '">' + status + '</span>';
+                    html += '<span class="compare-item-url" title="' + escapeAttr(url) + '">' + escapeHtml(urlShort) + '</span>';
+                    html += '</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            panel.innerHTML = html;
+
+            // 插入到响应面板顶部
+            const responseContent = document.getElementById('responseContent');
+            if (responseContent) {
+                responseContent.insertBefore(panel, responseContent.firstChild);
+            }
+        }
+
+        // 切换对比历史选中状态
+        function toggleCompareSelect(id) {
+            if (state.compareSelectedIds.has(id)) {
+                state.compareSelectedIds.delete(id);
+            } else {
+                if (state.compareSelectedIds.size >= 2) {
+                    setStatus('最多选择 2 条记录进行对比', 'error');
+                    return;
+                }
+                state.compareSelectedIds.add(id);
+            }
+            // 刷新面板
+            toggleCompareHistory();
+            toggleCompareHistory();
+        }
+
+        // 清除对比选择
+        function clearCompareSelection() {
+            state.compareSelectedIds.clear();
+            toggleCompareHistory();
+            toggleCompareHistory();
+        }
+
+        // 打开对比视图
+        function openCompareView() {
+            if (state.compareSelectedIds.size !== 2) {
+                setStatus('请选择 2 条记录进行对比', 'error');
+                return;
+            }
+
+            const ids = Array.from(state.compareSelectedIds);
+            const entryA = state.compareHistory.find(e => e.id === ids[0]);
+            const entryB = state.compareHistory.find(e => e.id === ids[1]);
+
+            if (!entryA || !entryB) {
+                setStatus('历史记录不存在', 'error');
+                return;
+            }
+
+            // 关闭下拉面板
+            const panel = document.getElementById('compareHistoryPanel');
+            if (panel) panel.remove();
+
+            // 显示对比模态框
+            showCompareModal(entryA, entryB);
+        }
+
+        // 显示对比模态框
+        function showCompareModal(entryA, entryB) {
+            const overlay = document.createElement('div');
+            overlay.id = 'compareModalOverlay';
+            overlay.className = 'compare-modal-overlay visible';
+
+            const tabs = [
+                { id: 'url', label: 'URL & Method' },
+                { id: 'req_headers', label: 'Request Headers' },
+                { id: 'req_body', label: 'Request Body' },
+                { id: 'resp_status', label: 'Response Status' },
+                { id: 'resp_headers', label: 'Response Headers' },
+                { id: 'resp_body', label: 'Response Body' },
+            ];
+
+            let tabsHtml = tabs.map(t =>
+                `<button type="button" class="compare-tab" data-tab="${t.id}" onclick="switchCompareTab('${t.id}')">${t.label}</button>`
+            ).join('');
+
+            const modal = `
+                <div class="compare-modal">
+                    <div class="compare-modal-header">
+                        <h2>请求/响应对比</h2>
+                        <button type="button" class="compare-modal-close" onclick="closeCompareModal()">&times;</button>
+                    </div>
+                    <div class="compare-modal-tabs">${tabsHtml}</div>
+                    <div class="compare-modal-body" id="compareModalBody"></div>
+                    <div class="compare-diff-stats" id="compareDiffStats"></div>
+                </div>
+            `;
+
+            overlay.innerHTML = modal;
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) closeCompareModal();
+            });
+
+            document.body.appendChild(overlay);
+
+            // 保存对比数据到 state
+            state.compareEntries = { entryA, entryB };
+            state.compareActiveTab = 'url';
+
+            // 渲染默认 Tab
+            switchCompareTab('url');
+        }
+
+        // 关闭对比模态框
+        function closeCompareModal() {
+            const overlay = document.getElementById('compareModalOverlay');
+            if (overlay) overlay.remove();
+            state.compareEntries = null;
+        }
+
+        // 切换对比 Tab
+        function switchCompareTab(tabId) {
+            state.compareActiveTab = tabId;
+
+            // 更新 Tab 样式
+            document.querySelectorAll('.compare-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabId);
+            });
+
+            // 渲染内容
+            renderCompareTab(tabId);
+        }
+
+        // 渲染对比 Tab 内容
+        function renderCompareTab(tabId) {
+            const { entryA, entryB } = state.compareEntries;
+            const body = document.getElementById('compareModalBody');
+            const stats = document.getElementById('compareDiffStats');
+
+            let textA = '', textB = '';
+
+            switch (tabId) {
+                case 'url':
+                    textA = entryA.request.method + ' ' + entryA.request.url;
+                    textB = entryB.request.method + ' ' + entryB.request.url;
+                    break;
+                case 'req_headers':
+                    textA = formatHeaders(entryA.request.headers);
+                    textB = formatHeaders(entryB.request.headers);
+                    break;
+                case 'req_body':
+                    textA = formatBody(entryA.request.body, entryA.request.body_mode);
+                    textB = formatBody(entryB.request.body, entryB.request.body_mode);
+                    break;
+                case 'resp_status':
+                    textA = entryA.response.status_code + ' ' + (entryA.response.elapsed_ms || 0) + 'ms';
+                    textB = entryB.response.status_code + ' ' + (entryB.response.elapsed_ms || 0) + 'ms';
+                    break;
+                case 'resp_headers':
+                    textA = formatHeaders(entryA.response.headers);
+                    textB = formatHeaders(entryB.response.headers);
+                    break;
+                case 'resp_body':
+                    textA = formatBody(entryA.response.body);
+                    textB = formatBody(entryB.response.body);
+                    break;
+            }
+
+            // 计算 diff
+            const diffResult = computeLineDiff(textA, textB);
+
+            // 渲染双栏
+            const paneA = renderDiffPane(diffResult, 'A', entryA.timestamp);
+            const paneB = renderDiffPane(diffResult, 'B', entryB.timestamp);
+
+            body.innerHTML = paneA + paneB;
+
+            // 渲染统计
+            const added = diffResult.filter(d => d.type === 'added').length;
+            const removed = diffResult.filter(d => d.type === 'removed').length;
+            stats.innerHTML = `
+                <span class="compare-stat-added">+${added} 行新增</span>
+                <span class="compare-stat-removed">-${removed} 行删除</span>
+                <span>${diffResult.filter(d => d.type === 'unchanged').length} 行未变</span>
+            `;
+        }
+
+        // 格式化 Headers
+        function formatHeaders(headers) {
+            if (!headers) return '';
+            if (Array.isArray(headers)) {
+                return headers.map(h => h.key + ': ' + h.value).join('\n');
+            }
+            if (typeof headers === 'object') {
+                return Object.entries(headers).map(([k, v]) => k + ': ' + v).join('\n');
+            }
+            return String(headers);
+        }
+
+        // 格式化 Body
+        function formatBody(body, bodyMode) {
+            if (!body) return '(empty)';
+            if (typeof body === 'object') {
+                try {
+                    return JSON.stringify(body, null, 2);
+                } catch (e) {
+                    return String(body);
+                }
+            }
+            if (typeof body === 'string') {
+                // 尝试解析 JSON
+                try {
+                    const parsed = JSON.parse(body);
+                    return JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    return body;
+                }
+            }
+            return String(body);
+        }
+
+        // 计算行级 diff（LCS 算法简化版）
+        function computeLineDiff(textA, textB) {
+            const linesA = textA.split('\n');
+            const linesB = textB.split('\n');
+
+            // 大文本降级：超过 10000 行时简单对比
+            if (linesA.length > 10000 || linesB.length > 10000) {
+                return computeSimpleDiff(linesA, linesB);
+            }
+
+            // LCS 动态规划
+            const m = linesA.length;
+            const n = linesB.length;
+            const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (linesA[i - 1] === linesB[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1] + 1;
+                    } else {
+                        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+            }
+
+            // 回溯构建 diff
+            const result = [];
+            let i = m, j = n;
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
+                    result.unshift({ type: 'unchanged', value: linesA[i - 1] });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                    result.unshift({ type: 'added', value: linesB[j - 1] });
+                    j--;
+                } else {
+                    result.unshift({ type: 'removed', value: linesA[i - 1] });
+                    i--;
+                }
+            }
+
+            return result;
+        }
+
+        // 大文本简单对比（无 LCS）
+        function computeSimpleDiff(linesA, linesB) {
+            const result = [];
+            const maxLen = Math.max(linesA.length, linesB.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (i < linesA.length && i < linesB.length) {
+                    if (linesA[i] === linesB[i]) {
+                        result.push({ type: 'unchanged', value: linesA[i] });
+                    } else {
+                        result.push({ type: 'removed', value: linesA[i] });
+                        result.push({ type: 'added', value: linesB[i] });
+                    }
+                } else if (i < linesA.length) {
+                    result.push({ type: 'removed', value: linesA[i] });
+                } else {
+                    result.push({ type: 'added', value: linesB[i] });
+                }
+            }
+            return result;
+        }
+
+        // 渲染 diff 面板
+        function renderDiffPane(diffResult, side, timestamp) {
+            const time = new Date(timestamp).toLocaleString();
+            let linesHtml = '';
+            let lineNum = 0;
+
+            diffResult.forEach(item => {
+                // 左侧显示 removed 和 unchanged，右侧显示 added 和 unchanged
+                if (side === 'A' && item.type === 'added') return;
+                if (side === 'B' && item.type === 'removed') return;
+
+                lineNum++;
+                const lineClass = item.type;
+                const escapedValue = escapeHtml(item.value);
+                linesHtml += `
+                    <div class="compare-diff-line ${lineClass}">
+                        <span class="line-num">${lineNum}</span>
+                        <span class="line-content">${escapedValue}</span>
+                    </div>
+                `;
+            });
+
+            return `
+                <div class="compare-pane">
+                    <div class="compare-pane-header">
+                        <span>请求 ${side}</span>
+                        <span style="color:#94a3b8;font-size:11px;">${time}</span>
+                    </div>
+                    <div class="compare-pane-content">${linesHtml || '<div style="color:#94a3b8;">(empty)</div>'}</div>
+                </div>
+            `;
+        }
+
+        // 保存请求/响应到对比历史（最多 20 条，FIFO 淘汰）
+        function saveToCompareHistory(request, response) {
+            const MAX_HISTORY = 20;
+            const MAX_BODY_SIZE = 1024 * 1024; // 1MB
+
+            // 构建历史记录条目
+            const entry = {
+                id: 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                timestamp: new Date().toISOString(),
+                request: {
+                    url: request.url || '',
+                    method: request.method || 'GET',
+                    headers: request.headers || [],
+                    body: request.body || '',
+                    body_mode: request.body_mode || 'none',
+                },
+                response: {
+                    status_code: response.status_code || 0,
+                    elapsed_ms: response.elapsed_ms || 0,
+                    headers: response.response_headers || {},
+                    body: response.response_body || '',
+                }
+            };
+
+            // 截断超大响应体
+            const bodyStr = typeof entry.response.body === 'string'
+                ? entry.response.body
+                : JSON.stringify(entry.response.body);
+            if (bodyStr.length > MAX_BODY_SIZE) {
+                entry.response.body = bodyStr.substring(0, MAX_BODY_SIZE) + '... [truncated]';
+                entry.response.truncated = true;
+            }
+
+            // 添加到历史（FIFO 淘汰）
+            state.compareHistory.push(entry);
+            if (state.compareHistory.length > MAX_HISTORY) {
+                state.compareHistory.shift(); // 移除最旧的
             }
         }
 
@@ -2163,6 +2613,9 @@
                         <select id="respFormatSelect" onchange="switchResponseFormat(this.value)" style="padding:3px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;color:#64748b;background:#fff;cursor:pointer;">
                             ${fmtSelect}
                         </select>
+                        <button type="button" class="resp-copy-btn" onclick="toggleCompareHistory()" title="对比历史" id="compareHistoryBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                        </button>
                         <button type="button" class="resp-copy-btn" onclick="copyResponseContent()" title="复制响应内容">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
