@@ -2493,6 +2493,8 @@
             const treeEl = document.querySelector('.json-tree');
             if (!treeEl) return;
 
+            // Phase 1: collect all matching text nodes
+            const matches = [];
             const walker = document.createTreeWalker(treeEl, NodeFilter.SHOW_TEXT, null, false);
             let node;
             while (node = walker.nextNode()) {
@@ -2500,10 +2502,13 @@
                 if (text.includes(keyword)) {
                     const parent = node.parentElement;
                     if (parent && !parent.classList.contains('json-toggle')) {
-                        highlightTextNode(node, keyword);
+                        matches.push(node);
                     }
                 }
             }
+
+            // Phase 2: highlight all matches
+            matches.forEach(textNode => highlightTextNode(textNode, keyword));
 
             updateSearchCount();
             if (jsonSearchMatches.length > 0) {
