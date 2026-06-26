@@ -9,9 +9,11 @@ from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import (
+    BaseHandler,
     get_report_or_error,
     json_error as _json_error,
 )
+from postman_api_tester.exceptions import ValidationError
 from postman_api_tester.services.report_manual_case_service import (
     add_manual_case as _svc_add_manual_case,
     delete_manual_case as _svc_delete_manual_case,
@@ -98,6 +100,10 @@ def api_manual_case_add() -> ResponseReturnValue:
     report_name = str(payload.get("report_name") or "").strip()
     if not report_name:
         return _json_error("report_name 不能为空", 400, "RPT_MANUAL_001")
+    try:
+        report_name = BaseHandler.validate_string_length(report_name, "report_name", 255, 1)
+    except ValidationError as e:
+        return _json_error(str(e), 400, "RPT_MANUAL_001")
     case_payload = dict(payload.get("case") or {})
     if not case_payload:
         return _json_error("case 不能为空", 400, "RPT_MANUAL_002")
@@ -127,10 +133,12 @@ def api_manual_case_update() -> ResponseReturnValue:
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
     case_payload = dict(payload.get("case") or {})
-    if not report_name:
-        return _json_error("report_name 不能为空", 400, "RPT_MANUAL_005")
-    if not case_id:
-        return _json_error("case_id 不能为空", 400, "RPT_MANUAL_006")
+    try:
+        report_name = BaseHandler.validate_non_empty_string(report_name, "report_name")
+        case_id = BaseHandler.validate_non_empty_string(case_id, "case_id", 100)
+    except ValidationError as e:
+        error_code = "RPT_MANUAL_005" if "report_name" in str(e) else "RPT_MANUAL_006"
+        return _json_error(str(e), 400, error_code)
     try:
         result = _svc_update_manual_case(
             report_name=report_name,
@@ -156,10 +164,12 @@ def api_manual_case_delete() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name") or "").strip()
     case_id = str(payload.get("case_id") or "").strip()
-    if not report_name:
-        return _json_error("report_name 不能为空", 400, "RPT_MANUAL_009")
-    if not case_id:
-        return _json_error("case_id 不能为空", 400, "RPT_MANUAL_010")
+    try:
+        report_name = BaseHandler.validate_non_empty_string(report_name, "report_name")
+        case_id = BaseHandler.validate_non_empty_string(case_id, "case_id", 100)
+    except ValidationError as e:
+        error_code = "RPT_MANUAL_009" if "report_name" in str(e) else "RPT_MANUAL_010"
+        return _json_error(str(e), 400, error_code)
     try:
         result = _svc_delete_manual_case(
             report_name=report_name,
@@ -186,10 +196,12 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     exclusion_key = str(payload.get("exclusion_key") or "").strip()
     from postman_api_tester.report_server_utils import to_bool as _to_bool
     excluded = _to_bool(payload.get("excluded"), default=True)
-    if not report_name:
-        return _json_error("report_name 不能为空", 400, "RPT_EXCL_001")
-    if not exclusion_key:
-        return _json_error("exclusion_key 不能为空", 400, "RPT_EXCL_002")
+    try:
+        report_name = BaseHandler.validate_non_empty_string(report_name, "report_name")
+        exclusion_key = BaseHandler.validate_non_empty_string(exclusion_key, "exclusion_key", 500)
+    except ValidationError as e:
+        error_code = "RPT_EXCL_001" if "report_name" in str(e) else "RPT_EXCL_002"
+        return _json_error(str(e), 400, error_code)
     try:
         result = _svc_set_case_exclusion(
             report_name=report_name,
@@ -213,8 +225,10 @@ def api_report_result_judgement() -> ResponseReturnValue:
     """结果人工判定 API。错误码：RPT_JUDGE_001-005"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
-    if not report_name:
-        return _json_error("report_name 不能为空", 400, "RPT_JUDGE_001")
+    try:
+        report_name = BaseHandler.validate_non_empty_string(report_name, "report_name")
+    except ValidationError as e:
+        return _json_error(str(e), 400, "RPT_JUDGE_001")
 
     raw_result_index = payload.get("result_index")
     if raw_result_index is None:

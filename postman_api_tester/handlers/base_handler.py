@@ -46,6 +46,70 @@ class BaseHandler:
         return value
 
     @staticmethod
+    def validate_string_length(
+        value: str,
+        param_name: str,
+        max_length: int,
+        min_length: int = 0,
+    ) -> str:
+        """字符串长度验证。
+
+        Args:
+            value: 字符串值
+            param_name: 参数名（用于错误消息）
+            max_length: 最大长度
+            min_length: 最小长度（默认 0）
+
+        Returns:
+            验证通过的字符串
+
+        Raises:
+            ValidationError: 长度超出范围
+        """
+        if not isinstance(value, str):
+            raise ValidationError(f"Invalid type for {param_name}: expected str")
+
+        length = len(value)
+        if length < min_length:
+            raise ValidationError(
+                f"{param_name} too short: {length} < {min_length}"
+            )
+        if length > max_length:
+            raise ValidationError(
+                f"{param_name} too long: {length} > {max_length}"
+            )
+
+        return value
+
+    @staticmethod
+    def validate_non_empty_string(
+        value: Any,
+        param_name: str,
+        max_length: int = 255,
+    ) -> str:
+        """非空字符串验证（含长度检查）。
+
+        Args:
+            value: 参数值
+            param_name: 参数名（用于错误消息）
+            max_length: 最大长度（默认 255）
+
+        Returns:
+            验证通过的字符串
+
+        Raises:
+            ValidationError: 参数为空、非字符串或超长
+        """
+        if value is None or not isinstance(value, str) or not value.strip():
+            raise ValidationError(f"{param_name} 不能为空")
+
+        value = value.strip()
+        if len(value) > max_length:
+            raise ValidationError(f"{param_name} too long: {len(value)} > {max_length}")
+
+        return value
+
+    @staticmethod
     def json_response(
         data: Any,
         status_code: int = 200,
