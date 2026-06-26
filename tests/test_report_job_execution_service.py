@@ -9,11 +9,82 @@ import pytest
 
 from postman_api_tester.services.report_job_execution_service import (
     _safe_run_job,
+    _build_progress_message,
+    _create_progress_callback,
     run_postman_job,
     enqueue_retry_job,
     prepare_retry_job_context,
     enqueue_job_with_worker,
 )
+
+
+class TestBuildProgressMessage:
+    """Tests for _build_progress_message helper."""
+
+    def test_zero_total_returns_basic_message(self):
+        """Test that zero total returns basic message."""
+        result = _build_progress_message(0, 0, 0, "")
+        assert result == "任务正在执行中..."
+
+    def test_negative_total_returns_basic_message(self):
+        """Test that negative total returns basic message."""
+        result = _build_progress_message(-1, 0, 0, "")
+        assert result == "任务正在执行中..."
+
+    def test_positive_total_without_name(self):
+        """Test positive total without current name."""
+        result = _build_progress_message(10, 5, 50, "")
+        assert result == "任务正在执行中: 5/10 (50%)"
+
+    def test_positive_total_with_name(self):
+        """Test positive total with current name."""
+        result = _build_progress_message(10, 5, 50, "API1")
+        assert result == "任务正在执行中: 5/10 (50%)，当前接口: API1"
+
+    def test_completed_equals_total(self):
+        """Test when completed equals total."""
+        result = _build_progress_message(10, 10, 100, "LastAPI")
+        assert result == "任务正在执行中: 10/10 (100%)，当前接口: LastAPI"
+
+
+class TestCreateProgressCallback:
+    """Tests for _create_progress_callback helper."""
+
+    def test_callback_updates_status(self):
+        """Test that callback updates job status."""
+        set_run_job = MagicMock()
+        callback = _create_progress_callback("job-1", set_run_job)
+
+        callback({
+            "total": 10,
+            "completed": 5,
+            "percent": 50,
+            "current_name": "API1",
+            "current_method": "GET",
+            "current_url": "http://test.com",
+            "last_status": "passed",
+        })
+
+        set_run_job.assert_called_once()
+        call_kwargs = set_run_job.call_args[1]
+        assert call_kwargs["status"] == "running"
+        assert call_kwargs["total"] == 10
+        assert call_kwargs["completed"] == 5
+        assert call_kwargs["percent"] == 50
+        assert "API1" in call_kwargs["message"]
+
+    def test_callback_handles_missing_fields(self):
+        """Test callback handles missing progress fields gracefully."""
+        set_run_job = MagicMock()
+        callback = _create_progress_callback("job-2", set_run_job)
+
+        callback({})  # All fields missing
+
+        set_run_job.assert_called_once()
+        call_kwargs = set_run_job.call_args[1]
+        assert call_kwargs["status"] == "running"
+        assert call_kwargs["total"] == 0
+        assert call_kwargs["completed"] == 0
 
 
 class TestSafeRunJob:
