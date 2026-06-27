@@ -40,6 +40,62 @@ def _safe_run_job(
             pass
 
 
+def _build_progress_message(total: int, completed: int, percent: int, current_name: str) -> str:
+    """构建进度消息文本。"""
+    if total <= 0:
+        return "任务正在执行中..."
+    message = f"任务正在执行中: {completed}/{total} ({percent}%)"
+    if current_name:
+        message = f"{message}，当前接口: {current_name}"
+    return message
+
+
+def _create_progress_callback(
+    job_id: str,
+    set_run_job: Callable[..., None],
+) -> Callable[[Dict[str, Any]], None]:
+    """创建进度回调函数，用于更新任务状态和记录日志。"""
+    def on_progress(progress: Dict[str, Any]) -> None:
+        total = int(progress.get("total") or 0)
+        completed = int(progress.get("completed") or 0)
+        percent = int(progress.get("percent") or 0)
+        current_name = str(progress.get("current_name") or "")
+        current_method = str(progress.get("current_method") or "")
+        current_url = str(progress.get("current_url") or "")
+
+        message = _build_progress_message(total, completed, percent, current_name)
+
+        set_run_job(
+            job_id,
+            status="running",
+            message=message,
+            total=total,
+            completed=completed,
+            percent=percent,
+            current_name=current_name,
+            current_method=current_method,
+            current_url=current_url,
+            last_status=str(progress.get("last_status") or ""),
+        )
+        log_sampled(
+            logger,
+            logging.INFO,
+            "job progress",
+            sample_rate=PROGRESS_LOG_SAMPLE_RATE,
+            extra={
+                "event": "job.run.progress",
+                "job_id": job_id,
+                "completed": completed,
+                "total": total,
+                "percent": percent,
+                "current_name": current_name,
+                "last_status": str(progress.get("last_status") or ""),
+            },
+        )
+
+    return on_progress
+
+
 def run_postman_job(
     job_id: str,
     postman_file: str,
@@ -73,47 +129,7 @@ def run_postman_job(
     try:
         from postman_api_tester.postman_api_tester import run_postman_tests
 
-        def on_progress(progress: Dict[str, Any]) -> None:
-            total = int(progress.get("total") or 0)
-            completed = int(progress.get("completed") or 0)
-            percent = int(progress.get("percent") or 0)
-            current_name = str(progress.get("current_name") or "")
-            current_method = str(progress.get("current_method") or "")
-            current_url = str(progress.get("current_url") or "")
-
-            message = "任务正在执行中..."
-            if total > 0:
-                message = f"任务正在执行中: {completed}/{total} ({percent}%)"
-                if current_name:
-                    message = f"{message}，当前接口: {current_name}"
-
-            set_run_job(
-                job_id,
-                status="running",
-                message=message,
-                total=total,
-                completed=completed,
-                percent=percent,
-                current_name=current_name,
-                current_method=current_method,
-                current_url=current_url,
-                last_status=str(progress.get("last_status") or ""),
-            )
-            log_sampled(
-                logger,
-                logging.INFO,
-                "job progress",
-                sample_rate=PROGRESS_LOG_SAMPLE_RATE,
-                extra={
-                    "event": "job.run.progress",
-                    "job_id": job_id,
-                    "completed": completed,
-                    "total": total,
-                    "percent": percent,
-                    "current_name": current_name,
-                    "last_status": str(progress.get("last_status") or ""),
-                },
-            )
+        on_progress = _create_progress_callback(job_id, set_run_job)
 
         report = run_postman_tests(
             postman_file=postman_file,
