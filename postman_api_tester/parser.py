@@ -165,6 +165,58 @@ class PostmanApiParser:
 
         return apis
 
+    def _parse_body(self, body_data: Dict[str, Any]) -> Any:
+        """解析请求体，支持 raw/formdata/urlencoded 三种模式。"""
+        if not body_data:
+            return None
+
+        mode = body_data.get('mode')
+        if mode == 'raw':
+            try:
+                return json.loads(body_data.get('raw', '{}'))
+            except (json.JSONDecodeError, ValueError, TypeError):
+                return body_data.get('raw', '')
+        elif mode in ('formdata', 'urlencoded'):
+            body = {}
+            items = body_data.get(mode, [])
+            for item_data in items:
+                if not item_data.get('disabled'):
+                    body[item_data.get('key')] = item_data.get('value')
+            return body
+        return None
+
+    def _parse_x_extensions(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """解析 x_* 扩展字段，返回非空字段字典。"""
+        extensions = {}
+
+        # 字符串类型扩展
+        for field in ('x_success_err_codes', 'x_success_messages'):
+            value = request.get(field)
+            if value is not None:
+                value = str(value).strip() or None
+                if value is not None:
+                    extensions[field] = value
+
+        # 布尔类型扩展
+        bool_fields = ('x_enable_err_code_judgment', 'x_enable_message_judgment')
+        for field in bool_fields:
+            value = request.get(field)
+            if value is not None:
+                if not isinstance(value, bool):
+                    value = str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+                extensions[field] = value
+
+        # 字典类型扩展
+        dict_fields = ('x_extract', 'x_pre_request')
+        for field in dict_fields:
+            value_raw = request.get(field)
+            if isinstance(value_raw, dict) and value_raw:
+                value = {str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)}
+                if value:
+                    extensions[field] = value
+
+        return extensions
+
     def _parse_request(self, item: Dict[str, Any], parent_name: str = "", item_path: Optional[List[int]] = None) -> ApiConfig:
         """
         解析单个请求
@@ -191,24 +243,7 @@ class PostmanApiParser:
             headers[header.get('key', '')] = header.get('value', '')
 
         # 解析请求体
-        body = None
-        body_data = request.get('body', {})
-        if body_data:
-            if body_data.get('mode') == 'raw':
-                try:
-                    body = json.loads(body_data.get('raw', '{}'))
-                except (json.JSONDecodeError, ValueError, TypeError):
-                    body = body_data.get('raw', '')
-            elif body_data.get('mode') == 'formdata':
-                body = {}
-                for item_data in body_data.get('formdata', []):
-                    if not item_data.get('disabled'):
-                        body[item_data.get('key')] = item_data.get('value')
-            elif body_data.get('mode') == 'urlencoded':
-                body = {}
-                for item_data in body_data.get('urlencoded', []):
-                    if not item_data.get('disabled'):
-                        body[item_data.get('key')] = item_data.get('value')
+        body = self._parse_body(request.get('body', {}))
 
         # 解析参数
         params = {}
@@ -229,36 +264,8 @@ class PostmanApiParser:
                 if '200' in str(script):
                     expected_status = 200
 
-        # 解析可配置结果判定扩展字段（x_* 系列）
-        x_success_err_codes = request.get('x_success_err_codes')
-        if x_success_err_codes is not None:
-            x_success_err_codes = str(x_success_err_codes).strip() or None
-
-        x_success_messages = request.get('x_success_messages')
-        if x_success_messages is not None:
-            x_success_messages = str(x_success_messages).strip() or None
-
-        x_enable_err_code = request.get('x_enable_err_code_judgment')
-        if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
-            x_enable_err_code = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-
-        x_enable_message = request.get('x_enable_message_judgment')
-        if x_enable_message is not None and not isinstance(x_enable_message, bool):
-            x_enable_message = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-
-        x_extract_raw = request.get('x_extract')
-        x_extract: Optional[Dict[str, str]] = None
-        if isinstance(x_extract_raw, dict) and x_extract_raw:
-            x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
-            if not x_extract:
-                x_extract = None
-
-        x_pre_request_raw = request.get('x_pre_request')
-        x_pre_request: Optional[Dict[str, str]] = None
-        if isinstance(x_pre_request_raw, dict) and x_pre_request_raw:
-            x_pre_request = {str(k): str(v) for k, v in x_pre_request_raw.items() if isinstance(v, str)}
-            if not x_pre_request:
-                x_pre_request = None
+        # 解析 x_* 扩展字段
+        extensions = self._parse_x_extensions(request)
 
         result: ApiConfig = {
             'name': name,
@@ -274,19 +281,8 @@ class PostmanApiParser:
             'item_path': list(item_path or []),
         }
 
-        # 仅在存在时写入 x_* 扩展字段，避免污染无配置接口的字典
-        if x_success_err_codes is not None:
-            result['x_success_err_codes'] = x_success_err_codes
-        if x_success_messages is not None:
-            result['x_success_messages'] = x_success_messages
-        if x_enable_err_code is not None:
-            result['x_enable_err_code_judgment'] = x_enable_err_code
-        if x_enable_message is not None:
-            result['x_enable_message_judgment'] = x_enable_message
-        if x_extract is not None:
-            result['x_extract'] = x_extract
-        if x_pre_request is not None:
-            result['x_pre_request'] = x_pre_request
+        # 合并扩展字段
+        result.update(extensions)
 
         return result
 
