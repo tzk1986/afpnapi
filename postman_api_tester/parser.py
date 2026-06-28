@@ -187,33 +187,33 @@ class PostmanApiParser:
 
     def _parse_x_extensions(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """解析 x_* 扩展字段，返回非空字段字典。"""
-        extensions = {}
+        extensions: Dict[str, Any] = {}
 
         # 字符串类型扩展
         for field in ('x_success_err_codes', 'x_success_messages'):
-            value = request.get(field)
-            if value is not None:
-                value = str(value).strip() or None
-                if value is not None:
-                    extensions[field] = value
+            str_value = request.get(field)
+            if str_value is not None:
+                str_value = str(str_value).strip() or None
+                if str_value is not None:
+                    extensions[field] = str_value
 
         # 布尔类型扩展
         bool_fields = ('x_enable_err_code_judgment', 'x_enable_message_judgment')
         for field in bool_fields:
-            value = request.get(field)
-            if value is not None:
-                if not isinstance(value, bool):
-                    value = str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-                extensions[field] = value
+            bool_value: Any = request.get(field)
+            if bool_value is not None:
+                if not isinstance(bool_value, bool):
+                    bool_value = str(bool_value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+                extensions[field] = bool_value
 
         # 字典类型扩展
         dict_fields = ('x_extract', 'x_pre_request')
         for field in dict_fields:
             value_raw = request.get(field)
             if isinstance(value_raw, dict) and value_raw:
-                value = {str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)}
-                if value:
-                    extensions[field] = value
+                dict_value = {str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)}
+                if dict_value:
+                    extensions[field] = dict_value
 
         return extensions
 
@@ -282,7 +282,8 @@ class PostmanApiParser:
         }
 
         # 合并扩展字段
-        result.update(extensions)
+        for key, val in extensions.items():
+            result[key] = val  # type: ignore[literal-required]
 
         return result
 
