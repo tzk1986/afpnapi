@@ -84,6 +84,58 @@ def test_token() -> ResponseReturnValue:
     return jsonify(build_test_token_payload(success=True, message="token 格式有效，可用于后续请求"))
 
 
+def _build_request_response_info(exec_result: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    """构建请求和响应信息字典。"""
+    request_info = {
+        "headers": exec_result["headers_to_send"],
+        "params": exec_result["normalized_params"],
+        "body": exec_result["stored_body"],
+        "body_mode": exec_result["stored_body_mode"],
+        "body_data": exec_result["stored_body_data"],
+    }
+    response_info = {"headers": exec_result["response_headers"], "body": exec_result["response_body"]}
+    return request_info, response_info
+
+
+def _evaluate_and_build_result(
+    exec_result: Dict[str, Any],
+    source: Dict[str, Any],
+    method: str,
+    expected_status: int,
+) -> tuple[str, str, str, Dict[str, Any]]:
+    """评估结果判定并构建结果字段，返回 (status, message, err_code, result_fields)。"""
+    response_message, err_code = _utils_extract_msg_errcode(exec_result["response_body"])
+
+    judgment_params = _resolve_judgment_params_for_proxy(source)
+    judgment_passed, judgment_fail_reason = _evaluate_result_judgment(
+        status_code=exec_result["status_code"],
+        expected_status=expected_status,
+        err_code=err_code,
+        response_message=response_message,
+        success_err_codes=judgment_params['success_err_codes'],
+        success_messages=judgment_params['success_messages'],
+        enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
+        enable_message_judgment=judgment_params['enable_message_judgment'],
+    )
+
+    result_status = "PASSED" if judgment_passed else "FAILED"
+    result_message = response_message if judgment_passed else judgment_fail_reason
+
+    result_fields = {
+        "method": method,
+        "url": exec_result["normalized_url"],
+        "actual_request_url": exec_result["actual_request_url"],
+        "item_path": source.get("item_path", []),
+        "expected_status": expected_status,
+        "status": result_status,
+        "status_code": exec_result["status_code"],
+        "message": result_message,
+        "err_code": err_code,
+    }
+
+    return result_status, result_message, err_code, result_fields
+
+
 def re_request_api() -> ResponseReturnValue:
     """重新请求 API：支持编辑后重发并可写回报告。"""
     is_multipart, payload, source = _svc_resolve_request_payload_source(
@@ -145,49 +197,10 @@ def re_request_api() -> ResponseReturnValue:
             )
         )
 
-    response_body = exec_result["response_body"]
-    response_message, err_code = _utils_extract_msg_errcode(response_body)
-
-    # 可配置结果判定：集合接口级 x_* > 全局 config > 内置默认
-    judgment_params = _resolve_judgment_params_for_proxy(source)
-    judgment_passed, judgment_fail_reason = _evaluate_result_judgment(
-        status_code=exec_result["status_code"],
-        expected_status=expected_status,
-        err_code=err_code,
-        response_message=response_message,
-        success_err_codes=judgment_params['success_err_codes'],
-        success_messages=judgment_params['success_messages'],
-        enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
-        enable_message_judgment=judgment_params['enable_message_judgment'],
+    new_request_info, new_response_info = _build_request_response_info(exec_result)
+    result_status, result_message, err_code, result_fields = _evaluate_and_build_result(
+        exec_result, source, method, expected_status
     )
-
-    if judgment_passed:
-        result_status = "PASSED"
-        result_message = response_message
-    else:
-        result_status = "FAILED"
-        result_message = judgment_fail_reason
-
-    new_request_info = {
-        "headers": exec_result["headers_to_send"],
-        "params": exec_result["normalized_params"],
-        "body": exec_result["stored_body"],
-        "body_mode": exec_result["stored_body_mode"],
-        "body_data": exec_result["stored_body_data"],
-    }
-    new_response_info = {"headers": exec_result["response_headers"], "body": response_body}
-
-    result_fields = {
-        "method": method,
-        "url": exec_result["normalized_url"],
-        "actual_request_url": exec_result["actual_request_url"],
-        "item_path": source.get("item_path", []),
-        "expected_status": expected_status,
-        "status": result_status,
-        "status_code": exec_result["status_code"],
-        "message": result_message,
-        "err_code": err_code,
-    }
 
     new_summary: Dict[str, Any] = {}
     if save_to_report and rpt_name and rpt_index is not None:
