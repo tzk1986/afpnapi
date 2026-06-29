@@ -4,6 +4,48 @@
 
 ---
 
+## 2026-06-29 20:30 — 测试覆盖强化（第十一轮）
+
+**分支**：`feature/auto-upgrade-2026-06-29`
+**状态**：✅ 完成（2 个改进）
+
+### 改进项
+
+#### 改进 1：test_proxy_routes 模块测试覆盖（+7 项）
+- 扩展 `tests/test_test_proxy_routes.py`（62 行 → 217 行）
+- 新增 `TestBuildRequestResponseInfo`：测试请求/响应信息构建（2 项）
+- 新增 `TestEvaluateAndBuildResult`：测试结果判定评估（通过/失败场景，2 项）
+- 新增 `TestCheckProxyHostAllowed`：测试代理主机白名单验证（无白名单/匹配/不匹配，3 项）
+- 覆盖昨晚重构提取的辅助函数，确保行为正确性
+- 测试数量从 4 项增加到 11 项（+175%）
+
+#### 改进 2：url_utils 模块测试覆盖（+12 项）
+- 扩展 `tests/test_url_utils.py`（52 行 → 143 行）
+- 新增 `TestNormalizeUrlAndParams`：URL 和参数归一化（7 项）
+  - 简单 URL、查询字符串、字典/列表参数、混合参数、空 URL、fragment
+- 新增 `TestMergeUrlWithParams`：URL 和参数合并（5 项）
+  - 简单合并、多参数、现有查询字符串、空参数、None 值处理
+- 填补测试覆盖空白：该模块此前 44 行代码仅 5 项测试
+
+### 验证结果
+
+- pytest: 1971 passed（+19，无回归）
+- mypy: 84 source files, no issues
+
+### 风险点
+
+- 低风险：所有改进为纯新增测试，无源码变更
+- 所有测试通过，无回归
+
+### 回退方法
+
+```bash
+git checkout master
+git branch -D feature/auto-upgrade-2026-06-29
+```
+
+---
+
 ## 2026-06-28 20:30 — 请求构建器重构 + 测试覆盖强化（第十轮）
 
 **分支**：`feature/auto-upgrade-2026-06-28`
