@@ -7,7 +7,7 @@
 """
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from urllib.parse import urlencode
 
 from postman_api_tester.runtime_utils import merge_url_with_params as _merge_url_with_params
@@ -217,6 +217,116 @@ def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | No
     }
 
 
+def _build_multipart_request(
+    normalized_mode: str,
+    body_data: Any,
+    headers_to_send: Dict[str, Any],
+    files_source: Any,
+) -> Tuple[Dict[str, Any], Any, Any]:
+    """构建 multipart 请求（formdata/binary），返回 (request_kwargs, normalized_data, stored_body)。"""
+    request_kwargs: Dict[str, Any] = {}
+    normalized_data: Any = body_data
+    stored_body: Any = None
+
+    if normalized_mode == "formdata":
+        rows = normalize_formdata_rows(body_data)
+        data_rows = []
+        file_rows = []
+        for row in rows:
+            key = row["key"]
+            row_type = row["type"]
+            if row_type == "file":
+                upload_key = str(row.get("upload_key") or "").strip()
+                if not upload_key:
+                    upload_key = "upload_0"
+                file_obj = files_source.get(upload_key) if files_source is not None else None
+                if file_obj and str(file_obj.filename or "").strip():
+                    file_rows.append((key, (file_obj.filename, file_obj.stream, file_obj.mimetype or "application/octet-stream")))
+                    row["file_name"] = str(file_obj.filename or row.get("file_name") or "")
+            else:
+                data_rows.append((key, "" if row.get("value") is None else str(row.get("value"))))
+        headers_to_send.pop("Content-Type", None)
+        request_kwargs["data"] = data_rows
+        request_kwargs["files"] = file_rows
+        normalized_data = {"formdata": rows}
+        stored_body = normalized_data
+    elif normalized_mode == "binary":
+        upload_key = "upload_0"
+        if isinstance(body_data, dict):
+            upload_key = str(body_data.get("upload_key") or upload_key).strip() or "upload_0"
+        file_obj = files_source.get(upload_key) if files_source is not None else None
+        if not file_obj:
+            raise ValueError("binary 模式缺少上传文件")
+        payload_bytes = file_obj.read()
+        request_kwargs["data"] = payload_bytes
+        headers_to_send.setdefault("Content-Type", file_obj.mimetype or "application/octet-stream")
+        normalized_data = {"file_name": str(file_obj.filename or "")}
+        stored_body = normalized_data
+    else:
+        raise ValueError(f"multipart 请求不支持 body_mode={normalized_mode}")
+
+    return request_kwargs, normalized_data, stored_body
+
+
+def _build_non_multipart_request(
+    normalized_mode: str,
+    body_data: Any,
+    legacy_body: Any,
+    headers_to_send: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Any, Any]:
+    """构建非 multipart 请求（none/raw/urlencoded/graphql/legacy），返回 (request_kwargs, normalized_data, stored_body)。"""
+    request_kwargs: Dict[str, Any] = {}
+    normalized_data: Any = body_data
+    stored_body: Any = None
+
+    if normalized_mode == "none":
+        request_kwargs["data"] = None
+        normalized_data = None
+        stored_body = None
+    elif normalized_mode == "raw":
+        raw_content = ""
+        raw_language = "text"
+        raw_ct = ""
+        if isinstance(body_data, dict):
+            raw_content = str(body_data.get("raw_content") or "")
+            raw_language = str(body_data.get("raw_language") or "text").strip().lower() or "text"
+            raw_ct = str(body_data.get("raw_content_type") or "").strip()
+        if raw_ct:
+            headers_to_send.setdefault("Content-Type", raw_ct)
+        request_kwargs["data"] = raw_content
+        normalized_data = {
+            "raw_language": raw_language,
+            "raw_content_type": raw_ct,
+            "raw_content": raw_content,
+        }
+        stored_body = raw_content
+    elif normalized_mode == "urlencoded":
+        rows = normalize_urlencoded_rows(body_data)
+        params_list = [(row["key"], row["value"]) for row in rows]
+        request_kwargs["data"] = urlencode(params_list, doseq=True)
+        headers_to_send.setdefault("Content-Type", "application/x-www-form-urlencoded")
+        normalized_data = {"urlencoded": rows}
+        stored_body = {key: value for key, value in params_list}
+    elif normalized_mode == "graphql":
+        gql = normalize_graphql_data(body_data)
+        gql_payload = {"query": gql["query"], "variables": gql["variables"]}
+        request_kwargs["json"] = gql_payload
+        headers_to_send.setdefault("Content-Type", "application/json")
+        normalized_data = gql_payload
+        stored_body = gql_payload
+    elif normalized_mode == "legacy":
+        if legacy_body is not None:
+            request_kwargs["json"] = legacy_body
+        else:
+            request_kwargs["data"] = None
+        normalized_data = legacy_body
+        stored_body = legacy_body
+    else:
+        raise ValueError(f"不支持的 body_mode: {normalized_mode}")
+
+    return request_kwargs, normalized_data, stored_body
+
+
 def build_request_kwargs(
     *,
     is_multipart: bool,
@@ -228,96 +338,17 @@ def build_request_kwargs(
 ) -> Dict[str, Any]:
     # build_request_kwargs 负责生成 requests.request 可直接消费的 kwargs，
     # 并同步返回可持久化的 body/header 形态，供报告详情与重试回写复用。
-    request_kwargs: Dict[str, Any] = {}
     headers_to_send = dict(headers or {})
     normalized_mode = str(body_mode or "legacy").strip().lower() or "legacy"
-    normalized_data: Any = body_data
-    stored_body: Any = None
 
     if is_multipart:
-        # multipart 分支只接受 formdata/binary，且会接管 Content-Type 处理。
-        if normalized_mode == "formdata":
-            rows = normalize_formdata_rows(body_data)
-            data_rows = []
-            file_rows = []
-            for row in rows:
-                key = row["key"]
-                row_type = row["type"]
-                if row_type == "file":
-                    upload_key = str(row.get("upload_key") or "").strip()
-                    if not upload_key:
-                        upload_key = "upload_0"
-                    file_obj = files_source.get(upload_key) if files_source is not None else None
-                    if file_obj and str(file_obj.filename or "").strip():
-                        file_rows.append((key, (file_obj.filename, file_obj.stream, file_obj.mimetype or "application/octet-stream")))
-                        row["file_name"] = str(file_obj.filename or row.get("file_name") or "")
-                else:
-                    data_rows.append((key, "" if row.get("value") is None else str(row.get("value"))))
-            headers_to_send.pop("Content-Type", None)
-            request_kwargs["data"] = data_rows
-            request_kwargs["files"] = file_rows
-            normalized_data = {"formdata": rows}
-            stored_body = normalized_data
-        elif normalized_mode == "binary":
-            upload_key = "upload_0"
-            if isinstance(body_data, dict):
-                upload_key = str(body_data.get("upload_key") or upload_key).strip() or "upload_0"
-            file_obj = files_source.get(upload_key) if files_source is not None else None
-            if not file_obj:
-                raise ValueError("binary 模式缺少上传文件")
-            payload_bytes = file_obj.read()
-            request_kwargs["data"] = payload_bytes
-            headers_to_send.setdefault("Content-Type", file_obj.mimetype or "application/octet-stream")
-            normalized_data = {"file_name": str(file_obj.filename or "")}
-            stored_body = normalized_data
-        else:
-            raise ValueError(f"multipart 请求不支持 body_mode={normalized_mode}")
+        request_kwargs, normalized_data, stored_body = _build_multipart_request(
+            normalized_mode, body_data, headers_to_send, files_source
+        )
     else:
-        # 非 multipart 分支按 body_mode 显式分流，避免 legacy/新模式混用。
-        if normalized_mode == "none":
-            request_kwargs["data"] = None
-            normalized_data = None
-            stored_body = None
-        elif normalized_mode == "raw":
-            raw_content = ""
-            raw_language = "text"
-            raw_ct = ""
-            if isinstance(body_data, dict):
-                raw_content = str(body_data.get("raw_content") or "")
-                raw_language = str(body_data.get("raw_language") or "text").strip().lower() or "text"
-                raw_ct = str(body_data.get("raw_content_type") or "").strip()
-            if raw_ct:
-                headers_to_send.setdefault("Content-Type", raw_ct)
-            request_kwargs["data"] = raw_content
-            normalized_data = {
-                "raw_language": raw_language,
-                "raw_content_type": raw_ct,
-                "raw_content": raw_content,
-            }
-            stored_body = raw_content
-        elif normalized_mode == "urlencoded":
-            rows = normalize_urlencoded_rows(body_data)
-            params_list = [(row["key"], row["value"]) for row in rows]
-            request_kwargs["data"] = urlencode(params_list, doseq=True)
-            headers_to_send.setdefault("Content-Type", "application/x-www-form-urlencoded")
-            normalized_data = {"urlencoded": rows}
-            stored_body = {key: value for key, value in params_list}
-        elif normalized_mode == "graphql":
-            gql = normalize_graphql_data(body_data)
-            gql_payload = {"query": gql["query"], "variables": gql["variables"]}
-            request_kwargs["json"] = gql_payload
-            headers_to_send.setdefault("Content-Type", "application/json")
-            normalized_data = gql_payload
-            stored_body = gql_payload
-        elif normalized_mode == "legacy":
-            if legacy_body is not None:
-                request_kwargs["json"] = legacy_body
-            else:
-                request_kwargs["data"] = None
-            normalized_data = legacy_body
-            stored_body = legacy_body
-        else:
-            raise ValueError(f"不支持的 body_mode: {normalized_mode}")
+        request_kwargs, normalized_data, stored_body = _build_non_multipart_request(
+            normalized_mode, body_data, legacy_body, headers_to_send
+        )
 
     return {
         "request_kwargs": request_kwargs,

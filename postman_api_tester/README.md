@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.20.2
-发布日期：2026-06-26
+版本：v1.20.3
+发布日期：2026-06-29
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.20.3）：
+- **代码重构 + 测试覆盖强化**：request_builder.build_request_kwargs 重构（109→30 行，-72%），test_proxy_routes.re_request_api 重构（131→100 行，-24%），新增 assertions 模块测试（35 项），新增 report_meta_repository 模块测试（22 项），总计 1952 个测试。
 
 本版新增重点（v1.20.2）：
 - **请求/响应对比视图**：Collection 编辑器新增并排对比功能，支持选择 2 次请求历史，对比 URL/Headers/Body/Response 差异，LCS 算法行级高亮，6 个 Tab 切换。
