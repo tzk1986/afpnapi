@@ -4,6 +4,50 @@
 
 ---
 
+## 2026-06-30 20:30 — report_patch_service 重构 + 测试覆盖（第十二轮）
+
+**分支**：`feature/auto-upgrade-2026-06-30`
+**状态**：✅ 完成（2 个改进）
+
+### 改进项
+
+#### 改进 1：report_patch_service.patch_report_result 函数重构（114 行 → 87 行）
+- 提取 `_build_retry_history_and_judgement()`：构建重试历史和重置手工判定
+- 提取 `_build_merged_result()`：构建合并后的结果对象并生成 key
+- 提取 `_update_details_file()`：更新详情文件中的请求和响应信息
+- 减少主函数 24% 行数，从 114 行降至 87 行
+- 逻辑分离更清晰：重试历史 / 结果合并 / 详情更新
+- 所有测试通过，无行为变更
+
+#### 改进 2：report_patch_service 辅助函数测试覆盖（+12 项）
+- 扩展 `tests/test_report_patch_service.py`（648 行 → 850 行）
+- 新增 `TestBuildRetryHistoryAndJudgement`：测试重试历史构建（4 项）
+  - 从空历史构建、从现有历史构建、重置手工判定、处理缺失判定
+- 新增 `TestBuildMergedResult`：测试结果合并（4 项）
+  - 合并新旧字段、生成 key、缺失字段处理、保留 item_path 和 expected_status
+- 新增 `TestUpdateDetailsFile`：测试详情文件更新（4 项）
+  - 创建新文件、更新现有文件、处理空文件名、处理损坏文件
+- 测试数量从 27 项增加到 39 项（+44%）
+
+### 验证结果
+
+- pytest: 1983 passed（+12，无回归）
+- mypy: 84 source files, no issues
+
+### 风险点
+
+- 低风险：改进 1 为内部重构（保持外部行为不变），改进 2 为纯新增测试
+- 所有测试通过，无回归
+
+### 回退方法
+
+```bash
+git checkout master
+git branch -D feature/auto-upgrade-2026-06-30
+```
+
+---
+
 ## 2026-06-29 20:30 — 测试覆盖强化（第十一轮）
 
 **分支**：`feature/auto-upgrade-2026-06-29`

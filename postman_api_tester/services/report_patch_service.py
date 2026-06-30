@@ -11,6 +11,76 @@ from typing import Any, Callable, Dict, List, cast
 from postman_api_tester.utils.file_utils import atomic_write_json
 
 
+def _build_retry_history_and_judgement(
+    old_result: Dict[str, Any],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """构建重试历史和重置手工判定。"""
+    old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
+    retry_history = old_history + [old_result]
+    old_judgement_value = old_result.get("manual_judgement")
+    old_judgement: Dict[str, Any] = old_judgement_value if isinstance(old_judgement_value, dict) else {}
+    manual_judgement = {
+        **old_judgement,
+        "active": False,
+        "source": "auto",
+    }
+    return retry_history, manual_judgement
+
+
+def _build_merged_result(
+    old_result: Dict[str, Any],
+    new_result_fields: Dict[str, Any],
+    retry_history: List[Dict[str, Any]],
+    manual_judgement: Dict[str, Any],
+) -> Dict[str, Any]:
+    """构建合并后的结果对象。"""
+    merged = {
+        "name": old_result.get("name", ""),
+        "folder": old_result.get("folder", ""),
+        "method": new_result_fields.get("method", old_result.get("method", "")),
+        "url": new_result_fields.get("url", old_result.get("url", "")),
+        "item_path": new_result_fields.get("item_path", old_result.get("item_path", [])),
+        "expected_status": new_result_fields.get("expected_status", old_result.get("expected_status", 200)),
+        **new_result_fields,
+        "retry_history": retry_history,
+        "retried": True,
+        "manual_judgement": manual_judgement,
+        "judgement_history": old_result.get("judgement_history", []),
+    }
+    merged["key"] = " | ".join([
+        merged.get("folder", "") or "-",
+        merged.get("name", "") or "-",
+        merged.get("method", "") or "-",
+        merged.get("url", "") or "-",
+    ])
+    return merged
+
+
+def _update_details_file(
+    details_file_name: str,
+    result_index: int,
+    new_request_info: Dict[str, Any],
+    new_response_info: Dict[str, Any],
+    reports_dir: Path,
+) -> None:
+    """更新详情文件中的请求和响应信息。"""
+    if not details_file_name:
+        return
+    details_path = reports_dir / details_file_name
+    details: Dict[str, Any] = {}
+    if details_path.exists():
+        try:
+            with details_path.open("r", encoding="utf-8") as f:
+                details = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    details[str(result_index)] = {
+        "request_info": new_request_info,
+        "response_info": new_response_info,
+    }
+    atomic_write_json(details_path, details)
+
+
 def patch_report_result(
     report_name: str,
     result_index: int,
@@ -48,35 +118,8 @@ def patch_report_result(
             return {}
 
         old_result = dict(results[result_index])
-        old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
-        retry_history = old_history + [old_result]
-        old_judgement_value = old_result.get("manual_judgement")
-        old_judgement: Dict[str, Any] = old_judgement_value if isinstance(old_judgement_value, dict) else {}
-        manual_judgement = {
-            **old_judgement,
-            "active": False,
-            "source": "auto",
-        }
-
-        merged = {
-            "name": old_result.get("name", ""),
-            "folder": old_result.get("folder", ""),
-            "method": new_result_fields.get("method", old_result.get("method", "")),
-            "url": new_result_fields.get("url", old_result.get("url", "")),
-            "item_path": new_result_fields.get("item_path", old_result.get("item_path", [])),
-            "expected_status": new_result_fields.get("expected_status", old_result.get("expected_status", 200)),
-            **new_result_fields,
-            "retry_history": retry_history,
-            "retried": True,
-            "manual_judgement": manual_judgement,
-            "judgement_history": old_result.get("judgement_history", []),
-        }
-        merged["key"] = " | ".join([
-            merged.get("folder", "") or "-",
-            merged.get("name", "") or "-",
-            merged.get("method", "") or "-",
-            merged.get("url", "") or "-",
-        ])
+        retry_history, manual_judgement = _build_retry_history_and_judgement(old_result)
+        merged = _build_merged_result(old_result, new_result_fields, retry_history, manual_judgement)
         results[result_index] = merged
         meta["results"] = results
 
@@ -94,20 +137,7 @@ def patch_report_result(
         atomic_write_json(meta_path, meta)
 
         details_file_name = str(report.get("details_file") or "").strip()
-        if details_file_name:
-            details_path = reports_dir / details_file_name
-            details: Dict[str, Any] = {}
-            if details_path.exists():
-                try:
-                    with details_path.open("r", encoding="utf-8") as f:
-                        details = json.load(f)
-                except (json.JSONDecodeError, OSError):
-                    pass
-            details[str(result_index)] = {
-                "request_info": new_request_info,
-                "response_info": new_response_info,
-            }
-            atomic_write_json(details_path, details)
+        _update_details_file(details_file_name, result_index, new_request_info, new_response_info, reports_dir)
 
         invalidate_reports_cache()
         return cast(Dict[str, Any], meta["summary"])
