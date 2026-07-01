@@ -452,7 +452,7 @@ def send_single_request(request_data: Dict[str, Any], variables: Dict[str, str])
 
     headers: Dict[str, str] = {}
     for h in request_data.get("headers", []):
-        if isinstance(h, dict):
+        if isinstance(h, dict) and not h.get("disabled"):
             k = substitute_variables(str(h.get("key", "")), variables)
             v = substitute_variables(str(h.get("value", "")), variables)
             if k:
@@ -460,7 +460,7 @@ def send_single_request(request_data: Dict[str, Any], variables: Dict[str, str])
 
     params: Dict[str, str] = {}
     for p in request_data.get("params", []):
-        if isinstance(p, dict):
+        if isinstance(p, dict) and not p.get("disabled"):
             k = substitute_variables(str(p.get("key", "")), variables)
             v = substitute_variables(str(p.get("value", "")), variables)
             if k:
