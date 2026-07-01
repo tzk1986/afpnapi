@@ -6,6 +6,8 @@ import math
 import re
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
+from postman_api_tester.report_server_utils import to_bool as _to_bool
+
 
 ERROR_CATEGORY_CONNECTION = "connection"
 ERROR_CATEGORY_AUTH = "auth"
@@ -185,17 +187,6 @@ def distinct_list(values: Iterable[str]) -> List[str]:
         seen.add(value)
         result.append(value)
     return result
-
-
-def _to_bool(value: object, default: bool = False) -> bool:
-    if isinstance(value, bool):
-        return value
-    text = str(value or "").strip().lower()
-    if text in {"1", "true", "yes", "y", "on"}:
-        return True
-    if text in {"0", "false", "no", "n", "off"}:
-        return False
-    return default
 
 
 def normalize_analytics_query_params(

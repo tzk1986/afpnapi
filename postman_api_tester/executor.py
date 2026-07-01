@@ -34,6 +34,7 @@ from postman_api_tester.runtime_utils import normalize_url_and_params as _normal
 from postman_api_tester.db_feedback import build_db_feedback
 from postman_api_tester.session import normalize_timeout
 from postman_api_tester.parser import ApiConfig
+from postman_api_tester.utils.response_parser import extract_msg_errcode as _extract_msg_errcode
 from postman_api_tester.utils.judgment_utils import evaluate_result_judgment, resolve_judgment_params
 from postman_api_tester import report_server_config as _rsc
 
@@ -515,30 +516,6 @@ class PostmanTestExecutor:
                     close_fn()
 
     def _extract_message_and_err_code(self, response_data: object) -> Tuple[str, str]:
-        """从响应体中提取 message 与 errCode 字段，用于成功判定与报告查询。"""
-        if not isinstance(response_data, dict):
-            return "", ""
-
-        response_map: JsonObject = response_data
-
-        message_keys = ["message", "msg", "error_message", "errorMessage", "errMsg"]
-        err_code_keys = ["errCode", "errcode", "errorCode", "error_code", "code"]
-
-        def pick_text(data: JsonObject, keys: List[str]) -> str:
-            for key in keys:
-                if key in data and data[key] is not None:
-                    return str(data[key]).strip()
-            return ""
-
-        message = pick_text(response_map, message_keys)
-        err_code = pick_text(response_map, err_code_keys)
-
-        payload = response_map.get("data")
-        if isinstance(payload, dict):
-            if not message:
-                message = pick_text(payload, message_keys)
-            if not err_code:
-                err_code = pick_text(payload, err_code_keys)
-
-        return message, err_code
+        """从响应体中提取 message 与 errCode 字段，委托到 response_parser.extract_msg_errcode。"""
+        return _extract_msg_errcode(response_data)
 
