@@ -14,7 +14,11 @@ from postman_api_tester.utils.file_utils import atomic_write_json
 def _build_retry_history_and_judgement(
     old_result: Dict[str, Any],
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """构建重试历史和重置手工判定。"""
+    """构建重试历史和重置手工判定。
+
+    注意：会通过 pop() 修改传入的 old_result（移除 retry_history 字段），
+    调用方需确保传入的是副本而非原始引用。
+    """
     old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
     retry_history = old_history + [old_result]
     old_judgement_value = old_result.get("manual_judgement")

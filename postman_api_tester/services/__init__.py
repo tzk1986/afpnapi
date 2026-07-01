@@ -1,4 +1,4 @@
-﻿"""Service layer modules."""
+"""Service layer modules."""
 
 """开发导读：
 - 目录定位：services 负责稳定业务实现，供 handlers 路由层调用。

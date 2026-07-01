@@ -321,14 +321,14 @@ class PostmanTestExecutor:
         self.api_config = dict(api)
         return api
 
-    def _prepare_request_context(
-        self, api: ApiConfig
-    ) -> Tuple[str, str, str, Dict[str, str], Dict[str, Any], Any]:
-        """准备请求上下文：提取配置、规范化 URL、注入认证。
+    def execute_test(self) -> TestResultRecord:
+        """执行单个API测试，返回标准化结果记录"""
+        from typing import cast
+        api: ApiConfig = cast(ApiConfig, self.api_config)
 
-        Returns:
-            Tuple of (method, raw_url, url, headers, params, body)
-        """
+        # 变量替换与 pre-request 脚本
+        api = self._execute_pre_request_and_substitute(api)
+
         method = str(api.get('method') or 'GET').lower()
         raw_url = str(api.get('full_url') or '')
         raw_headers = api.get('headers')
@@ -338,40 +338,24 @@ class PostmanTestExecutor:
         url, params = _normalize_url_and_params(raw_url, params)
         body = api.get('body')
 
-        # 如果 body 是字符串（可能因为包含 {{variable}} 导致 JSON 解析失败），
-        # 在变量替换后尝试重新解析为 JSON 对象
+        # 变量替换后 body 可能变为合法 JSON 字符串，尝试解析
         if isinstance(body, str) and body.strip().startswith(('{', '[')):
             try:
                 body = json.loads(body)
             except (json.JSONDecodeError, ValueError):
-                pass  # 保持原字符串
+                pass
 
-        # 自动添加认证 token（如果存在则始终覆盖，确保使用最新 token）
+        # 注入认证 token（始终覆盖，确保使用最新 token）
         if self._auth_token:
-            # 大小写不敏感地查找已有认证头，避免重复键
             headers_lower = {k.lower(): k for k in headers}
             if 'authorization' in headers_lower:
                 orig_key = headers_lower['authorization']
                 headers[orig_key] = f'Bearer {self._auth_token}'
             else:
-                # 删除大小写不一致的 token 键，统一用小写 token
                 for k in list(headers.keys()):
                     if k.lower() == 'token':
                         del headers[k]
                 headers['token'] = self._auth_token
-
-        return method, raw_url, url, headers, params, body
-
-    def execute_test(self) -> TestResultRecord:
-        """执行单个API测试，返回标准化结果记录"""
-        from typing import cast
-        api: ApiConfig = cast(ApiConfig, self.api_config)
-
-        # Phase 1: 执行 pre-request 脚本并进行变量替换
-        api = self._execute_pre_request_and_substitute(api)
-
-        # Phase 2: 准备请求上下文（提取配置、规范化 URL、注入认证）
-        method, raw_url, url, headers, params, body = self._prepare_request_context(api)
 
         try:
             import requests as _requests

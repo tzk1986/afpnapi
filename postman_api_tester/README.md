@@ -1,8 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.20.6
+版本：v1.20.7
 发布日期：2026-07-01
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.20.7）：
+- **代码走查精简**：回退 request_builder 5 个过度抽象的 `_build_*_body` 函数及分派字典为内联 if-elif，回退 executor `_prepare_request_context`（6-tuple 返回值）为内联代码，修复 services/__init__.py BOM 语法错误，补充 report_patch_service pop() 副作用注释。
+- **全量走查**：审查 84 个源文件、55 个短小单次调用私有函数，确认无其他过度抽象。
 
 本版新增重点（v1.20.6）：
 - **代码质量重构**：report_patch_service.patch_report_result 重构（114→87 行，-24%），request_builder.set_request_body 重构（78→40 行，-49%），executor.execute_test 重构（209→167 行，-20%），总计提取 10 个辅助函数，重构 401 行代码。
