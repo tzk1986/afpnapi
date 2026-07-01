@@ -567,6 +567,8 @@
             varFunctions: [],
             compareHistory: [],  // 对比历史：最多保存 20 条请求/响应记录
             compareSelectedIds: new Set(),  // 对比视图选中的历史 ID
+            kvEditMode: { headers: 'form', params: 'form' },  // KV 编辑模式：form | bulk
+            _bulkText: {},  // 批量编辑模式临时文本缓存
         };
 
         // Methods
@@ -1341,18 +1343,91 @@
 
         // KV Tab (Headers/Params)
         function renderKVTab(kvs, field) {
-            let html = '<div style="margin-bottom:12px;">';
+            const mode = state.kvEditMode[field] || 'form';
+            const modeButtons = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <div style="display:flex;gap:4px;">
+                        <button type="button" class="preview-toggle-btn ${mode === 'form' ? 'active' : ''}" onclick="switchKVEditMode('${field}', 'form')" style="font-size:11px;padding:3px 10px;">表单编辑</button>
+                        <button type="button" class="preview-toggle-btn ${mode === 'bulk' ? 'active' : ''}" onclick="switchKVEditMode('${field}', 'bulk')" style="font-size:11px;padding:3px 10px;">批量编辑</button>
+                    </div>
+                    ${mode === 'form' ? `<button type="button" class="btn btn-secondary" onclick="addKV('${field}')" style="font-size:12px;">+ 添加</button>` : ''}
+                </div>`;
+
+            if (mode === 'bulk') {
+                const text = state._bulkText[field] || kvs.map(kv =>
+                    (kv.disabled ? '# ' : '') + (kv.key || '') + ': ' + (kv.value || '')
+                ).join('\n');
+                state._bulkText[field] = text;
+                return modeButtons + `<div class="field">
+                    <textarea rows="8" style="font-family:monospace;font-size:12px;line-height:1.6;" placeholder="Key: Value（每行一个，# 开头禁用）" onchange="updateBulkKV('${field}', this.value)">${escapeHtml(text)}</textarea>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:4px;">每行格式：<code>Key: Value</code>，<code>#</code> 开头禁用该行。切换回表单编辑时自动解析。</div>
+                </div>`;
+            }
+
+            let html = modeButtons + '<div style="margin-bottom:12px;">';
             for (let i = 0; i < kvs.length; i++) {
                 const kv = kvs[i];
-                html += `<div class="kv-row">
+                const disabledStyle = kv.disabled ? 'opacity:0.5;' : '';
+                const disabledCheckbox = `<input type="checkbox" ${kv.disabled ? 'checked' : ''} onchange="toggleKVDisabled('${field}', ${i}, this.checked)" title="${kv.disabled ? '已禁用' : '启用'}" style="width:auto;margin:0;">`;
+                html += `<div class="kv-row" style="${disabledStyle}">
+                    ${disabledCheckbox}
                     <input type="text" placeholder="Key" value="${escapeAttr(kv.key || '')}" onchange="updateKV('${field}', ${i}, 'key', this.value)">
                     <input type="text" placeholder="Value" value="${escapeAttr(kv.value || '')}" onchange="updateKV('${field}', ${i}, 'value', this.value)">
                     <button type="button" onclick="removeKV('${field}', ${i})"></button>
                 </div>`;
             }
             html += '</div>';
-            html += `<button type="button" class="btn btn-secondary" onclick="addKV('${field}')" style="font-size:12px;">+ 添加</button>`;
             return html;
+        }
+
+        function switchKVEditMode(field, mode) {
+            const currentMode = state.kvEditMode[field] || 'form';
+            if (currentMode === mode) return;
+
+            if (mode === 'bulk') {
+                const kvs = (state.editBuffer && state.editBuffer[field]) || [];
+                state._bulkText[field] = kvs.map(kv =>
+                    (kv.disabled ? '# ' : '') + (kv.key || '') + ': ' + (kv.value || '')
+                ).join('\n');
+            } else {
+                const text = state._bulkText[field] || '';
+                if (state.editBuffer) {
+                    state.editBuffer[field] = parseBulkKV(text);
+                    syncToAllRequests();
+                }
+                delete state._bulkText[field];
+            }
+            state.kvEditMode[field] = mode;
+            renderEditor();
+        }
+
+        function parseBulkKV(text) {
+            return text.split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                    const trimmed = line.trimStart();
+                    const disabled = trimmed.startsWith('#');
+                    const clean = disabled ? trimmed.slice(1).trimStart() : trimmed;
+                    const colonIdx = clean.indexOf(':');
+                    if (colonIdx < 0) return { key: clean.trim(), value: '', disabled };
+                    return {
+                        key: clean.slice(0, colonIdx).trim(),
+                        value: clean.slice(colonIdx + 1).trim(),
+                        disabled
+                    };
+                });
+        }
+
+        function updateBulkKV(field, text) {
+            state._bulkText[field] = text;
+        }
+
+        function toggleKVDisabled(field, index, checked) {
+            if (state.editBuffer && state.editBuffer[field]) {
+                state.editBuffer[field][index].disabled = checked;
+                syncToAllRequests();
+                renderEditor();
+            }
         }
 
         // Body Tab

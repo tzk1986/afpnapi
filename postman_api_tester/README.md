@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.20.8
+版本：v1.20.9
 发布日期：2026-07-01
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.20.9）：
+- **竞品借鉴三项改进**：Headers/Params 批量文本编辑模式（`key: value` 格式，`#` 注释禁用行），报告详情页 JSONPath 响应过滤器（支持 `$.data[*].name`、`..id` 等语法），响应体文本搜索与高亮（🔍 搜索栏 + Enter/F3 导航 + 匹配计数）。
 
 本版新增重点（v1.20.8）：
 - **消除重复代码**：executor._extract_message_and_err_code 委托到 response_parser.extract_msg_errcode（28→3 行），analytics_utils._to_bool 复用 report_server_utils.to_bool，config.py 22 处布尔解析模式统一为 _env_bool() 辅助函数（400→363 行，-9%）。
