@@ -137,6 +137,62 @@ def infer_body_mode_from_stored_body(body: Any) -> Dict[str, Any] | None:
     return None
 
 
+def _build_raw_body(data: Any) -> Dict[str, Any]:
+    """构建 raw 模式的 body。"""
+    if isinstance(data, dict):
+        raw_content = str(data.get("raw_content") or "")
+        raw_language = str(data.get("raw_language") or "text").strip().lower() or "text"
+    else:
+        raw_content = "" if data is None else str(data)
+        raw_language = "text"
+    return {
+        "mode": "raw",
+        "raw": raw_content,
+        "options": {"raw": {"language": raw_language}},
+    }
+
+
+def _build_urlencoded_body(data: Any) -> Dict[str, Any]:
+    """构建 urlencoded 模式的 body。"""
+    rows = normalize_urlencoded_rows(data)
+    return {
+        "mode": "urlencoded",
+        "urlencoded": rows,
+    }
+
+
+def _build_formdata_body(data: Any) -> Dict[str, Any]:
+    """构建 formdata 模式的 body。"""
+    rows = normalize_formdata_rows(data)
+    return {
+        "mode": "formdata",
+        "formdata": rows,
+    }
+
+
+def _build_graphql_body(data: Any) -> Dict[str, Any]:
+    """构建 graphql 模式的 body。"""
+    gql = normalize_graphql_data(data)
+    return {
+        "mode": "graphql",
+        "graphql": {
+            "query": gql["query"],
+            "variables": json.dumps(gql["variables"], ensure_ascii=False),
+        },
+    }
+
+
+def _build_binary_body(data: Any) -> Dict[str, Any]:
+    """构建 binary 模式的 body。"""
+    file_name = ""
+    if isinstance(data, dict):
+        file_name = str(data.get("file_name") or data.get("src") or "").strip()
+    return {
+        "mode": "file",
+        "file": {"src": file_name or None},
+    }
+
+
 def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | None = None, body_data: Any = None) -> None:
     # set_request_body 负责将前端/历史结构统一映射到 Postman request.body 语义。
     mode = str(body_mode or "legacy").strip().lower()
@@ -152,55 +208,16 @@ def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | No
         request_obj.pop("body", None)
         return
 
-    if mode == "raw":
-        if isinstance(data, dict):
-            raw_content = str(data.get("raw_content") or "")
-            raw_language = str(data.get("raw_language") or "text").strip().lower() or "text"
-        else:
-            raw_content = "" if data is None else str(data)
-            raw_language = "text"
-        request_obj["body"] = {
-            "mode": "raw",
-            "raw": raw_content,
-            "options": {"raw": {"language": raw_language}},
-        }
-        return
+    body_builders = {
+        "raw": _build_raw_body,
+        "urlencoded": _build_urlencoded_body,
+        "formdata": _build_formdata_body,
+        "graphql": _build_graphql_body,
+        "binary": _build_binary_body,
+    }
 
-    if mode == "urlencoded":
-        rows = normalize_urlencoded_rows(data)
-        request_obj["body"] = {
-            "mode": "urlencoded",
-            "urlencoded": rows,
-        }
-        return
-
-    if mode == "formdata":
-        rows = normalize_formdata_rows(data)
-        request_obj["body"] = {
-            "mode": "formdata",
-            "formdata": rows,
-        }
-        return
-
-    if mode == "graphql":
-        gql = normalize_graphql_data(data)
-        request_obj["body"] = {
-            "mode": "graphql",
-            "graphql": {
-                "query": gql["query"],
-                "variables": json.dumps(gql["variables"], ensure_ascii=False),
-            },
-        }
-        return
-
-    if mode == "binary":
-        file_name = ""
-        if isinstance(data, dict):
-            file_name = str(data.get("file_name") or data.get("src") or "").strip()
-        request_obj["body"] = {
-            "mode": "file",
-            "file": {"src": file_name or None},
-        }
+    if mode in body_builders:
+        request_obj["body"] = body_builders[mode](data)
         return
 
     if isinstance(body, (dict, list)):

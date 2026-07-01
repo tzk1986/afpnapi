@@ -19,7 +19,7 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING, Union
 if TYPE_CHECKING:
     from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.session import RequestTimeout
@@ -299,30 +299,38 @@ class PostmanTestExecutor:
         result['db_feedback'] = db_feedback
         return result
 
-    def execute_test(self) -> TestResultRecord:
-        """执行单个API测试，返回标准化结果记录"""
-        from typing import cast
-        api: ApiConfig = cast(ApiConfig, self.api_config)
+    def _execute_pre_request_and_substitute(self, api: ApiConfig) -> ApiConfig:
+        """执行 pre-request 脚本并进行变量替换。"""
+        if self.variable_context is None:
+            return api
 
-        if self.variable_context is not None:
-            from postman_api_tester.utils.variable_substitution import substitute_in_api_config
+        from postman_api_tester.utils.variable_substitution import substitute_in_api_config
 
-            local_vars: Dict[str, str] = {}
-            pre_request_expr = api.get("x_pre_request")
-            if pre_request_expr:
-                from postman_api_tester.config import ENABLE_PRE_REQUEST_SCRIPT
-                if ENABLE_PRE_REQUEST_SCRIPT:
-                    from postman_api_tester.utils.pre_request_executor import execute_pre_request
-                    local_vars = execute_pre_request(pre_request_expr, self.variable_context.variables)
-                    if local_vars:
-                        logging.getLogger(__name__).debug("pre-request variables set: %s", list(local_vars.keys()))
+        local_vars: Dict[str, str] = {}
+        pre_request_expr = api.get("x_pre_request")
+        if pre_request_expr:
+            from postman_api_tester.config import ENABLE_PRE_REQUEST_SCRIPT
+            if ENABLE_PRE_REQUEST_SCRIPT:
+                from postman_api_tester.utils.pre_request_executor import execute_pre_request
+                local_vars = execute_pre_request(pre_request_expr, self.variable_context.variables)
+                if local_vars:
+                    logging.getLogger(__name__).debug("pre-request variables set: %s", list(local_vars.keys()))
 
-            merged_vars = {**self.variable_context.variables, **local_vars}
-            api = substitute_in_api_config(api, merged_vars)
-            self.api_config = dict(api)
+        merged_vars = {**self.variable_context.variables, **local_vars}
+        api = substitute_in_api_config(api, merged_vars)
+        self.api_config = dict(api)
+        return api
 
+    def _prepare_request_context(
+        self, api: ApiConfig
+    ) -> Tuple[str, str, str, Dict[str, str], Dict[str, Any], Any]:
+        """准备请求上下文：提取配置、规范化 URL、注入认证。
+
+        Returns:
+            Tuple of (method, raw_url, url, headers, params, body)
+        """
         method = str(api.get('method') or 'GET').lower()
-        raw_url = str(api.get('full_url') or '')  # 使用完整URL
+        raw_url = str(api.get('full_url') or '')
         raw_headers = api.get('headers')
         headers = dict(raw_headers) if isinstance(raw_headers, dict) else {}
         raw_params = api.get('params')
@@ -338,7 +346,7 @@ class PostmanTestExecutor:
             except (json.JSONDecodeError, ValueError):
                 pass  # 保持原字符串
 
-        # 自动添加认证token（如果存在则始终覆盖，确保使用最新token）
+        # 自动添加认证 token（如果存在则始终覆盖，确保使用最新 token）
         if self._auth_token:
             # 大小写不敏感地查找已有认证头，避免重复键
             headers_lower = {k.lower(): k for k in headers}
@@ -351,6 +359,19 @@ class PostmanTestExecutor:
                     if k.lower() == 'token':
                         del headers[k]
                 headers['token'] = self._auth_token
+
+        return method, raw_url, url, headers, params, body
+
+    def execute_test(self) -> TestResultRecord:
+        """执行单个API测试，返回标准化结果记录"""
+        from typing import cast
+        api: ApiConfig = cast(ApiConfig, self.api_config)
+
+        # Phase 1: 执行 pre-request 脚本并进行变量替换
+        api = self._execute_pre_request_and_substitute(api)
+
+        # Phase 2: 准备请求上下文（提取配置、规范化 URL、注入认证）
+        method, raw_url, url, headers, params, body = self._prepare_request_context(api)
 
         try:
             import requests as _requests

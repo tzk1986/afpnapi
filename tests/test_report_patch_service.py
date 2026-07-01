@@ -6,7 +6,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from postman_api_tester.services.report_patch_service import patch_report_result
+from postman_api_tester.services.report_patch_service import (
+    patch_report_result,
+    _build_retry_history_and_judgement,
+    _build_merged_result,
+    _update_details_file,
+)
 
 
 def _write_json(path: Path, data) -> None:
@@ -645,3 +650,198 @@ class TestNonDictManualJudgement:
         with (tmp_path / "_meta.json").open("r") as f:
             saved = json.load(f)
         assert saved["results"][0]["manual_judgement"]["active"] is False
+
+
+# --- helper function tests ---------------------------------------------------
+
+class TestBuildRetryHistoryAndJudgement:
+    """_build_retry_history_and_judgement 辅助函数测试。"""
+
+    def test_builds_retry_history_from_empty(self) -> None:
+        """测试从空历史构建重试历史。"""
+        old_result = {
+            "name": "test",
+            "status": "FAILED",
+            "method": "GET",
+        }
+        retry_history, manual_judgement = _build_retry_history_and_judgement(old_result)
+
+        assert len(retry_history) == 1
+        assert retry_history[0]["name"] == "test"
+        assert retry_history[0]["status"] == "FAILED"
+        assert "retry_history" not in retry_history[0]
+
+    def test_builds_retry_history_from_existing(self) -> None:
+        """测试从现有历史构建重试历史。"""
+        old_result = {
+            "name": "test",
+            "status": "FAILED",
+            "retry_history": [
+                {"name": "test", "status": "ERROR"},
+            ],
+        }
+        retry_history, _ = _build_retry_history_and_judgement(old_result)
+
+        assert len(retry_history) == 2
+        assert retry_history[0]["status"] == "ERROR"
+        assert retry_history[1]["status"] == "FAILED"
+
+    def test_resets_manual_judgement_to_auto(self) -> None:
+        """测试重置手工判定为自动模式。"""
+        old_result = {
+            "name": "test",
+            "manual_judgement": {
+                "active": True,
+                "source": "manual",
+                "result": "PASSED",
+            },
+        }
+        _, manual_judgement = _build_retry_history_and_judgement(old_result)
+
+        assert manual_judgement["active"] is False
+        assert manual_judgement["source"] == "auto"
+        assert manual_judgement["result"] == "PASSED"
+
+    def test_handles_missing_manual_judgement(self) -> None:
+        """测试处理缺失的手工判定。"""
+        old_result = {"name": "test"}
+        _, manual_judgement = _build_retry_history_and_judgement(old_result)
+
+        assert manual_judgement == {
+            "active": False,
+            "source": "auto",
+        }
+
+
+class TestBuildMergedResult:
+    """_build_merged_result 辅助函数测试。"""
+
+    def test_merges_new_fields_with_old(self) -> None:
+        """测试合并新旧字段。"""
+        old_result = {
+            "name": "test",
+            "folder": "api",
+            "method": "GET",
+            "url": "http://old.com",
+            "item_path": [0, 1],
+            "expected_status": 200,
+        }
+        new_fields = {
+            "method": "POST",
+            "url": "http://new.com",
+            "status": "PASSED",
+        }
+        retry_history = [{"name": "test", "status": "FAILED"}]
+        manual_judgement = {"active": False, "source": "auto"}
+
+        merged = _build_merged_result(old_result, new_fields, retry_history, manual_judgement)
+
+        assert merged["name"] == "test"
+        assert merged["folder"] == "api"
+        assert merged["method"] == "POST"
+        assert merged["url"] == "http://new.com"
+        assert merged["status"] == "PASSED"
+        assert merged["retried"] is True
+        assert len(merged["retry_history"]) == 1
+        assert merged["manual_judgement"]["active"] is False
+
+    def test_generates_key_from_fields(self) -> None:
+        """测试从字段生成 key。"""
+        old_result = {
+            "name": "test",
+            "folder": "api",
+            "method": "GET",
+            "url": "http://example.com",
+        }
+        merged = _build_merged_result(old_result, {}, [], {})
+
+        assert merged["key"] == "api | test | GET | http://example.com"
+
+    def test_uses_dash_for_missing_fields(self) -> None:
+        """测试缺失字段使用短横线。"""
+        old_result = {"name": "test"}
+        merged = _build_merged_result(old_result, {}, [], {})
+
+        assert merged["key"] == "- | test | - | -"
+
+    def test_preserves_item_path_and_expected_status(self) -> None:
+        """测试保留 item_path 和 expected_status。"""
+        old_result = {
+            "name": "test",
+            "item_path": [0, 1, 2],
+            "expected_status": 201,
+        }
+        merged = _build_merged_result(old_result, {}, [], {})
+
+        assert merged["item_path"] == [0, 1, 2]
+        assert merged["expected_status"] == 201
+
+
+class TestUpdateDetailsFile:
+    """_update_details_file 辅助函数测试。"""
+
+    def test_creates_details_file(self, tmp_path: Path) -> None:
+        """测试创建详情文件。"""
+        _update_details_file(
+            details_file_name="report_details.json",
+            result_index=0,
+            new_request_info={"method": "GET"},
+            new_response_info={"status_code": 200},
+            reports_dir=tmp_path,
+        )
+
+        details_path = tmp_path / "report_details.json"
+        assert details_path.exists()
+        with details_path.open("r", encoding="utf-8") as f:
+            details = json.load(f)
+        assert details["0"]["request_info"]["method"] == "GET"
+        assert details["0"]["response_info"]["status_code"] == 200
+
+    def test_updates_existing_details(self, tmp_path: Path) -> None:
+        """测试更新已有详情文件。"""
+        details_path = tmp_path / "report_details.json"
+        with details_path.open("w", encoding="utf-8") as f:
+            json.dump({"0": {"request_info": {}, "response_info": {}}}, f)
+
+        _update_details_file(
+            details_file_name="report_details.json",
+            result_index=1,
+            new_request_info={"method": "POST"},
+            new_response_info={"status_code": 201},
+            reports_dir=tmp_path,
+        )
+
+        with details_path.open("r", encoding="utf-8") as f:
+            details = json.load(f)
+        assert "0" in details
+        assert details["1"]["request_info"]["method"] == "POST"
+
+    def test_handles_empty_filename(self, tmp_path: Path) -> None:
+        """测试处理空文件名。"""
+        _update_details_file(
+            details_file_name="",
+            result_index=0,
+            new_request_info={},
+            new_response_info={},
+            reports_dir=tmp_path,
+        )
+        # 不应创建文件
+        assert not any(tmp_path.iterdir())
+
+    def test_handles_corrupted_existing_file(self, tmp_path: Path) -> None:
+        """测试处理损坏的现有文件。"""
+        details_path = tmp_path / "report_details.json"
+        with details_path.open("w", encoding="utf-8") as f:
+            f.write("{invalid json")
+
+        _update_details_file(
+            details_file_name="report_details.json",
+            result_index=0,
+            new_request_info={"method": "GET"},
+            new_response_info={"status_code": 200},
+            reports_dir=tmp_path,
+        )
+
+        with details_path.open("r", encoding="utf-8") as f:
+            details = json.load(f)
+        assert details["0"]["request_info"]["method"] == "GET"
