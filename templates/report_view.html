@@ -2029,8 +2029,8 @@ let _searchMatches = [];
 let _searchIndex = -1;
 
 function toggleResponseSearch() {
-    const bar = document.getElementById('responseSearchBar');
-    const input = document.getElementById('responseSearchInput');
+    const bar = document.getElementById('responseSearchBar') || document.getElementById('mc-responseSearchBar');
+    const input = document.getElementById('responseSearchInput') || document.getElementById('mc-responseSearchInput');
     if (!bar) return;
     const visible = bar.classList.toggle('visible');
     if (visible) {
@@ -2061,7 +2061,7 @@ function _clearSearchHighlights() {
 }
 
 function searchInJsonViewer() {
-    const input = document.getElementById('responseSearchInput');
+    const input = document.getElementById('responseSearchInput') || document.getElementById('mc-responseSearchInput');
     if (!input) return;
     const keyword = input.value;
     _clearSearchHighlights();
@@ -2119,7 +2119,7 @@ function navigateSearchMatch(direction) {
 }
 
 function _updateSearchCount() {
-    const count = document.getElementById('searchCount');
+    const count = document.getElementById('searchCount') || document.getElementById('mc-searchCount');
     if (!count) return;
     if (_searchMatches.length === 0) { count.textContent = '0/0'; return; }
     count.textContent = (_searchIndex + 1) + '/' + _searchMatches.length;
@@ -4937,11 +4937,11 @@ function renderManualCaseDetailPanels(caseData) {
                         <span id="jsonPathResultInfo" style="font-size:11px;color:#64748b;"></span>
                     </div>
                 </div>
-                <div id="responseSearchBar" class="response-search-bar">
-                    <input type="text" id="responseSearchInput" placeholder="搜索响应体文本..." oninput="searchInJsonViewer()" onkeydown="handleSearchKey(event)">
+                <div id="mc-responseSearchBar" class="response-search-bar">
+                    <input type="text" id="mc-responseSearchInput" placeholder="搜索响应体文本..." oninput="searchInJsonViewer()" onkeydown="handleSearchKey(event)">
                     <button onclick="navigateSearchMatch(-1)">◀</button>
                     <button onclick="navigateSearchMatch(1)">▶</button>
-                    <span id="searchCount" class="search-count"></span>
+                    <span id="mc-searchCount" class="search-count"></span>
                     <button onclick="toggleResponseSearch()">✕</button>
                 </div>
                 <div id="responseBodyMeta" class="muted response-meta"></div>

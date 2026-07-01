@@ -98,6 +98,54 @@ class TestUrlValidation:
 		assert result["success"] is False
 		assert result["error_code"] == 400
 
+	def test_rejects_invalid_netloc_with_special_chars(self) -> None:
+		"""netloc 包含特殊字符被拒绝。"""
+		result = execute_http_request(
+			url="http://exam ple.com/api",
+			method="GET",
+			headers={},
+			params={},
+			body_mode="none",
+			body_data=None,
+			legacy_body=None,
+			is_multipart=False,
+			files_source=None,
+		)
+		assert result["success"] is False
+		assert result["error_code"] == 400
+
+	def test_rejects_netloc_with_newline_injection(self) -> None:
+		"""netloc 包含换行符被拒绝（CRLF 注入防护）。"""
+		result = execute_http_request(
+			url="http://example.com%0d%0aX-Injected:/api",
+			method="GET",
+			headers={},
+			params={},
+			body_mode="none",
+			body_data=None,
+			legacy_body=None,
+			is_multipart=False,
+			files_source=None,
+		)
+		assert result["success"] is False
+		assert result["error_code"] == 400
+
+	def test_accepts_valid_netloc_with_port(self) -> None:
+		"""合法 netloc + 端口应通过校验。"""
+		result = execute_http_request(
+			url="http://127.0.0.1:8080/api",
+			method="GET",
+			headers={},
+			params={},
+			body_mode="none",
+			body_data=None,
+			legacy_body=None,
+			is_multipart=False,
+			files_source=None,
+		)
+		assert result["success"] is False
+		assert result["error_code"] == 502
+
 
 class TestSuccessfulRequests:
 	"""成功请求路径测试。"""
