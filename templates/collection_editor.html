@@ -2728,8 +2728,8 @@
         function renderRequestPreview(req) {
             const method = (req.method || 'GET').toUpperCase();
             const url = substituteVars(req.url || '');
-            const headers = (req.headers || []).filter(h => h.key).map(h => ({ key: h.key, value: substituteVars(h.value) }));
-            const params = (req.params || []).filter(p => p.key).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
+            const headers = (req.headers || []).filter(h => h.key && !h.disabled).map(h => ({ key: h.key, value: substituteVars(h.value) }));
+            const params = (req.params || []).filter(p => p.key && !p.disabled).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
             const bodyMode = req.body_mode || 'none';
             const bodyData = req.body_data || {};
 
@@ -4498,8 +4498,8 @@
         function generateCodeSnippet(req, lang) {
             const method = (req.method || 'GET').toUpperCase();
             const url = substituteVars(req.url || '');
-            const headers = (req.headers || []).filter(h => h.key).map(h => ({ key: h.key, value: substituteVars(h.value) }));
-            const params = (req.params || []).filter(p => p.key).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
+            const headers = (req.headers || []).filter(h => h.key && !h.disabled).map(h => ({ key: h.key, value: substituteVars(h.value) }));
+            const params = (req.params || []).filter(p => p.key && !p.disabled).map(p => ({ key: substituteVars(p.key), value: substituteVars(p.value) }));
             const bodyMode = req.body_mode || 'none';
             const bodyData = req.body_data || {};
 
