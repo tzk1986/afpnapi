@@ -275,7 +275,20 @@ class PostmanTestExecutor:
     ) -> TestResultRecord:
         """构建请求异常路径的结果（含数据库反馈）。"""
         import requests as _requests
-        err_type = '请求超时' if isinstance(error, _requests.exceptions.Timeout) else '请求异常'
+        if isinstance(error, _requests.exceptions.Timeout):
+            err_type = '请求超时'
+        elif isinstance(error, _requests.exceptions.ConnectionError):
+            err_type = '连接失败'
+        elif isinstance(error, _requests.exceptions.TooManyRedirects):
+            err_type = '重定向过多'
+        elif isinstance(error, _requests.exceptions.InvalidURL):
+            err_type = 'URL无效'
+        elif isinstance(error, _requests.exceptions.MissingSchema):
+            err_type = 'URL缺少协议'
+        elif isinstance(error, (ValueError, KeyError, TypeError)):
+            err_type = '数据处理异常'
+        else:
+            err_type = '请求异常'
         db_feedback = build_db_feedback(
             status='ERROR',
             status_code=None,
