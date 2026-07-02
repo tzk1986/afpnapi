@@ -431,7 +431,6 @@ class TestInputValidation:
         }))
         deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
 
-        # Should NOT raise even though target_status is invalid
         set_report_result_judgement(
             report_name="r", result_index=0, action="restore",
             target_status="GARBAGE_VALUE", reports_dir=tmp_path,
@@ -440,6 +439,8 @@ class TestInputValidation:
             compute_summary=deps.compute_summary,
             invalidate_reports_cache=MagicMock(),
         )
+        # 验证 compute_summary 被调用（状态被重新计算）
+        deps.compute_summary.assert_called_once()
 
     def test_override_no_target_status(self) -> None:
         with pytest.raises(ValueError, match="target_status 仅支持 PASSED 或 FAILED"):

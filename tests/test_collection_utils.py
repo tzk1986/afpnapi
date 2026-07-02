@@ -151,9 +151,11 @@ class TestExtractCollectionPreviewItems:
 class TestValidateAdhocUrl:
 
     def test_valid_http_url(self) -> None:
+        # 合法 HTTP URL 不应抛出异常
         _validate_adhoc_url("http://example.com/api", None, 0)
 
     def test_valid_https_url(self) -> None:
+        # 合法 HTTPS URL 不应抛出异常
         _validate_adhoc_url("https://example.com/api", None, 0)
 
     def test_empty_url_raises(self) -> None:
@@ -169,9 +171,11 @@ class TestValidateAdhocUrl:
             _validate_adhoc_url("{{baseUrl}}/api", None, 0)
 
     def test_variable_url_with_base_url_ok(self) -> None:
+        # 变量 URL + base_url 应通过校验
         _validate_adhoc_url("{{baseUrl}}/api", "http://example.com", 0)
 
     def test_variable_url_base_url_variant_ok(self) -> None:
+        # 变量名变体 {{base_url}} 也应通过
         _validate_adhoc_url("{{base_url}}/api", "http://example.com", 0)
 
     def test_unsupported_variable_prefix_raises(self) -> None:
@@ -183,6 +187,7 @@ class TestValidateAdhocUrl:
             _validate_adhoc_url("/api/v1", None, 0)
 
     def test_relative_url_with_base_url_ok(self) -> None:
+        # 相对路径 + base_url 应通过校验
         _validate_adhoc_url("/api/v1", "http://example.com", 0)
 
 

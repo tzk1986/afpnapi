@@ -48,10 +48,15 @@ def test_different_names_return_different_locks() -> None:
 def test_lock_is_reentrant() -> None:
     """验证锁本身支持可重入（RLock 特性）."""
     lock = get_report_write_lock("reentrant")
+    # RLock 允许同一线程多次 acquire，不应死锁
+    acquired = []
     with lock:
+        acquired.append(1)
         with lock:
+            acquired.append(2)
             with lock:
-                pass
+                acquired.append(3)
+    assert acquired == [1, 2, 3]
 
 
 def test_empty_string_name() -> None:

@@ -126,8 +126,10 @@ class TestSafeRunJob:
         fn = MagicMock(side_effect=ValueError("test error"))
         set_run_job = MagicMock(side_effect=RuntimeError("set_run_job failed"))
 
-        # Should not raise
+        # set_run_job 抛出异常不应传播
         _safe_run_job(fn, (), "job-1", set_run_job)
+        # 验证 fn 确实被调用了
+        fn.assert_called_once()
 
 
 class TestRunPostmanJob:

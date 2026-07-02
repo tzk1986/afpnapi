@@ -1,8 +1,14 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.20.10
+版本：v1.20.12
 发布日期：2026-07-02
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.20.12）：
+- **测试代码质量优化**：修复 `test_report_lock_service.py` 中 `lock._count` 不存在的属性引用，补充 12 个"不抛异常即通过"测试的注释说明，增强 3 个测试的断言覆盖。
+
+本版新增重点（v1.20.11）：
+- **Preview/代码生成 disabled 过滤修复**：Collection 编辑器 Request Preview 和代码生成功能现在正确过滤 disabled 的 Headers/Params，预览不再显示被禁用的条目。
 
 本版新增重点（v1.20.10）：
 - **缺陷修复 + 安全增强**：编辑器 Headers/Params disabled 勾选未生效修复，复选框布局错位修复，URL netloc 正则校验增强（防 CRLF 注入），重复 DOM ID 修复，未使用导入清理。

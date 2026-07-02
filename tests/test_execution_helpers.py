@@ -38,12 +38,15 @@ class TestValidateBaseUrl:
     """Tests for _validate_base_url function."""
 
     def test_none_is_valid(self) -> None:
+        # None base_url 不应抛出异常
         _validate_base_url(None)
 
     def test_http_url_is_valid(self) -> None:
+        # HTTP URL 不应抛出异常
         _validate_base_url("http://example.com")
 
     def test_https_url_is_valid(self) -> None:
+        # HTTPS URL 不应抛出异常
         _validate_base_url("https://api.example.com/v1")
 
     def test_ftp_url_raises(self) -> None:
@@ -141,6 +144,7 @@ class TestEmitProgress:
     """Tests for _emit_progress function."""
 
     def test_none_callback_does_nothing(self) -> None:
+        # None callback 不应抛出异常
         _emit_progress(None, {"stage": "running", "completed": 0})
 
     def test_callback_invoked_with_payload(self) -> None:
@@ -151,6 +155,7 @@ class TestEmitProgress:
 
     def test_callback_exception_swallowed(self) -> None:
         callback = MagicMock(side_effect=RuntimeError("callback error"))
+        # callback 抛出异常不应传播
         _emit_progress(callback, {"stage": "running"})
         callback.assert_called_once()
 

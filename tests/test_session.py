@@ -19,6 +19,7 @@ class TestCloseSession:
 	"""close_session() 会话关闭测试。"""
 
 	def test_none_session_no_error(self) -> None:
+		# None 会话应安全返回，不抛出异常
 		close_session(None)
 
 	def test_normal_close(self) -> None:
@@ -29,11 +30,13 @@ class TestCloseSession:
 	def test_os_error_caught(self) -> None:
 		mock_session = MagicMock()
 		mock_session.close.side_effect = OSError("connection reset")
+		# close_session swallows OSError internally; test passes if no exception leaks
 		close_session(mock_session)
 
 	def test_generic_exception_caught(self) -> None:
 		mock_session = MagicMock()
 		mock_session.close.side_effect = RuntimeError("unexpected")
+		# close_session swallows all exceptions internally; test passes if no exception leaks
 		close_session(mock_session)
 
 
