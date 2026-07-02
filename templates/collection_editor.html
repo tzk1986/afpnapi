@@ -347,6 +347,28 @@
                 <button type="button" class="btn btn-primary" onclick="executeCollection()">▶ 执行</button>
                 <button type="button" class="btn btn-secondary" onclick="clearRuntimeVars()" title="清除运行时变量池">🧹 清除变量</button>
                 <a class="btn btn-secondary" href="/" style="text-decoration:none;">← 返回首页</a>
+                <button type="button" class="btn btn-secondary" onclick="toggleShortcutsHelp()" title="快捷键帮助" style="padding:8px 10px;">⌨️</button>
+            </div>
+        </div>
+
+        <!-- Shortcuts Help Tooltip -->
+        <div id="shortcutsHelp" style="display:none;position:fixed;top:70px;right:24px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 20px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:1000;min-width:320px;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <strong style="color:#0f172a;">⌨️ 快捷键</strong>
+                <button onclick="toggleShortcutsHelp()" style="background:none;border:none;cursor:pointer;font-size:16px;color:#94a3b8;">&times;</button>
+            </div>
+            <div style="display:grid;gap:4px;">
+                <div style="display:flex;justify-content:space-between;"><span>导出 JSON</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+S</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>执行集合</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+Enter</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>导入 JSON</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+Shift+I</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>复制请求</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+D</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>新增请求</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+N</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>重命名</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">F2</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>搜索接口</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+F</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>切换页签</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+1~6</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>导航列表</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl+↑↓</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>删除选中</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Delete</kbd></div>
+                <div style="display:flex;justify-content:space-between;"><span>关闭弹窗</span><kbd style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">Esc</kbd></div>
             </div>
         </div>
 
@@ -5977,7 +5999,135 @@
                     e.preventDefault();
                 }
             }
+
+            // ── 增强快捷键 ──────────────────────────────────────────
+            // Ctrl/Cmd + D: 复制当前请求
+            if (mod && e.key === 'd' && !e.shiftKey) {
+                e.preventDefault();
+                duplicateCurrentRequest();
+                return;
+            }
+
+            // Ctrl/Cmd + N: 新增请求到当前文件夹
+            if (mod && e.key === 'n' && !e.shiftKey) {
+                e.preventDefault();
+                addRequestToCurrentGroup();
+                return;
+            }
+
+            // F2: 重命名当前请求
+            if (e.key === 'F2' && !isTyping) {
+                e.preventDefault();
+                renameCurrentRequest();
+                return;
+            }
+
+            // Ctrl/Cmd + F: 聚焦侧边栏搜索
+            if (mod && e.key === 'f') {
+                e.preventDefault();
+                const searchInput = document.getElementById('sidebarSearch');
+                if (searchInput) searchInput.focus();
+                return;
+            }
+
+            // Ctrl/Cmd + 1~6: 切换编辑器页签
+            if (mod && e.key >= '1' && e.key <= '6') {
+                e.preventDefault();
+                const tabNames = ['general', 'headers', 'params', 'body', 'prerequest', 'x_extract'];
+                const idx = parseInt(e.key) - 1;
+                if (idx < tabNames.length) {
+                    switchTab(tabNames[idx]);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + ↑/↓: 在接口列表中上下导航
+            if (mod && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+                e.preventDefault();
+                navigateRequestList(e.key === 'ArrowUp' ? -1 : 1);
+                return;
+            }
+
+            // Esc: 关闭弹窗/模态框
+            if (e.key === 'Escape') {
+                const codeModal = document.getElementById('codeModal');
+                if (codeModal && codeModal.style.display !== 'none') {
+                    closeCodeModal();
+                    return;
+                }
+                const compareModal = document.getElementById('compareModal');
+                if (compareModal && compareModal.style.display !== 'none') {
+                    closeCompareModal();
+                    return;
+                }
+            }
         });
+
+        // ─ 快捷键辅助函数 ──────────────────────────────────────────
+        function toggleShortcutsHelp() {
+            const el = document.getElementById('shortcutsHelp');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function duplicateCurrentRequest() {
+            if (!state.selectedRequestId) { showToast('请先选择一个请求'); return; }
+            const req = state.requests.find(r => r.id === state.selectedRequestId);
+            if (!req) return;
+            const newReq = JSON.parse(JSON.stringify(req));
+            newReq.id = 'req_' + Date.now();
+            newReq.name = req.name + ' (副本)';
+            state.requests.push(newReq);
+            // 插入到当前请求之后
+            const idx = state.requests.indexOf(req);
+            state.requests.splice(idx + 1, 0, state.requests.pop());
+            state.selectedRequestId = newReq.id;
+            renderTree();
+            selectRequest(newReq.id);
+            showToast('已复制请求');
+        }
+
+        function addRequestToCurrentGroup() {
+            const groupId = state.selectedGroupId || (state.requests.length > 0 ? state.requests[state.requests.length - 1].group_id : null) || '';
+            const newReq = {
+                id: 'req_' + Date.now(),
+                name: '新请求',
+                method: 'GET',
+                url: '',
+                headers: [],
+                params: [],
+                body_mode: 'none',
+                body_data: {},
+                group_id: groupId,
+            };
+            state.requests.push(newReq);
+            state.selectedRequestId = newReq.id;
+            renderTree();
+            selectRequest(newReq.id);
+            showToast('已新增请求');
+        }
+
+        function renameCurrentRequest() {
+            if (!state.selectedRequestId) { showToast('请先选择一个请求'); return; }
+            const req = state.requests.find(r => r.id === state.selectedRequestId);
+            if (!req) return;
+            const newName = prompt('重命名请求:', req.name);
+            if (newName !== null && newName.trim()) {
+                req.name = newName.trim();
+                renderTree();
+                showToast('已重命名');
+            }
+        }
+
+        function navigateRequestList(direction) {
+            if (!state.selectedRequestId) return;
+            const visibleItems = Array.from(document.querySelectorAll('.tree-item[data-type="request"]'));
+            const currentIdx = visibleItems.findIndex(el => el.dataset.id === state.selectedRequestId);
+            if (currentIdx < 0) return;
+            const nextIdx = currentIdx + direction;
+            if (nextIdx < 0 || nextIdx >= visibleItems.length) return;
+            const nextId = visibleItems[nextIdx].dataset.id;
+            selectRequest(nextId);
+        }
     </script>
 
     <!-- Toast Container -->
