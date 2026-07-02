@@ -4,6 +4,47 @@
 
 ---
 
+## 2026-07-01 20:30 — 清理未使用导入 + 修复重复 DOM ID + 增强 URL 验证（第十三轮）
+
+**分支**：`feature/auto-upgrade-2026-07-01`
+**状态**：✅ 完成（2 个改进）
+
+### 改进项
+
+#### 改进 1：清理未使用导入 + 修复重复 DOM ID
+
+- `executor.py` 移除未使用的 `Any`/`Union` 导入（import 行 44→36 字符）
+- `core/concurrent_executor.py` 移除未使用的 `Dict`/`Set` 导入
+- `run_test_and_open.py` 移除未使用的 `signal` 导入
+- `report_view.html` 修复两个人工用例/报告详情响应体卡片共用 `searchCount`/`responseSearchBar`/`responseSearchInput` ID 的问题，第二组加 `mc-` 前缀
+- 同步更新 JS 函数 `toggleResponseSearch`/`searchInJsonViewer`/`_updateSearchCount` 支持双重 ID 查找
+
+#### 改进 2：增强 URL 验证（安全加固）
+
+- `http_handler._validate_url` 增加 netloc 格式正则校验：`^[a-zA-Z0-9](?:[a-zA-Z0-9.\-]*[a-zA-Z0-9])?(?::\d{1,5})?$`
+- 防止空格/换行/特殊字符注入（CRLF 注入防护）
+- `test_http_handler.py` 新增 3 项测试：空格 netloc 拒绝、换行编码 netloc 拒绝、合法 netloc + 端口通过
+
+### 验证结果
+
+- pytest: 1986 passed（+3，无回归）
+- mypy: 84 source files, no issues
+
+### 风险点
+
+- 改进 1 低风险：清理导入不影响行为，DOM ID 修复仅影响同一页面不重叠的两个区域
+- 改进 2 低风险：正则校验只拒绝异常 netloc 格式，正常 URL（域名/IP/端口）不受影响
+- 所有改进保持现有功能的外部行为不变
+
+### 回退方法
+
+```bash
+git checkout master
+git branch -D feature/auto-upgrade-2026-07-01
+```
+
+---
+
 ## 2026-06-30 20:30 — report_patch_service 重构 + 测试覆盖（第十二轮）
 
 **分支**：`feature/auto-upgrade-2026-06-30`

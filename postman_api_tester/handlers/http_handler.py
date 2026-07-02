@@ -9,6 +9,7 @@
 
 import base64 as _base64
 import logging
+import re as _re
 import time as _time
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
@@ -22,11 +23,16 @@ from postman_api_tester.utils.request_builder import build_request_kwargs
 logger = logging.getLogger(__name__)
 
 
+_NETLOC_RE = _re.compile(r'^[a-zA-Z0-9](?:[a-zA-Z0-9.\-]*[a-zA-Z0-9])?(?::\d{1,5})?$')
+
+
 def _validate_url(normalized_url: str) -> Optional[str]:
-	"""校验 URL 仅允许 http/https 协议。返回错误信息，合法则返回 None。"""
+	"""校验 URL 仅允许 http/https 协议，netloc 格式合法。返回错误信息，合法则返回 None。"""
 	parsed = urlparse(normalized_url)
 	if parsed.scheme not in ("http", "https") or not parsed.netloc:
 		return "url 仅允许合法的 http/https 地址"
+	if not _NETLOC_RE.match(parsed.netloc):
+		return "url 地址格式不合法"
 	return None
 
 

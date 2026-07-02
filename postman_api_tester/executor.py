@@ -19,7 +19,7 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING, Union
+from typing import Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING
 if TYPE_CHECKING:
     from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.session import RequestTimeout

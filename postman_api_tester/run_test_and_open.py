@@ -128,7 +128,6 @@ def main() -> None:
         print("\n🚀 启动报告服务器...")
         try:
             import subprocess
-            import signal
             import time
             
             # 启动Flask服务器
