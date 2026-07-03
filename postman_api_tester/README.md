@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.20.14
+版本：v1.20.15
 发布日期：2026-07-03
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.20.15）：
+- **合并 v1.20.13 + v1.20.14**：Collection 编辑器快捷键体系（Ctrl+S/D/N/F/1~6/Enter 等 11 项快捷键 + 帮助面板）+ 竞品调研文档；WCAG 无障碍增强（ARIA 角色/标签）+ executor 异常类型细化（2→7 类）+ config.py `_env_int()` 安全规范化。
 
 本版新增重点（v1.20.14）：
 - **WCAG 无障碍增强 + 异常诊断优化 + 配置安全规范化**：Collection 编辑器添加 ARIA 角色/标签（tablist/tab/aria-live/aria-label），executor 异常类型从 2 类细化为 7 类，config.py 新增 `_env_int()` 安全读取函数统一规范化 18 处 int 转换。
