@@ -4,6 +4,57 @@
 
 ---
 
+## 2026-07-02 20:30 — 无障碍增强 + 异常诊断优化 + 配置安全规范化（第十四轮）
+
+**分支**：`feature/auto-upgrade-2026-07-02-night`
+**状态**：✅ 完成（3 个改进）
+
+### 改进项
+
+#### 改进 1：Collection 编辑器 WCAG 无障碍增强
+
+- 编辑器页签添加 ARIA 角色：`role="tablist"`、`role="tab"`、`aria-selected`、`aria-controls`、`tabindex`
+- Toast 通知添加 `aria-live="polite"`、`role="status"`，屏幕阅读器可播报操作反馈
+- 预览切换按钮添加 `aria-label`、`aria-pressed` 属性，状态可感知
+- 3 个图标按钮（复制代码片段、对比历史、复制响应内容）添加 `aria-label`
+- 所有功能性 SVG 图标添加 `aria-hidden="true"` 避免冗余朗读
+- 代码片段菜单按钮添加 `aria-haspopup="true"` 提示弹出菜单
+
+#### 改进 2：executor.py 异常错误类型细化
+
+- `_build_request_error_result` 从 2 类错误（超时/其他）细化为 7 类：
+  - `请求超时`（Timeout）、`连接失败`（ConnectionError）、`重定向过多`（TooManyRedirects）
+  - `URL无效`（InvalidURL）、`URL缺少协议`（MissingSchema）、`数据处理异常`（ValueError/KeyError/TypeError）
+  - `请求异常`（兜底）
+- 报告中展示更精确的错误类型标签，提升问题定位效率
+
+#### 改进 3：config.py 环境变量安全规范化
+
+- 新增 `_env_int()` 辅助函数：安全读取整数环境变量，非法值自动回退到默认值
+- 替换 18 处 `int(os.environ.get(...))` 调用为 `_env_int()`，消除非法环境变量导致启动崩溃的风险
+- 所有配置项统一添加 `lo`/`hi` 边界约束
+
+### 验证结果
+
+- config import 冒烟测试通过
+- executor import 冒烟测试通过
+- mypy: config.py, executor.py 无类型问题
+
+### 风险点
+
+- 改进 1 低风险：仅添加 HTML 属性，不影响现有功能和样式
+- 改进 2 低风险：仅改变错误消息中的类型标签文本，不改变异常处理逻辑
+- 改进 3 低风险：`_env_int` 在非法输入时回退到默认值，与原有 max/min 模式行为一致
+
+### 回退方法
+
+```bash
+git checkout master
+git branch -D feature/auto-upgrade-2026-07-02-night
+```
+
+---
+
 ## 2026-07-01 20:30 — 清理未使用导入 + 修复重复 DOM ID + 增强 URL 验证（第十三轮）
 
 **分支**：`feature/auto-upgrade-2026-07-01`

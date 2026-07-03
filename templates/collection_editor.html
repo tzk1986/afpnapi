@@ -1163,17 +1163,17 @@
             const tab = state.activeTab || 'general';
             const tabs = ['general', 'headers', 'params', 'body', 'pre_request', 'extract'];
             const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', pre_request: 'Pre-request', extract: 'x_extract'};
-            const tabsHtml = tabs.map(t =>
-                `<button type="button" class="tab ${t === tab ? 'active' : ''}" onclick="switchTab('${t}', this)">${tabLabels[t]}</button>`
+            const tabsHtml = tabs.map((t, i) =>
+                `<button type="button" class="tab ${t === tab ? 'active' : ''}" role="tab" aria-selected="${t === tab}" aria-controls="tab-panel-${t}" id="tab-${t}" onclick="switchTab('${t}', this)" tabindex="${t === tab ? 0 : -1}">${tabLabels[t]}</button>`
             ).join('');
 
             const container = document.getElementById('editorContent');
             container.innerHTML = `
-                <div class="editor-tabs" style="display:flex;justify-content:space-between;align-items:center;">
+                <div class="editor-tabs" role="tablist" aria-label="请求编辑页签" style="display:flex;justify-content:space-between;align-items:center;">
                     <div style="display:flex;gap:4px;">${tabsHtml}</div>
                     <div class="copy-snippet-wrap">
-                        <button type="button" class="copy-snippet-btn" onclick="toggleSnippetMenu(event)" title="复制为代码片段">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <button type="button" class="copy-snippet-btn" onclick="toggleSnippetMenu(event)" title="复制为代码片段" aria-label="复制为代码片段" aria-haspopup="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
                         <div class="copy-snippet-menu" id="snippetMenu" style="max-height:70vh;overflow-y:auto;">
                             <div class="copy-snippet-item" onclick="showCodePreview('curl')"><span class="copy-snippet-lang">cURL</span><span class="copy-snippet-desc">终端命令</span></div>
@@ -1461,11 +1461,11 @@
             const previewMode = state.previewMode || false;
             const previewBtns = `
                 <div class="preview-toggle">
-                    <button type="button" class="preview-toggle-btn ${!previewMode ? 'active' : ''}" onclick="togglePreview(false)" title="编辑模式">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    <button type="button" class="preview-toggle-btn ${!previewMode ? 'active' : ''}" onclick="togglePreview(false)" title="编辑模式" aria-label="编辑模式" aria-pressed="${!previewMode}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                         Code
                     </button>
-                    <button type="button" class="preview-toggle-btn ${previewMode ? 'active' : ''}" onclick="togglePreview(true)" title="预览请求报文">Preview</button>
+                    <button type="button" class="preview-toggle-btn ${previewMode ? 'active' : ''}" onclick="togglePreview(true)" title="预览请求报文" aria-label="预览请求报文" aria-pressed="${previewMode}">Preview</button>
                 </div>
             `;
 
@@ -2689,11 +2689,11 @@
                         <select id="respFormatSelect" onchange="switchResponseFormat(this.value)" style="padding:3px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;color:#64748b;background:#fff;cursor:pointer;">
                             ${fmtSelect}
                         </select>
-                        <button type="button" class="resp-copy-btn" onclick="toggleCompareHistory()" title="对比历史" id="compareHistoryBtn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                        <button type="button" class="resp-copy-btn" onclick="toggleCompareHistory()" title="对比历史" id="compareHistoryBtn" aria-label="对比历史响应">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
                         </button>
-                        <button type="button" class="resp-copy-btn" onclick="copyResponseContent()" title="复制响应内容">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <button type="button" class="resp-copy-btn" onclick="copyResponseContent()" title="复制响应内容" aria-label="复制响应内容">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         </button>
                     </div>
                 </div>
@@ -5981,7 +5981,7 @@
     </script>
 
     <!-- Toast Container -->
-    <div class="toast-container"><div class="toast-msg" id="toastMsg"></div></div>
+    <div class="toast-container" aria-live="polite" aria-atomic="true"><div class="toast-msg" id="toastMsg" role="status"></div></div>
 
     <!-- Code Preview Modal -->
     <div class="code-modal-overlay" id="codeModal">

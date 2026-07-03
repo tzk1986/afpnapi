@@ -384,7 +384,7 @@ class TestExecuteTestRequestError:
 		exc = _make_executor(session=session)
 		result = exc.execute_test()
 		assert result["status"] == "ERROR"
-		assert "请求异常" in result["message"]
+		assert "连接失败" in result["message"]
 		assert result["status_code"] is None
 		assert result["response_time_ms"] == 0
 
