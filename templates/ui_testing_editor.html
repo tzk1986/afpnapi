@@ -1,0 +1,283 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用例编辑器 - Web UI 测试</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 16px 24px; border-radius: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 18px; }
+        .header-links { display: flex; gap: 10px; }
+        .header-links a { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .header-links a:hover { color: #3b82f6; }
+
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+        .panel { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .panel h2 { font-size: 15px; margin-bottom: 16px; color: #0f172a; }
+
+        .field-group { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .field-group label { font-size: 13px; color: #6b7280; }
+        .field-group input, .field-group textarea { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; width: 100%; }
+        .field-group input:focus, .field-group textarea:focus { border-color: #3b82f6; }
+        .field-group textarea { min-height: 60px; resize: vertical; }
+
+        .steps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .steps-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 500; color: #6b7280; font-size: 12px; }
+        .steps-table td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .steps-table tr:hover td { background: #f8fafc; }
+        .steps-table .step-num { width: 40px; text-align: center; color: #9ca3af; font-weight: 600; }
+        .steps-table .step-actions { width: 100px; text-align: right; }
+        .steps-table select, .steps-table input { padding: 4px 8px; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 12px; }
+        .steps-table select { max-width: 100px; }
+        .steps-table input { width: 100%; }
+
+        .action-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: monospace; }
+        .action-click { background: #dbeafe; color: #1d4ed8; }
+        .action-type { background: #fef3c7; color: #b45309; }
+        .action-navigate { background: #e0e7ff; color: #4338ca; }
+        .action-select { background: #d1fae5; color: #047857; }
+        .action-submit { background: #fce7f3; color: #be185d; }
+        .action-wait { background: #fef9c3; color: #a16207; }
+        .action-assert { background: #e0f2fe; color: #0369a1; }
+        .action-default { background: #f3f4f6; color: #374151; }
+
+        .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+        .empty-steps { text-align: center; padding: 40px; color: #9ca3af; }
+
+        .save-status { font-size: 12px; color: #6b7280; margin-left: 12px; }
+        .save-status.saved { color: #10b981; }
+        .save-status.error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>用例编辑器</h1>
+            <div class="header-links">
+                <span class="save-status" id="saveStatus"></span>
+                <button class="btn btn-success" onclick="saveCase()">保存</button>
+                <a href="/ui-testing">← 返回列表</a>
+            </div>
+        </div>
+
+        <!-- Basic info -->
+        <div class="panel">
+            <h2>基本信息</h2>
+            <div class="field-group">
+                <label>用例名称</label>
+                <input type="text" id="caseName" placeholder="输入用例名称" />
+            </div>
+            <div class="field-group">
+                <label>描述</label>
+                <textarea id="caseDesc" placeholder="用例描述（可选）"></textarea>
+            </div>
+            <div class="field-group">
+                <label>基础 URL</label>
+                <input type="text" id="caseBaseUrl" placeholder="https://example.com" />
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="panel">
+            <h2>操作步骤</h2>
+            <div class="toolbar">
+                <button class="btn btn-sm btn-primary" onclick="addStep()">+ 添加步骤</button>
+                <button class="btn btn-sm btn-secondary" onclick="addWaitStep()">+ 添加等待</button>
+                <button class="btn btn-sm btn-secondary" onclick="addAssertStep()">+ 添加断言</button>
+            </div>
+            <table class="steps-table" id="stepsTable">
+                <thead>
+                    <tr>
+                        <th class="step-num">#</th>
+                        <th style="width:100px">操作</th>
+                        <th>选择器</th>
+                        <th style="width:180px">值</th>
+                        <th style="width:160px">描述</th>
+                        <th class="step-actions">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="stepsBody"></tbody>
+            </table>
+            <div class="empty-steps" id="emptySteps" style="display:none;">暂无步骤，点击上方按钮添加</div>
+        </div>
+    </div>
+
+    <script>
+        var caseId = '{{ case_id }}';
+        var caseData = null;
+        var steps = [];
+
+        var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title'];
+
+        function loadCase() {
+            fetch('/api/ui-testing/cases/' + caseId)
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    caseData = result.data;
+                    document.getElementById('caseName').value = caseData.name || '';
+                    document.getElementById('caseDesc').value = caseData.description || '';
+                    document.getElementById('caseBaseUrl').value = caseData.base_url || '';
+                    steps = caseData.steps || [];
+                    renderSteps();
+                })
+                .catch(function(e) {
+                    alert('加载用例失败: ' + e.message);
+                });
+        }
+
+        function renderSteps() {
+            var body = document.getElementById('stepsBody');
+            var empty = document.getElementById('emptySteps');
+
+            if (steps.length === 0) {
+                body.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+
+            body.innerHTML = steps.map(function(step, i) {
+                var actionClass = getActionClass(step.action);
+                var selectorStr = step.selector ? (typeof step.selector === 'string' ? step.selector : (step.selector.primary || '')) : '';
+                var desc = step.description || '';
+
+                return '<tr>' +
+                    '<td class="step-num">' + (i + 1) + '</td>' +
+                    '<td><select onchange="updateStep(' + i + ', \'action\', this.value)">' +
+                        ACTION_OPTIONS.map(function(a) {
+                            return '<option value="' + a + '"' + (a === step.action ? ' selected' : '') + '>' + a + '</option>';
+                        }).join('') +
+                    '</select></td>' +
+                    '<td><input type="text" value="' + escapeHtml(selectorStr) + '" onchange="updateStep(' + i + ', \'selector\', this.value)" placeholder="选择器" /></td>' +
+                    '<td><input type="text" value="' + escapeHtml(step.value || '') + '" onchange="updateStep(' + i + ', \'value\', this.value)" placeholder="值" /></td>' +
+                    '<td><input type="text" value="' + escapeHtml(desc) + '" onchange="updateStep(' + i + ', \'description\', this.value)" placeholder="描述" /></td>' +
+                    '<td class="step-actions">' +
+                        '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', -1)"' + (i === 0 ? ' disabled' : '') + '>↑</button> ' +
+                        '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', 1)"' + (i === steps.length - 1 ? ' disabled' : '') + '>↓</button> ' +
+                        '<button class="btn btn-sm btn-danger" onclick="removeStep(' + i + ')">×</button>' +
+                    '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function getActionClass(action) {
+            var map = { click: 'action-click', dblclick: 'action-click', type: 'action-type', keypress: 'action-type',
+                        navigate: 'action-navigate', select: 'action-select', check: 'action-select', uncheck: 'action-select',
+                        submit: 'action-submit', wait: 'action-wait', wait_for: 'action-wait',
+                        assert_visible: 'action-assert', assert_text: 'action-assert', assert_url: 'action-assert', assert_title: 'action-assert' };
+            return map[action] || 'action-default';
+        }
+
+        function updateStep(index, field, value) {
+            if (!steps[index]) return;
+            if (field === 'selector' && typeof steps[index].selector === 'object') {
+                steps[index].selector.primary = value;
+            } else {
+                steps[index][field] = value;
+            }
+            markDirty();
+        }
+
+        function addStep() {
+            steps.push({ action: 'click', selector: '', value: '', description: '', element_info: {} });
+            renderSteps();
+            markDirty();
+        }
+
+        function addWaitStep() {
+            steps.push({ action: 'wait', selector: '', value: '1000', description: '等待 1000ms' });
+            renderSteps();
+            markDirty();
+        }
+
+        function addAssertStep() {
+            steps.push({ action: 'assert_visible', selector: '', value: '', description: '断言元素可见' });
+            renderSteps();
+            markDirty();
+        }
+
+        function removeStep(index) {
+            steps.splice(index, 1);
+            renderSteps();
+            markDirty();
+        }
+
+        function moveStep(index, direction) {
+            var newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= steps.length) return;
+            var tmp = steps[index];
+            steps[index] = steps[newIndex];
+            steps[newIndex] = tmp;
+            renderSteps();
+            markDirty();
+        }
+
+        function markDirty() {
+            document.getElementById('saveStatus').textContent = '未保存';
+            document.getElementById('saveStatus').className = 'save-status';
+        }
+
+        function saveCase() {
+            var payload = {
+                name: document.getElementById('caseName').value.trim(),
+                description: document.getElementById('caseDesc').value.trim(),
+                base_url: document.getElementById('caseBaseUrl').value.trim(),
+                steps: steps,
+                assertions: (caseData && caseData.assertions) || [],
+                variables: (caseData && caseData.variables) || {},
+                tags: (caseData && caseData.tags) || []
+            };
+
+            if (!payload.name) {
+                alert('请输入用例名称');
+                return;
+            }
+
+            fetch('/api/ui-testing/cases/' + caseId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function() {
+                document.getElementById('saveStatus').textContent = '已保存';
+                document.getElementById('saveStatus').className = 'save-status saved';
+            })
+            .catch(function(e) {
+                document.getElementById('saveStatus').textContent = '保存失败';
+                document.getElementById('saveStatus').className = 'save-status error';
+            });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Keyboard shortcut: Ctrl+S to save
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                saveCase();
+            }
+        });
+
+        loadCase();
+    </script>
+</body>
+</html>
+{% endraw %}
