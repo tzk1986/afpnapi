@@ -2823,9 +2823,12 @@ function renderResults(data) {
             : '';
         const dataIdx = Number(item.data_index || 0);
         const dataBadge = dataIdx > 0 ? ` <span class="count-badge" title="数据驱动第 ${dataIdx + 1} 组">#${dataIdx + 1}</span>` : '';
+        const repeatTotal = Number(item.repeat_total || 1);
+        const repeatIdx = Number(item.repeat_index || 0);
+        const repeatBadge = repeatTotal > 1 ? ` <span class="count-badge" style="background:#e0e7ff;color:#3730a3;" title="缓存验证第 ${repeatIdx + 1} 次（共 ${repeatTotal} 次）">×${repeatIdx + 1}/${repeatTotal}</span>` : '';
         return `
         <tr class="${excluded ? 'excluded-row' : ''}" ${rowTooltip ? `data-tooltip="${escapeHtml(rowTooltip)}"` : ''}>
-            <td class="tooltip-target" data-tooltip="${escapeHtml(item.name)}">${escapeHtml(item.name)}${dataBadge}</td>
+            <td class="tooltip-target" data-tooltip="${escapeHtml(item.name)}">${escapeHtml(item.name)}${dataBadge}${repeatBadge}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.folder || '-')}">${escapeHtml(item.folder || '-')}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.method)}">${escapeHtml(item.method)}</td>
             <td class="tooltip-target" data-tooltip="${escapeHtml(item.url)}"><span class="url">${escapeHtml(item.url)}</span></td>

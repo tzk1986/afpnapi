@@ -54,6 +54,7 @@ class ApiConfig(TypedDict, total=False):
     x_enable_message_judgment: Optional[bool]
     x_extract: Optional[Dict[str, str]]
     x_pre_request: Optional[Dict[str, str]]
+    x_repeat: Optional[int]
     data_index: int
     data_row: Dict[str, str]
 
@@ -214,6 +215,15 @@ class PostmanApiParser:
                 dict_value = {str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)}
                 if dict_value:
                     extensions[field] = dict_value
+
+        # 整数类型扩展
+        repeat_raw = request.get('x_repeat')
+        if repeat_raw is not None:
+            try:
+                repeat_val = max(1, min(int(repeat_raw), 10))
+                extensions['x_repeat'] = repeat_val
+            except (TypeError, ValueError):
+                pass
 
         return extensions
 

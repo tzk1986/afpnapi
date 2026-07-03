@@ -86,6 +86,9 @@ def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Di
         "detail_available": bool(detail),
         "data_index": result.get("data_index", 0),
         "extracted_variables": result.get("extracted_variables", {}),
+        "repeat_index": result.get("repeat_index", 0),
+        "repeat_total": result.get("repeat_total", 1),
+        "repeat_group": result.get("repeat_group", ""),
         "request_info": {"headers": {}, "params": {}, "body": None},
         "response_info": {"headers": {}, "body": None},
     }

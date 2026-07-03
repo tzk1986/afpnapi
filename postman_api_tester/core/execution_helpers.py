@@ -16,7 +16,7 @@ import re
 import sys
 from datetime import datetime
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from postman_api_tester.postman_api_tester import PostmanTestReport
 from urllib.parse import urljoin
@@ -405,6 +405,28 @@ def _execute_api_suite_concurrent(
     """并发执行路径：基于 BatchScheduler 分批 + ThreadPoolExecutor 批次内并行。"""
     import threading
 
+    # 展开 x_repeat > 1 的接口为多次执行项
+    expanded_apis: List[ApiConfig] = []
+    for api in apis:
+        repeat = int(api.get('x_repeat') or 1)
+        if repeat <= 1:
+            expanded_apis.append(api)
+        else:
+            repeat = min(repeat, 10)  # 上限 10
+            base_name = str(api.get('name') or '')
+            item_path_value = api.get('item_path')
+            item_path = item_path_value if isinstance(item_path_value, list) else []
+            for ri in range(repeat):
+                dup = dict(api)
+                dup['repeat_index'] = ri
+                dup['repeat_total'] = repeat
+                dup['repeat_group'] = base_name
+                dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
+                if item_path:
+                    dup['item_path'] = item_path + [ri]
+                expanded_apis.append(cast(ApiConfig, dup))
+    apis = expanded_apis
+
     execution_error: Optional[Exception] = None
     completed_count = 0
     set_lock = threading.Lock()
@@ -428,6 +450,9 @@ def _execute_api_suite_concurrent(
             assertion_strict_mode=assertion_strict_mode,
             judgment_config=judgment_config,
             variable_context=variable_context,  # type: ignore[arg-type]
+            repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
+            repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
+            repeat_group=str(api.get('repeat_group') or ''),
         )
         executor.start()
         return executor.execute_test()
@@ -512,6 +537,9 @@ def _execute_single_api(
 		assertion_strict_mode=assertion_strict_mode,
 		judgment_config=judgment_config,
 		variable_context=variable_context,  # type: ignore[arg-type]
+		repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
+		repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
+		repeat_group=str(api.get('repeat_group') or ''),
 	)
 	executor.start()
 	result: TestResultRecord = executor.execute_test()
@@ -591,6 +619,28 @@ def _execute_api_suite(
     enable_concurrent: bool = False,
     concurrent_workers: int = 10,
 ) -> Tuple[int, Optional[Exception]]:
+    # 展开 x_repeat > 1 的接口为多次执行项
+    expanded_apis: List[ApiConfig] = []
+    for api in apis:
+        repeat = int(api.get('x_repeat') or 1)
+        if repeat <= 1:
+            expanded_apis.append(api)
+        else:
+            repeat = min(repeat, 10)  # 上限 10
+            base_name = str(api.get('name') or '')
+            item_path_value = api.get('item_path')
+            item_path = item_path_value if isinstance(item_path_value, list) else []
+            for ri in range(repeat):
+                dup = dict(api)
+                dup['repeat_index'] = ri
+                dup['repeat_total'] = repeat
+                dup['repeat_group'] = base_name
+                dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
+                if item_path:
+                    dup['item_path'] = item_path + [ri]
+                expanded_apis.append(cast(ApiConfig, dup))
+    apis = expanded_apis
+
     if enable_concurrent and len(apis) > 1:
         return _execute_api_suite_concurrent(
             apis=apis,

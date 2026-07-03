@@ -81,6 +81,9 @@ class TestResultRecord(TypedDict, total=False):
     db_feedback: JsonObject
     data_index: int
     extracted_variables: Dict[str, str]
+    repeat_index: int
+    repeat_total: int
+    repeat_group: str
 
 
 class RequestInfo(TypedDict, total=False):
@@ -108,6 +111,9 @@ class PostmanTestExecutor:
         assertion_strict_mode: bool = False,
         judgment_config: Optional[Dict[str, object]] = None,
         variable_context: Optional["VariableContext"] = None,
+        repeat_index: int = 0,
+        repeat_total: int = 1,
+        repeat_group: str = "",
     ) -> None:
         """
         初始化执行器
@@ -118,6 +124,9 @@ class PostmanTestExecutor:
         :param request_timeout: 请求超时配置（connect_timeout, read_timeout）
         :param judgment_config: 任务级结果判定配置（可选），支持覆盖全局与集合配置
         :param variable_context: 可选的 VariableContext 实例，用于变量提取与替换
+        :param repeat_index: 当前重复序号（从 0 开始），默认 0
+        :param repeat_total: 总重复次数，默认 1
+        :param repeat_group: 重复组标识，默认使用接口名
         """
         import requests as _requests_mod
         self.api_config = dict(api_config)
@@ -133,6 +142,9 @@ class PostmanTestExecutor:
         self.request_timeout: Tuple[int, int] = normalize_timeout(request_timeout, default=(10, 30))
         self.assertion_strict_mode = bool(assertion_strict_mode)
         self.judgment_config: Optional[Dict[str, object]] = judgment_config if isinstance(judgment_config, dict) else None
+        self._repeat_index = repeat_index
+        self._repeat_total = repeat_total
+        self._repeat_group = repeat_group or str(api_config.get('name') or '')
 
     def start(self) -> None:
         """测试前准备"""
@@ -185,6 +197,9 @@ class PostmanTestExecutor:
             'assertion_engine_error': '',
             'data_index': _safe_int(api.get('data_index')),
             'extracted_variables': {},
+            'repeat_index': self._repeat_index,
+            'repeat_total': self._repeat_total,
+            'repeat_group': self._repeat_group,
         }
 
     def _build_passed_result(
