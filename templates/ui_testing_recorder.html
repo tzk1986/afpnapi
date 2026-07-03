@@ -1,0 +1,486 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>UI 录制器 - Web UI 测试</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Header */
+        .header { background: #fff; padding: 10px 20px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .header h1 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .header-links { display: flex; gap: 12px; font-size: 13px; }
+        .header-links a { color: #6b7280; text-decoration: none; }
+        .header-links a:hover { color: #3b82f6; }
+
+        /* URL Bar */
+        .url-bar { background: #fff; padding: 8px 20px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .url-input { flex: 1; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; outline: none; }
+        .url-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Main Layout */
+        .main { flex: 1; display: flex; overflow: hidden; }
+
+        /* Left: Browser iframe */
+        .browser-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #e5e7eb; }
+        .browser-frame { flex: 1; border: none; background: #fff; width: 100%; }
+        .browser-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #9ca3af; background: #fff; }
+        .browser-placeholder h2 { font-size: 18px; margin-bottom: 8px; color: #6b7280; }
+        .browser-placeholder p { font-size: 13px; }
+
+        /* Right: Step panel */
+        .step-panel { width: 380px; display: flex; flex-direction: column; background: #fff; flex-shrink: 0; }
+        .step-panel-header { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+        .step-panel-header h3 { font-size: 14px; }
+        .step-count-badge { background: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+
+        .step-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .step-list-empty { text-align: center; padding: 40px 16px; color: #9ca3af; font-size: 13px; }
+
+        .step-item { padding: 8px 12px; margin: 4px 0; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.1s; }
+        .step-item:hover { border-color: #93c5fd; background: #f8fafc; }
+        .step-item.selected { border-color: #3b82f6; background: #eff6ff; }
+        .step-item .step-index { display: inline-block; width: 22px; height: 22px; line-height: 22px; text-align: center; background: #e5e7eb; border-radius: 50%; font-size: 11px; font-weight: 600; margin-right: 6px; }
+        .step-item .step-action { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 500; font-family: monospace; margin-right: 4px; }
+        .action-click { background: #dbeafe; color: #1d4ed8; }
+        .action-type { background: #fef3c7; color: #b45309; }
+        .action-navigate { background: #e0e7ff; color: #4338ca; }
+        .action-select { background: #d1fae5; color: #047857; }
+        .action-submit { background: #fce7f3; color: #be185d; }
+        .action-api { background: #f3e8ff; color: #7c3aed; }
+        .action-default { background: #f3f4f6; color: #374151; }
+
+        .step-item .step-desc { display: block; color: #6b7280; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+        .step-item .step-value { display: inline-block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; color: #92400e; }
+
+        .step-toolbar { padding: 8px 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 6px; }
+        .step-toolbar .btn { padding: 6px 10px; font-size: 12px; flex: 1; }
+
+        /* Status bar */
+        .status-bar { background: #1f2937; color: #d1d5db; padding: 6px 20px; font-size: 12px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.idle { background: #6b7280; }
+        .status-dot.recording { background: #ef4444; animation: pulse 1s infinite; }
+        .status-dot.paused { background: #f59e0b; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Save dialog */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 12px; padding: 24px; width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal h3 { margin-bottom: 16px; font-size: 16px; }
+        .modal label { display: block; font-size: 13px; color: #6b7280; margin-bottom: 4px; }
+        .modal input { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 16px; outline: none; }
+        .modal input:focus { border-color: #3b82f6; }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>UI 测试录制器</h1>
+        <div class="header-links">
+            <a href="/ui-testing">← 用例列表</a>
+        </div>
+    </div>
+
+    <div class="url-bar">
+        <input type="text" class="url-input" id="urlInput" placeholder="输入目标网站 URL，如 https://example.com" />
+        <button class="btn btn-primary" id="btnOpen" onclick="openUrl()">打开</button>
+        <button class="btn btn-danger" id="btnRecord" onclick="toggleRecording()" disabled>开始录制</button>
+        <button class="btn btn-success" id="btnSave" onclick="showSaveDialog()" disabled>保存为用例</button>
+        <button class="btn btn-secondary" id="btnClear" onclick="clearSteps()">清除</button>
+    </div>
+
+    <div class="main">
+        <div class="browser-panel">
+            <div class="browser-placeholder" id="browserPlaceholder">
+                <h2>输入 URL 开始浏览</h2>
+                <p>在上方地址栏输入目标网站 URL，点击「打开」加载页面</p>
+            </div>
+            <iframe class="browser-frame" id="browserFrame" style="display:none;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        </div>
+
+        <div class="step-panel">
+            <div class="step-panel-header">
+                <h3>录制步骤</h3>
+                <span class="step-count-badge" id="stepCountBadge">0 步</span>
+            </div>
+            <div class="step-list" id="stepList">
+                <div class="step-list-empty">暂无录制步骤<br><br>打开页面并点击「开始录制」后操作页面</div>
+            </div>
+            <div class="step-toolbar">
+                <button class="btn btn-secondary" onclick="deleteSelectedStep()" id="btnDeleteStep" disabled>删除</button>
+                <button class="btn btn-secondary" onclick="moveStepUp()" id="btnMoveUp" disabled>↑ 上移</button>
+                <button class="btn btn-secondary" onclick="moveStepDown()" id="btnMoveDown" disabled>↓ 下移</button>
+                <button class="btn btn-secondary" onclick="exportSteps()">导出 JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span class="status-dot idle" id="statusDot"></span>
+        <span id="statusText">就绪</span>
+        <span>|</span>
+        <span>步骤: <strong id="statusStepCount">0</strong></span>
+        <span>|</span>
+        <span>录制时长: <strong id="statusDuration">00:00</strong></span>
+        <span>|</span>
+        <span id="statusUrl">-</span>
+    </div>
+
+    <!-- Save dialog -->
+    <div class="modal-overlay" id="saveModal">
+        <div class="modal">
+            <h3>保存为用例</h3>
+            <label for="caseName">用例名称</label>
+            <input type="text" id="caseName" placeholder="输入用例名称" />
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideSaveDialog()">取消</button>
+                <button class="btn btn-success" onclick="saveAsCase()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ====== State ======
+        var steps = [];
+        var recording = false;
+        var sessionId = null;
+        var currentUrl = '';
+        var selectedStepIndex = -1;
+        var recordStartTime = null;
+        var durationTimer = null;
+
+        // ====== URL & iframe ======
+        function openUrl() {
+            var url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+                document.getElementById('urlInput').value = url;
+            }
+            currentUrl = url;
+            loadInIframe(url);
+        }
+
+        function loadInIframe(url) {
+            var placeholder = document.getElementById('browserPlaceholder');
+            var frame = document.getElementById('browserFrame');
+            placeholder.style.display = 'none';
+            frame.style.display = 'block';
+
+            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url);
+            frame.src = proxyUrl;
+            document.getElementById('btnRecord').disabled = false;
+            document.getElementById('statusUrl').textContent = url;
+        }
+
+        document.getElementById('urlInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') openUrl();
+        });
+
+        // ====== Recording ======
+        function toggleRecording() {
+            if (recording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            recording = true;
+            recordStartTime = Date.now();
+
+            // Start duration timer
+            durationTimer = setInterval(updateDuration, 1000);
+
+            // Create server-side session
+            fetch('/api/ui-testing/recording/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ base_url: currentUrl })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) { sessionId = data.data.session_id; });
+
+            // Notify iframe to start recording
+            var frame = document.getElementById('browserFrame');
+            if (frame.contentWindow) {
+                frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'start' }, '*');
+            }
+
+            // Update UI
+            document.getElementById('btnRecord').textContent = '停止录制';
+            document.getElementById('btnRecord').className = 'btn btn-secondary';
+            document.getElementById('statusDot').className = 'status-dot recording';
+            document.getElementById('statusText').textContent = '录制中';
+        }
+
+        function stopRecording() {
+            recording = false;
+            clearInterval(durationTimer);
+
+            // Notify iframe to stop
+            var frame = document.getElementById('browserFrame');
+            if (frame.contentWindow) {
+                frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'stop' }, '*');
+            }
+
+            // Update server session
+            if (sessionId) {
+                fetch('/api/ui-testing/recording/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+            }
+
+            // Update UI
+            document.getElementById('btnRecord').textContent = '开始录制';
+            document.getElementById('btnRecord').className = 'btn btn-danger';
+            document.getElementById('btnSave').disabled = steps.length === 0;
+            document.getElementById('statusDot').className = 'status-dot idle';
+            document.getElementById('statusText').textContent = '已停止';
+        }
+
+        function updateDuration() {
+            if (!recordStartTime) return;
+            var elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
+            var min = Math.floor(elapsed / 60);
+            var sec = elapsed % 60;
+            document.getElementById('statusDuration').textContent =
+                String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+        }
+
+        // ====== Event handling from iframe ======
+        window.addEventListener('message', function(e) {
+            if (!e.data) return;
+
+            // Recorder event from iframe
+            if (e.data.type === 'ui-recorder-event') {
+                if (!recording) return;
+                var step = e.data.data;
+                steps.push(step);
+
+                // Send to server
+                if (sessionId) {
+                    fetch('/api/ui-testing/recording/step', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: sessionId, step: step })
+                    });
+                }
+
+                renderStepList();
+                updateStepCount();
+                return;
+            }
+
+            // Navigation from iframe (link click)
+            if (e.data.type === 'ui-recorder-navigate') {
+                var targetUrl = e.data.url;
+                if (targetUrl) {
+                    currentUrl = targetUrl;
+                    document.getElementById('urlInput').value = targetUrl;
+                    loadInIframe(targetUrl);
+                }
+                return;
+            }
+
+            // Form submit from iframe
+            if (e.data.type === 'ui-recorder-form-submit') {
+                // Form submit is already recorded as a step event
+                return;
+            }
+
+            // Recorder ready
+            if (e.data.type === 'ui-recorder-ready') {
+                // If we were recording, re-start the recorder in the new page
+                if (recording) {
+                    var frame = document.getElementById('browserFrame');
+                    if (frame.contentWindow) {
+                        frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'start' }, '*');
+                    }
+                }
+                return;
+            }
+        });
+
+        // ====== Step list rendering ======
+        function renderStepList() {
+            var container = document.getElementById('stepList');
+            if (steps.length === 0) {
+                container.innerHTML = '<div class="step-list-empty">暂无录制步骤<br><br>打开页面并点击「开始录制」后操作页面</div>';
+                return;
+            }
+
+            container.innerHTML = steps.map(function(step, i) {
+                var actionClass = getActionClass(step.action);
+                var desc = buildStepDescription(step);
+                var isSelected = i === selectedStepIndex;
+                return '<div class="step-item' + (isSelected ? ' selected' : '') + '" onclick="selectStep(' + i + ')">' +
+                    '<span class="step-index">' + (i + 1) + '</span>' +
+                    '<span class="step-action ' + actionClass + '">' + (step.action || '-') + '</span>' +
+                    (step.value ? '<span class="step-value">' + escapeHtml(truncate(step.value, 20)) + '</span>' : '') +
+                    '<span class="step-desc">' + escapeHtml(desc) + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function buildStepDescription(step) {
+            if (!step) return '';
+            var info = step.element_info || {};
+            var parts = [];
+            if (info.tag) parts.push(info.tag);
+            if (info.text && info.text.length <= 30) parts.push('「' + info.text + '」');
+            else if (info.name) parts.push('name=' + info.name);
+            else if (info.placeholder) parts.push('placeholder=' + info.placeholder);
+            if (step.page_url) {
+                try { parts.push(new URL(step.page_url).pathname); } catch(e) {}
+            }
+            return parts.join(' ') || step.action || '';
+        }
+
+        function getActionClass(action) {
+            var map = { click: 'action-click', dblclick: 'action-click', type: 'action-type',
+                        keypress: 'action-type', navigate: 'action-navigate', new_tab: 'action-navigate',
+                        select: 'action-select', check: 'action-select', uncheck: 'action-select',
+                        select_radio: 'action-select', submit: 'action-submit', api_call: 'action-api' };
+            return map[action] || 'action-default';
+        }
+
+        function selectStep(index) {
+            selectedStepIndex = (selectedStepIndex === index) ? -1 : index;
+            renderStepList();
+            document.getElementById('btnDeleteStep').disabled = selectedStepIndex < 0;
+            document.getElementById('btnMoveUp').disabled = selectedStepIndex <= 0;
+            document.getElementById('btnMoveDown').disabled = selectedStepIndex < 0 || selectedStepIndex >= steps.length - 1;
+        }
+
+        function updateStepCount() {
+            document.getElementById('stepCountBadge').textContent = steps.length + ' 步';
+            document.getElementById('statusStepCount').textContent = steps.length;
+        }
+
+        // ====== Step operations ======
+        function deleteSelectedStep() {
+            if (selectedStepIndex < 0) return;
+            steps.splice(selectedStepIndex, 1);
+            selectedStepIndex = -1;
+            renderStepList();
+            updateStepCount();
+            document.getElementById('btnDeleteStep').disabled = true;
+            document.getElementById('btnMoveUp').disabled = true;
+            document.getElementById('btnMoveDown').disabled = true;
+        }
+
+        function moveStepUp() {
+            if (selectedStepIndex <= 0) return;
+            var tmp = steps[selectedStepIndex];
+            steps[selectedStepIndex] = steps[selectedStepIndex - 1];
+            steps[selectedStepIndex - 1] = tmp;
+            selectedStepIndex--;
+            renderStepList();
+        }
+
+        function moveStepDown() {
+            if (selectedStepIndex < 0 || selectedStepIndex >= steps.length - 1) return;
+            var tmp = steps[selectedStepIndex];
+            steps[selectedStepIndex] = steps[selectedStepIndex + 1];
+            steps[selectedStepIndex + 1] = tmp;
+            selectedStepIndex++;
+            renderStepList();
+        }
+
+        function clearSteps() {
+            if (steps.length > 0 && !confirm('确认清除所有录制步骤？')) return;
+            steps = [];
+            selectedStepIndex = -1;
+            renderStepList();
+            updateStepCount();
+        }
+
+        function exportSteps() {
+            var data = JSON.stringify({ steps: steps, base_url: currentUrl, exported_at: new Date().toISOString() }, null, 2);
+            var blob = new Blob([data], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'ui-recording-' + Date.now() + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ====== Save as case ======
+        function showSaveDialog() {
+            if (steps.length === 0) return;
+            document.getElementById('saveModal').classList.add('active');
+            document.getElementById('caseName').focus();
+        }
+
+        function hideSaveDialog() {
+            document.getElementById('saveModal').classList.remove('active');
+        }
+
+        function saveAsCase() {
+            var name = document.getElementById('caseName').value.trim();
+            if (!name) { alert('请输入用例名称'); return; }
+
+            var payload = {
+                name: name,
+                description: '录制于 ' + new Date().toLocaleString(),
+                base_url: currentUrl,
+                steps: steps,
+                assertions: [],
+                variables: {},
+                tags: ['recorded']
+            };
+
+            fetch('/api/ui-testing/cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                hideSaveDialog();
+                alert('用例已保存！ID: ' + data.data.id);
+                window.location.href = '/ui-testing';
+            })
+            .catch(function(e) {
+                alert('保存失败: ' + e.message);
+            });
+        }
+
+        document.getElementById('caseName').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') saveAsCase();
+            if (e.key === 'Escape') hideSaveDialog();
+        });
+
+        // ====== Helpers ======
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function truncate(str, max) {
+            if (!str) return '';
+            return str.length > max ? str.substring(0, max) + '...' : str;
+        }
+    </script>
+</body>
+</html>
+{% endraw %}

@@ -90,6 +90,23 @@ from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_session_export as _route_api_ui_recorder_session_export,
     ui_recorder_page as _route_ui_recorder_page,
 )
+from postman_api_tester.handlers.ui_testing_routes import (
+    api_ui_testing_case_delete as _route_api_ui_testing_case_delete,
+    api_ui_testing_case_get as _route_api_ui_testing_case_get,
+    api_ui_testing_case_update as _route_api_ui_testing_case_update,
+    api_ui_testing_cases_create as _route_api_ui_testing_cases_create,
+    api_ui_testing_cases_list as _route_api_ui_testing_cases_list,
+    api_ui_testing_recording_get as _route_api_ui_testing_recording_get,
+    api_ui_testing_recording_save_as_case as _route_api_ui_testing_recording_save_as_case,
+    api_ui_testing_recording_start as _route_api_ui_testing_recording_start,
+    api_ui_testing_recording_step as _route_api_ui_testing_recording_step,
+    api_ui_testing_recording_stop as _route_api_ui_testing_recording_stop,
+    ui_testing_editor_page as _route_ui_testing_editor_page,
+    ui_testing_index_page as _route_ui_testing_index_page,
+    ui_testing_proxy as _route_ui_testing_proxy,
+    ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
+    ui_testing_recorder_page as _route_ui_testing_recorder_page,
+)
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
 from postman_api_tester.report_repository import configure_report_repository
@@ -407,6 +424,84 @@ def api_ui_recorder_session_delete(session_id: str) -> ResponseReturnValue:
 @app.route("/api/ui-recorder/session/<path:session_id>/export")
 def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
     return _route_api_ui_recorder_session_export(session_id)
+
+
+# ---------------------------------------------------------------
+# Web UI 自动化测试
+# ---------------------------------------------------------------
+@app.route("/ui-testing")
+def ui_testing_index_page() -> ResponseReturnValue:
+    return _route_ui_testing_index_page()
+
+
+@app.route("/ui-testing/recorder")
+def ui_testing_recorder_page() -> ResponseReturnValue:
+    return _route_ui_testing_recorder_page()
+
+
+@app.route("/ui-testing/editor/<path:case_id>")
+def ui_testing_editor_page(case_id: str) -> ResponseReturnValue:
+    return _route_ui_testing_editor_page(case_id)
+
+
+@app.route("/ui-testing/proxy")
+def ui_testing_proxy() -> ResponseReturnValue:
+    return _route_ui_testing_proxy()
+
+
+@app.route("/ui-testing/proxy-resource")
+def ui_testing_proxy_resource() -> ResponseReturnValue:
+    return _route_ui_testing_proxy_resource()
+
+
+@app.route("/api/ui-testing/cases")
+def api_ui_testing_cases_list() -> ResponseReturnValue:
+    return _route_api_ui_testing_cases_list()
+
+
+@app.route("/api/ui-testing/cases", methods=["POST"])
+def api_ui_testing_cases_create() -> ResponseReturnValue:
+    return _route_api_ui_testing_cases_create()
+
+
+@app.route("/api/ui-testing/cases/<path:case_id>")
+def api_ui_testing_case_get(case_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_case_get(case_id)
+
+
+@app.route("/api/ui-testing/cases/<path:case_id>", methods=["PUT"])
+def api_ui_testing_case_update(case_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_case_update(case_id)
+
+
+@app.route("/api/ui-testing/cases/<path:case_id>", methods=["DELETE"])
+def api_ui_testing_case_delete(case_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_case_delete(case_id)
+
+
+@app.route("/api/ui-testing/recording/start", methods=["POST"])
+def api_ui_testing_recording_start() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_start()
+
+
+@app.route("/api/ui-testing/recording/step", methods=["POST"])
+def api_ui_testing_recording_step() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_step()
+
+
+@app.route("/api/ui-testing/recording/stop", methods=["POST"])
+def api_ui_testing_recording_stop() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_stop()
+
+
+@app.route("/api/ui-testing/recording/<path:session_id>")
+def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_get(session_id)
+
+
+@app.route("/api/ui-testing/recording/<path:session_id>/save", methods=["POST"])
+def api_ui_testing_recording_save_as_case() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_save_as_case()
 
 
 @app.route("/favicon.ico")
