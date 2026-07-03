@@ -113,6 +113,7 @@ def run_postman_job(
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
     env_name: str = "",
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> None:
     """执行 Postman 测试任务，包含进度追踪与异常处理。"""
     logger.info(
@@ -145,6 +146,7 @@ def run_postman_job(
             data_file=data_file,
             initial_variables=initial_variables,
             env_name=env_name,
+            uploaded_files=uploaded_files,
         )
         set_run_job(
             job_id,
@@ -283,6 +285,7 @@ def enqueue_job_with_worker(
     data_file = job_params.pop("data_file", "")
     initial_variables = job_params.pop("initial_variables", None)
     env_name = job_params.pop("env_name", "")
+    uploaded_files = job_params.pop("uploaded_files", None)
 
     set_run_job(job_id, **job_params)
     logger.info(
@@ -305,6 +308,8 @@ def enqueue_job_with_worker(
         job_kwargs["initial_variables"] = initial_variables
     if env_name:
         job_kwargs["env_name"] = env_name
+    if uploaded_files:
+        job_kwargs["uploaded_files"] = uploaded_files
 
     worker = threading.Thread(
         target=_safe_run_job,

@@ -241,6 +241,24 @@ def api_run_postman() -> ResponseReturnValue:
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id, suffix)
     collection_file.save(str(saved_file))
+
+    # 保存上传的文件（formdata/binary 模式）
+    uploaded_files_paths: Dict[str, str] = {}
+    upload_files = request.files.getlist("upload_files")
+    if upload_files:
+        upload_dir = UPLOADS_DIR / job_id / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        for upload_file in upload_files:
+            if upload_file and str(upload_file.filename or "").strip():
+                # 文件名格式: upload_key_original_filename
+                raw_name = str(upload_file.filename or "").strip()
+                parts = raw_name.split("_", 2)
+                upload_key = parts[0] + "_" + parts[1] if len(parts) >= 3 else raw_name
+                file_name = parts[2] if len(parts) >= 3 else raw_name
+                file_path = upload_dir / file_name
+                upload_file.save(str(file_path))
+                uploaded_files_paths[upload_key] = str(file_path)
+
     job_params = _build_run_postman_job_params(
         job_id=job_id,
         original_name=original_name,
@@ -254,6 +272,7 @@ def api_run_postman() -> ResponseReturnValue:
         data_file=data_file_path,
         initial_variables=initial_variables,
         env_name=env_name,
+        uploaded_files=uploaded_files_paths if uploaded_files_paths else None,
     )
 
     _enqueue_job(

@@ -587,6 +587,7 @@
             globalEnvVars: {},
             globalEnvList: [],
             selectedEnv: '',
+            uploadedFiles: {},
             varFunctions: [],
             compareHistory: [],  // 对比历史：最多保存 20 条请求/响应记录
             compareSelectedIds: new Set(),  // 对比视图选中的历史 ID
@@ -1463,13 +1464,27 @@
                 content = `<textarea rows="8" onchange="updateBodyContent(this.value)">${escapeHtml(bodyData.content || '')}</textarea>`;
             } else if (req.body_mode === 'urlencoded' || req.body_mode === 'formdata') {
                 const data = bodyData.data || [];
+                const isFormData = req.body_mode === 'formdata';
                 content = '<div style="margin-bottom:12px;">';
                 for (let i = 0; i < data.length; i++) {
-                    content += `<div class="kv-row">
-                        <input type="text" placeholder="Key" value="${escapeAttr(data[i].key || '')}" onchange="updateBodyKV(${i}, 'key', this.value)">
-                        <input type="text" placeholder="Value" value="${escapeAttr(data[i].value || '')}" onchange="updateBodyKV(${i}, 'value', this.value)">
-                        <button type="button" onclick="removeBodyKV(${i})"></button>
-                    </div>`;
+                    const rowType = data[i].type || 'text';
+                    const isFile = isFormData && rowType === 'file';
+                    content += `<div class="kv-row">`;
+                    if (isFormData) {
+                        content += `<select onchange="updateBodyKVType(${i}, this.value)" style="max-width:80px;" title="字段类型">
+                            <option value="text" ${rowType === 'text' ? 'selected' : ''}>Text</option>
+                            <option value="file" ${rowType === 'file' ? 'selected' : ''}>File</option>
+                        </select>`;
+                    }
+                    content += `<input type="text" placeholder="Key" value="${escapeAttr(data[i].key || '')}" onchange="updateBodyKV(${i}, 'key', this.value)">`;
+                    if (isFile) {
+                        const fileName = data[i].file_name || '';
+                        content += `<input type="text" placeholder="文件名（只读）" value="${escapeAttr(fileName)}" readonly style="background:#f1f5f9;">
+                            <input type="file" onchange="updateBodyKVFile(${i}, this)" style="max-width:150px;">`;
+                    } else {
+                        content += `<input type="text" placeholder="Value" value="${escapeAttr(data[i].value || '')}" onchange="updateBodyKV(${i}, 'value', this.value)">`;
+                    }
+                    content += `<button type="button" onclick="removeBodyKV(${i})"></button></div>`;
                 }
                 content += '</div>';
                 content += `<button type="button" class="btn btn-secondary" onclick="addBodyKV()" style="font-size:12px;">+ 添加</button>`;
@@ -1478,6 +1493,13 @@
                     <textarea rows="5" onchange="updateGraphqlField('query', this.value)">${escapeHtml(bodyData.query || '')}</textarea>
                     <label style="font-size:12px;color:#64748b;margin-top:8px;display:block;">Variables</label>
                     <textarea rows="3" onchange="updateGraphqlField('variables', this.value)">${escapeHtml(bodyData.variables || '')}</textarea>`;
+            } else if (req.body_mode === 'binary') {
+                const fileName = bodyData.file_name || '';
+                content = `<div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:#64748b;display:block;margin-bottom:6px;">选择要上传的文件</label>
+                    <input type="file" onchange="updateBinaryFile(this)" style="margin-bottom:8px;">
+                    <input type="text" placeholder="文件名（只读）" value="${escapeAttr(fileName)}" readonly style="background:#f1f5f9;width:100%;">
+                </div>`;
             }
 
             const previewMode = state.previewMode || false;
@@ -1637,7 +1659,11 @@
         function addBodyKV() {
             if (state.editBuffer && state.editBuffer.body_data) {
                 if (!state.editBuffer.body_data.data) state.editBuffer.body_data.data = [];
-                state.editBuffer.body_data.data.push({key: '', value: ''});
+                const newRow = {key: '', value: ''};
+                if (state.editBuffer.body_mode === 'formdata') {
+                    newRow.type = 'text';
+                }
+                state.editBuffer.body_data.data.push(newRow);
                 renderEditor();
             }
         }
@@ -1645,6 +1671,44 @@
         function removeBodyKV(index) {
             if (state.editBuffer && state.editBuffer.body_data?.data) {
                 state.editBuffer.body_data.data.splice(index, 1);
+                renderEditor();
+                syncToAllRequests();
+            }
+        }
+
+        function updateBodyKVType(index, type) {
+            if (state.editBuffer && state.editBuffer.body_data?.data) {
+                state.editBuffer.body_data.data[index].type = type;
+                if (type === 'file') {
+                    state.editBuffer.body_data.data[index].value = '';
+                } else {
+                    state.editBuffer.body_data.data[index].file_name = '';
+                    delete state.editBuffer.body_data.data[index].upload_key;
+                }
+                renderEditor();
+                syncToAllRequests();
+            }
+        }
+
+        function updateBodyKVFile(index, input) {
+            if (state.editBuffer && state.editBuffer.body_data?.data && input.files.length > 0) {
+                const file = input.files[0];
+                const uploadKey = 'formdata_' + index + '_' + Date.now();
+                state.editBuffer.body_data.data[index].file_name = file.name;
+                state.editBuffer.body_data.data[index].upload_key = uploadKey;
+                state.uploadedFiles[uploadKey] = file;
+                renderEditor();
+                syncToAllRequests();
+            }
+        }
+
+        function updateBinaryFile(input) {
+            if (state.editBuffer && state.editBuffer.body_data && input.files.length > 0) {
+                const file = input.files[0];
+                const uploadKey = 'binary_' + Date.now();
+                state.editBuffer.body_data.file_name = file.name;
+                state.editBuffer.body_data.upload_key = uploadKey;
+                state.uploadedFiles[uploadKey] = file;
                 renderEditor();
                 syncToAllRequests();
             }
@@ -2039,6 +2103,13 @@
                     // 使用 Collection 名称作为报告名
                     const colName = (state.collection.collection_info && state.collection.collection_info.name) || 'collection';
                     formData.append('report_name', colName);
+
+                    // 添加上传的文件（formdata/binary 模式）
+                    if (state.uploadedFiles && Object.keys(state.uploadedFiles).length > 0) {
+                        for (const [uploadKey, file] of Object.entries(state.uploadedFiles)) {
+                            formData.append('upload_files', file, uploadKey + '_' + file.name);
+                        }
+                    }
 
                     const runResp = await fetch('/api/run-postman', {
                         method: 'POST',

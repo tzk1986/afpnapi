@@ -32,6 +32,7 @@ def build_run_postman_job_params(
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
     env_name: str = "",
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     selected_count = len(selected_item_paths or [])
     logger.info(
@@ -68,6 +69,8 @@ def build_run_postman_job_params(
         result["initial_variables"] = initial_variables
     if env_name:
         result["env_name"] = env_name
+    if uploaded_files:
+        result["uploaded_files"] = uploaded_files
     return result
 
 

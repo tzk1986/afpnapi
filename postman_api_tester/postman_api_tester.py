@@ -143,6 +143,7 @@ def run_postman_tests(
     data_file: str = "",
     initial_variables: Optional[Dict[str, str]] = None,
     env_name: str = "",
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> PostmanTestReport:
     """
     运行 Postman 接口测试。
@@ -160,6 +161,7 @@ def run_postman_tests(
     :param data_file: 数据驱动文件路径（CSV/JSON，可选）。
     :param initial_variables: 预置变量（可选，用于请求串联的初始值）。
     :param env_name: 环境名称（可选，用于合并多环境全局变量）。
+    :param uploaded_files: 上传文件路径映射（upload_key -> file_path，可选），用于 formdata/binary 模式。
     :return: 测试报告对象。
     """
     from postman_api_tester import config as _cfg
@@ -253,6 +255,7 @@ def run_postman_tests(
         variable_context=variable_context,
         enable_concurrent=enable_concurrent,
         concurrent_workers=concurrent_workers,
+        uploaded_files=uploaded_files,
     )
 
     _complete_report_output(

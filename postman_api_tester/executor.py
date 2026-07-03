@@ -19,7 +19,8 @@ Postman API 测试执行模块 - 单接口执行与结果收集
 import json
 import logging
 import time as _time_mod
-from typing import Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING
 if TYPE_CHECKING:
     from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.session import RequestTimeout
@@ -114,6 +115,7 @@ class PostmanTestExecutor:
         repeat_index: int = 0,
         repeat_total: int = 1,
         repeat_group: str = "",
+        uploaded_files: Optional[Dict[str, str]] = None,
     ) -> None:
         """
         初始化执行器
@@ -127,6 +129,7 @@ class PostmanTestExecutor:
         :param repeat_index: 当前重复序号（从 0 开始），默认 0
         :param repeat_total: 总重复次数，默认 1
         :param repeat_group: 重复组标识，默认使用接口名
+        :param uploaded_files: 上传文件路径映射（upload_key -> file_path），用于 formdata/binary 模式
         """
         import requests as _requests_mod
         self.api_config = dict(api_config)
@@ -145,6 +148,7 @@ class PostmanTestExecutor:
         self._repeat_index = repeat_index
         self._repeat_total = repeat_total
         self._repeat_group = repeat_group or str(api_config.get('name') or '')
+        self._uploaded_files: Dict[str, str] = uploaded_files if isinstance(uploaded_files, dict) else {}
 
     def start(self) -> None:
         """测试前准备"""
@@ -407,7 +411,59 @@ class PostmanTestExecutor:
                 'timeout': self.request_timeout,
             }
             if method in {'post', 'put', 'patch'}:
-                request_kwargs['json'] = body
+                # 检查是否为 formdata 或 binary 模式
+                body_dict = body if isinstance(body, dict) else None
+                body_mode = body_dict.get('__body_mode') if body_dict else None
+                if body_mode == 'formdata' and body_dict:
+                    # 构建 multipart/form-data 请求
+                    formdata_items: List[Dict[str, Any]] = body_dict.get('formdata', []) or []  # type: ignore[assignment]
+                    data_rows: List[Tuple[str, str]] = []
+                    file_rows: List[Tuple[str, Tuple[str, Any, str]]] = []
+                    for item in formdata_items:
+                        if not isinstance(item, dict):
+                            continue
+                        key = str(item.get('key', ''))
+                        if item.get('type') == 'file':
+                            upload_key = str(item.get('upload_key', ''))
+                            file_path = self._uploaded_files.get(upload_key)
+                            if file_path and Path(file_path).exists():
+                                file_name = Path(file_path).name
+                                file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))
+                        else:
+                            data_rows.append((key, str(item.get('value', ''))))
+                    # 移除 Content-Type，让 requests 自动设置 multipart boundary
+                    headers.pop('Content-Type', None)
+                    headers.pop('content-type', None)
+                    request_kwargs['headers'] = headers
+                    request_kwargs['data'] = data_rows
+                    request_kwargs['files'] = file_rows
+                elif body_mode == 'binary' and body_dict:
+                    # 构建 binary 请求
+                    upload_key = str(body_dict.get('upload_key', ''))
+                    file_path = self._uploaded_files.get(upload_key)
+                    if file_path and Path(file_path).exists():
+                        with open(file_path, 'rb') as f:
+                            request_kwargs['data'] = f.read()
+                        # 根据文件扩展名设置 Content-Type
+                        ext = Path(file_path).suffix.lower()
+                        content_type_map = {
+                            '.json': 'application/json',
+                            '.xml': 'application/xml',
+                            '.txt': 'text/plain',
+                            '.csv': 'text/csv',
+                            '.pdf': 'application/pdf',
+                            '.zip': 'application/zip',
+                            '.png': 'image/png',
+                            '.jpg': 'image/jpeg',
+                            '.jpeg': 'image/jpeg',
+                            '.gif': 'image/gif',
+                        }
+                        headers.setdefault('Content-Type', content_type_map.get(ext, 'application/octet-stream'))
+                        request_kwargs['headers'] = headers
+                    else:
+                        request_kwargs['data'] = b''
+                else:
+                    request_kwargs['json'] = body
 
             _t0 = _time_mod.monotonic()
             response = getattr(self.session, method)(url, **request_kwargs)

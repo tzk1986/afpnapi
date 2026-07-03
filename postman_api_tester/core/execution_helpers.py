@@ -401,6 +401,7 @@ def _execute_api_suite_concurrent(
     concurrent_workers: int,
     judgment_config: Optional[Dict[str, Any]] = None,
     variable_context: Optional[object] = None,
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, Optional[Exception]]:
     """并发执行路径：基于 BatchScheduler 分批 + ThreadPoolExecutor 批次内并行。"""
     import threading
@@ -453,6 +454,7 @@ def _execute_api_suite_concurrent(
             repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
             repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
             repeat_group=str(api.get('repeat_group') or ''),
+            uploaded_files=uploaded_files,
         )
         executor.start()
         return executor.execute_test()
@@ -525,6 +527,7 @@ def _execute_single_api(
     executed_item_paths: set[str],
     total_apis_count: int,
     progress_callback: Optional[ProgressCallback],
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> TestResultRecord:
 	"""执行单个 API 并将结果写入 report，同时处理 checkpoint 与进度回调。"""
 	logger.debug("[%d/%d] 测试: %s (%s %s)", idx, total, api['name'], api['method'], api['url'])
@@ -540,6 +543,7 @@ def _execute_single_api(
 		repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
 		repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
 		repeat_group=str(api.get('repeat_group') or ''),
+		uploaded_files=uploaded_files,
 	)
 	executor.start()
 	result: TestResultRecord = executor.execute_test()
@@ -618,6 +622,7 @@ def _execute_api_suite(
     variable_context: Optional[object] = None,
     enable_concurrent: bool = False,
     concurrent_workers: int = 10,
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, Optional[Exception]]:
     # 展开 x_repeat > 1 的接口为多次执行项
     expanded_apis: List[ApiConfig] = []
@@ -661,6 +666,7 @@ def _execute_api_suite(
             concurrent_workers=concurrent_workers,
             judgment_config=judgment_config,
             variable_context=variable_context,
+            uploaded_files=uploaded_files,
         )
 
     execution_error: Optional[Exception] = None
@@ -687,6 +693,7 @@ def _execute_api_suite(
                 executed_item_paths=executed_item_paths,
                 total_apis_count=total_apis_count,
                 progress_callback=progress_callback,
+                uploaded_files=uploaded_files,
             )
             completed_count = idx
     except Exception as exc:
@@ -717,6 +724,7 @@ def _execute_and_finalize_suite(
     variable_context: Optional[object] = None,
     enable_concurrent: bool = False,
     concurrent_workers: int = 10,
+    uploaded_files: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, Optional[Exception]]:
     completed_count = 0
     execution_error: Optional[Exception] = None
@@ -741,6 +749,7 @@ def _execute_and_finalize_suite(
             variable_context=variable_context,
             enable_concurrent=enable_concurrent,
             concurrent_workers=concurrent_workers,
+            uploaded_files=uploaded_files,
         )
     finally:
         close_session(shared_session)

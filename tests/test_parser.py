@@ -244,7 +244,11 @@ class TestParseRequest:
 				}
 			}
 			result = parser._parse_request(item)
-			assert result["body"] == {"name": "Alice"}
+			assert result["body"]["__body_mode"] == "formdata"
+			assert len(result["body"]["formdata"]) == 1
+			assert result["body"]["formdata"][0]["key"] == "name"
+			assert result["body"]["formdata"][0]["value"] == "Alice"
+			assert result["body"]["formdata"][0]["type"] == "text"
 
 	def test_urlencoded_body(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:

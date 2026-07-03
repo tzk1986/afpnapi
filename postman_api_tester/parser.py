@@ -167,7 +167,7 @@ class PostmanApiParser:
         return apis
 
     def _parse_body(self, body_data: Dict[str, Any]) -> Any:
-        """解析请求体，支持 raw/formdata/urlencoded 三种模式。"""
+        """解析请求体，支持 raw/formdata/urlencoded/file 模式。"""
         if not body_data:
             return None
 
@@ -177,13 +177,34 @@ class PostmanApiParser:
                 return json.loads(body_data.get('raw', '{}'))
             except (json.JSONDecodeError, ValueError, TypeError):
                 return body_data.get('raw', '')
-        elif mode in ('formdata', 'urlencoded'):
+        elif mode == 'urlencoded':
             body = {}
             items = body_data.get(mode, [])
             for item_data in items:
                 if not item_data.get('disabled'):
                     body[item_data.get('key')] = item_data.get('value')
             return body
+        elif mode == 'formdata':
+            # 保留完整结构，包括 type 和 upload_key，供执行器处理文件上传
+            items = body_data.get(mode, [])
+            formdata_items = []
+            for item_data in items:
+                if not item_data.get('disabled'):
+                    formdata_items.append({
+                        'key': item_data.get('key', ''),
+                        'value': item_data.get('value', ''),
+                        'type': item_data.get('type', 'text'),
+                        'file_name': item_data.get('file_name', ''),
+                        'upload_key': item_data.get('upload_key', ''),
+                    })
+            return {'__body_mode': 'formdata', 'formdata': formdata_items}
+        elif mode == 'file':
+            # binary 模式，保留文件名信息
+            return {
+                '__body_mode': 'binary',
+                'file_name': body_data.get('src', ''),
+                'upload_key': body_data.get('upload_key', ''),
+            }
         return None
 
     def _parse_x_extensions(self, request: Dict[str, Any]) -> Dict[str, Any]:
