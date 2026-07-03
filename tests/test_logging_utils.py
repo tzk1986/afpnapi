@@ -6,6 +6,9 @@ _parse_log_level、_parse_sample_rate、LogMetricsHandler。
 
 import json
 import logging
+import tempfile
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -14,6 +17,7 @@ from postman_api_tester.utils.logging_utils import (
 	JsonFormatter,
 	LogMetricsHandler,
 	StructuredFormatter,
+	configure_logging,
 	_extra_fields,
 	_parse_log_level,
 	_parse_sample_rate,
@@ -213,3 +217,68 @@ class TestLogMetricsHandler:
 		handler.emit(logging.makeLogRecord({"msg": "err", "levelname": "ERROR", "levelno": logging.ERROR, "name": "t"}))
 		count = handler.error_count_since(window_seconds=60)
 		assert count == 1
+
+
+class TestConfigureLoggingFileHandler:
+	"""configure_logging() 文件日志支持测试。"""
+
+	def test_log_file_creates_rotating_handler(self) -> None:
+		with tempfile.TemporaryDirectory() as tmp_dir:
+			log_file = str(Path(tmp_dir) / "test.log")
+			root_logger = logging.getLogger()
+			original_handlers = list(root_logger.handlers)
+			try:
+				configure_logging(log_file=log_file)
+				file_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
+				assert len(file_handlers) >= 1
+				assert file_handlers[0].baseFilename == str(Path(log_file).expanduser().resolve())
+			finally:
+				for h in list(root_logger.handlers):
+					if h not in original_handlers:
+						root_logger.removeHandler(h)
+						h.close()
+
+	def test_log_file_empty_does_not_add_handler(self) -> None:
+		root_logger = logging.getLogger()
+		original_handlers = list(root_logger.handlers)
+		try:
+			configure_logging(log_file="")
+			new_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
+			original_file = [h for h in original_handlers if isinstance(h, RotatingFileHandler)]
+			assert len(new_handlers) == len(original_file)
+		finally:
+			for h in list(root_logger.handlers):
+				if h not in original_handlers:
+					root_logger.removeHandler(h)
+					h.close()
+
+	def test_log_file_creates_parent_directory(self) -> None:
+		with tempfile.TemporaryDirectory() as tmp_dir:
+			log_file = str(Path(tmp_dir) / "nested" / "dir" / "test.log")
+			root_logger = logging.getLogger()
+			original_handlers = list(root_logger.handlers)
+			try:
+				configure_logging(log_file=log_file)
+				assert Path(log_file).parent.exists()
+			finally:
+				for h in list(root_logger.handlers):
+					if h not in original_handlers:
+						root_logger.removeHandler(h)
+						h.close()
+
+	def test_duplicate_log_file_does_not_add_handler(self) -> None:
+		with tempfile.TemporaryDirectory() as tmp_dir:
+			log_file = str(Path(tmp_dir) / "test.log")
+			root_logger = logging.getLogger()
+			original_handlers = list(root_logger.handlers)
+			try:
+				configure_logging(log_file=log_file)
+				count_before = sum(1 for h in root_logger.handlers if isinstance(h, RotatingFileHandler))
+				configure_logging(log_file=log_file)
+				count_after = sum(1 for h in root_logger.handlers if isinstance(h, RotatingFileHandler))
+				assert count_after == count_before
+			finally:
+				for h in list(root_logger.handlers):
+					if h not in original_handlers:
+						root_logger.removeHandler(h)
+						h.close()
