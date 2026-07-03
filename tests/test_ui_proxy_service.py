@@ -52,6 +52,31 @@ class TestRewriteHtml:
         result = UiProxyService.rewrite_html(html, "https://example.com/page")
         assert "/ui-testing/proxy-resource?url=" in result
 
+    def test_skip_script_content_dynamic_url(self) -> None:
+        html = (
+            '<script>'
+            "document.write('<script src=\"' + window.location.protocol + '//' + "
+            "window.location.host + '/config.js' + '\"></scr' + 'ipt>')"
+            '</script>'
+        )
+        result = UiProxyService.rewrite_html(html, "http://10.50.11.120:9001/login")
+        assert "window.location.protocol" in result
+        assert "window.location.host" in result
+        script_body = result.split("</script>")[0]
+        assert "proxy-resource" not in script_body
+        assert "proxy?url" not in script_body
+
+    def test_skip_script_content_preserves_html_attrs(self) -> None:
+        html = (
+            '<a href="/page">Link</a>'
+            '<script>var x = \'<img src="/img.png">\';</script>'
+            '<img src="/logo.png">'
+        )
+        result = UiProxyService.rewrite_html(html, "https://example.com")
+        assert 'href="/page"' not in result
+        assert 'src="/logo.png"' not in result
+        assert 'src="/img.png"' in result
+
     def test_preserve_data_urls(self) -> None:
         html = '<img src="data:image/png;base64,iVBOR">'
         result = UiProxyService.rewrite_html(html, "https://example.com/page")

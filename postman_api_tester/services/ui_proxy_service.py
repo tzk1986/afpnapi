@@ -139,7 +139,7 @@ class UiProxyService:
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
         result = UiProxyService._rewrite_style_tag_urls(result, base_url, origin)
         result = UiProxyService._remove_frame_busting(result)
-        result = UiProxyService._inject_recorder_script(result)
+        result = UiProxyService._inject_recorder_script(result, origin)
 
         return result
 
@@ -170,6 +170,19 @@ class UiProxyService:
         return html
 
     @staticmethod
+    def _outside_scripts(html: str, transform) -> str:
+        """对 <script> 标签外部的 HTML 内容应用变换，保持脚本内容不变。"""
+        pattern = re.compile(r'(<script\b[^>]*>)(.*?)(</script>)', re.IGNORECASE | re.DOTALL)
+        parts = pattern.split(html)
+        result = []
+        for i, part in enumerate(parts):
+            if i % 4 == 0:
+                result.append(transform(part))
+            else:
+                result.append(part)
+        return "".join(result)
+
+    @staticmethod
     def _rewrite_attr_urls(html: str, base_url: str, origin: str) -> str:
         """改写 HTML 属性中的 URL 引用。"""
         attr_patterns = [
@@ -185,21 +198,23 @@ class UiProxyService:
             (r'(<(?:video|img)\s[^>]*?)poster\s*=\s*"([^"]*)"', "poster", False),
         ]
 
-        for pattern, attr_name, is_page_url in attr_patterns:
-            def _replace_attr(match: re.Match) -> str:
-                prefix = match.group(1)
-                url_value = match.group(2)
-                resolved = UiProxyService._resolve_url(url_value, base_url)
-                if resolved is None:
-                    return match.group(0)
-                if is_page_url:
-                    proxy_url = UiProxyService.to_proxy_url(resolved)
-                else:
-                    proxy_url = UiProxyService.to_resource_proxy_url(resolved)
-                return f'{prefix}{attr_name}="{proxy_url}"'
-            html = re.sub(pattern, _replace_attr, html, flags=re.IGNORECASE)
+        def _rewrite_outside(outside: str) -> str:
+            for pattern, attr_name, is_page_url in attr_patterns:
+                def _replace_attr(match: re.Match) -> str:
+                    prefix = match.group(1)
+                    url_value = match.group(2)
+                    resolved = UiProxyService._resolve_url(url_value, base_url)
+                    if resolved is None:
+                        return match.group(0)
+                    if is_page_url:
+                        proxy_url = UiProxyService.to_proxy_url(resolved)
+                    else:
+                        proxy_url = UiProxyService.to_resource_proxy_url(resolved)
+                    return f'{prefix}{attr_name}="{proxy_url}"'
+                outside = re.sub(pattern, _replace_attr, outside, flags=re.IGNORECASE)
+            return outside
 
-        return html
+        return UiProxyService._outside_scripts(html, _rewrite_outside)
 
     @staticmethod
     def _rewrite_inline_style_urls(html: str, base_url: str, origin: str) -> str:
@@ -210,13 +225,15 @@ class UiProxyService:
             rewritten = UiProxyService._rewrite_css_urls(style_content, base_url, origin)
             return f'{prefix}"{rewritten}"'
 
-        html = re.sub(
-            r'(style\s*=\s*)"((?:[^"\\]|\\.)*)"',
-            _replace_style_attr,
-            html,
-            flags=re.IGNORECASE,
-        )
-        return html
+        def _rewrite_outside(outside: str) -> str:
+            return re.sub(
+                r'(style\s*=\s*)"((?:[^"\\]|\\.)*)"',
+                _replace_style_attr,
+                outside,
+                flags=re.IGNORECASE,
+            )
+
+        return UiProxyService._outside_scripts(html, _rewrite_outside)
 
     @staticmethod
     def _rewrite_style_tag_urls(html: str, base_url: str, origin: str) -> str:
@@ -228,13 +245,15 @@ class UiProxyService:
             rewritten = UiProxyService._rewrite_css_urls(css_content, base_url, origin)
             return f"{open_tag}{rewritten}{close_tag}"
 
-        html = re.sub(
-            r'(<style[^>]*>)(.*?)(</style>)',
-            _replace_style_tag,
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        return html
+        def _rewrite_outside(outside: str) -> str:
+            return re.sub(
+                r'(<style[^>]*>)(.*?)(</style>)',
+                _replace_style_tag,
+                outside,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+
+        return UiProxyService._outside_scripts(html, _rewrite_outside)
 
     @staticmethod
     def _rewrite_css_urls(css: str, base_url: str, origin: str) -> str:
@@ -274,11 +293,11 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _inject_recorder_script(html: str) -> str:
+    def _inject_recorder_script(html: str, origin: str = "") -> str:
         """在 </body> 前注入录制器脚本。"""
         from postman_api_tester.services.ui_recorder_inject import get_recorder_js
 
-        script_tag = f"<script>\n{get_recorder_js()}\n</script>"
+        script_tag = f"<script>\n{get_recorder_js(origin)}\n</script>"
 
         lower = html.lower()
         if "</body>" in lower:

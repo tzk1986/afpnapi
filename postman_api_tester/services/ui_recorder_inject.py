@@ -5,9 +5,13 @@
 """
 
 
-def get_recorder_js() -> str:
+def get_recorder_js(origin: str = "") -> str:
     """返回完整的录制器 JavaScript 代码。"""
-    return _RECORDER_JS
+    code = _RECORDER_JS
+    if origin:
+        origin_decl = '\n  var _PROXY_ORIGIN = "' + origin + '";'
+        code = code.replace("'use strict';", "'use strict';" + origin_decl, 1)
+    return code
 
 
 _RECORDER_JS = r"""
@@ -312,9 +316,13 @@ _RECORDER_JS = r"""
     });
   }
 
-  // 拦截 fetch 和 XMLHttpRequest
+  // 拦截 fetch：重定向原始服务器 API 调用 + 录制
   var origFetch = window.fetch;
   window.fetch = function(url, opts) {
+    if (typeof url === 'string' && _PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) {
+      var proxyUrl = '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
+      arguments[0] = proxyUrl;
+    }
     if (recording && url && typeof url === 'string') {
       sendEvent({
         action: 'api_call',
@@ -326,6 +334,24 @@ _RECORDER_JS = r"""
       });
     }
     return origFetch.apply(this, arguments);
+  };
+
+  // 拦截 XMLHttpRequest：重定向原始服务器 API 调用
+  var _OrigXHR = window.XMLHttpRequest;
+  var origOpen = _OrigXHR.prototype.open;
+  var origSend = _OrigXHR.prototype.send;
+  _OrigXHR.prototype.open = function(method, url) {
+    this._uiRecorderMethod = method;
+    this._uiRecorderUrl = url;
+    return origOpen.apply(this, arguments);
+  };
+  _OrigXHR.prototype.send = function() {
+    var url = this._uiRecorderUrl;
+    if (typeof url === 'string' && _PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) {
+      var proxyUrl = '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
+      origOpen.call(this, this._uiRecorderMethod || 'GET', proxyUrl);
+    }
+    return origSend.apply(this, arguments);
   };
 
   // 监听来自父页面的控制消息
