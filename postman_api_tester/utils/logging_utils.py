@@ -11,6 +11,8 @@ import time
 from collections import Counter
 from collections import deque
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from threading import Lock
 from typing import Any, Deque, Dict, Mapping, Optional
 
@@ -121,6 +123,9 @@ def configure_logging(
     level: Any = "INFO",
     log_format: str = "structured",
     service_name: str = "postman_api_tester",
+    log_file: str = "",
+    log_file_max_bytes: int = 10 * 1024 * 1024,
+    log_file_backup_count: int = 5,
 ) -> None:
     global _METRICS_HANDLER
 
@@ -133,7 +138,7 @@ def configure_logging(
     else:
         formatter = StructuredFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-    stream_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler)]
+    stream_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)]
     if stream_handlers:
         for handler in stream_handlers:
             handler.setFormatter(formatter)
@@ -141,6 +146,23 @@ def configure_logging(
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)
         root_logger.addHandler(stream_handler)
+
+    if log_file:
+        log_path = Path(log_file).expanduser().resolve()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        has_file_handler = any(
+            isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "") == str(log_path)
+            for h in root_logger.handlers
+        )
+        if not has_file_handler:
+            file_handler = RotatingFileHandler(
+                str(log_path),
+                maxBytes=log_file_max_bytes,
+                backupCount=log_file_backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setFormatter(formatter)
+            root_logger.addHandler(file_handler)
 
     if _METRICS_HANDLER is None:
         _METRICS_HANDLER = LogMetricsHandler()
@@ -153,13 +175,27 @@ def configure_logging(
             "service": service_name,
             "log_level": logging.getLevelName(root_logger.level),
             "log_format": str(log_format).strip().lower() or "structured",
+            "log_file": log_file or "",
         },
     )
 
 
 def configure_logging_from_config(service_name: str) -> None:
-    from postman_api_tester.report_server_config import LOG_LEVEL, LOG_FORMAT
-    configure_logging(level=LOG_LEVEL, log_format=LOG_FORMAT, service_name=service_name)
+    from postman_api_tester.report_server_config import (
+        LOG_LEVEL,
+        LOG_FORMAT,
+        LOG_FILE,
+        LOG_FILE_MAX_BYTES,
+        LOG_FILE_BACKUP_COUNT,
+    )
+    configure_logging(
+        level=LOG_LEVEL,
+        log_format=LOG_FORMAT,
+        service_name=service_name,
+        log_file=LOG_FILE,
+        log_file_max_bytes=LOG_FILE_MAX_BYTES,
+        log_file_backup_count=LOG_FILE_BACKUP_COUNT,
+    )
 
 
 def get_log_sample_rate(default: float = 0.1) -> float:
