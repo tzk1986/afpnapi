@@ -6,7 +6,7 @@
 
 import logging
 import re
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 from urllib.parse import quote, unquote, urljoin, urlparse
 
 import requests
@@ -170,7 +170,7 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _outside_scripts(html: str, transform) -> str:
+    def _outside_scripts(html: str, transform: Callable[[str], str]) -> str:
         """对 <script> 标签外部的 HTML 内容应用变换，保持脚本内容不变。"""
         pattern = re.compile(r'(<script\b[^>]*>)(.*?)(</script>)', re.IGNORECASE | re.DOTALL)
         parts = pattern.split(html)
