@@ -82,6 +82,14 @@ from postman_api_tester.handlers.test_proxy_routes import (
     re_request_api as _route_re_request_api,
     test_token as _route_test_token,
 )
+from postman_api_tester.handlers.ui_recorder_routes import (
+    api_ui_recorder_event as _route_api_ui_recorder_event,
+    api_ui_recorder_sessions as _route_api_ui_recorder_sessions,
+    api_ui_recorder_session_detail as _route_api_ui_recorder_session_detail,
+    api_ui_recorder_session_delete as _route_api_ui_recorder_session_delete,
+    api_ui_recorder_session_export as _route_api_ui_recorder_session_export,
+    ui_recorder_page as _route_ui_recorder_page,
+)
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
 from postman_api_tester.report_repository import configure_report_repository
@@ -366,6 +374,39 @@ def api_env_create() -> ResponseReturnValue:
 def api_env_delete(env_name: str) -> ResponseReturnValue:
     """删除环境。"""
     return _route_api_env_remove(env_name)
+
+
+# ---------------------------------------------------------------
+# UI 录制器
+# ---------------------------------------------------------------
+@app.route("/ui-recorder")
+def ui_recorder_page() -> ResponseReturnValue:
+    return _route_ui_recorder_page()
+
+
+@app.route("/api/ui-recorder/event", methods=["POST"])
+def api_ui_recorder_event() -> ResponseReturnValue:
+    return _route_api_ui_recorder_event()
+
+
+@app.route("/api/ui-recorder/sessions")
+def api_ui_recorder_sessions() -> ResponseReturnValue:
+    return _route_api_ui_recorder_sessions()
+
+
+@app.route("/api/ui-recorder/session/<path:session_id>")
+def api_ui_recorder_session_detail(session_id: str) -> ResponseReturnValue:
+    return _route_api_ui_recorder_session_detail(session_id)
+
+
+@app.route("/api/ui-recorder/session/<path:session_id>", methods=["DELETE"])
+def api_ui_recorder_session_delete(session_id: str) -> ResponseReturnValue:
+    return _route_api_ui_recorder_session_delete(session_id)
+
+
+@app.route("/api/ui-recorder/session/<path:session_id>/export")
+def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
+    return _route_api_ui_recorder_session_export(session_id)
 
 
 @app.route("/favicon.ico")

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+    h1 .dot.active {
+      background: #ef4444;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .field {
+      margin-bottom: 12px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    .field input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      outline: none;
+    }
+    .field input:focus {
+      border-color: #3b82f6;
+    }
+    .field input:disabled {
+      background: #f5f5f5;
+      color: #999;
+    }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    button {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-start {
+      background: #ef4444;
+      color: #fff;
+    }
+    .btn-stop {
+      background: #6b7280;
+      color: #fff;
+    }
+    .stats {
+      background: #f9fafb;
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+    .stats .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 12px;
+    }
+    .stats .row .label { color: #666; }
+    .stats .row .value { font-weight: 500; }
+    .status-msg {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+      min-height: 16px;
+    }
+    .status-msg.error { color: #ef4444; }
+    .status-msg.success { color: #10b981; }
+  </style>
+</head>
+<body>
+  <h1><span class="dot" id="statusDot"></span>UI Test Recorder</h1>
+
+  <div class="field">
+    <label for="serverUrl">服务端地址</label>
+    <input type="text" id="serverUrl" placeholder="http://localhost:5000" />
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-start" id="btnStart">开始录制</button>
+    <button class="btn-stop" id="btnStop" disabled>停止录制</button>
+  </div>
+
+  <div class="stats" id="statsPanel">
+    <div class="row">
+      <span class="label">状态</span>
+      <span class="value" id="stateText">未录制</span>
+    </div>
+    <div class="row">
+      <span class="label">已捕获步骤</span>
+      <span class="value" id="stepCount">0</span>
+    </div>
+    <div class="row">
+      <span class="label">录制时长</span>
+      <span class="value" id="duration">--</span>
+    </div>
+    <div class="row">
+      <span class="label">Session ID</span>
+      <span class="value" id="sessionId">--</span>
+    </div>
+  </div>
+
+  <div class="status-msg" id="statusMsg"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
