@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from flask import make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
@@ -111,6 +111,25 @@ def ui_testing_editor_page(case_id: str) -> ResponseReturnValue:
 # ── 代理端点 ──
 
 
+def _check_ui_proxy_host_allowed(url: str) -> Optional[ResponseReturnValue]:
+    """若配置了 PROXY_ALLOWED_HOSTS，校验 url 的域名是否在白名单内。
+
+    返回 None 表示通过，否则返回 403 错误响应。
+    """
+    from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
+    if not PROXY_ALLOWED_HOSTS:
+        return None
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host and host not in PROXY_ALLOWED_HOSTS:
+        logger.warning(
+            "ui_proxy_host_blocked",
+            extra={"event": "ui.proxy.host_blocked", "url": url, "host": host},
+        )
+        return json_error(f"proxy 域名不在白名单内：{host}", 403, "UIT_PROXY_005")
+    return None
+
+
 def ui_testing_proxy() -> ResponseReturnValue:
     """反向代理端点：获取外部 URL 并改写 HTML。"""
     target_url = request.args.get("url", "")
@@ -121,6 +140,10 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
+
+    host_error = _check_ui_proxy_host_allowed(target_url)
+    if host_error is not None:
+        return host_error
 
     started_at = time.perf_counter()
     try:
@@ -176,6 +199,10 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
 
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_RES_002")
+
+    host_error = _check_ui_proxy_host_allowed(target_url)
+    if host_error is not None:
+        return host_error
 
     started_at = time.perf_counter()
     try:

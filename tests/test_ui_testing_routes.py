@@ -103,6 +103,44 @@ class TestProxyEndpoint:
         resp = client.get("/ui-testing/proxy-resource")
         assert resp.status_code == 400
 
+    def test_proxy_host_blocked_by_whitelist(self, client) -> None:
+        with patch(
+            "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS",
+            ("allowed.example.com",),
+        ):
+            resp = client.get("/ui-testing/proxy?url=http://evil.example.com/page")
+            assert resp.status_code == 403
+            data = resp.get_json()
+            assert data.get("error_code") == "UIT_PROXY_005"
+
+    def test_proxy_host_allowed_by_whitelist(self, client) -> None:
+        with patch(
+            "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS",
+            ("allowed.example.com",),
+        ):
+            with patch("postman_api_tester.services.ui_proxy_service.UiProxyService.fetch_and_rewrite") as mock_fetch:
+                mock_fetch.return_value = ("<html></html>", 200, {"Content-Type": "text/html"})
+                resp = client.get("/ui-testing/proxy?url=http://allowed.example.com/page")
+                assert resp.status_code == 200
+
+    def test_proxy_resource_host_blocked_by_whitelist(self, client) -> None:
+        with patch(
+            "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS",
+            ("allowed.example.com",),
+        ):
+            resp = client.get("/ui-testing/proxy-resource?url=http://evil.example.com/style.css")
+            assert resp.status_code == 403
+
+    def test_proxy_empty_whitelist_allows_all(self, client) -> None:
+        with patch(
+            "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS",
+            (),
+        ):
+            with patch("postman_api_tester.services.ui_proxy_service.UiProxyService.fetch_and_rewrite") as mock_fetch:
+                mock_fetch.return_value = ("<html></html>", 200, {"Content-Type": "text/html"})
+                resp = client.get("/ui-testing/proxy?url=http://any.example.com/page")
+                assert resp.status_code == 200
+
 
 class TestCaseCrudApi:
     """用例 CRUD API 测试。"""
