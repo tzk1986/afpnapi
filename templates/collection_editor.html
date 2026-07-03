@@ -694,6 +694,9 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            // 重置 input value，允许重新选择相同文件
+            event.target.value = '';
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -705,12 +708,27 @@
                 });
                 const data = await resp.json();
                 if (resp.ok) {
-                    state.collection = data;
-                    state.allRequests = collectAllRequests(data.groups);
-                    state.selectedIds = new Set();
-                    state.runtimeVars = {};
-                    renderTree();
-                    setStatus(`已加载 ${state.allRequests.length} 个接口`);
+                    // 检测是否已有数据，提示用户选择导入模式
+                    if (state.collection && state.allRequests.length > 0) {
+                        const mode = confirm(
+                            `当前已有 ${state.allRequests.length} 个接口。\n\n` +
+                            '点击「确定」合并导入（追加到现有集合）\n' +
+                            '点击「取消」替换导入（清空现有集合）'
+                        );
+                        if (mode) {
+                            // 合并模式：追加 groups
+                            mergeCollectionData(data);
+                            setStatus(`合并导入成功，当前共 ${state.allRequests.length} 个接口`);
+                        } else {
+                            // 替换模式：清空后加载
+                            replaceCollectionData(data);
+                            setStatus(`替换导入成功，已加载 ${state.allRequests.length} 个接口`);
+                        }
+                    } else {
+                        // 首次导入，直接加载
+                        replaceCollectionData(data);
+                        setStatus(`已加载 ${state.allRequests.length} 个接口`);
+                    }
                 } else {
                     const errCode = data.error_code ? `[${data.error_code}] ` : '';
                     setStatus('解析失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
@@ -718,6 +736,45 @@
             } catch (e) {
                 setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
             }
+        }
+
+        // 替换导入：清空现有数据并加载新集合
+        function replaceCollectionData(data) {
+            state.collection = data;
+            state.allRequests = collectAllRequests(data.groups);
+            state.selectedIds = new Set();
+            state.runtimeVars = {};
+            state.currentRequestId = null;
+            state.editBuffer = null;
+            renderTree();
+            renderEditor();
+        }
+
+        // 合并导入：追加新集合的 groups 到现有集合
+        function mergeCollectionData(data) {
+            if (!state.collection) {
+                replaceCollectionData(data);
+                return;
+            }
+            // 合并 groups
+            if (!state.collection.groups) state.collection.groups = [];
+            const newGroups = data.groups || [];
+            state.collection.groups.push(...newGroups);
+            // 合并 collection_info.variables（去重）
+            if (data.collection_info && data.collection_info.variables) {
+                if (!state.collection.collection_info) state.collection.collection_info = {};
+                if (!state.collection.collection_info.variables) state.collection.collection_info.variables = [];
+                const existingKeys = new Set(state.collection.collection_info.variables.map(v => v.key));
+                for (const v of data.collection_info.variables) {
+                    if (!existingKeys.has(v.key)) {
+                        state.collection.collection_info.variables.push(v);
+                    }
+                }
+            }
+            // 重新收集所有请求
+            state.allRequests = collectAllRequests(state.collection.groups);
+            state.selectedIds = new Set();
+            renderTree();
         }
 
         // Collect all requests from tree
