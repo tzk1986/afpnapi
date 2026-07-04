@@ -4,6 +4,55 @@
 
 ---
 
+## 2026-07-03 20:30 — v1.24.0 UI 测试模块安全加固 + 日志增强 + 测试覆盖（第十五轮）
+
+**分支**：`feature/auto-upgrade-2026-07-03`
+**状态**：✅ 完成（3 个改进）
+
+### 改进项
+
+#### 改进 1：UI 代理 SSRF 安全修复
+
+- `ui_testing_routes.py` 新增 `_check_ui_proxy_host_allowed()` 函数
+- 在 `/ui-testing/proxy` 和 `/ui-testing/proxy-resource` 两个端点添加 `PROXY_ALLOWED_HOSTS` 白名单校验
+- 阻止非白名单域名的代理请求，返回 403（UIT_PROXY_005）
+- 与主代理端点 `http_handler` 的安全策略保持一致
+- 新增 4 项 SSRF 白名单测试
+
+#### 改进 2：日志文件支持 + LogRecord 保留字段修复
+
+- `logging_utils.py` 新增 `RotatingFileHandler` 文件日志支持（`LOG_FILE`、`LOG_FILE_MAX_BYTES`、`LOG_FILE_BACKUP_COUNT`）
+- `report_server_config.py` 新增 3 个日志配置项
+- 修复 `ui_testing_routes.py` 日志 `extra` 字段中 `name`（LogRecord 保留字）改为 `case_name`
+- 全部 UI 测试路由添加结构化事件日志（`ui.proxy.*`、`ui.case.*`、`ui.recording.*`）
+- 新增 4 项 RotatingFileHandler 配置测试
+
+#### 改进 3：测试覆盖补充 + mypy 类型修复
+
+- 新增 `tests/test_ui_recorder_inject.py`（7 项）：`get_recorder_js` origin 注入、fetch/XHR 拦截器、事件监听器
+- `ui_proxy_service.py::_outside_scripts` 补充 `Callable[[str], str]` 类型注解，修复 mypy 错误
+- 验证结果：2103 passed, mypy 63 source files no issues
+
+### 验证结果
+
+- pytest: 2103 passed（无回归）
+- mypy: 63 source files, no issues
+
+### 风险点
+
+- 改进 1 中等风险：如果 `PROXY_ALLOWED_HOSTS` 配置不当可能阻断合法代理请求，但空白名单（默认）放行所有
+- 改进 2 低风险：文件日志可选（`LOG_FILE=""` 不启用），保留字段修复防止运行时 KeyError
+- 改进 3 低风险：纯新增测试 + 类型注解修复
+
+### 回退方法
+
+```bash
+git checkout master
+git branch -D feature/auto-upgrade-2026-07-03
+```
+
+---
+
 ## 2026-07-03 08:30 — 合并 v1.20.13 遗漏分支 + 统一版本至 v1.20.15
 
 **分支**：`feature/auto-upgrade-2026-07-02-nightly` → master
