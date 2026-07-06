@@ -422,7 +422,7 @@ _REPLAYER_JS = r"""
       var primary = '';
       var fallbackCss = '';
       var fallbackXpath = '';
-      if (typeof selectorStr === 'string') {
+      if (typeof selectorStr === 'string' && selectorStr) {
         primary = selectorStr;
       } else if (selectorObj) {
         primary = selectorObj.primary || '';
