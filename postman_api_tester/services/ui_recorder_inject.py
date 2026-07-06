@@ -460,9 +460,14 @@ _REPLAYER_JS = r"""
     _tryXpath: function(xpath) {
       if (!xpath) return null;
       try {
+        console.log('[ReplayEngine] _tryXpath:', xpath, 'doc ready:', document.readyState);
         var result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        console.log('[ReplayEngine] _tryXpath result:', result ? result.singleNodeValue : 'null');
         return result.singleNodeValue || null;
-      } catch(e) { return null; }
+      } catch(e) {
+        console.error('[ReplayEngine] _tryXpath ERROR:', e.message, 'xpath:', xpath);
+        return null;
+      }
     }
   };
 
@@ -549,6 +554,7 @@ _REPLAYER_JS = r"""
       var self = this;
       var timeout = this.options.timeout || 30000;
       var action = step.action || '';
+      console.log('[ReplayEngine] _executeStep', index, action, 'selector:', JSON.stringify(step.selector || '').substring(0, 100));
       var result = {
         index: index,
         action: action,
@@ -688,17 +694,23 @@ _REPLAYER_JS = r"""
       var selector = step.selector;
       var start = Date.now();
       var interval = 200;
+      var attempts = 0;
+      console.log('[ReplayEngine] _waitForElement selector:', JSON.stringify(typeof selector === 'string' ? selector : (selector ? selector.primary : 'null')));
 
       function check() {
+        attempts++;
         var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
         if (found && found.element) {
+          console.log('[ReplayEngine] element found after', attempts, 'attempts');
           callback(found.element);
           return;
         }
         if (Date.now() - start >= timeout) {
+          console.log('[ReplayEngine] element NOT found after', attempts, 'attempts, timed out');
           callback(null);
           return;
         }
+        if (attempts <= 3) console.log('[ReplayEngine] attempt', attempts, 'failed, retrying...');
         setTimeout(check, interval);
       }
       check();
@@ -766,8 +778,15 @@ _REPLAYER_JS = r"""
     }
   });
 
-  // 通知父页面回放引擎已就绪
-  window.parent.postMessage({ type: 'ui-replay-ready' }, '*');
-  console.log('[ReplayEngine] Injected and ready');
+  // 等待 DOM 完全加载后再通知父页面
+  function _replayReady() {
+    window.parent.postMessage({ type: 'ui-replay-ready' }, '*');
+    console.log('[ReplayEngine] Injected and ready');
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    _replayReady();
+  } else {
+    window.addEventListener('DOMContentLoaded', _replayReady);
+  }
 })();
 """
