@@ -7,6 +7,7 @@ reports/
 *.log
 uploaded_collections/
 variables.json
+ui_testing_cases/
 
 # 备份与临时文件
 .backup/

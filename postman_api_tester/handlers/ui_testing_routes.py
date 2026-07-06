@@ -105,7 +105,11 @@ def ui_testing_editor_page(case_id: str) -> ResponseReturnValue:
     case = _case_store.get_case(case_id)
     if not case:
         return redirect(url_for("ui_testing_index_page"))
-    return render_template("ui_testing_editor.html", case_id=case_id)
+    resp = make_response(render_template("ui_testing_editor.html", case_id=case_id))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 # ── 代理端点 ──
@@ -284,7 +288,10 @@ def api_ui_testing_case_get(case_id: str) -> ResponseReturnValue:
     """获取用例详情。"""
     case = _case_store.get_case(case_id)
     if not case:
+        logger.warning("Case not found: id=%s, available_files=%s", case_id,
+                       [f.name for f in _case_store._cases_dir.glob("case_*.json")])
         return json_error(f"用例不存在: {case_id}", 404, "UIT_CASE_002")
+    logger.info("Case loaded: id=%s, steps=%d", case_id, len(case.get("steps", [])))
     return BaseHandler.json_response(case)
 
 

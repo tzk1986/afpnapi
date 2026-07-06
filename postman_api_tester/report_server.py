@@ -88,6 +88,7 @@ from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_session_detail as _route_api_ui_recorder_session_detail,
     api_ui_recorder_session_delete as _route_api_ui_recorder_session_delete,
     api_ui_recorder_session_export as _route_api_ui_recorder_session_export,
+    ui_recorder_demo_page as _route_ui_recorder_demo_page,
     ui_recorder_page as _route_ui_recorder_page,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
@@ -401,7 +402,12 @@ def ui_recorder_page() -> ResponseReturnValue:
     return _route_ui_recorder_page()
 
 
-@app.route("/api/ui-recorder/event", methods=["POST"])
+@app.route("/ui-recorder/demo")
+def ui_recorder_demo_page() -> ResponseReturnValue:
+    return _route_ui_recorder_demo_page()
+
+
+@app.route("/api/ui-recorder/event", methods=["POST", "OPTIONS"])
 def api_ui_recorder_event() -> ResponseReturnValue:
     return _route_api_ui_recorder_event()
 

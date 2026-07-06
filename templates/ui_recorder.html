@@ -315,6 +315,7 @@
 
           <div class="toolbar">
             <button class="btn btn-primary" onclick="exportSession('${session.session_id}')">导出 JSON</button>
+            <button class="btn" onclick="importToUITesting('${session.session_id}')" style="background:#10b981;color:#fff;border-color:#10b981;">导入到 UI 测试</button>
             <button class="btn btn-danger" onclick="deleteSession('${session.session_id}')">删除</button>
           </div>
 
@@ -366,7 +367,41 @@
     }
 
     async function exportSession(sessionId) {
-      window.open('/api/ui-recorder/session/' + sessionId + '/export', '_blank');
+      try {
+        const resp = await fetch('/api/ui-recorder/session/' + sessionId + '/export');
+        const data = await resp.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'recording_' + sessionId + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('导出失败');
+      }
+    }
+
+    async function importToUITesting(sessionId) {
+      try {
+        const exportResp = await fetch('/api/ui-recorder/session/' + sessionId + '/export');
+        const exportData = await exportResp.json();
+        const createResp = await fetch('/api/ui-testing/cases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(exportData),
+        });
+        const result = await createResp.json();
+        if (result.code >= 200 && result.code < 300) {
+          alert('已导入到 UI 测试模块\n用例名: ' + exportData.name + '\n步骤数: ' + exportData.steps.length);
+        } else {
+          alert('导入失败: ' + (result.message || '未知错误'));
+        }
+      } catch (e) {
+        alert('导入失败');
+      }
     }
 
     async function deleteSession(sessionId) {

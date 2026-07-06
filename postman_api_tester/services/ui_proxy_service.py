@@ -315,37 +315,59 @@ class UiProxyService:
 
     @staticmethod
     def _inject_early_script(html: str, origin: str) -> str:
-        """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。"""
+        """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
+
+        拦截机制（7 层防护）：
+        1. document.write / writeln — 替换字符串中的目标 URL
+        2. document.createElement — 拦截所有元素的 src/href/data/poster 属性
+        3. Element.innerHTML setter — 重写 HTML 字符串中的属性 URL
+        4. Element.insertAdjacentHTML — 同上
+        5. DOMParser.parseFromString — 同上
+        6. MutationObserver — 兜底：对 DOM 中新增的 <script> 元素重写 src
+        """
+        # _rwHtml: 重写 HTML 字符串中 src/href/data/poster 属性的 URL
+        rw_html = (
+            'function _rwHtml(s){'
+            'if(typeof s!=="string")return s;'
+            'return s.replace(/([ \\t\\n\\r])(src|href|data|poster)([ \\t\\n\\r]*=[ \\t\\n\\r]*)(["\\x27])([^"\\x27]*?)(\\4)/gi,'
+            'function(m,pre,attr,eq,q,val,qe){'
+            'if(val.indexOf(_F)===0)return pre+attr+eq+q+_T+val.substring(_F.length)+qe;'
+            'return m;});}'
+        )
+
         early_js = (
             '(function(){'
             'var _T="' + origin + '";'
             'var _F=location.protocol+"//"+location.host;'
             'if(!_T||_T===_F)return;'
-            'var _dw=document.write.bind(document);'
-            'document.write=function(h){'
-            'if(typeof h==="string"){'
-            'h=h.split(_F).join(_T);'
-            '}'
-            'return _dw(h);'
-            '};'
+            'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
+            + rw_html +
+            'var _dw=document.write.bind(document);document.write=function(h){return _dw(_rw(h))};'
+            'var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rw(h))};'
             'var _ce=document.createElement.bind(document);'
             'document.createElement=function(t){'
             'var el=_ce(t);'
-            'if(t&&t.toLowerCase()==="script"){'
-            'var _s=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,"src");'
-            'if(_s&&_s.set){'
-            'var _ss=_s.set;'
-            'Object.defineProperty(el,"src",{'
-            'set:function(v){'
+            '["src","href","data","poster"].forEach(function(p){'
+            'var d=Object.getOwnPropertyDescriptor(el.constructor.prototype,p);'
+            'if(d&&d.set){var o=d.set;'
+            'Object.defineProperty(el,p,{set:function(v){'
             'if(typeof v==="string"&&v.indexOf(_F)===0)v=_T+v.substring(_F.length);'
-            '_ss.call(this,v);'
-            '},'
-            'get:function(){return _s.get.call(this);}'
-            '});'
-            '}'
-            '}'
-            'return el;'
-            '};'
+            'o.call(this,v);},get:d.get});}});'
+            'return el;};'
+            'var _ihp=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");'
+            'if(_ihp&&_ihp.set){var _ihs=_ihp.set;'
+            'Object.defineProperty(Element.prototype,"innerHTML",{set:function(h){_ihs.call(this,_rwHtml(h));},get:_ihp.get});}'
+            'var _iah=Element.prototype.insertAdjacentHTML;'
+            'Element.prototype.insertAdjacentHTML=function(p,h){return _iah.call(this,p,_rwHtml(h))};'
+            'var _pd=DOMParser.prototype.parseFromString;'
+            'DOMParser.prototype.parseFromString=function(s,t){return _pd.call(this,_rwHtml(s),t)};'
+            'var _obs=new MutationObserver(function(mutations){'
+            'mutations.forEach(function(m){m.addedNodes.forEach(function(n){'
+            'if(n.nodeType!==1)return;'
+            'if(n.tagName==="SCRIPT"&&n.src&&n.src.indexOf(_F)===0)n.src=_T+n.src.substring(_F.length);'
+            'if(n.querySelectorAll)n.querySelectorAll("script[src]").forEach(function(s){'
+            'if(s.src.indexOf(_F)===0)s.src=_T+s.src.substring(_F.length);});});});});'
+            '_obs.observe(document.documentElement||document,{childList:true,subtree:true});'
             '})();'
         )
         early_script = f"<script>{early_js}</script>"

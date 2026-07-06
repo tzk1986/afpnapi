@@ -1,4 +1,3 @@
-{% raw %}
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -107,6 +106,7 @@
                         <th>选择器</th>
                         <th style="width:180px">值</th>
                         <th style="width:160px">描述</th>
+                        <th style="width:120px">页面</th>
                         <th class="step-actions">操作</th>
                     </tr>
                 </thead>
@@ -127,6 +127,10 @@
             fetch('/api/ui-testing/cases/' + caseId)
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
+                    if (!result.data) {
+                        showError('用例不存在 (ID: ' + caseId + ')，请确认是否已正确导入。');
+                        return;
+                    }
                     caseData = result.data;
                     document.getElementById('caseName').value = caseData.name || '';
                     document.getElementById('caseDesc').value = caseData.description || '';
@@ -135,8 +139,32 @@
                     renderSteps();
                 })
                 .catch(function(e) {
-                    alert('加载用例失败: ' + e.message);
+                    showError('加载用例失败: ' + e.message);
                 });
+        }
+
+        function showError(msg) {
+            var container = document.querySelector('.container');
+            container.innerHTML = '<div class="panel" style="text-align:center;padding:60px 20px;">' +
+                '<h2 style="color:#ef4444;margin-bottom:12px;">加载失败</h2>' +
+                '<p style="color:#6b7280;margin-bottom:20px;">' + escapeHtml(msg) + '</p>' +
+                '<a href="/ui-testing" class="btn btn-secondary">返回列表</a>' +
+                '</div>';
+        }
+
+        function buildStepDescription(step) {
+            if (!step) return '';
+            var info = step.element_info || {};
+            var parts = [];
+            if (info.tag) parts.push(info.tag);
+            if (info.text && info.text.length <= 30) parts.push('「' + info.text + '」');
+            else if (info.name) parts.push('name=' + info.name);
+            else if (info.placeholder) parts.push('placeholder=' + info.placeholder);
+            else if (info.aria_label) parts.push('aria=' + info.aria_label);
+            if (step.page_url) {
+                try { parts.push(new URL(step.page_url).pathname); } catch(e) {}
+            }
+            return parts.join(' ') || step.action || '';
         }
 
         function renderSteps() {
@@ -153,7 +181,9 @@
             body.innerHTML = steps.map(function(step, i) {
                 var actionClass = getActionClass(step.action);
                 var selectorStr = step.selector ? (typeof step.selector === 'string' ? step.selector : (step.selector.primary || '')) : '';
-                var desc = step.description || '';
+                var desc = step.description || buildStepDescription(step);
+                var pageDomain = '';
+                if (step.page_url) { try { pageDomain = new URL(step.page_url).hostname; } catch(e) { pageDomain = step.page_url; } }
 
                 return '<tr>' +
                     '<td class="step-num">' + (i + 1) + '</td>' +
@@ -165,6 +195,7 @@
                     '<td><input type="text" value="' + escapeHtml(selectorStr) + '" onchange="updateStep(' + i + ', \'selector\', this.value)" placeholder="选择器" /></td>' +
                     '<td><input type="text" value="' + escapeHtml(step.value || '') + '" onchange="updateStep(' + i + ', \'value\', this.value)" placeholder="值" /></td>' +
                     '<td><input type="text" value="' + escapeHtml(desc) + '" onchange="updateStep(' + i + ', \'description\', this.value)" placeholder="描述" /></td>' +
+                    '<td style="font-size:11px;color:#9ca3af;" title="' + escapeHtml(step.page_url || '') + '">' + escapeHtml(pageDomain) + '</td>' +
                     '<td class="step-actions">' +
                         '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', -1)"' + (i === 0 ? ' disabled' : '') + '>↑</button> ' +
                         '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', 1)"' + (i === steps.length - 1 ? ' disabled' : '') + '>↓</button> ' +
@@ -276,8 +307,31 @@
             }
         });
 
+        // Debug: log API response to console
+        var _origLoadCase = loadCase;
+        loadCase = function() {
+            fetch('/api/ui-testing/cases/' + caseId)
+                .then(function(r) {
+                    console.log('API status:', r.status);
+                    return r.json();
+                })
+                .then(function(result) {
+                    console.log('API full response:', JSON.stringify(result, null, 2));
+                    if (result.data) {
+                        console.log('caseData.name:', result.data.name);
+                        console.log('caseData.base_url:', result.data.base_url);
+                        console.log('caseData.steps count:', (result.data.steps || []).length);
+                        console.log('caseData.steps sample:', JSON.stringify((result.data.steps || []).slice(0, 2), null, 2));
+                    }
+                    _origLoadCase();
+                })
+                .catch(function(e) {
+                    console.error('API error:', e);
+                    _origLoadCase();
+                });
+        };
+
         loadCase();
     </script>
 </body>
 </html>
-{% endraw %}
