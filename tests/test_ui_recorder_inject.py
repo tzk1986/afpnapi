@@ -9,7 +9,7 @@ class TestGetRecorderJs:
     def test_without_origin(self) -> None:
         code = get_recorder_js()
         assert "'use strict';" in code
-        assert 'var _PROXY_ORIGIN = "' not in code
+        assert 'var _PROXY_ORIGIN = ""' in code
         assert "SelectorEngine" in code
 
     def test_with_origin(self) -> None:
@@ -19,7 +19,7 @@ class TestGetRecorderJs:
 
     def test_with_empty_origin(self) -> None:
         code = get_recorder_js("")
-        assert 'var _PROXY_ORIGIN = "' not in code
+        assert 'var _PROXY_ORIGIN = ""' in code
 
     def test_fetch_interceptor_present(self) -> None:
         code = get_recorder_js("http://example.com")

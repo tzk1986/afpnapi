@@ -95,8 +95,20 @@ class UiProxyService:
         return body, resp.status_code, response_headers
 
     @classmethod
-    def fetch_resource(cls, url: str) -> Tuple[bytes, int, Dict[str, str]]:
-        """获取子资源（CSS/JS/图片），不改写内容。
+    def fetch_resource(
+        cls,
+        url: str,
+        method: str = "GET",
+        req_headers: Optional[Dict[str, str]] = None,
+        req_body: Optional[bytes] = None,
+    ) -> Tuple[bytes, int, Dict[str, str]]:
+        """获取子资源（CSS/JS/图片/API），不改写内容。
+
+        Args:
+            url: 目标 URL
+            method: HTTP 方法（GET/POST/PUT/DELETE 等）
+            req_headers: 原始请求头（转发 Content-Type 等）
+            req_body: 原始请求体
 
         Returns:
             (body_bytes, status_code, headers)
@@ -105,11 +117,19 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
-        headers = {
+        headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "*/*",
         }
-        resp = requests.get(url, headers=headers, timeout=cls.REQUEST_TIMEOUT, allow_redirects=True)
+        if req_headers:
+            for key in ("Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language"):
+                if key in req_headers:
+                    headers[key] = req_headers[key]
+
+        resp = requests.request(
+            method, url, headers=headers, data=req_body,
+            timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+        )
 
         response_headers: Dict[str, str] = {}
         for key in ("Content-Type", "Cache-Control", "ETag"):

@@ -190,7 +190,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
 
 def ui_testing_proxy_resource() -> ResponseReturnValue:
-    """代理子资源（CSS/JS/图片等）。"""
+    """代理子资源（CSS/JS/图片/API 调用），支持所有 HTTP 方法。"""
     target_url = request.args.get("url", "")
     if not target_url:
         return json_error("缺少 url 参数", 400, "UIT_RES_001")
@@ -206,7 +206,12 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
 
     started_at = time.perf_counter()
     try:
-        body, status_code, headers = UiProxyService.fetch_resource(target_url)
+        body, status_code, headers = UiProxyService.fetch_resource(
+            target_url,
+            method=request.method,
+            req_headers=dict(request.headers),
+            req_body=request.get_data(),
+        )
     except Exception as e:
         duration_ms = round((time.perf_counter() - started_at) * 1000)
         logger.error(
@@ -214,6 +219,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
             extra={
                 "event": "ui.proxy.resource_failed",
                 "url": target_url,
+                "method": request.method,
                 "error": str(e),
                 "duration_ms": duration_ms,
             },
@@ -227,6 +233,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
         extra={
             "event": "ui.proxy.resource_success",
             "url": target_url,
+            "method": request.method,
             "status_code": status_code,
             "content_type": content_type,
             "body_size": len(body),
@@ -238,6 +245,8 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     for key, value in headers.items():
         resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
     return resp
 
 

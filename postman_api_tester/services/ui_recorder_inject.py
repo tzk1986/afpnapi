@@ -8,9 +8,8 @@
 def get_recorder_js(origin: str = "") -> str:
     """返回完整的录制器 JavaScript 代码。"""
     code = _RECORDER_JS
-    if origin:
-        origin_decl = '\n  var _PROXY_ORIGIN = "' + origin + '";'
-        code = code.replace("'use strict';", "'use strict';" + origin_decl, 1)
+    origin_decl = '\n  var _PROXY_ORIGIN = "' + origin + '";'
+    code = code.replace("'use strict';", "'use strict';" + origin_decl, 1)
     return code
 
 
@@ -316,18 +315,37 @@ _RECORDER_JS = r"""
     });
   }
 
+  // 判断 URL 是否需要通过代理转发
+  function _shouldProxy(url) {
+    if (typeof url !== 'string' || !url) return false;
+    if (url.indexOf('/ui-testing/') === 0) return false;
+    if (url.indexOf('data:') === 0 || url.indexOf('blob:') === 0) return false;
+    if (_PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) return true;
+    if (url.charAt(0) === '/' && url.charAt(1) !== '/') return true;
+    if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
+      if (_PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) !== 0) return false;
+    }
+    return false;
+  }
+
+  function _toProxyUrl(url) {
+    if (_PROXY_ORIGIN && url.charAt(0) === '/' && url.charAt(1) !== '/') {
+      return '/ui-testing/proxy-resource?url=' + encodeURIComponent(_PROXY_ORIGIN + url);
+    }
+    return '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
+  }
+
   // 拦截 fetch：重定向原始服务器 API 调用 + 录制
   var origFetch = window.fetch;
   window.fetch = function(url, opts) {
-    if (typeof url === 'string' && _PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) {
-      var proxyUrl = '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
-      arguments[0] = proxyUrl;
+    if (_shouldProxy(url)) {
+      arguments[0] = _toProxyUrl(typeof url === 'string' ? url : String(url));
     }
     if (recording && url && typeof url === 'string') {
       sendEvent({
         action: 'api_call',
         selector: null,
-        value: typeof url === 'string' ? url : String(url),
+        value: url,
         element_info: { tag: 'fetch', method: (opts && opts.method) || 'GET' },
         page_url: location.href,
         page_title: document.title
@@ -347,8 +365,8 @@ _RECORDER_JS = r"""
   };
   _OrigXHR.prototype.send = function() {
     var url = this._uiRecorderUrl;
-    if (typeof url === 'string' && _PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) {
-      var proxyUrl = '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
+    if (_shouldProxy(url)) {
+      var proxyUrl = _toProxyUrl(typeof url === 'string' ? url : String(url));
       origOpen.call(this, this._uiRecorderMethod || 'GET', proxyUrl);
     }
     return origSend.apply(this, arguments);

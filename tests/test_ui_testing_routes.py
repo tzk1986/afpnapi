@@ -40,7 +40,7 @@ def app() -> Generator[Flask, None, None]:
     app.add_url_rule("/ui-testing/recorder", "ui_testing_recorder_page", ui_testing_recorder_page)
     app.add_url_rule("/ui-testing/editor/<path:case_id>", "ui_testing_editor_page", ui_testing_editor_page)
     app.add_url_rule("/ui-testing/proxy", "ui_testing_proxy", ui_testing_proxy)
-    app.add_url_rule("/ui-testing/proxy-resource", "ui_testing_proxy_resource", ui_testing_proxy_resource)
+    app.add_url_rule("/ui-testing/proxy-resource", "ui_testing_proxy_resource", ui_testing_proxy_resource, methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
     app.add_url_rule("/api/ui-testing/recording/<path:session_id>/save", "api_ui_testing_recording_save_as_case", api_ui_testing_recording_save_as_case, methods=["POST"])
     app.add_url_rule("/api/ui-testing/cases", "api_ui_testing_cases_list", api_ui_testing_cases_list)
     app.add_url_rule("/api/ui-testing/cases", "api_ui_testing_cases_create", api_ui_testing_cases_create, methods=["POST"])

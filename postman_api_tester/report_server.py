@@ -449,7 +449,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
     return _route_ui_testing_proxy()
 
 
-@app.route("/ui-testing/proxy-resource")
+@app.route("/ui-testing/proxy-resource", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 def ui_testing_proxy_resource() -> ResponseReturnValue:
     return _route_ui_testing_proxy_resource()
 
