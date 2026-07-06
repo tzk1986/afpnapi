@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>用例回放 - Web UI 测试</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; height: 100vh; display: flex; flex-direction: column; }
+
+        .top-bar { background: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+        .top-bar h1 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .top-bar .status-info { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #6b7280; }
+        .top-bar .status-info .step-counter { font-weight: 600; color: #0f172a; }
+        .top-bar .status-info .timer { font-family: monospace; }
+
+        .main-content { flex: 1; display: flex; overflow: hidden; }
+
+        .iframe-panel { flex: 1; position: relative; background: #e5e7eb; }
+        .iframe-panel iframe { width: 100%; height: 100%; border: none; }
+        .iframe-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.9); font-size: 14px; color: #6b7280; }
+
+        .steps-panel { width: 380px; background: #fff; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; flex-shrink: 0; }
+        .steps-header { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: 500; color: #374151; }
+        .steps-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+        .step-item { padding: 8px 16px; display: flex; align-items: flex-start; gap: 8px; font-size: 12px; border-left: 3px solid transparent; transition: all 0.15s; }
+        .step-item.current { background: #eff6ff; border-left-color: #3b82f6; }
+        .step-item.passed { border-left-color: #10b981; }
+        .step-item.failed { border-left-color: #ef4444; background: #fef2f2; }
+        .step-item.skipped { opacity: 0.5; }
+
+        .step-icon { width: 18px; text-align: center; flex-shrink: 0; font-size: 14px; line-height: 18px; }
+        .step-icon.pending { color: #d1d5db; }
+        .step-icon.running { color: #3b82f6; }
+        .step-icon.passed { color: #10b981; }
+        .step-icon.failed { color: #ef4444; }
+
+        .step-content { flex: 1; min-width: 0; }
+        .step-action { font-family: monospace; font-weight: 500; color: #374151; }
+        .step-detail { color: #9ca3af; font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .step-duration { font-family: monospace; color: #9ca3af; font-size: 11px; flex-shrink: 0; }
+        .step-error { color: #ef4444; font-size: 11px; margin-top: 4px; word-break: break-all; }
+
+        .steps-footer { padding: 12px 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; }
+
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-warning { background: #f59e0b; color: #fff; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .summary-bar { padding: 16px; background: #f9fafb; border-top: 1px solid #e5e7eb; }
+        .summary-bar.passed { background: #f0fdf4; }
+        .summary-bar.failed { background: #fef2f2; }
+        .summary-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .summary-stats { display: flex; gap: 16px; font-size: 12px; color: #6b7280; }
+        .summary-stats strong { color: #0f172a; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1>
+            <span id="execIcon">▶</span>
+            <span id="execTitle">正在加载...</span>
+        </h1>
+        <div class="status-info">
+            <span>步骤 <span class="step-counter" id="stepCounter">0/0</span></span>
+            <span class="timer" id="timer">0.0s</span>
+            <a href="javascript:history.back()" style="color:#6b7280;text-decoration:none;font-size:12px;">← 返回</a>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="iframe-panel">
+            <iframe id="replayFrame" sandbox="allow-same-origin allow-scripts allow-modals allow-forms"></iframe>
+            <div class="iframe-loading" id="iframeLoading">正在加载目标页面...</div>
+        </div>
+
+        <div class="steps-panel">
+            <div class="steps-header">步骤记录</div>
+            <div class="steps-list" id="stepsList"></div>
+            <div id="summaryArea"></div>
+            <div class="steps-footer" id="controlsArea">
+                <button class="btn btn-warning" id="btnPause" onclick="pauseReplay()" disabled>暂停</button>
+                <button class="btn btn-danger" id="btnStop" onclick="stopReplay()" disabled>停止</button>
+                <button class="btn btn-secondary" id="btnExport" onclick="exportReport()" style="display:none">导出报告</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var jobId = '{{ job_id }}';
+        var steps = [];
+        var results = [];
+        var currentStepIndex = -1;
+        var isRunning = false;
+        var isPaused = false;
+        var startTime = 0;
+        var timerInterval = null;
+        var iframeReady = false;
+        var replayStarted = false;
+
+        // 加载执行任务数据
+        function loadJobData() {
+            fetch('/api/ui-testing/execution/' + jobId + '/init')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (!result.data) {
+                        document.getElementById('execTitle').textContent = '加载失败';
+                        return;
+                    }
+                    var data = result.data;
+                    steps = data.steps || [];
+                    document.getElementById('execTitle').textContent = data.case_name || '用例回放';
+                    document.title = '回放 - ' + (data.case_name || '');
+                    renderStepsList();
+
+                    // 加载目标页面到 iframe
+                    var baseUrl = data.base_url || '';
+                    if (baseUrl) {
+                        var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(baseUrl);
+                        document.getElementById('replayFrame').src = proxyUrl;
+                    } else {
+                        document.getElementById('iframeLoading').textContent = '用例无 base_url，请导航步骤指定页面';
+                    }
+                })
+                .catch(function(e) {
+                    document.getElementById('execTitle').textContent = '加载失败: ' + e.message;
+                });
+        }
+
+        function renderStepsList() {
+            var html = steps.map(function(step, i) {
+                return '<div class="step-item pending" id="step-' + i + '">' +
+                    '<div class="step-icon pending" id="step-icon-' + i + '">○</div>' +
+                    '<div class="step-content">' +
+                        '<div class="step-action">' + (step.action || '-') + '</div>' +
+                        '<div class="step-detail">' + buildStepDetail(step) + '</div>' +
+                    '</div>' +
+                    '<div class="step-duration" id="step-dur-' + i + '"></div>' +
+                    '</div>';
+            }).join('');
+            document.getElementById('stepsList').innerHTML = html;
+            document.getElementById('stepCounter').textContent = '0/' + steps.length;
+        }
+
+        function buildStepDetail(step) {
+            if (step.action === 'navigate') return truncate(step.value || '', 60);
+            if (step.action === 'wait') return (step.value || '1000') + 'ms';
+            var sel = '';
+            if (step.selector) {
+                if (typeof step.selector === 'string') sel = step.selector;
+                else sel = step.selector.primary || '';
+            }
+            var info = step.element_info || {};
+            var parts = [];
+            if (sel) parts.push(truncate(sel, 30));
+            if (info.text && info.text.length <= 20) parts.push('「' + info.text + '」');
+            if (step.value && step.action === 'type') parts.push('→ ' + truncate(step.value, 20));
+            return parts.join(' ') || '-';
+        }
+
+        // iframe 加载完成
+        document.getElementById('replayFrame').addEventListener('load', function() {
+            document.getElementById('iframeLoading').style.display = 'none';
+            iframeReady = true;
+            injectReplayEngine();
+        });
+
+        function injectReplayEngine() {
+            var frame = document.getElementById('replayFrame');
+            try {
+                var doc = frame.contentDocument || frame.contentWindow.document;
+                var script = doc.createElement('script');
+                script.textContent = getReplayerJs();
+                doc.head.appendChild(script);
+            } catch(e) {
+                console.error('Failed to inject replay engine:', e);
+            }
+        }
+
+        // 监听来自 iframe 的 postMessage
+        window.addEventListener('message', function(e) {
+            if (!e.data || !e.data.type) return;
+            var type = e.data.type;
+            var data = e.data.data || {};
+
+            switch (type) {
+                case 'ui-replay-ready':
+                    // 引擎就绪，自动开始
+                    if (!replayStarted && steps.length > 0) {
+                        replayStarted = true;
+                        startReplay();
+                    }
+                    break;
+                case 'ui-replay-step_start':
+                    onStepStart(data.index, data.total);
+                    break;
+                case 'ui-replay-step_complete':
+                    onStepComplete(data);
+                    break;
+                case 'ui-replay-all_complete':
+                    onAllComplete(data);
+                    break;
+                case 'ui-replay-navigate':
+                    onNavigate(data.url);
+                    break;
+                case 'ui-replay-paused':
+                    isPaused = true;
+                    updateControlButtons();
+                    break;
+                case 'ui-replay-stopped':
+                    isRunning = false;
+                    updateControlButtons();
+                    break;
+            }
+        });
+
+        function startReplay() {
+            isRunning = true;
+            startTime = Date.now();
+            startTimer();
+            updateControlButtons();
+            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 30000 } });
+            setTimeout(function() {
+                sendToFrame({ type: 'ui-replay-control', action: 'start' });
+            }, 100);
+        }
+
+        function pauseReplay() {
+            if (isPaused) {
+                sendToFrame({ type: 'ui-replay-control', action: 'resume' });
+                isPaused = false;
+            } else {
+                sendToFrame({ type: 'ui-replay-control', action: 'pause' });
+                isPaused = true;
+            }
+            updateControlButtons();
+        }
+
+        function stopReplay() {
+            sendToFrame({ type: 'ui-replay-control', action: 'stop' });
+            isRunning = false;
+            stopTimer();
+            updateControlButtons();
+        }
+
+        function sendToFrame(msg) {
+            var frame = document.getElementById('replayFrame');
+            try {
+                if (frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+            } catch(e) { console.error('postMessage failed:', e); }
+        }
+
+        function onStepStart(index, total) {
+            currentStepIndex = index;
+            document.getElementById('stepCounter').textContent = (index + 1) + '/' + total;
+            var el = document.getElementById('step-' + index);
+            if (el) {
+                el.className = 'step-item current';
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            var icon = document.getElementById('step-icon-' + index);
+            if (icon) { icon.className = 'step-icon running'; icon.innerHTML = '<span class="spinner"></span>'; }
+        }
+
+        function onStepComplete(data) {
+            var index = data.index;
+            var el = document.getElementById('step-' + index);
+            if (el) el.className = 'step-item ' + (data.status || 'passed');
+            var icon = document.getElementById('step-icon-' + index);
+            if (icon) {
+                icon.className = 'step-icon ' + (data.status || 'passed');
+                icon.textContent = data.status === 'passed' ? '✓' : '✗';
+            }
+            var dur = document.getElementById('step-dur-' + index);
+            if (dur) dur.textContent = ((data.duration_ms || 0) / 1000).toFixed(1) + 's';
+
+            // 如果步骤失败，显示错误
+            if (data.status !== 'passed' && data.error) {
+                var content = el ? el.querySelector('.step-content') : null;
+                if (content) {
+                    var errDiv = document.createElement('div');
+                    errDiv.className = 'step-error';
+                    errDiv.textContent = data.error;
+                    content.appendChild(errDiv);
+                }
+            }
+
+            // 上报步骤结果到后端
+            fetch('/api/ui-testing/execution/' + jobId + '/step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step_result: data })
+            }).catch(function() {});
+        }
+
+        function onAllComplete(data) {
+            isRunning = false;
+            stopTimer();
+            document.getElementById('execIcon').textContent = data.status === 'passed' ? '✓' : '✗';
+
+            // 标记未执行的步骤为 skipped
+            for (var i = currentStepIndex + 1; i < steps.length; i++) {
+                var el = document.getElementById('step-' + i);
+                if (el) el.className = 'step-item skipped';
+            }
+
+            // 上报完成到后端
+            fetch('/api/ui-testing/execution/' + jobId + '/finalize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: data.status,
+                    summary: {
+                        total_duration_ms: data.duration_ms,
+                        steps_total: data.total_steps,
+                        steps_passed: data.passed,
+                        steps_failed: data.failed
+                    }
+                })
+            }).catch(function() {});
+
+            // 显示汇总
+            var summaryHtml = '<div class="summary-bar ' + data.status + '">' +
+                '<div class="summary-title">' + (data.status === 'passed' ? '全部通过' : '执行失败') + '</div>' +
+                '<div class="summary-stats">' +
+                    '<span>总步骤: <strong>' + data.total_steps + '</strong></span>' +
+                    '<span>通过: <strong style="color:#10b981">' + data.passed + '</strong></span>' +
+                    '<span>失败: <strong style="color:#ef4444">' + data.failed + '</strong></span>' +
+                    '<span>耗时: <strong>' + (data.duration_ms / 1000).toFixed(1) + 's</strong></span>' +
+                '</div>' +
+                '</div>';
+            document.getElementById('summaryArea').innerHTML = summaryHtml;
+            document.getElementById('btnExport').style.display = 'inline-block';
+            updateControlButtons();
+        }
+
+        function onNavigate(url) {
+            if (!url) return;
+            document.getElementById('iframeLoading').style.display = 'flex';
+            document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
+            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url);
+            document.getElementById('replayFrame').src = proxyUrl;
+            // 导航后需要重新注入回放引擎（iframe onload 会触发）
+            replayStarted = false;
+        }
+
+        function updateControlButtons() {
+            document.getElementById('btnPause').disabled = !isRunning;
+            document.getElementById('btnPause').textContent = isPaused ? '继续' : '暂停';
+            document.getElementById('btnStop').disabled = !isRunning;
+        }
+
+        function exportReport() {
+            window.open('/api/ui-testing/execution/' + jobId + '/report', '_blank');
+        }
+
+        // 计时器
+        function startTimer() {
+            timerInterval = setInterval(function() {
+                var elapsed = (Date.now() - startTime) / 1000;
+                document.getElementById('timer').textContent = elapsed.toFixed(1) + 's';
+            }, 100);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function truncate(str, max) {
+            if (!str) return '';
+            return str.length > max ? str.substring(0, max) + '...' : str;
+        }
+
+        // 回放引擎 JS（内联，由服务端注入的简化版 — 此处仅做 fallback）
+        function getReplayerJs() {
+            // 实际引擎由后端 api_ui_testing_execution_init 返回后通过 script 注入
+            // 这里返回空，真正的引擎通过 API 获取
+            return '';
+        }
+
+        // 改为通过 API 获取回放引擎 JS 并注入
+        function injectReplayEngine() {
+            fetch('/api/ui-testing/replay-engine-js')
+                .then(function(r) { return r.text(); })
+                .then(function(js) {
+                    var frame = document.getElementById('replayFrame');
+                    try {
+                        var doc = frame.contentDocument || frame.contentWindow.document;
+                        var script = doc.createElement('script');
+                        script.textContent = js;
+                        doc.head.appendChild(script);
+                    } catch(e) {
+                        console.error('Failed to inject replay engine:', e);
+                    }
+                })
+                .catch(function(e) {
+                    console.error('Failed to fetch replay engine JS:', e);
+                });
+        }
+
+        // 启动
+        loadJobData();
+    </script>
+</body>
+</html>

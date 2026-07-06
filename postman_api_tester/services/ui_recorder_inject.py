@@ -2,6 +2,7 @@
 
 生成内联注入到代理页面的 JavaScript 代码，
 负责事件捕获、选择器生成和与父页面的 postMessage 通信。
+同时提供回放引擎 JS 生成（get_replayer_js）。
 """
 
 
@@ -398,5 +399,374 @@ _RECORDER_JS = r"""
   // 通知父页面录制器已就绪
   window.parent.postMessage({ type: 'ui-recorder-ready' }, '*');
   console.log('[UIRecorder] Injected and ready');
+})();
+"""
+
+
+def get_replayer_js(origin: str = "") -> str:
+    """返回完整的回放引擎 JavaScript 代码。"""
+    code = _REPLAYER_JS
+    origin_decl = '\n  var _REPLAY_ORIGIN = "' + origin + '";'
+    code = code.replace("'use strict';", "'use strict';" + origin_decl, 1)
+    return code
+
+
+_REPLAYER_JS = r"""
+(function() {
+  'use strict';
+
+  // ====== 选择器引擎（回放模式，仅查找）======
+  var SelectorEngine = {
+    find: function(selectorStr, selectorObj) {
+      if (!selectorStr && !selectorObj) return null;
+      var primary = '';
+      var fallbackCss = '';
+      var fallbackXpath = '';
+      if (typeof selectorStr === 'string') {
+        primary = selectorStr;
+      } else if (selectorObj) {
+        primary = selectorObj.primary || '';
+        fallbackCss = selectorObj.fallback_css || '';
+        fallbackXpath = selectorObj.fallback_xpath || '';
+      }
+      var el = SelectorEngine._tryFind(primary);
+      if (el) return { element: el, strategy: 'primary' };
+      if (fallbackCss) {
+        el = SelectorEngine._tryFind(fallbackCss);
+        if (el) return { element: el, strategy: 'fallback_css' };
+      }
+      if (fallbackXpath) {
+        el = SelectorEngine._tryXpath(fallbackXpath);
+        if (el) return { element: el, strategy: 'fallback_xpath' };
+      }
+      return null;
+    },
+    _tryFind: function(selector) {
+      if (!selector) return null;
+      try {
+        if (selector.indexOf('//') === 0) return SelectorEngine._tryXpath(selector);
+        if (selector.indexOf('text=') === 0) {
+          var text = selector.substring(5).replace(/^["']|["']$/g, '');
+          var all = document.querySelectorAll('*');
+          for (var i = 0; i < all.length; i++) {
+            if (all[i].children.length === 0 && (all[i].textContent || '').trim() === text) return all[i];
+          }
+          return null;
+        }
+        return document.querySelector(selector);
+      } catch(e) { return null; }
+    },
+    _tryXpath: function(xpath) {
+      if (!xpath) return null;
+      try {
+        var result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        return result.singleNodeValue || null;
+      } catch(e) { return null; }
+    }
+  };
+
+  // ====== 回放引擎 ======
+  var ReplayEngine = {
+    steps: [],
+    options: {},
+    currentIndex: -1,
+    running: false,
+    paused: false,
+    stopped: false,
+    startTime: 0,
+    results: [],
+
+    init: function(steps, options) {
+      this.steps = steps || [];
+      this.options = options || {};
+      this.currentIndex = -1;
+      this.running = false;
+      this.paused = false;
+      this.stopped = false;
+      this.results = [];
+      this._notifyParent('ready', { step_count: this.steps.length });
+    },
+
+    start: function() {
+      if (this.running) return;
+      this.running = true;
+      this.paused = false;
+      this.stopped = false;
+      this.startTime = Date.now();
+      this._executeNext();
+    },
+
+    pause: function() {
+      this.paused = true;
+      this._notifyParent('paused', { index: this.currentIndex });
+    },
+
+    resume: function() {
+      if (!this.paused) return;
+      this.paused = false;
+      this._executeNext();
+    },
+
+    stop: function() {
+      this.stopped = true;
+      this.running = false;
+      this._notifyParent('stopped', {
+        index: this.currentIndex,
+        results: this.results
+      });
+    },
+
+    _executeNext: function() {
+      var self = this;
+      if (this.stopped || !this.running) return;
+      if (this.paused) return;
+
+      this.currentIndex++;
+      if (this.currentIndex >= this.steps.length) {
+        this._finishAll();
+        return;
+      }
+
+      var step = this.steps[this.currentIndex];
+      var stepStart = Date.now();
+
+      this._notifyParent('step_start', {
+        index: this.currentIndex,
+        action: step.action,
+        total: this.steps.length
+      });
+
+      var delay = this.options.delay_between_steps || 500;
+      if (this.currentIndex === 0) delay = 0;
+
+      setTimeout(function() {
+        self._executeStep(step, self.currentIndex, stepStart);
+      }, delay);
+    },
+
+    _executeStep: function(step, index, stepStart) {
+      var self = this;
+      var timeout = this.options.timeout || 30000;
+      var action = step.action || '';
+      var result = {
+        index: index,
+        action: action,
+        selector: step.selector || null,
+        value: step.value || '',
+        status: 'passed',
+        duration_ms: 0,
+        timestamp: new Date().toISOString(),
+        current_url: location.href,
+        error: ''
+      };
+
+      // navigate 和 wait 不需要查找元素
+      if (action === 'navigate') {
+        result.duration_ms = Date.now() - stepStart;
+        self.results.push(result);
+        self._notifyParent('step_complete', result);
+        self._notifyParent('navigate', { url: step.value || '' });
+        return;
+      }
+
+      if (action === 'wait') {
+        var ms = parseInt(step.value, 10) || 1000;
+        setTimeout(function() {
+          result.duration_ms = Date.now() - stepStart;
+          self.results.push(result);
+          self._notifyParent('step_complete', result);
+          self._executeNext();
+        }, ms);
+        return;
+      }
+
+      // assert_url / assert_title 不需要元素
+      if (action === 'assert_url') {
+        var match = location.href === step.value || location.href.indexOf(step.value) >= 0;
+        result.status = match ? 'passed' : 'failed';
+        if (!match) result.error = 'URL 不匹配: 期望包含 "' + step.value + '", 实际 "' + location.href + '"';
+        result.duration_ms = Date.now() - stepStart;
+        self.results.push(result);
+        self._notifyParent('step_complete', result);
+        self._executeNext();
+        return;
+      }
+
+      if (action === 'assert_title') {
+        var titleMatch = (document.title || '').indexOf(step.value || '') >= 0;
+        result.status = titleMatch ? 'passed' : 'failed';
+        if (!titleMatch) result.error = '标题不匹配: 期望包含 "' + step.value + '", 实际 "' + document.title + '"';
+        result.duration_ms = Date.now() - stepStart;
+        self.results.push(result);
+        self._notifyParent('step_complete', result);
+        self._executeNext();
+        return;
+      }
+
+      // 需要查找元素的 action
+      self._waitForElement(step, timeout, function(el) {
+        if (!el) {
+          result.status = 'failed';
+          result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '');
+          result.duration_ms = Date.now() - stepStart;
+          self.results.push(result);
+          self._notifyParent('step_complete', result);
+          self._executeNext();
+          return;
+        }
+
+        self._highlightElement(el);
+
+        try {
+          var actionResult = self._executeAction(action, el, step.value);
+          if (actionResult === false) {
+            result.status = 'failed';
+            result.error = '断言失败';
+          }
+        } catch(e) {
+          result.status = 'error';
+          result.error = e.message || String(e);
+        }
+
+        result.duration_ms = Date.now() - stepStart;
+        self.results.push(result);
+        self._notifyParent('step_complete', result);
+        self._executeNext();
+      });
+    },
+
+    _executeAction: function(action, el, value) {
+      switch (action) {
+        case 'click':
+          el.click();
+          return true;
+        case 'dblclick':
+          el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+          return true;
+        case 'type':
+          el.focus();
+          el.value = '';
+          el.dispatchEvent(new Event('focus', { bubbles: true }));
+          el.value = value || '';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        case 'select':
+          el.value = value || '';
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        case 'check':
+          el.checked = true;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        case 'uncheck':
+          el.checked = false;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          return true;
+        case 'submit':
+          var form = el.tagName === 'FORM' ? el : el.closest('form');
+          if (form) form.submit();
+          return true;
+        case 'keypress':
+          el.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true }));
+          el.dispatchEvent(new KeyboardEvent('keyup', { key: value, bubbles: true }));
+          return true;
+        case 'wait_for':
+          return el ? true : false;
+        case 'assert_visible':
+          return el && el.offsetParent !== null;
+        case 'assert_text':
+          var text = (el.textContent || '').trim();
+          return text.indexOf(value || '') >= 0;
+        default:
+          return true;
+      }
+    },
+
+    _waitForElement: function(step, timeout, callback) {
+      var selector = step.selector;
+      var start = Date.now();
+      var interval = 200;
+
+      function check() {
+        var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
+        if (found && found.element) {
+          callback(found.element);
+          return;
+        }
+        if (Date.now() - start >= timeout) {
+          callback(null);
+          return;
+        }
+        setTimeout(check, interval);
+      }
+      check();
+    },
+
+    _highlightElement: function(el) {
+      if (!el || !el.style) return;
+      var origOutline = el.style.outline;
+      var origTransition = el.style.transition;
+      el.style.transition = 'outline 0.15s';
+      el.style.outline = '3px solid #3b82f6';
+      setTimeout(function() {
+        el.style.outline = '3px solid #ef4444';
+        setTimeout(function() {
+          el.style.outline = origOutline;
+          el.style.transition = origTransition;
+        }, 300);
+      }, 300);
+    },
+
+    _finishAll: function() {
+      this.running = false;
+      var passed = 0, failed = 0;
+      for (var i = 0; i < this.results.length; i++) {
+        if (this.results[i].status === 'passed') passed++;
+        else failed++;
+      }
+      var duration = Date.now() - this.startTime;
+      this._notifyParent('all_complete', {
+        status: failed > 0 ? 'failed' : 'passed',
+        total_steps: this.steps.length,
+        passed: passed,
+        failed: failed,
+        duration_ms: duration,
+        results: this.results
+      });
+    },
+
+    _notifyParent: function(eventType, data) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'ui-replay-' + eventType,
+          data: data || {}
+        }, '*');
+      }
+    }
+  };
+
+  // 监听来自父页面的控制消息
+  window.addEventListener('message', function(e) {
+    if (!e.data || !e.data.type) return;
+    if (e.data.type !== 'ui-replay-control') return;
+
+    var action = e.data.action;
+    if (action === 'init') {
+      ReplayEngine.init(e.data.steps || [], e.data.options || {});
+    } else if (action === 'start') {
+      ReplayEngine.start();
+    } else if (action === 'pause') {
+      ReplayEngine.pause();
+    } else if (action === 'resume') {
+      ReplayEngine.resume();
+    } else if (action === 'stop') {
+      ReplayEngine.stop();
+    }
+  });
+
+  // 通知父页面回放引擎已就绪
+  window.parent.postMessage({ type: 'ui-replay-ready' }, '*');
+  console.log('[ReplayEngine] Injected and ready');
 })();
 """

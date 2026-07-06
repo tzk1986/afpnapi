@@ -378,3 +378,22 @@ ENABLE_VARIABLE_FUNCTIONS = _env_bool("ENABLE_VARIABLE_FUNCTIONS", "true")
 GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
 GLOBAL_VARIABLES_MAX_COUNT = _env_int("GLOBAL_VARIABLES_MAX_COUNT", 1000, lo=1, hi=100000)
 ENABLE_PRE_REQUEST_SCRIPT = _env_bool("ENABLE_PRE_REQUEST_SCRIPT", "false")
+
+# ==============================================================
+# UI 测试执行配置
+# ==============================================================
+
+# UI_EXECUTION_RESULTS_DIR: 执行结果存储目录（默认 ui_testing_cases）
+UI_EXECUTION_RESULTS_DIR = str(os.environ.get("UI_EXECUTION_RESULTS_DIR", "")).strip()
+
+# UI_EXECUTION_DEFAULT_DELAY_MS: 步骤间默认间隔（毫秒）
+UI_EXECUTION_DEFAULT_DELAY_MS = _env_int("UI_EXECUTION_DEFAULT_DELAY_MS", 500, lo=100, hi=10000)
+
+# UI_EXECUTION_DEFAULT_TIMEOUT_MS: 单步默认超时（毫秒）
+UI_EXECUTION_DEFAULT_TIMEOUT_MS = _env_int("UI_EXECUTION_DEFAULT_TIMEOUT_MS", 30000, lo=1000, hi=300000)
+
+# UI_EXECUTION_MAX_CONCURRENT: 同时执行的最大任务数（防止资源耗尽）
+UI_EXECUTION_MAX_CONCURRENT = _env_int("UI_EXECUTION_MAX_CONCURRENT", 5, lo=1, hi=50)
+
+# UI_EXECUTION_RETENTION_DAYS: 执行结果保留天数（过期自动清理）
+UI_EXECUTION_RETENTION_DAYS = _env_int("UI_EXECUTION_RETENTION_DAYS", 30, lo=1, hi=365)

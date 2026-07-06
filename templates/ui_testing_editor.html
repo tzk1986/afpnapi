@@ -69,6 +69,7 @@
             <div class="header-links">
                 <span class="save-status" id="saveStatus"></span>
                 <button class="btn btn-success" onclick="saveCase()">保存</button>
+                <button class="btn btn-primary" onclick="executeCase()">▶ 执行</button>
                 <a href="/ui-testing">← 返回列表</a>
             </div>
         </div>
@@ -291,6 +292,36 @@
             .catch(function(e) {
                 document.getElementById('saveStatus').textContent = '保存失败';
                 document.getElementById('saveStatus').className = 'save-status error';
+            });
+        }
+
+        function executeCase() {
+            if (!caseData || !steps.length) {
+                alert('用例无步骤，无法执行');
+                return;
+            }
+            var btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '创建中...';
+            fetch('/api/ui-testing/execute/' + caseId, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'browser_replay', options: {} })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.data && result.data.replay_url) {
+                    window.location.href = result.data.replay_url;
+                } else {
+                    alert('创建执行任务失败: ' + (result.message || '未知错误'));
+                    btn.disabled = false;
+                    btn.textContent = '▶ 执行';
+                }
+            })
+            .catch(function(e) {
+                alert('创建执行任务失败: ' + e.message);
+                btn.disabled = false;
+                btn.textContent = '▶ 执行';
             });
         }
 

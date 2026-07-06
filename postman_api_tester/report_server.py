@@ -108,6 +108,18 @@ from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
     ui_testing_recorder_page as _route_ui_testing_recorder_page,
 )
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execute as _route_api_ui_testing_execute,
+    api_ui_testing_execution_cancel as _route_api_ui_testing_execution_cancel,
+    api_ui_testing_execution_finalize as _route_api_ui_testing_execution_finalize,
+    api_ui_testing_execution_init as _route_api_ui_testing_execution_init,
+    api_ui_testing_execution_report as _route_api_ui_testing_execution_report,
+    api_ui_testing_execution_status as _route_api_ui_testing_execution_status,
+    api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
+    api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
+    api_ui_testing_replay_engine_js as _route_api_ui_testing_replay_engine_js,
+    ui_testing_replay_page as _route_ui_testing_replay_page,
+)
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
 from postman_api_tester.report_repository import configure_report_repository
@@ -508,6 +520,59 @@ def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:
 @app.route("/api/ui-testing/recording/<path:session_id>/save", methods=["POST"])
 def api_ui_testing_recording_save_as_case() -> ResponseReturnValue:
     return _route_api_ui_testing_recording_save_as_case()
+
+
+# ── UI 测试执行 ──
+
+
+@app.route("/api/ui-testing/execute/<path:case_id>", methods=["POST"])
+def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execute(case_id)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/status")
+def api_ui_testing_execution_status(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_status(job_id)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/report")
+def api_ui_testing_execution_report(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_report(job_id)
+
+
+@app.route("/api/ui-testing/executions")
+def api_ui_testing_executions_list() -> ResponseReturnValue:
+    return _route_api_ui_testing_executions_list()
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/cancel", methods=["POST"])
+def api_ui_testing_execution_cancel(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_cancel(job_id)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/step", methods=["POST"])
+def api_ui_testing_execution_step_report(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_step_report(job_id)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/finalize", methods=["POST"])
+def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_finalize(job_id)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/init")
+def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_init(job_id)
+
+
+@app.route("/api/ui-testing/replay-engine-js")
+def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
+    return _route_api_ui_testing_replay_engine_js()
+
+
+@app.route("/ui-testing/replay/<path:job_id>")
+def ui_testing_replay_page(job_id: str) -> ResponseReturnValue:
+    return _route_ui_testing_replay_page(job_id)
 
 
 @app.route("/favicon.ico")
