@@ -442,10 +442,12 @@ _REPLAYER_JS = r"""
       return null;
     },
     _tryFind: function(selector) {
+      console.log('[ReplayEngine] _tryFind called with:', typeof selector, JSON.stringify(selector).substring(0, 80));
       if (!selector) return null;
       try {
-        // XPath patterns: //... (relative) or /... (absolute)
-        if (selector.indexOf('/') === 0) return SelectorEngine._tryXpath(selector);
+        var startsWithSlash = selector.indexOf('/') === 0;
+        console.log('[ReplayEngine] _tryFind startsWithSlash:', startsWithSlash, 'selector:', selector.substring(0, 20));
+        if (startsWithSlash) return SelectorEngine._tryXpath(selector);
         if (selector.indexOf('text=') === 0) {
           var text = selector.substring(5).replace(/^["']|["']$/g, '');
           var all = document.querySelectorAll('*');
@@ -454,8 +456,12 @@ _REPLAYER_JS = r"""
           }
           return null;
         }
+        console.log('[ReplayEngine] _tryFind falling back to querySelector');
         return document.querySelector(selector);
-      } catch(e) { return null; }
+      } catch(e) {
+        console.error('[ReplayEngine] _tryFind ERROR:', e.message);
+        return null;
+      }
     },
     _tryXpath: function(xpath) {
       if (!xpath) return null;
