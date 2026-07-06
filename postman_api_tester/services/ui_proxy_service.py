@@ -154,6 +154,7 @@ class UiProxyService:
 
         result = html
 
+        result = UiProxyService._inject_early_script(result, origin)
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
@@ -310,6 +311,55 @@ class UiProxyService:
         ]
         for pattern in patterns:
             html = re.sub(pattern, '/* frame-busting removed */', html, flags=re.IGNORECASE)
+        return html
+
+    @staticmethod
+    def _inject_early_script(html: str, origin: str) -> str:
+        """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。"""
+        early_js = (
+            '(function(){'
+            'var _T="' + origin + '";'
+            'var _F=location.protocol+"//"+location.host;'
+            'if(!_T||_T===_F)return;'
+            'var _dw=document.write.bind(document);'
+            'document.write=function(h){'
+            'if(typeof h==="string"){'
+            'h=h.split(_F).join(_T);'
+            '}'
+            'return _dw(h);'
+            '};'
+            'var _ce=document.createElement.bind(document);'
+            'document.createElement=function(t){'
+            'var el=_ce(t);'
+            'if(t&&t.toLowerCase()==="script"){'
+            'var _s=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,"src");'
+            'if(_s&&_s.set){'
+            'var _ss=_s.set;'
+            'Object.defineProperty(el,"src",{'
+            'set:function(v){'
+            'if(typeof v==="string"&&v.indexOf(_F)===0)v=_T+v.substring(_F.length);'
+            '_ss.call(this,v);'
+            '},'
+            'get:function(){return _s.get.call(this);}'
+            '});'
+            '}'
+            '}'
+            'return el;'
+            '};'
+            '})();'
+        )
+        early_script = f"<script>{early_js}</script>"
+
+        lower = html.lower()
+        if "<head>" in lower:
+            idx = lower.index("<head>") + len("<head>")
+            html = html[:idx] + early_script + html[idx:]
+        elif "<html>" in lower:
+            idx = lower.index("<html>") + len("<html>")
+            html = html[:idx] + early_script + html[idx:]
+        else:
+            html = early_script + html
+
         return html
 
     @staticmethod

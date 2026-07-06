@@ -98,6 +98,20 @@ class TestRewriteHtml:
         assert "<script>" in result
         assert "UIRecorder" in result or "SelectorEngine" in result
 
+    def test_inject_early_script(self) -> None:
+        html = "<html><head><title>Test</title></head><body></body></html>"
+        result = UiProxyService.rewrite_html(html, "http://10.50.11.120:9001")
+        assert '_T="http://10.50.11.120:9001"' in result
+        assert "document.write=function" in result
+        assert "document.createElement=function" in result
+
+    def test_early_script_intercepts_document_write(self) -> None:
+        html = '<html><head><script>document.write("<scr"+"ipt>")</script></head><body></body></html>'
+        result = UiProxyService.rewrite_html(html, "http://10.50.11.120:9001")
+        early_script_pos = result.index('_T="http://10.50.11.120:9001"')
+        doc_write_pos = result.index("document.write")
+        assert early_script_pos < doc_write_pos
+
     def test_remove_base_tag(self) -> None:
         html = '<base href="/"><a href="/page">Link</a>'
         result = UiProxyService.rewrite_html(html, "https://example.com")
