@@ -444,7 +444,8 @@ _REPLAYER_JS = r"""
     _tryFind: function(selector) {
       if (!selector) return null;
       try {
-        if (selector.indexOf('//') === 0) return SelectorEngine._tryXpath(selector);
+        // XPath patterns: //... (relative) or /... (absolute)
+        if (selector.indexOf('/') === 0) return SelectorEngine._tryXpath(selector);
         if (selector.indexOf('text=') === 0) {
           var text = selector.substring(5).replace(/^["']|["']$/g, '');
           var all = document.querySelectorAll('*');
