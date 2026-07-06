@@ -5,6 +5,7 @@
 
 import logging
 import time
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from flask import make_response, render_template, request
@@ -14,26 +15,53 @@ from postman_api_tester.config import (
     UI_EXECUTION_DEFAULT_DELAY_MS,
     UI_EXECUTION_DEFAULT_TIMEOUT_MS,
     UI_EXECUTION_MAX_CONCURRENT,
+    UI_HEADLESS_BROWSER,
 )
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
+from postman_api_tester.services.ui_execution_manager import UiExecutionManager
 from postman_api_tester.services.ui_execution_store import UiExecutionStore
+from postman_api_tester.services.ui_headless_engine import is_playwright_available
 from postman_api_tester.services.ui_recorder_inject import get_replayer_js
+from postman_api_tester.services.ui_settings_store import UiSettingsStore
 
 logger = logging.getLogger(__name__)
 
 _case_store = UiCaseStore()
 _execution_store = UiExecutionStore()
+_execution_manager = UiExecutionManager(_execution_store)
+_settings_store = UiSettingsStore()
 
-# 当前活跃任务计数（简易并发控制）
+# 当前活跃任务计数（浏览器回放模式，简易并发控制）
 _active_jobs: Dict[str, Dict[str, Any]] = {}
 
 
 def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
-    """创建执行任务，返回 job_id 和 replay_url。"""
+    """创建执行任务，返回 job_id。
+
+    mode=browser_replay: 返回 replay_url（前端 iframe 回放）
+    mode=headless: 启动后台线程执行，返回 status_url
+    """
     payload = request.get_json(silent=True) or {}
-    mode = payload.get("mode", "browser_replay")
+    settings = _settings_store.get_settings()
+    mode = payload.get("mode", settings.get("default_mode", "browser_replay"))
     options = payload.get("options", {})
+
+    br_settings = settings.get("browser_replay", {})
+    if not options.get("delay_between_steps"):
+        options["delay_between_steps"] = br_settings.get(
+            "delay_between_steps", UI_EXECUTION_DEFAULT_DELAY_MS
+        )
+    if not options.get("timeout"):
+        options["timeout"] = br_settings.get(
+            "timeout_ms", UI_EXECUTION_DEFAULT_TIMEOUT_MS
+        )
+
+    if mode == "headless":
+        if not is_playwright_available():
+            return json_error("Playwright 未安装，请运行: pip install playwright && playwright install chromium", 400, "UIT_EXEC_010")
+        if not _execution_manager.can_start():
+            return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
 
     if len(_active_jobs) >= UI_EXECUTION_MAX_CONCURRENT:
         logger.warning(
@@ -53,10 +81,35 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     case_name = case_data.get("name", "")
     job_id = _execution_store.create_job(case_id, mode, case_name)
 
-    if not options.get("delay_between_steps"):
-        options["delay_between_steps"] = UI_EXECUTION_DEFAULT_DELAY_MS
-    if not options.get("timeout"):
-        options["timeout"] = UI_EXECUTION_DEFAULT_TIMEOUT_MS
+    logger.info(
+        "ui_execution_created",
+        extra={
+            "event": "ui.execution.created",
+            "job_id": job_id,
+            "case_id": case_id,
+            "mode": mode,
+        },
+    )
+
+    if mode == "headless":
+        hl_settings = settings.get("headless", {})
+        options["headless_browser"] = hl_settings.get("browser_type", UI_HEADLESS_BROWSER)
+        options["viewport_width"] = hl_settings.get("viewport_width", 1280)
+        options["viewport_height"] = hl_settings.get("viewport_height", 720)
+        options["take_screenshots"] = hl_settings.get("take_screenshots", True)
+        _execution_manager.start_headless(job_id, case_data, options, on_complete=_send_webhook)
+        return BaseHandler.json_response(
+            {
+                "job_id": job_id,
+                "case_id": case_id,
+                "mode": mode,
+                "status": "running",
+                "status_url": f"/api/ui-testing/execution/{job_id}/status",
+                "report_url": f"/ui-testing/execution/{job_id}/report",
+            },
+            201,
+            "Created",
+        )
 
     _active_jobs[job_id] = {
         "case_id": case_id,
@@ -67,16 +120,6 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     }
 
     replay_url = f"/ui-testing/replay/{job_id}"
-
-    logger.info(
-        "ui_execution_created",
-        extra={
-            "event": "ui.execution.created",
-            "job_id": job_id,
-            "case_id": case_id,
-            "mode": mode,
-        },
-    )
 
     return BaseHandler.json_response(
         {
@@ -124,13 +167,18 @@ def api_ui_testing_execution_cancel(job_id: str) -> ResponseReturnValue:
     if result.get("status") in ("passed", "failed", "cancelled"):
         return json_error(f"任务已结束: {result['status']}", 400, "UIT_EXEC_005")
 
+    mode = result.get("mode", "browser_replay")
+    if mode == "headless":
+        _execution_manager.cancel(job_id)
+    else:
+        _active_jobs.pop(job_id, None)
+
     summary = {
         "steps_total": len(result.get("steps", [])),
         "steps_passed": result.get("steps_passed", 0),
         "steps_failed": result.get("steps_failed", 0),
     }
     _execution_store.finalize_job(job_id, "cancelled", summary)
-    _active_jobs.pop(job_id, None)
 
     logger.info(
         "ui_execution_cancelled",
@@ -161,6 +209,11 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
     _execution_store.finalize_job(job_id, status, summary)
     _active_jobs.pop(job_id, None)
+
+    result = _execution_store.get_result(job_id)
+    if result:
+        _send_webhook(result)
+
     return BaseHandler.json_response({"ok": True})
 
 
@@ -200,6 +253,81 @@ def ui_testing_replay_page(job_id: str) -> ResponseReturnValue:
     return resp
 
 
+def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
+    """渲染 HTML 执行报告页面。"""
+    result = _execution_store.get_result(job_id)
+    if not result:
+        return render_template(
+            "ui_testing_report.html",
+            job_id=job_id,
+            case_name="执行任务不存在",
+            case_id="",
+            status="cancelled",
+            status_label="不存在",
+            mode_label="",
+            started_at="",
+            ended_at="",
+            steps_total=0,
+            steps_passed=0,
+            steps_failed=0,
+            duration_s="0",
+            steps=[],
+            generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+    status = result.get("status", "running")
+    status_labels = {"passed": "通过", "failed": "失败", "running": "执行中", "cancelled": "已取消", "ready": "就绪"}
+    mode_labels = {"browser_replay": "浏览器回放", "headless": "无头浏览器"}
+
+    raw_steps = result.get("steps", [])
+    steps = []
+    for i, s in enumerate(raw_steps):
+        selector = s.get("selector", "")
+        if isinstance(selector, dict):
+            selector_display = selector.get("primary", "") or selector.get("fallback_css", "") or selector.get("fallback_xpath", "")
+        else:
+            selector_display = str(selector) if selector else ""
+
+        value = s.get("value", "")
+        value_display = str(value)[:60] if value else ""
+
+        step_status = s.get("status", "skipped")
+        step_status_labels = {"passed": "通过", "failed": "失败", "skipped": "跳过", "error": "错误"}
+
+        duration_ms = s.get("duration_ms", 0)
+        steps.append({
+            "status": step_status,
+            "action": s.get("action", "unknown"),
+            "selector_display": selector_display,
+            "value_display": value_display,
+            "status_label": step_status_labels.get(step_status, step_status),
+            "duration_s": f"{duration_ms / 1000:.2f}",
+            "error": s.get("error", ""),
+        })
+
+    total_duration_ms = result.get("total_duration_ms", 0)
+
+    resp = make_response(render_template(
+        "ui_testing_report.html",
+        job_id=job_id,
+        case_name=result.get("case_name", ""),
+        case_id=result.get("case_id", ""),
+        status=status,
+        status_label=status_labels.get(status, status),
+        mode_label=mode_labels.get(result.get("mode", ""), result.get("mode", "")),
+        started_at=result.get("started_at", ""),
+        ended_at=result.get("ended_at", "") or "",
+        steps_total=result.get("steps_total", len(raw_steps)),
+        steps_passed=result.get("steps_passed", 0),
+        steps_failed=result.get("steps_failed", 0),
+        duration_s=f"{total_duration_ms / 1000:.2f}",
+        steps=steps,
+        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    ))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
 def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
     """返回回放引擎 JavaScript 代码。"""
     origin = request.host_url.rstrip("/")
@@ -208,3 +336,111 @@ def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
     resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
     resp.headers["Cache-Control"] = "no-cache"
     return resp
+
+
+# ---- Phase 3: 设置管理 ----
+
+
+def api_ui_testing_settings_get() -> ResponseReturnValue:
+    """获取当前 UI 测试设置。"""
+    return BaseHandler.json_response(_settings_store.get_settings())
+
+
+def api_ui_testing_settings_update() -> ResponseReturnValue:
+    """更新 UI 测试设置。"""
+    payload = request.get_json(silent=True)
+    if not payload:
+        return json_error("无效的 JSON 数据", 400, "UIT_SETTINGS_001")
+    updated = _settings_store.update_settings(payload)
+    logger.info(
+        "ui_settings_updated",
+        extra={
+            "event": "ui.settings.updated",
+            "changed_keys": list(payload.keys()),
+        },
+    )
+    return BaseHandler.json_response(updated)
+
+
+def api_ui_testing_settings_reset() -> ResponseReturnValue:
+    """恢复默认设置。"""
+    settings = _settings_store.reset_settings()
+    logger.info("ui_settings_reset", extra={"event": "ui.settings.reset"})
+    return BaseHandler.json_response(settings)
+
+
+def api_ui_testing_cleanup() -> ResponseReturnValue:
+    """清理过期执行记录。"""
+    settings = _settings_store.get_settings()
+    retention_days = settings.get("retention_days", 30)
+    deleted = _execution_store.cleanup_expired(retention_days)
+    return BaseHandler.json_response({"deleted": deleted, "retention_days": retention_days})
+
+
+def ui_testing_settings_page() -> ResponseReturnValue:
+    """设置页面渲染。"""
+    resp = make_response(render_template("ui_testing_settings.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+def api_ui_testing_playwright_status() -> ResponseReturnValue:
+    """检查 Playwright 安装状态。"""
+    return BaseHandler.json_response({
+        "available": is_playwright_available(),
+        "hint": "已安装" if is_playwright_available() else "未安装，请运行: pip install playwright && playwright install chromium",
+    })
+
+
+def _send_webhook(result: Dict[str, Any]) -> None:
+    """执行完成后发送 Webhook 通知。"""
+    import requests as req
+
+    settings = _settings_store.get_settings()
+    webhook_url = settings.get("webhook_url", "").strip()
+    if not webhook_url:
+        return
+
+    status = result.get("status", "")
+    on_complete = settings.get("webhook_on_complete", True)
+    on_failure = settings.get("webhook_on_failure", True)
+
+    if status == "failed" and not on_failure:
+        return
+    if status != "failed" and not on_complete:
+        return
+
+    payload = {
+        "event": "ui.execution.completed",
+        "job_id": result.get("job_id", ""),
+        "case_id": result.get("case_id", ""),
+        "case_name": result.get("case_name", ""),
+        "status": status,
+        "mode": result.get("mode", ""),
+        "duration_ms": result.get("total_duration_ms", 0),
+        "steps_total": result.get("steps_total", 0),
+        "steps_passed": result.get("steps_passed", 0),
+        "steps_failed": result.get("steps_failed", 0),
+        "report_url": f"/ui-testing/execution/{result.get('job_id', '')}/report",
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    try:
+        resp = req.post(webhook_url, json=payload, timeout=10)
+        logger.info(
+            "ui_settings_webhook_sent",
+            extra={
+                "event": "ui.settings.webhook_sent",
+                "webhook_url": webhook_url,
+                "status_code": resp.status_code,
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            "ui_settings_webhook_failed",
+            extra={
+                "event": "ui.settings.webhook_failed",
+                "webhook_url": webhook_url,
+                "error": str(e),
+            },
+        )

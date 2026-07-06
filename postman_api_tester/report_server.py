@@ -118,7 +118,14 @@ from postman_api_tester.handlers.ui_execution_routes import (
     api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
     api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
     api_ui_testing_replay_engine_js as _route_api_ui_testing_replay_engine_js,
+    api_ui_testing_settings_get as _route_api_ui_testing_settings_get,
+    api_ui_testing_settings_update as _route_api_ui_testing_settings_update,
+    api_ui_testing_playwright_status as _route_api_ui_testing_playwright_status,
+    api_ui_testing_settings_reset as _route_api_ui_testing_settings_reset,
+    api_ui_testing_cleanup as _route_api_ui_testing_cleanup,
     ui_testing_replay_page as _route_ui_testing_replay_page,
+    ui_testing_report_page as _route_ui_testing_report_page,
+    ui_testing_settings_page as _route_ui_testing_settings_page,
 )
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
@@ -573,6 +580,41 @@ def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
 @app.route("/ui-testing/replay/<path:job_id>")
 def ui_testing_replay_page(job_id: str) -> ResponseReturnValue:
     return _route_ui_testing_replay_page(job_id)
+
+
+@app.route("/ui-testing/execution/<path:job_id>/report")
+def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
+    return _route_ui_testing_report_page(job_id)
+
+
+@app.route("/api/ui-testing/settings", methods=["GET"])
+def api_ui_testing_settings_get() -> ResponseReturnValue:
+    return _route_api_ui_testing_settings_get()
+
+
+@app.route("/api/ui-testing/settings", methods=["PUT"])
+def api_ui_testing_settings_update() -> ResponseReturnValue:
+    return _route_api_ui_testing_settings_update()
+
+
+@app.route("/api/ui-testing/playwright-status", methods=["GET"])
+def api_ui_testing_playwright_status() -> ResponseReturnValue:
+    return _route_api_ui_testing_playwright_status()
+
+
+@app.route("/api/ui-testing/settings/reset", methods=["POST"])
+def api_ui_testing_settings_reset() -> ResponseReturnValue:
+    return _route_api_ui_testing_settings_reset()
+
+
+@app.route("/api/ui-testing/cleanup", methods=["POST"])
+def api_ui_testing_cleanup() -> ResponseReturnValue:
+    return _route_api_ui_testing_cleanup()
+
+
+@app.route("/ui-testing/settings")
+def ui_testing_settings_page() -> ResponseReturnValue:
+    return _route_ui_testing_settings_page()
 
 
 @app.route("/favicon.ico")

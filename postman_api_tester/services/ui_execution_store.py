@@ -10,6 +10,7 @@
 
 import json
 import logging
+import shutil
 import threading
 import uuid
 from datetime import datetime
@@ -181,6 +182,32 @@ class UiExecutionStore:
                     logger.warning("Failed to read execution result %s: %s", job_dir.name, e)
 
         return results
+
+    def cleanup_expired(self, retention_days: int = 30) -> int:
+        """清理过期的执行记录目录，返回删除数量。"""
+        import time
+        cutoff = time.time() - retention_days * 86400
+        deleted = 0
+        with self._lock:
+            for job_dir in self._base_dir.glob("exec_*"):
+                if not job_dir.is_dir():
+                    continue
+                try:
+                    if job_dir.stat().st_mtime < cutoff:
+                        shutil.rmtree(job_dir)
+                        deleted += 1
+                except OSError as e:
+                    logger.warning("cleanup_failed for %s: %s", job_dir.name, e)
+        if deleted:
+            logger.info(
+                "ui_execution_cleanup",
+                extra={
+                    "event": "ui.execution.cleanup",
+                    "deleted_count": deleted,
+                    "retention_days": retention_days,
+                },
+            )
+        return deleted
 
     def _read_result(self, job_id: str) -> Optional[Dict[str, Any]]:
         """内部：读取 result.json（调用方需持有锁）。"""

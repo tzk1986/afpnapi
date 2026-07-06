@@ -303,26 +303,34 @@
             var btn = event.target;
             btn.disabled = true;
             btn.textContent = '创建中...';
-            fetch('/api/ui-testing/execute/' + caseId, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'browser_replay', options: {} })
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(result) {
-                if (result.data && result.data.replay_url) {
-                    window.location.href = result.data.replay_url;
-                } else {
-                    alert('创建执行任务失败: ' + (result.message || '未知错误'));
+            fetch('/api/ui-testing/settings')
+                .then(function(r) { return r.json(); })
+                .then(function(sResp) {
+                    var mode = (sResp.data && sResp.data.default_mode) || 'browser_replay';
+                    return fetch('/api/ui-testing/execute/' + caseId, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: mode, options: {} })
+                    });
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var d = result.data;
+                    if (d && d.replay_url) {
+                        window.location.href = d.replay_url;
+                    } else if (d && d.report_url) {
+                        window.location.href = d.report_url;
+                    } else {
+                        alert('创建执行任务失败: ' + (result.message || '未知错误'));
+                        btn.disabled = false;
+                        btn.textContent = '▶ 执行';
+                    }
+                })
+                .catch(function(e) {
+                    alert('创建执行任务失败: ' + e.message);
                     btn.disabled = false;
                     btn.textContent = '▶ 执行';
-                }
-            })
-            .catch(function(e) {
-                alert('创建执行任务失败: ' + e.message);
-                btn.disabled = false;
-                btn.textContent = '▶ 执行';
-            });
+                });
         }
 
         function escapeHtml(str) {

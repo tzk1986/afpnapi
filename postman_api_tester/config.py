@@ -397,3 +397,12 @@ UI_EXECUTION_MAX_CONCURRENT = _env_int("UI_EXECUTION_MAX_CONCURRENT", 5, lo=1, h
 
 # UI_EXECUTION_RETENTION_DAYS: 执行结果保留天数（过期自动清理）
 UI_EXECUTION_RETENTION_DAYS = _env_int("UI_EXECUTION_RETENTION_DAYS", 30, lo=1, hi=365)
+
+# UI_HEADLESS_ENABLED: 是否启用无头浏览器执行模式（需安装 playwright）
+UI_HEADLESS_ENABLED = _env_bool("UI_HEADLESS_ENABLED", "false")
+
+# UI_HEADLESS_BROWSER: 无头浏览器类型（chromium / firefox / webkit）
+UI_HEADLESS_BROWSER = str(os.environ.get("UI_HEADLESS_BROWSER", "chromium")).strip().lower()
+
+# UI_HEADLESS_TIMEOUT_S: 无头执行全局超时（秒）
+UI_HEADLESS_TIMEOUT_S = _env_int("UI_HEADLESS_TIMEOUT_S", 300, lo=30, hi=3600)

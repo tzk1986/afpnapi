@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>执行报告 - {{ case_name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; padding: 24px; }
+
+        .container { max-width: 960px; margin: 0 auto; }
+
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; font-weight: 500; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f3f4f6; }
+
+        .header { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .header h1 { font-size: 20px; margin-bottom: 4px; }
+        .header .subtitle { color: #6b7280; font-size: 13px; }
+
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .status-badge.passed { background: #d1fae5; color: #065f46; }
+        .status-badge.failed { background: #fef2f2; color: #991b1b; }
+        .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
+        .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-card { background: #fff; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; transition: border-color 0.3s; }
+        .stat-card .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-card .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .stat-card.passed .stat-value { color: #10b981; }
+        .stat-card.failed .stat-value { color: #ef4444; }
+        .stat-card.total .stat-value { color: #3b82f6; }
+        .stat-card.duration .stat-value { color: #8b5cf6; }
+
+        /* 进度条 */
+        .progress-bar-container { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; display: none; }
+        .progress-bar-container.visible { display: block; }
+        .progress-label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .progress-track { background: #e5e7eb; border-radius: 6px; height: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 6px; transition: width 0.5s ease; width: 0%; }
+        .progress-text { font-size: 12px; color: #9ca3af; margin-top: 6px; text-align: right; }
+
+        .panel { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .panel h2 { font-size: 15px; margin-bottom: 16px; color: #0f172a; }
+
+        .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+        .meta-grid dt { color: #6b7280; }
+        .meta-grid dd { color: #1f2937; font-weight: 500; }
+
+        .steps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .steps-table th { text-align: left; padding: 10px 12px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 500; color: #6b7280; font-size: 12px; position: sticky; top: 0; }
+        .steps-table td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .steps-table tr:hover td { background: #f8fafc; }
+        .steps-table tr.failed td { background: #fef2f2; }
+        .steps-table tr.failed:hover td { background: #fee2e2; }
+        .steps-table tr.current td { background: #eff6ff; }
+
+        .action-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: monospace; }
+        .action-click { background: #dbeafe; color: #1d4ed8; }
+        .action-type { background: #fef3c7; color: #b45309; }
+        .action-navigate { background: #e0e7ff; color: #4338ca; }
+        .action-wait { background: #fef9c3; color: #a16207; }
+        .action-assert { background: #e0f2fe; color: #0369a1; }
+        .action-default { background: #f3f4f6; color: #374151; }
+
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .status-dot.passed { background: #10b981; }
+        .status-dot.failed { background: #ef4444; }
+        .status-dot.skipped { background: #d1d5db; }
+
+        .error-text { color: #ef4444; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .duration-cell { font-family: monospace; color: #6b7280; font-size: 12px; }
+
+        .selector-cell { font-family: monospace; font-size: 11px; color: #4b5563; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .footer { text-align: center; padding: 16px; color: #9ca3af; font-size: 12px; }
+
+        .empty-state { text-align: center; padding: 40px; color: #9ca3af; }
+
+        .refresh-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .panel, .stat-card, .header { box-shadow: none; }
+            .progress-bar-container { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-bar">
+            <a href="/ui-testing" class="btn btn-secondary">&larr; 返回列表</a>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <span id="lastUpdate" style="font-size:12px;color:#9ca3af;"></span>
+                <button class="btn btn-secondary" onclick="refreshReport()" id="btnRefresh">刷新</button>
+                <a href="javascript:window.print()" class="btn btn-secondary">打印报告</a>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>
+                <span class="status-badge {{ status }}" id="statusBadge">{{ status_label }}</span>
+                {{ case_name }}
+            </h1>
+            <div class="subtitle">执行报告 &middot; {{ job_id }}</div>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar-container" id="progressContainer">
+            <div class="progress-label" id="progressLabel">执行中...</div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0 / 0 步骤</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-value" id="stepsTotal">{{ steps_total }}</div>
+                <div class="stat-label">总步骤</div>
+            </div>
+            <div class="stat-card passed">
+                <div class="stat-value" id="stepsPassed">{{ steps_passed }}</div>
+                <div class="stat-label">通过</div>
+            </div>
+            <div class="stat-card failed">
+                <div class="stat-value" id="stepsFailed">{{ steps_failed }}</div>
+                <div class="stat-label">失败</div>
+            </div>
+            <div class="stat-card duration">
+                <div class="stat-value" id="durationS">{{ duration_s }}s</div>
+                <div class="stat-label">总耗时</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>基本信息</h2>
+            <dl class="meta-grid">
+                <dt>执行模式</dt><dd id="modeLabel">{{ mode_label }}</dd>
+                <dt>开始时间</dt><dd id="startedAt">{{ started_at }}</dd>
+                <dt>结束时间</dt><dd id="endedAt">{{ ended_at }}</dd>
+                <dt>用例 ID</dt><dd>{{ case_id }}</dd>
+            </dl>
+        </div>
+
+        <div class="panel">
+            <h2>步骤详情</h2>
+            <div id="stepsContainer">
+            {% if steps %}
+            <table class="steps-table">
+                <thead>
+                    <tr>
+                        <th style="width:36px">#</th>
+                        <th style="width:90px">操作</th>
+                        <th>选择器</th>
+                        <th style="width:100px">值</th>
+                        <th style="width:60px">状态</th>
+                        <th style="width:70px">耗时</th>
+                        <th>错误信息</th>
+                    </tr>
+                </thead>
+                <tbody id="stepsBody">
+                    {% for step in steps %}
+                    <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}">
+                        <td>{{ loop.index }}</td>
+                        <td><span class="action-badge action-{{ step.action }}">{{ step.action }}</span></td>
+                        <td class="selector-cell" title="{{ step.selector_display }}">{{ step.selector_display }}</td>
+                        <td style="font-size:12px;color:#6b7280;">{{ step.value_display }}</td>
+                        <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
+                        <td class="duration-cell">{{ step.duration_s }}s</td>
+                        <td class="error-text" title="{{ step.error }}">{{ step.error }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state" id="emptyState">暂无步骤数据</div>
+            {% endif %}
+            </div>
+        </div>
+
+        <div class="footer">
+            由 Postman API 测试工具 &middot; UI 测试模块生成 &middot; {{ generated_at }}
+        </div>
+    </div>
+
+    <script>
+        var jobId = '{{ job_id }}';
+        var pollTimer = null;
+        var initialStatus = '{{ status }}';
+        var totalSteps = {{ steps_total }};
+
+        function refreshReport() {
+            var btn = document.getElementById('btnRefresh');
+            btn.disabled = true;
+            btn.innerHTML = '&larr; 刷新';
+            btn.classList.add('refresh-spin');
+            fetch('/api/ui-testing/execution/' + jobId + '/status')
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var data = resp.data || resp;
+                    updatePage(data);
+                })
+                .catch(function(e) { console.error('Refresh failed:', e); })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '刷新';
+                    btn.classList.remove('refresh-spin');
+                });
+        }
+
+        function updatePage(data) {
+            var status = data.status || 'running';
+            var statusLabels = {'passed': '通过', 'failed': '失败', 'running': '执行中', 'cancelled': '已取消', 'ready': '就绪'};
+
+            // 状态徽章
+            var badge = document.getElementById('statusBadge');
+            badge.className = 'status-badge ' + status;
+            badge.textContent = statusLabels[status] || status;
+
+            // 统计数据
+            var steps = data.steps || [];
+            var sTotal = data.steps_total || steps.length;
+            var sPassed = data.steps_passed || 0;
+            var sFailed = data.steps_failed || 0;
+
+            document.getElementById('stepsTotal').textContent = sTotal;
+            document.getElementById('stepsPassed').textContent = sPassed;
+            document.getElementById('stepsFailed').textContent = sFailed;
+
+            var durationMs = data.total_duration_ms || 0;
+            document.getElementById('durationS').textContent = (durationMs / 1000).toFixed(2) + 's';
+
+            // 基本信息
+            document.getElementById('modeLabel').textContent = data.mode === 'headless' ? '无头浏览器' : '浏览器回放';
+            document.getElementById('startedAt').textContent = data.started_at || '';
+            document.getElementById('endedAt').textContent = data.ended_at || '-';
+
+            // 更新时间
+            var now = new Date();
+            document.getElementById('lastUpdate').textContent = '更新: ' + now.toLocaleTimeString();
+
+            // 进度条
+            var progressContainer = document.getElementById('progressContainer');
+            if (status === 'running') {
+                progressContainer.classList.add('visible');
+                var completed = sPassed + sFailed;
+                var pct = sTotal > 0 ? (completed / sTotal * 100) : 0;
+                document.getElementById('progressFill').style.width = pct + '%';
+                document.getElementById('progressText').textContent = completed + ' / ' + sTotal + ' 步骤';
+                document.getElementById('progressLabel').textContent = '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败';
+            } else {
+                progressContainer.classList.remove('visible');
+            }
+
+            // 更新步骤表格
+            if (steps.length > 0) {
+                var emptyEl = document.getElementById('emptyState');
+                if (emptyEl) emptyEl.style.display = 'none';
+                var table = document.querySelector('.steps-table');
+                if (!table) {
+                    // 初始没有表格，动态创建
+                    buildStepsTable(steps, sTotal);
+                } else {
+                    updateStepsTable(steps);
+                }
+            }
+
+            // 完成或失败时停止轮询
+            if (status !== 'running' && pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function buildStepsTable(steps, total) {
+            var container = document.getElementById('stepsContainer');
+            var html = '<table class="steps-table"><thead><tr>' +
+                '<th style="width:36px">#</th><th style="width:90px">操作</th><th>选择器</th>' +
+                '<th style="width:100px">值</th><th style="width:60px">状态</th>' +
+                '<th style="width:70px">耗时</th><th>错误信息</th></tr></thead><tbody>';
+            for (var i = 0; i < steps.length; i++) {
+                html += renderStepRow(steps[i], i);
+            }
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateStepsTable(steps) {
+            var tbody = document.getElementById('stepsBody');
+            if (!tbody) return;
+            for (var i = 0; i < steps.length; i++) {
+                var existing = tbody.querySelector('[data-step-index="' + i + '"]');
+                if (existing) {
+                    // 更新现有行
+                    var cells = existing.querySelectorAll('td');
+                    var s = steps[i];
+                    existing.className = s.status + (isCurrentStep(s) ? ' current' : '');
+                    cells[0].textContent = i + 1;
+                    cells[1].innerHTML = '<span class="action-badge action-' + s.action + '">' + s.action + '</span>';
+                    var sel = formatSelector(s.selector);
+                    cells[2].textContent = sel;
+                    cells[2].title = sel;
+                    cells[3].textContent = (s.value || '').toString().substring(0, 60);
+                    var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
+                    cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status);
+                    cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
+                    cells[6].textContent = (s.error || '').substring(0, 200);
+                    cells[6].title = s.error || '';
+                } else {
+                    // 新步骤，追加
+                    tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i));
+                }
+            }
+        }
+
+        function renderStepRow(s, idx) {
+            var sel = formatSelector(s.selector);
+            var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
+            var cur = isCurrentStep(s) ? ' current' : '';
+            return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '">' +
+                '<td>' + (idx + 1) + '</td>' +
+                '<td><span class="action-badge action-' + s.action + '">' + s.action + '</span></td>' +
+                '<td class="selector-cell" title="' + sel + '">' + sel + '</td>' +
+                '<td style="font-size:12px;color:#6b7280;">' + ((s.value || '').toString().substring(0, 60)) + '</td>' +
+                '<td><span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status) + '</td>' +
+                '<td class="duration-cell">' + ((s.duration_ms || 0) / 1000).toFixed(2) + 's</td>' +
+                '<td class="error-text" title="' + (s.error || '') + '">' + ((s.error || '').substring(0, 200)) + '</td>' +
+                '</tr>';
+        }
+
+        function formatSelector(sel) {
+            if (!sel) return '';
+            if (typeof sel === 'string') return sel;
+            return sel.primary || sel.fallback_css || sel.fallback_xpath || '';
+        }
+
+        function isCurrentStep(s) {
+            return s.status === 'running' || s.status === 'pending';
+        }
+
+        // 初始状态如果是执行中，启动轮询（每2秒）
+        if (initialStatus === 'running') {
+            pollTimer = setInterval(refreshReport, 2000);
+        }
+
+        // 首次加载时也刷新一次获取最新数据
+        refreshReport();
+    </script>
+</body>
+</html>

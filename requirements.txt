@@ -5,3 +5,5 @@ jsonpath-ng>=1.5.3
 mypy>=1.10.0,<2.0.0
 # 可选依赖：断言引擎 schema 操作符需要
 # jsonschema>=4.0
+# 可选依赖：UI 测试 Phase 2 无头浏览器执行
+# playwright>=1.40.0

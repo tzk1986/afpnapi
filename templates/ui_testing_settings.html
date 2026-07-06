@@ -1,0 +1,302 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>UI 测试设置</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 720px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 22px; color: #0f172a; }
+        .back-link { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #3b82f6; }
+
+        .panel { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .panel h2 { font-size: 15px; margin-bottom: 16px; color: #0f172a; border-bottom: 1px solid #f3f4f6; padding-bottom: 10px; }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+        .form-group .hint { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+
+        .form-row { display: flex; gap: 12px; align-items: center; }
+        .form-row .form-group { flex: 1; }
+
+        input[type="text"], input[type="number"], input[type="url"], select {
+            width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
+            background: #fff; color: #1f2937; transition: border-color 0.15s;
+        }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        input[type="number"] { width: 120px; }
+
+        .radio-group { display: flex; gap: 16px; }
+        .radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 400; }
+        .radio-group input[type="radio"] { accent-color: #3b82f6; }
+
+        .checkbox-group { display: flex; gap: 16px; flex-wrap: wrap; }
+        .checkbox-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 400; font-size: 13px; }
+        .checkbox-group input[type="checkbox"] { accent-color: #3b82f6; }
+
+        .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn-danger { background: #fff; color: #ef4444; border: 1px solid #fca5a5; }
+        .btn-danger:hover { background: #fef2f2; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 9999; transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        .section-divider { border: none; border-top: 1px dashed #e5e7eb; margin: 20px 0; }
+
+        .cleanup-info { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; font-size: 13px; color: #64748b; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/ui-testing" class="back-link">← 返回用例列表</a>
+                <h1 style="margin-top:6px">UI 测试设置</h1>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>默认执行模式</h2>
+            <div class="form-group">
+                <div class="radio-group">
+                    <label><input type="radio" name="default_mode" value="browser_replay"> 浏览器内回放（推荐，实时可视）</label>
+                    <label><input type="radio" name="default_mode" value="headless"> Headless 无界面（后台自动）</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>浏览器内回放设置</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>步骤间隔（ms）</label>
+                    <input type="number" id="br_delay" min="100" max="10000" step="100">
+                </div>
+                <div class="form-group">
+                    <label>超时时间（ms）</label>
+                    <input type="number" id="br_timeout" min="1000" max="300000" step="1000">
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Headless 设置</h2>
+            <div id="pwStatus" class="cleanup-info" style="margin-bottom:12px">检查 Playwright 安装状态中...</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>浏览器类型</label>
+                    <select id="hl_browser">
+                        <option value="chromium">Chromium</option>
+                        <option value="firefox">Firefox</option>
+                        <option value="webkit">WebKit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>分辨率宽</label>
+                    <input type="number" id="hl_vw" min="320" max="7680" step="1">
+                </div>
+                <div class="form-group">
+                    <label>分辨率高</label>
+                    <input type="number" id="hl_vh" min="240" max="4320" step="1">
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="hl_screenshots"> 启用失败截图</label>
+                    <label><input type="checkbox" id="hl_ignore_https"> 忽略 HTTPS 证书错误</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>执行历史</h2>
+            <div class="form-group">
+                <label>保留天数</label>
+                <input type="number" id="retention_days" min="1" max="365" step="1">
+                <div class="hint">超过此天数的执行记录将被标记为过期，可通过下方按钮清理</div>
+            </div>
+            <button class="btn btn-danger" onclick="cleanupExpired()">清理过期记录</button>
+            <div class="cleanup-info" id="cleanupResult" style="display:none"></div>
+        </div>
+
+        <div class="panel">
+            <h2>通知回调（可选）</h2>
+            <div class="form-group">
+                <label>Webhook URL</label>
+                <input type="url" id="webhook_url" placeholder="https://example.com/webhook">
+                <div class="hint">执行完成后自动发送 HTTP POST 到该地址</div>
+            </div>
+            <div class="form-group">
+                <label>回调时机</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="webhook_on_complete"> 执行完成</label>
+                    <label><input type="checkbox" id="webhook_on_failure"> 执行失败</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="resetSettings()">恢复默认</button>
+            <button class="btn btn-primary" id="btnSave" onclick="saveSettings()">保存设置</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        var settings = {};
+
+        function loadSettings() {
+            fetch('/api/ui-testing/settings')
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    settings = resp.data || resp;
+                    renderForm(settings);
+                    checkPlaywright();
+                })
+                .catch(function(e) { showToast('加载设置失败: ' + e.message, 'error'); });
+        }
+
+        function checkPlaywright() {
+            fetch('/api/ui-testing/playwright-status')
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var d = resp.data || resp;
+                    var el = document.getElementById('pwStatus');
+                    if (d.available) {
+                        el.style.background = '#f0fdf4';
+                        el.style.borderColor = '#86efac';
+                        el.style.color = '#166534';
+                        el.textContent = 'Playwright 已安装 ✓';
+                    } else {
+                        el.style.background = '#fef2f2';
+                        el.style.borderColor = '#fca5a5';
+                        el.style.color = '#991b1b';
+                        el.textContent = 'Playwright 未安装 — ' + (d.hint || '请运行: pip install playwright && playwright install chromium');
+                    }
+                })
+                .catch(function(e) {
+                    document.getElementById('pwStatus').textContent = '检查失败: ' + e.message;
+                });
+        }
+
+        function renderForm(s) {
+            var modeRadios = document.querySelectorAll('input[name="default_mode"]');
+            for (var i = 0; i < modeRadios.length; i++) {
+                modeRadios[i].checked = modeRadios[i].value === s.default_mode;
+            }
+
+            var br = s.browser_replay || {};
+            document.getElementById('br_delay').value = br.delay_between_steps || 500;
+            document.getElementById('br_timeout').value = br.timeout_ms || 30000;
+
+            var hl = s.headless || {};
+            document.getElementById('hl_browser').value = hl.browser_type || 'chromium';
+            document.getElementById('hl_vw').value = hl.viewport_width || 1280;
+            document.getElementById('hl_vh').value = hl.viewport_height || 720;
+            document.getElementById('hl_screenshots').checked = hl.take_screenshots !== false;
+            document.getElementById('hl_ignore_https').checked = hl.ignore_https_errors === true;
+
+            document.getElementById('retention_days').value = s.retention_days || 30;
+            document.getElementById('webhook_url').value = s.webhook_url || '';
+            document.getElementById('webhook_on_complete').checked = s.webhook_on_complete !== false;
+            document.getElementById('webhook_on_failure').checked = s.webhook_on_failure !== false;
+        }
+
+        function collectForm() {
+            var mode = 'browser_replay';
+            var modeRadios = document.querySelectorAll('input[name="default_mode"]');
+            for (var i = 0; i < modeRadios.length; i++) {
+                if (modeRadios[i].checked) { mode = modeRadios[i].value; break; }
+            }
+
+            return {
+                default_mode: mode,
+                browser_replay: {
+                    delay_between_steps: parseInt(document.getElementById('br_delay').value) || 500,
+                    timeout_ms: parseInt(document.getElementById('br_timeout').value) || 30000
+                },
+                headless: {
+                    browser_type: document.getElementById('hl_browser').value,
+                    viewport_width: parseInt(document.getElementById('hl_vw').value) || 1280,
+                    viewport_height: parseInt(document.getElementById('hl_vh').value) || 720,
+                    take_screenshots: document.getElementById('hl_screenshots').checked,
+                    ignore_https_errors: document.getElementById('hl_ignore_https').checked
+                },
+                retention_days: parseInt(document.getElementById('retention_days').value) || 30,
+                webhook_url: document.getElementById('webhook_url').value.trim(),
+                webhook_on_complete: document.getElementById('webhook_on_complete').checked,
+                webhook_on_failure: document.getElementById('webhook_on_failure').checked
+            };
+        }
+
+        function saveSettings() {
+            var data = collectForm();
+            document.getElementById('btnSave').disabled = true;
+            fetch('/api/ui-testing/settings', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(function(r) {
+                if (!r.ok) throw new Error('保存失败 (' + r.status + ')');
+                return r.json();
+            })
+            .then(function(resp) {
+                settings = resp.data || resp;
+                showToast('设置已保存', 'success');
+            })
+            .catch(function(e) { showToast(e.message, 'error'); })
+            .finally(function() { document.getElementById('btnSave').disabled = false; });
+        }
+
+        function resetSettings() {
+            if (!confirm('确定要恢复所有设置为默认值吗？')) return;
+            fetch('/api/ui-testing/settings/reset', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    settings = resp.data || resp;
+                    renderForm(settings);
+                    showToast('已恢复默认设置', 'success');
+                })
+                .catch(function(e) { showToast('恢复失败: ' + e.message, 'error'); });
+        }
+
+        function cleanupExpired() {
+            fetch('/api/ui-testing/cleanup', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var result = resp.data || resp;
+                    var el = document.getElementById('cleanupResult');
+                    el.style.display = 'block';
+                    el.textContent = '已清理 ' + result.deleted + ' 条过期记录（保留天数: ' + result.retention_days + '）';
+                    showToast('清理完成', 'success');
+                })
+                .catch(function(e) { showToast('清理失败: ' + e.message, 'error'); });
+        }
+
+        function showToast(msg, type) {
+            var el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast ' + type + ' show';
+            setTimeout(function() { el.className = 'toast'; }, 3000);
+        }
+
+        loadSettings();
+    </script>
+</body>
+</html>
+{% endraw %}
