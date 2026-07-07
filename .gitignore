@@ -8,6 +8,7 @@ reports/
 uploaded_collections/
 variables.json
 ui_testing_cases/
+uireports/
 
 # 备份与临时文件
 .backup/

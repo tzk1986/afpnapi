@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from flask import make_response, render_template, request
+from flask import make_response, render_template, request, send_file
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.config import (
@@ -79,7 +79,8 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
         return json_error(f"用例不存在: {case_id}", 404, "UIT_EXEC_001")
 
     case_name = case_data.get("name", "")
-    job_id = _execution_store.create_job(case_id, mode, case_name)
+    steps = case_data.get("steps", [])
+    job_id = _execution_store.create_job(case_id, mode, case_name, steps_total=len(steps))
 
     logger.info(
         "ui_execution_created",
@@ -390,6 +391,61 @@ def api_ui_testing_playwright_status() -> ResponseReturnValue:
         "available": is_playwright_available(),
         "hint": "已安装" if is_playwright_available() else "未安装，请运行: pip install playwright && playwright install chromium",
     })
+
+
+def api_ui_testing_reports_list() -> ResponseReturnValue:
+    """UI 报告列表（支持 status 筛选 + 分页）。"""
+    status_filter = request.args.get("status", "").strip() or None
+    case_id_filter = request.args.get("case_id", "").strip() or None
+    page = max(int(request.args.get("page", 1)), 1)
+    page_size = min(int(request.args.get("page_size", 20)), 999)
+
+    total = _execution_store.count_results(case_id=case_id_filter, status=status_filter)
+    offset = (page - 1) * page_size
+    results = _execution_store.list_results(
+        case_id=case_id_filter,
+        status=status_filter,
+        limit=page_size,
+        offset=offset,
+    )
+
+    return BaseHandler.json_response({
+        "items": results,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": max(1, (total + page_size - 1) // page_size),
+    })
+
+
+def api_ui_testing_report_delete(job_id: str) -> ResponseReturnValue:
+    """删除单个 UI 测试报告。"""
+    result = _execution_store.get_result(job_id)
+    if not result:
+        return json_error(f"报告不存在: {job_id}", 404, "UIT_REPORT_001")
+
+    if _execution_store.delete_job(job_id):
+        logger.info(
+            "ui_report_deleted",
+            extra={"event": "ui.report.deleted", "job_id": job_id},
+        )
+        return BaseHandler.json_response({"ok": True, "job_id": job_id})
+    return json_error("删除失败", 500, "UIT_REPORT_002")
+
+
+def ui_testing_reports_page() -> ResponseReturnValue:
+    """渲染 UI 测试报告列表页面。"""
+    resp = make_response(render_template("ui_testing_reports.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+def api_ui_testing_execution_screenshot(job_id: str, step_index: int) -> ResponseReturnValue:
+    """返回失败步骤截图。"""
+    screenshot_path = _execution_store.base_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_fail.png"
+    if not screenshot_path.is_file():
+        return json_error("截图不存在", 404, "UIT_SCREENSHOT_001")
+    return send_file(str(screenshot_path), mimetype="image/png")
 
 
 def _send_webhook(result: Dict[str, Any]) -> None:

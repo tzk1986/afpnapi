@@ -2,10 +2,10 @@
 
 以 JSON 文件形式持久化执行结果，服务重启后可恢复。
 目录结构：
-  ui_testing_cases/
+  uireports/
     exec_{job_id}/
       result.json      ← 完整报告
-      screenshots/     ← 截图（Phase 2）
+      screenshots/     ← 失败截图
 """
 
 import json
@@ -24,7 +24,7 @@ from postman_api_tester.config import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_DIR = Path("ui_testing_cases")
+_DEFAULT_DIR = Path("uireports")
 
 
 class UiExecutionStore:
@@ -40,13 +40,18 @@ class UiExecutionStore:
         self._lock = threading.Lock()
         self._base_dir.mkdir(parents=True, exist_ok=True)
 
+    @property
+    def base_dir(self) -> Path:
+        """返回存储根目录。"""
+        return self._base_dir
+
     def _job_dir(self, job_id: str) -> Path:
         return self._base_dir / f"exec_{job_id}"
 
     def _result_file(self, job_id: str) -> Path:
         return self._job_dir(job_id) / "result.json"
 
-    def create_job(self, case_id: str, mode: str, case_name: str) -> str:
+    def create_job(self, case_id: str, mode: str, case_name: str, steps_total: int = 0) -> str:
         """创建执行任务记录，返回 job_id。"""
         job_id = f"{uuid.uuid4().hex[:12]}"
         now = datetime.now().isoformat()
@@ -60,7 +65,7 @@ class UiExecutionStore:
             "started_at": now,
             "ended_at": None,
             "total_duration_ms": 0,
-            "steps_total": 0,
+            "steps_total": steps_total,
             "steps_passed": 0,
             "steps_failed": 0,
             "steps": [],
@@ -145,10 +150,14 @@ class UiExecutionStore:
             return self._read_result(job_id)
 
     def list_results(
-        self, case_id: Optional[str] = None, limit: int = 20
+        self,
+        case_id: Optional[str] = None,
+        limit: int = 20,
+        status: Optional[str] = None,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """列出执行历史（可选按 case_id 过滤）。"""
-        results: List[Dict[str, Any]] = []
+        """列出执行历史（支持 case_id / status 过滤 + offset 分页）。"""
+        all_results: List[Dict[str, Any]] = []
         with self._lock:
             dirs = sorted(
                 self._base_dir.glob("exec_*"),
@@ -156,8 +165,6 @@ class UiExecutionStore:
                 reverse=True,
             )
             for job_dir in dirs:
-                if len(results) >= limit:
-                    break
                 result_file = job_dir / "result.json"
                 if not result_file.exists():
                     continue
@@ -165,7 +172,9 @@ class UiExecutionStore:
                     data = json.loads(result_file.read_text(encoding="utf-8"))
                     if case_id and data.get("case_id") != case_id:
                         continue
-                    results.append({
+                    if status and data.get("status") != status:
+                        continue
+                    all_results.append({
                         "job_id": data.get("job_id", ""),
                         "case_id": data.get("case_id", ""),
                         "case_name": data.get("case_name", ""),
@@ -181,7 +190,47 @@ class UiExecutionStore:
                 except (json.JSONDecodeError, OSError) as e:
                     logger.warning("Failed to read execution result %s: %s", job_dir.name, e)
 
-        return results
+        return all_results[offset:offset + limit]
+
+    def count_results(
+        self,
+        case_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        """统计符合条件的报告总数。"""
+        count = 0
+        with self._lock:
+            for job_dir in self._base_dir.glob("exec_*"):
+                result_file = job_dir / "result.json"
+                if not result_file.exists():
+                    continue
+                try:
+                    data = json.loads(result_file.read_text(encoding="utf-8"))
+                    if case_id and data.get("case_id") != case_id:
+                        continue
+                    if status and data.get("status") != status:
+                        continue
+                    count += 1
+                except (json.JSONDecodeError, OSError):
+                    pass
+        return count
+
+    def delete_job(self, job_id: str) -> bool:
+        """删除单个执行报告目录，返回是否成功。"""
+        job_dir = self._job_dir(job_id)
+        if not job_dir.is_dir():
+            return False
+        with self._lock:
+            try:
+                shutil.rmtree(job_dir)
+                logger.info(
+                    "ui_execution_deleted",
+                    extra={"event": "ui.execution.deleted", "job_id": job_id},
+                )
+                return True
+            except OSError as e:
+                logger.warning("Failed to delete execution %s: %s", job_id, e)
+                return False
 
     def cleanup_expired(self, retention_days: int = 30) -> int:
         """清理过期的执行记录目录，返回删除数量。"""

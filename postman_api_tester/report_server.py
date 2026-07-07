@@ -114,10 +114,13 @@ from postman_api_tester.handlers.ui_execution_routes import (
     api_ui_testing_execution_finalize as _route_api_ui_testing_execution_finalize,
     api_ui_testing_execution_init as _route_api_ui_testing_execution_init,
     api_ui_testing_execution_report as _route_api_ui_testing_execution_report,
+    api_ui_testing_execution_screenshot as _route_api_ui_testing_execution_screenshot,
     api_ui_testing_execution_status as _route_api_ui_testing_execution_status,
     api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
     api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
     api_ui_testing_replay_engine_js as _route_api_ui_testing_replay_engine_js,
+    api_ui_testing_report_delete as _route_api_ui_testing_report_delete,
+    api_ui_testing_reports_list as _route_api_ui_testing_reports_list,
     api_ui_testing_settings_get as _route_api_ui_testing_settings_get,
     api_ui_testing_settings_update as _route_api_ui_testing_settings_update,
     api_ui_testing_playwright_status as _route_api_ui_testing_playwright_status,
@@ -125,6 +128,7 @@ from postman_api_tester.handlers.ui_execution_routes import (
     api_ui_testing_cleanup as _route_api_ui_testing_cleanup,
     ui_testing_replay_page as _route_ui_testing_replay_page,
     ui_testing_report_page as _route_ui_testing_report_page,
+    ui_testing_reports_page as _route_ui_testing_reports_page,
     ui_testing_settings_page as _route_ui_testing_settings_page,
 )
 from postman_api_tester.report_job_store import configure_run_jobs
@@ -572,6 +576,11 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
     return _route_api_ui_testing_execution_init(job_id)
 
 
+@app.route("/api/ui-testing/execution/<path:job_id>/screenshot/<int:step_index>")
+def api_ui_testing_execution_screenshot(job_id: str, step_index: int) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_screenshot(job_id, step_index)
+
+
 @app.route("/api/ui-testing/replay-engine-js")
 def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
     return _route_api_ui_testing_replay_engine_js()
@@ -615,6 +624,21 @@ def api_ui_testing_cleanup() -> ResponseReturnValue:
 @app.route("/ui-testing/settings")
 def ui_testing_settings_page() -> ResponseReturnValue:
     return _route_ui_testing_settings_page()
+
+
+@app.route("/ui-testing/reports")
+def ui_testing_reports_page() -> ResponseReturnValue:
+    return _route_ui_testing_reports_page()
+
+
+@app.route("/api/ui-testing/reports")
+def api_ui_testing_reports_list() -> ResponseReturnValue:
+    return _route_api_ui_testing_reports_list()
+
+
+@app.route("/api/ui-testing/report/<path:job_id>", methods=["DELETE"])
+def api_ui_testing_report_delete(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_report_delete(job_id)
 
 
 @app.route("/favicon.ico")

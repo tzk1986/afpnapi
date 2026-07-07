@@ -1,0 +1,316 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>UI 测试报告</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 22px; color: #0f172a; }
+        .header-actions { display: flex; gap: 10px; }
+
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #fff; color: #3b82f6; border: 1px solid #93c5fd; }
+        .btn-secondary:hover { background: #eff6ff; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .back-link { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #3b82f6; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 10px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .stat-card .stat-value { font-size: 28px; font-weight: 700; }
+        .stat-card .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+        .stat-card.total .stat-value { color: #3b82f6; }
+        .stat-card.passed .stat-value { color: #10b981; }
+        .stat-card.failed .stat-value { color: #ef4444; }
+        .stat-card.running .stat-value { color: #f59e0b; }
+
+        .panel { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+
+        /* 工具栏 */
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+        .filter-group { display: flex; gap: 4px; }
+        .filter-btn { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #374151; transition: all 0.15s; }
+        .filter-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+        .filter-btn:hover:not(.active) { background: #f3f4f6; }
+        .pagination { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7280; }
+        .pagination select { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; }
+        .pagination button { padding: 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; }
+        .pagination button:hover:not(:disabled) { background: #f3f4f6; }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* 报告表格 */
+        .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .report-table th { text-align: left; padding: 12px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 500; color: #6b7280; font-size: 12px; white-space: nowrap; }
+        .report-table td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .report-table tr:hover td { background: #f8fafc; }
+
+        .status-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+        .status-badge.passed { background: #d1fae5; color: #065f46; }
+        .status-badge.failed { background: #fef2f2; color: #991b1b; }
+        .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
+        .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
+        .status-badge.ready { background: #fef3c7; color: #92400e; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .mode-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+        .mode-badge.headless { background: #ede9fe; color: #6d28d9; }
+        .mode-badge.browser_replay { background: #e0f2fe; color: #0369a1; }
+
+        .case-name { font-weight: 500; color: #1f2937; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .step-stats { font-size: 12px; color: #6b7280; font-family: monospace; }
+        .step-stats .pass { color: #10b981; }
+        .step-stats .fail { color: #ef4444; }
+        .duration { font-family: monospace; font-size: 12px; color: #6b7280; }
+        .date-text { font-size: 12px; color: #9ca3af; }
+
+        .actions-cell { display: flex; gap: 6px; }
+
+        .empty-state { text-align: center; padding: 60px 20px; }
+        .empty-state h2 { font-size: 18px; color: #6b7280; margin-bottom: 8px; }
+        .empty-state p { font-size: 14px; color: #9ca3af; }
+
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 9999; transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        .loading { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/ui-testing" class="back-link">&larr; 返回用例列表</a>
+                <h1 style="margin-top:6px">UI 测试报告</h1>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="loadReports()">&#x21bb; 刷新</button>
+            </div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card total">
+                <div class="stat-value" id="statTotal">-</div>
+                <div class="stat-label">报告总数</div>
+            </div>
+            <div class="stat-card passed">
+                <div class="stat-value" id="statPassed">-</div>
+                <div class="stat-label">通过</div>
+            </div>
+            <div class="stat-card failed">
+                <div class="stat-value" id="statFailed">-</div>
+                <div class="stat-label">失败</div>
+            </div>
+            <div class="stat-card running">
+                <div class="stat-value" id="statRunning">-</div>
+                <div class="stat-label">执行中</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="toolbar">
+                <div class="filter-group" id="filterGroup">
+                    <button class="filter-btn active" data-filter="" onclick="setFilter('')">全部</button>
+                    <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">通过</button>
+                    <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">失败</button>
+                    <button class="filter-btn" data-filter="running" onclick="setFilter('running')">执行中</button>
+                    <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled')">已取消</button>
+                </div>
+                <div class="pagination">
+                    <span>每页</span>
+                    <select id="pageSizeSelect" onchange="setPageSize(this.value)">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="999">全部</option>
+                    </select>
+                    <span id="pageInfo">-</span>
+                    <button id="prevPage" onclick="changePage(-1)" disabled>&laquo;</button>
+                    <button id="nextPage" onclick="changePage(1)" disabled>&raquo;</button>
+                </div>
+            </div>
+
+            <div id="tableContainer">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        var currentFilter = '';
+        var currentPage = 1;
+        var pageSize = 20;
+        var totalPages = 1;
+        var totalCounts = { total: 0, passed: 0, failed: 0, running: 0 };
+
+        function loadReports() {
+            var params = '?page=' + currentPage + '&page_size=' + pageSize;
+            if (currentFilter) params += '&status=' + currentFilter;
+
+            document.getElementById('tableContainer').innerHTML = '<div class="loading">加载中...</div>';
+
+            fetch('/api/ui-testing/reports' + params)
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var data = resp.data || resp;
+                    totalPages = data.total_pages || 1;
+                    renderTable(data.items || []);
+                    renderPagination(data.total || 0);
+                    loadStats();
+                })
+                .catch(function(e) {
+                    document.getElementById('tableContainer').innerHTML =
+                        '<div class="empty-state"><h2>加载失败</h2><p>' + escapeHtml(e.message) + '</p></div>';
+                });
+        }
+
+        function loadStats() {
+            Promise.all([
+                fetch('/api/ui-testing/reports?page_size=1').then(function(r) { return r.json(); }),
+                fetch('/api/ui-testing/reports?page_size=1&status=passed').then(function(r) { return r.json(); }),
+                fetch('/api/ui-testing/reports?page_size=1&status=failed').then(function(r) { return r.json(); }),
+                fetch('/api/ui-testing/reports?page_size=1&status=running').then(function(r) { return r.json(); }),
+            ]).then(function(results) {
+                var t = results[0].data || results[0];
+                var p = results[1].data || results[1];
+                var f = results[2].data || results[2];
+                var r = results[3].data || results[3];
+                document.getElementById('statTotal').textContent = t.total || 0;
+                document.getElementById('statPassed').textContent = p.total || 0;
+                document.getElementById('statFailed').textContent = f.total || 0;
+                document.getElementById('statRunning').textContent = r.total || 0;
+            }).catch(function() {});
+        }
+
+        function renderTable(items) {
+            if (!items || items.length === 0) {
+                document.getElementById('tableContainer').innerHTML =
+                    '<div class="empty-state"><h2>暂无报告</h2><p>执行测试用例后，报告将显示在这里</p></div>';
+                return;
+            }
+
+            var html = '<table class="report-table"><thead><tr>' +
+                '<th>用例名称</th>' +
+                '<th>状态</th>' +
+                '<th>模式</th>' +
+                '<th>步骤</th>' +
+                '<th>耗时</th>' +
+                '<th>开始时间</th>' +
+                '<th>操作</th>' +
+                '</tr></thead><tbody>';
+
+            for (var i = 0; i < items.length; i++) {
+                html += renderRow(items[i]);
+            }
+            html += '</tbody></table>';
+            document.getElementById('tableContainer').innerHTML = html;
+        }
+
+        function renderRow(item) {
+            var statusLabels = { passed: '通过', failed: '失败', running: '执行中', cancelled: '已取消', ready: '就绪' };
+            var modeLabels = { headless: '无头浏览器', browser_replay: '浏览器回放' };
+            var modeClass = item.mode === 'headless' ? 'headless' : 'browser_replay';
+
+            var stepsHtml = '<span class="step-stats"><span class="pass">' + (item.steps_passed || 0) + '</span> / ' +
+                '<span class="fail">' + (item.steps_failed || 0) + '</span> / ' +
+                (item.steps_total || 0) + '</span>';
+
+            var durationS = ((item.total_duration_ms || 0) / 1000).toFixed(2);
+
+            var startedAt = item.started_at || '';
+            if (startedAt.length > 19) startedAt = startedAt.substring(0, 19);
+            startedAt = startedAt.replace('T', ' ');
+
+            var actionsHtml = '<div class="actions-cell">' +
+                '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">查看</a>' +
+                '<button class="btn btn-sm btn-danger" onclick="deleteReport(\'' + item.job_id + '\', \'' + escapeHtml(item.case_name) + '\')">删除</button>' +
+                '</div>';
+
+            return '<tr>' +
+                '<td class="case-name" title="' + escapeHtml(item.case_name) + '">' + escapeHtml(item.case_name) + '</td>' +
+                '<td><span class="status-badge ' + (item.status || '') + '">' + (statusLabels[item.status] || item.status) + '</span></td>' +
+                '<td><span class="mode-badge ' + modeClass + '">' + (modeLabels[item.mode] || item.mode) + '</span></td>' +
+                '<td>' + stepsHtml + '</td>' +
+                '<td class="duration">' + durationS + 's</td>' +
+                '<td class="date-text">' + startedAt + '</td>' +
+                '<td>' + actionsHtml + '</td>' +
+                '</tr>';
+        }
+
+        function renderPagination(total) {
+            document.getElementById('pageInfo').textContent = currentPage + ' / ' + totalPages + ' (共 ' + total + ' 条)';
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        function setFilter(f) {
+            currentFilter = f;
+            currentPage = 1;
+            var btns = document.querySelectorAll('.filter-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.toggle('active', btns[i].getAttribute('data-filter') === f);
+            }
+            loadReports();
+        }
+
+        function setPageSize(size) {
+            pageSize = parseInt(size) || 20;
+            currentPage = 1;
+            loadReports();
+        }
+
+        function changePage(delta) {
+            var newPage = currentPage + delta;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                loadReports();
+            }
+        }
+
+        function deleteReport(jobId, caseName) {
+            if (!confirm('确定要删除报告「' + caseName + '」吗？\n此操作不可恢复。')) return;
+            fetch('/api/ui-testing/report/' + jobId, { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var data = resp.data || resp;
+                    if (data.ok) {
+                        showToast('报告已删除', 'success');
+                        loadReports();
+                    } else {
+                        showToast('删除失败: ' + (resp.message || '未知错误'), 'error');
+                    }
+                })
+                .catch(function(e) { showToast('删除失败: ' + e.message, 'error'); });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type) {
+            var el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast ' + type + ' show';
+            setTimeout(function() { el.className = 'toast'; }, 3000);
+        }
+
+        loadReports();
+    </script>
+</body>
+</html>
+{% endraw %}

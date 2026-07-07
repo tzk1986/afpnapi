@@ -5,7 +5,6 @@
 
 import logging
 import threading
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 from postman_api_tester.config import (
@@ -69,7 +68,7 @@ class UiExecutionManager:
                 "thread": None,
             }
 
-        job_dir = Path("ui_testing_cases") / f"exec_{job_id}" / "screenshots"
+        job_dir = self._store.base_dir / f"exec_{job_id}" / "screenshots"
 
         def on_step_complete(step_index: int, step_result: Dict[str, Any]) -> None:
             self._store.update_step(job_id, step_result)

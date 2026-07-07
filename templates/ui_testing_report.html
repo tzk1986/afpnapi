@@ -35,8 +35,9 @@
         .stat-card.duration .stat-value { color: #8b5cf6; }
 
         /* 进度条 */
-        .progress-bar-container { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; display: none; }
-        .progress-bar-container.visible { display: block; }
+        .progress-bar-container { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .progress-bar-container.complete .progress-fill { background: linear-gradient(90deg, #3b82f6, #10b981); }
+        .progress-bar-container.complete .progress-track { background: #d1fae5; }
         .progress-label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
         .progress-track { background: #e5e7eb; border-radius: 6px; height: 8px; overflow: hidden; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 6px; transition: width 0.5s ease; width: 0%; }
@@ -56,6 +57,32 @@
         .steps-table tr.failed td { background: #fef2f2; }
         .steps-table tr.failed:hover td { background: #fee2e2; }
         .steps-table tr.current td { background: #eff6ff; }
+
+        /* 筛选和分页 */
+        .steps-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .filter-group { display: flex; gap: 4px; }
+        .filter-btn { padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; color: #374151; transition: all 0.15s; }
+        .filter-btn.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+        .filter-btn:hover:not(.active) { background: #f3f4f6; }
+        .pagination { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; }
+        .pagination select { padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; }
+        .pagination button { padding: 3px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; }
+        .pagination button:hover:not(:disabled) { background: #f3f4f6; }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* 截图链接 */
+        .screenshot-link { color: #3b82f6; font-size: 11px; text-decoration: none; cursor: pointer; }
+        .screenshot-link:hover { text-decoration: underline; }
+
+        /* 截图 Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; display: none; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: #fff; border-radius: 12px; padding: 20px; max-width: 90vw; max-height: 90vh; overflow: auto; position: relative; }
+        .modal-content h3 { font-size: 15px; margin-bottom: 12px; }
+        .modal-content img { max-width: 100%; max-height: 70vh; border: 1px solid #e5e7eb; border-radius: 6px; }
+        .modal-close { position: absolute; top: 10px; right: 14px; font-size: 20px; cursor: pointer; color: #6b7280; background: none; border: none; }
+        .modal-close:hover { color: #1f2937; }
+        .modal-no-img { color: #9ca3af; font-size: 13px; text-align: center; padding: 40px; }
 
         .action-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: monospace; }
         .action-click { background: #dbeafe; color: #1d4ed8; }
@@ -87,7 +114,16 @@
             body { background: #fff; padding: 0; }
             .panel, .stat-card, .header { box-shadow: none; }
             .progress-bar-container { display: none !important; }
+            .top-bar { display: none !important; }
+            .actions-cell { display: none !important; }
+            .steps-toolbar { display: none !important; }
         }
+
+        /* PDF 导出样式 */
+        body.pdf-exporting .top-bar { display: none !important; }
+        body.pdf-exporting .progress-bar-container { display: none !important; }
+        body.pdf-exporting .actions-cell { display: none !important; }
+        body.pdf-exporting .steps-toolbar { display: none !important; }
     </style>
 </head>
 <body>
@@ -98,6 +134,7 @@
                 <span id="lastUpdate" style="font-size:12px;color:#9ca3af;"></span>
                 <button class="btn btn-secondary" onclick="refreshReport()" id="btnRefresh">刷新</button>
                 <a href="javascript:window.print()" class="btn btn-secondary">打印报告</a>
+                <button class="btn btn-secondary" onclick="exportPDF()" id="btnExport">导出报告</button>
             </div>
         </div>
 
@@ -111,7 +148,7 @@
 
         <!-- 进度条 -->
         <div class="progress-bar-container" id="progressContainer">
-            <div class="progress-label" id="progressLabel">执行中...</div>
+            <div class="progress-label" id="progressLabel">加载中...</div>
             <div class="progress-track">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
@@ -149,6 +186,25 @@
 
         <div class="panel">
             <h2>步骤详情</h2>
+            <div class="steps-toolbar" id="stepsToolbar" style="display:none;">
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">全部</button>
+                    <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">通过</button>
+                    <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">失败</button>
+                </div>
+                <div class="pagination">
+                    <span>每页</span>
+                    <select id="pageSizeSelect" onchange="setPageSize(this.value)">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="999">全部</option>
+                    </select>
+                    <span id="pageInfo">1 / 1</span>
+                    <button id="prevPage" onclick="prevPage()" disabled>&laquo;</button>
+                    <button id="nextPage" onclick="nextPage()" disabled>&raquo;</button>
+                </div>
+            </div>
             <div id="stepsContainer">
             {% if steps %}
             <table class="steps-table">
@@ -161,11 +217,12 @@
                         <th style="width:60px">状态</th>
                         <th style="width:70px">耗时</th>
                         <th>错误信息</th>
+                        <th style="width:50px">截图</th>
                     </tr>
                 </thead>
                 <tbody id="stepsBody">
                     {% for step in steps %}
-                    <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}">
+                    <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}" data-status="{{ step.status }}">
                         <td>{{ loop.index }}</td>
                         <td><span class="action-badge action-{{ step.action }}">{{ step.action }}</span></td>
                         <td class="selector-cell" title="{{ step.selector_display }}">{{ step.selector_display }}</td>
@@ -173,6 +230,7 @@
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
                         <td class="duration-cell">{{ step.duration_s }}s</td>
                         <td class="error-text" title="{{ step.error }}">{{ step.error }}</td>
+                        <td>{% if step.status == 'failed' %}<a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewScreenshot(this)">查看</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -203,7 +261,9 @@
                 .then(function(r) { return r.json(); })
                 .then(function(resp) {
                     var data = resp.data || resp;
-                    updatePage(data);
+                    if (data.status && data.status !== 'error') {
+                        updatePage(data);
+                    }
                 })
                 .catch(function(e) { console.error('Refresh failed:', e); })
                 .finally(function() {
@@ -244,17 +304,28 @@
             var now = new Date();
             document.getElementById('lastUpdate').textContent = '更新: ' + now.toLocaleTimeString();
 
-            // 进度条
+            // 进度条 — 只要不是终态（passed/failed/cancelled）就一直显示
             var progressContainer = document.getElementById('progressContainer');
-            if (status === 'running') {
-                progressContainer.classList.add('visible');
-                var completed = sPassed + sFailed;
-                var pct = sTotal > 0 ? (completed / sTotal * 100) : 0;
+            var completed = sPassed + sFailed;
+            var pct = sTotal > 0 ? (completed / sTotal * 100) : 0;
+            var isTerminal = (status === 'passed' || status === 'failed' || status === 'cancelled');
+
+            if (!isTerminal) {
+                // ready / running / 未知状态：始终显示进度条
+                progressContainer.style.display = 'block';
+                progressContainer.classList.remove('complete');
                 document.getElementById('progressFill').style.width = pct + '%';
-                document.getElementById('progressText').textContent = completed + ' / ' + sTotal + ' 步骤';
-                document.getElementById('progressLabel').textContent = '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败';
+                document.getElementById('progressText').textContent = Math.round(pct) + '% (' + completed + ' / ' + sTotal + ' 步骤)';
+                var label = status === 'ready' ? '等待执行开始...' : '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败';
+                document.getElementById('progressLabel').textContent = label;
             } else {
-                progressContainer.classList.remove('visible');
+                // 终态：显示 100% 完成进度
+                progressContainer.style.display = 'block';
+                progressContainer.classList.add('complete');
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressText').textContent = '100% (' + completed + ' / ' + sTotal + ' 步骤)';
+                var doneLabel = status === 'cancelled' ? '已取消' : (status === 'failed' ? '执行失败' : '执行完成');
+                document.getElementById('progressLabel').textContent = doneLabel + ' — ' + sPassed + ' 通过, ' + sFailed + ' 失败';
             }
 
             // 更新步骤表格
@@ -263,40 +334,42 @@
                 if (emptyEl) emptyEl.style.display = 'none';
                 var table = document.querySelector('.steps-table');
                 if (!table) {
-                    // 初始没有表格，动态创建
-                    buildStepsTable(steps, sTotal);
+                    buildStepsTable(steps);
                 } else {
                     updateStepsTable(steps);
                 }
+                cacheSteps(steps);
             }
 
-            // 完成或失败时停止轮询
-            if (status !== 'running' && pollTimer) {
+            // 仅在终态（passed/failed/cancelled）停止轮询
+            if (isTerminal && pollTimer) {
                 clearInterval(pollTimer);
                 pollTimer = null;
             }
         }
 
-        function buildStepsTable(steps, total) {
+        function buildStepsTable(steps) {
             var container = document.getElementById('stepsContainer');
             var html = '<table class="steps-table"><thead><tr>' +
                 '<th style="width:36px">#</th><th style="width:90px">操作</th><th>选择器</th>' +
                 '<th style="width:100px">值</th><th style="width:60px">状态</th>' +
-                '<th style="width:70px">耗时</th><th>错误信息</th></tr></thead><tbody>';
+                '<th style="width:70px">耗时</th><th>错误信息</th><th style="width:50px">截图</th>' +
+                '</tr></thead><tbody id="stepsBody">';
             for (var i = 0; i < steps.length; i++) {
                 html += renderStepRow(steps[i], i);
             }
             html += '</tbody></table>';
             container.innerHTML = html;
+            document.getElementById('stepsToolbar').style.display = 'flex';
         }
 
         function updateStepsTable(steps) {
             var tbody = document.getElementById('stepsBody');
             if (!tbody) return;
+            document.getElementById('stepsToolbar').style.display = 'flex';
             for (var i = 0; i < steps.length; i++) {
                 var existing = tbody.querySelector('[data-step-index="' + i + '"]');
                 if (existing) {
-                    // 更新现有行
                     var cells = existing.querySelectorAll('td');
                     var s = steps[i];
                     existing.className = s.status + (isCurrentStep(s) ? ' current' : '');
@@ -311,8 +384,8 @@
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
                     cells[6].title = s.error || '';
+                    cells[7].innerHTML = s.status === 'failed' ? '<a class="screenshot-link" data-step="' + i + '" onclick="viewScreenshot(this)">查看</a>' : '';
                 } else {
-                    // 新步骤，追加
                     tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i));
                 }
             }
@@ -322,15 +395,24 @@
             var sel = formatSelector(s.selector);
             var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
             var cur = isCurrentStep(s) ? ' current' : '';
-            return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '">' +
+            var screenshotCell = s.status === 'failed'
+                ? '<a class="screenshot-link" data-step="' + idx + '" onclick="viewScreenshot(this)">查看</a>'
+                : '';
+            return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
                 '<td><span class="action-badge action-' + s.action + '">' + s.action + '</span></td>' +
-                '<td class="selector-cell" title="' + sel + '">' + sel + '</td>' +
-                '<td style="font-size:12px;color:#6b7280;">' + ((s.value || '').toString().substring(0, 60)) + '</td>' +
+                '<td class="selector-cell" title="' + escapeHtml(sel) + '">' + escapeHtml(sel) + '</td>' +
+                '<td style="font-size:12px;color:#6b7280;">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
                 '<td><span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status) + '</td>' +
                 '<td class="duration-cell">' + ((s.duration_ms || 0) / 1000).toFixed(2) + 's</td>' +
-                '<td class="error-text" title="' + (s.error || '') + '">' + ((s.error || '').substring(0, 200)) + '</td>' +
+                '<td class="error-text" title="' + escapeHtml(s.error || '') + '">' + escapeHtml((s.error || '').substring(0, 200)) + '</td>' +
+                '<td>' + screenshotCell + '</td>' +
                 '</tr>';
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         function formatSelector(sel) {
@@ -343,13 +425,131 @@
             return s.status === 'running' || s.status === 'pending';
         }
 
-        // 初始状态如果是执行中，启动轮询（每2秒）
-        if (initialStatus === 'running') {
-            pollTimer = setInterval(refreshReport, 2000);
+        // ---- 筛选 & 分页 ----
+        var allSteps = [];
+        var currentFilter = 'all';
+        var currentPage = 0;
+        var pageSize = 20;
+
+        function setFilter(f) {
+            currentFilter = f;
+            currentPage = 0;
+            var btns = document.querySelectorAll('.filter-btn');
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.toggle('active', btns[i].getAttribute('data-filter') === f);
+            }
+            renderPaginatedSteps();
         }
 
-        // 首次加载时也刷新一次获取最新数据
-        refreshReport();
+        function setPageSize(size) {
+            pageSize = parseInt(size) || 20;
+            currentPage = 0;
+            renderPaginatedSteps();
+        }
+
+        function prevPage() {
+            if (currentPage > 0) { currentPage--; renderPaginatedSteps(); }
+        }
+
+        function nextPage() {
+            currentPage++;
+            renderPaginatedSteps();
+        }
+
+        function renderPaginatedSteps() {
+            var filtered = [];
+            for (var i = 0; i < allSteps.length; i++) {
+                if (currentFilter === 'all' || allSteps[i].status === currentFilter) {
+                    filtered.push({step: allSteps[i], originalIndex: i});
+                }
+            }
+            var totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+            if (currentPage >= totalPages) currentPage = totalPages - 1;
+
+            var start = currentPage * pageSize;
+            var pageItems = filtered.slice(start, start + pageSize);
+
+            var tbody = document.getElementById('stepsBody');
+            if (!tbody) return;
+            var html = '';
+            for (var j = 0; j < pageItems.length; j++) {
+                html += renderStepRow(pageItems[j].step, pageItems[j].originalIndex);
+            }
+            tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:20px;">无匹配步骤</td></tr>';
+
+            document.getElementById('pageInfo').textContent = (currentPage + 1) + ' / ' + totalPages;
+            document.getElementById('prevPage').disabled = currentPage <= 0;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages - 1;
+        }
+
+        // ---- 截图查看 ----
+        function viewScreenshot(el) {
+            var stepIdx = parseInt(el.getAttribute('data-step'));
+            var modal = document.getElementById('screenshotModal');
+            var imgEl = document.getElementById('screenshotImg');
+            var titleEl = document.getElementById('screenshotTitle');
+            titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 失败截图';
+            imgEl.src = '/api/ui-testing/execution/' + jobId + '/screenshot/' + stepIdx;
+            imgEl.style.display = 'block';
+            imgEl.onerror = function() {
+                imgEl.style.display = 'none';
+                document.getElementById('screenshotNoImg').style.display = 'block';
+            };
+            imgEl.onload = function() {
+                document.getElementById('screenshotNoImg').style.display = 'none';
+            };
+            document.getElementById('screenshotNoImg').style.display = 'none';
+            modal.classList.add('show');
+        }
+
+        function closeScreenshotModal() {
+            document.getElementById('screenshotModal').classList.remove('show');
+        }
+
+        function exportPDF() {
+            document.body.classList.add('pdf-exporting');
+            window.print();
+            setTimeout(function() {
+                document.body.classList.remove('pdf-exporting');
+            }, 500);
+        }
+
+        // ---- 更新 allSteps 用于分页筛选 ----
+        function cacheSteps(steps) {
+            allSteps = steps;
+            if (steps.length > 0) {
+                renderPaginatedSteps();
+            }
+        }
+
+        // 初始显示进度条（执行中或等待开始）
+        var progressContainer = document.getElementById('progressContainer');
+        progressContainer.style.display = 'block';
+        document.getElementById('progressLabel').textContent = '执行中... 等待数据';
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('progressText').textContent = '0% (0 / ' + totalSteps + ' 步骤)';
+
+        // 启动轮询（每2秒）
+        pollTimer = setInterval(refreshReport, 2000);
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeScreenshotModal();
+        });
+
+        // 延迟 1 秒后首次刷新，让后端先积累一些数据
+        setTimeout(function() {
+            refreshReport();
+        }, 1000);
     </script>
+
+    <!-- 截图查看 Modal -->
+    <div class="modal-overlay" id="screenshotModal" onclick="if(event.target===this)closeScreenshotModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeScreenshotModal()">&times;</button>
+            <h3 id="screenshotTitle">失败截图</h3>
+            <img id="screenshotImg" src="" alt="截图">
+            <div class="modal-no-img" id="screenshotNoImg" style="display:none">暂无截图</div>
+        </div>
+    </div>
 </body>
 </html>

@@ -176,6 +176,8 @@ class UiHeadlessEngine:
                 return self._action_assert_url(page, value)
             elif action == "scroll":
                 return self._action_scroll(page, value)
+            elif action in ("select_radio", "check", "uncheck"):
+                return self._action_check(page, selector, action, timeout_ms)
             elif action == "screenshot":
                 return self._action_screenshot(page)
             else:
@@ -268,7 +270,15 @@ class UiHeadlessEngine:
 
     def _action_type(self, page: "Page", selector: Any, value: str, timeout_ms: int) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
-        el.fill(value)
+        try:
+            el.fill(value)
+        except Exception as e:
+            err = str(e)
+            if "cannot be filled" in err:
+                # radio/checkbox — 回退为点击
+                el.click()
+                return {"action": "type", "selector": self._selector_to_dict(selector), "value": value, "status": "passed", "error": ""}
+            raise
         return {"action": "type", "selector": self._selector_to_dict(selector), "value": value, "status": "passed", "error": ""}
 
     def _action_clear(self, page: "Page", selector: Any, timeout_ms: int) -> Dict[str, Any]:
@@ -285,6 +295,17 @@ class UiHeadlessEngine:
         el = self._find_element(page, selector, timeout_ms)
         el.hover()
         return {"action": "hover", "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+
+    def _action_check(self, page: "Page", selector: Any, action: str, timeout_ms: int) -> Dict[str, Any]:
+        el = self._find_element(page, selector, timeout_ms)
+        if action == "check":
+            el.check()
+        elif action == "uncheck":
+            el.uncheck()
+        else:
+            # select_radio → 点击 radio 按钮
+            el.click()
+        return {"action": action, "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
 
     def _action_wait(self, page: "Page", value: str) -> Dict[str, Any]:
         try:
