@@ -6,7 +6,10 @@
 
 import logging
 import re
-from typing import Callable, Dict, Optional, Tuple
+import threading
+import time
+import uuid
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote, unquote, urljoin, urlparse
 
 import requests
@@ -42,6 +45,113 @@ _CONTENT_TYPE_MAP = {
     ".ttf": "font/ttf",
 }
 
+# ── 代理 Cookie 会话管理 ──
+
+class _ProxySessionStore:
+    """代理 Cookie 会话存储 — 将目标服务器的 Cookie 转发给浏览器，反之亦然。"""
+
+    _TTL = 3600  # 会话 1 小时过期
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._sessions: Dict[str, Dict] = {}
+
+    def create_session(self, base_url: str = "") -> str:
+        sid = str(uuid.uuid4())
+        with self._lock:
+            self._sessions[sid] = {
+                "cookies": requests.cookies.RequestsCookieJar(),
+                "base_url": base_url,
+                "last_active": time.time(),
+            }
+        return sid
+
+    def get_cookie_jar(self, session_id: str) -> Optional[requests.cookies.RequestsCookieJar]:
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                return s["cookies"]
+            return None
+
+    def get_base_url(self, session_id: str) -> Optional[str]:
+        """获取会话关联的目标基础 URL。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                return s.get("base_url", "")
+            return None
+
+    def set_base_url(self, session_id: str, base_url: str) -> None:
+        """更新会话关联的目标基础 URL。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["base_url"] = base_url
+                s["last_active"] = time.time()
+
+    def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                s["cookies"].update(resp_cookies)
+
+    def get_set_cookie_headers(self, session_id: str) -> List[str]:
+        """将存储的 Cookie 转为浏览器可接收的 Set-Cookie 头列表。
+
+        移除 Domain 属性（让浏览器默认为代理域），
+        移除 Secure 标志（代理可能通过 HTTP 服务）。
+        """
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if not s:
+                return []
+            result = []
+            for cookie in s["cookies"]:
+                parts = [f"{cookie.name}={cookie.value}"]
+                if cookie.path:
+                    parts.append(f"Path={cookie.path}")
+                if cookie.expires:
+                    from email.utils import formatdate
+                    parts.append(f"Expires={formatdate(cookie.expires, usegmt=True)}")
+                if cookie.has_nonstandard_attr("HttpOnly"):
+                    parts.append("HttpOnly")
+                parts.append("SameSite=Lax")
+                result.append("; ".join(parts))
+            return result
+
+    def cleanup_expired(self) -> int:
+        now = time.time()
+        removed = 0
+        with self._lock:
+            expired = [sid for sid, s in self._sessions.items()
+                       if now - s["last_active"] > self._TTL]
+            for sid in expired:
+                del self._sessions[sid]
+                removed += 1
+        return removed
+
+
+_proxy_session_store = _ProxySessionStore()
+
+# 定时清理过期会话
+def _start_session_cleanup() -> None:
+    def _cleanup_loop():
+        while True:
+            time.sleep(300)
+            try:
+                removed = _proxy_session_store.cleanup_expired()
+                if removed:
+                    logger.debug("Cleaned up %d expired proxy sessions", removed)
+            except Exception:
+                pass
+    t = threading.Thread(target=_cleanup_loop, daemon=True)
+    t.start()
+
+_start_session_cleanup()
+
 
 class UiProxyService:
     """反向代理：获取外部 URL 并改写 HTML 以支持 iframe 嵌入。"""
@@ -50,11 +160,22 @@ class UiProxyService:
     MAX_RESPONSE_SIZE = 10 * 1024 * 1024  # 10MB
 
     @classmethod
-    def fetch_and_rewrite(cls, url: str) -> Tuple[str, int, Dict[str, str]]:
+    def fetch_and_rewrite(
+        cls,
+        url: str,
+        session_id: Optional[str] = None,
+        method: str = "GET",
+        req_headers: Optional[Dict[str, str]] = None,
+        req_body: Optional[bytes] = None,
+    ) -> Tuple[str, int, Dict[str, Any]]:
         """获取外部 URL 并改写 HTML。
 
         Args:
             url: 目标 URL
+            session_id: 代理会话 ID（用于 Cookie 转发）
+            method: HTTP 方法（GET/POST）
+            req_headers: 原始请求头（转发 Content-Type 等）
+            req_body: 原始请求体（POST 时使用）
 
         Returns:
             (body, status_code, response_headers)
@@ -72,8 +193,25 @@ class UiProxyService:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
+        if req_headers:
+            for key in ("Content-Type",):
+                if key in req_headers:
+                    headers[key] = req_headers[key]
 
-        resp = requests.get(url, headers=headers, timeout=cls.REQUEST_TIMEOUT, allow_redirects=True)
+        session = requests.Session()
+        if session_id:
+            cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
+            if cookie_jar:
+                session.cookies = cookie_jar
+
+        resp = session.request(
+            method, url, headers=headers, data=req_body,
+            timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+        )
+
+        # 存储目标服务器返回的 Cookie
+        if session_id:
+            _proxy_session_store.update_cookies(session_id, session.cookies)
 
         content_type = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml" in content_type
@@ -82,6 +220,10 @@ class UiProxyService:
         for key in ("Content-Type", "Cache-Control", "ETag"):
             if key in resp.headers:
                 response_headers[key] = resp.headers[key]
+
+        # 转发 Set-Cookie 给浏览器（返回列表，由 route handler 逐个设置）
+        if session_id:
+            response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
 
         response_headers.pop("X-Frame-Options", None)
         response_headers.pop("Content-Security-Policy", None)
@@ -101,7 +243,8 @@ class UiProxyService:
         method: str = "GET",
         req_headers: Optional[Dict[str, str]] = None,
         req_body: Optional[bytes] = None,
-    ) -> Tuple[bytes, int, Dict[str, str]]:
+        session_id: Optional[str] = None,
+    ) -> Tuple[bytes, int, Dict[str, Any]]:
         """获取子资源（CSS/JS/图片/API），不改写内容。
 
         Args:
@@ -109,6 +252,7 @@ class UiProxyService:
             method: HTTP 方法（GET/POST/PUT/DELETE 等）
             req_headers: 原始请求头（转发 Content-Type 等）
             req_body: 原始请求体
+            session_id: 代理会话 ID（用于 Cookie 转发）
 
         Returns:
             (body_bytes, status_code, headers)
@@ -126,15 +270,29 @@ class UiProxyService:
                 if key in req_headers:
                     headers[key] = req_headers[key]
 
-        resp = requests.request(
+        session = requests.Session()
+        if session_id:
+            cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
+            if cookie_jar:
+                session.cookies = cookie_jar
+
+        resp = session.request(
             method, url, headers=headers, data=req_body,
             timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
         )
+
+        # 存储目标服务器返回的 Cookie
+        if session_id:
+            _proxy_session_store.update_cookies(session_id, session.cookies)
 
         response_headers: Dict[str, str] = {}
         for key in ("Content-Type", "Cache-Control", "ETag"):
             if key in resp.headers:
                 response_headers[key] = resp.headers[key]
+
+        # 转发 Set-Cookie 给浏览器（返回列表，由 route handler 逐个设置）
+        if session_id:
+            response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
 
         return resp.content, resp.status_code, response_headers
 
@@ -154,7 +312,7 @@ class UiProxyService:
 
         result = html
 
-        result = UiProxyService._inject_early_script(result, origin)
+        result = UiProxyService._inject_early_script(result, origin, base_url)
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
@@ -192,15 +350,20 @@ class UiProxyService:
 
     @staticmethod
     def _outside_scripts(html: str, transform: Callable[[str], str]) -> str:
-        """对 <script> 标签外部的 HTML 内容应用变换，保持脚本内容不变。"""
+        """对 <script> 标签外部的 HTML 内容应用变换，保持脚本内容不变。
+
+        分割结果: [前文本, 开标签, 脚本内容, 闭标签, 后文本, 开标签, ...]
+        索引 0,1,3 需要变换（开标签含 src 等属性），索引 2（脚本内容）跳过。
+        """
         pattern = re.compile(r'(<script\b[^>]*>)(.*?)(</script>)', re.IGNORECASE | re.DOTALL)
         parts = pattern.split(html)
         result = []
         for i, part in enumerate(parts):
-            if i % 4 == 0:
-                result.append(transform(part))
-            else:
+            if i % 4 == 2:
+                # 脚本内容，不处理
                 result.append(part)
+            else:
+                result.append(transform(part))
         return "".join(result)
 
     @staticmethod
@@ -219,20 +382,26 @@ class UiProxyService:
             (r'(<(?:video|img)\s[^>]*?)poster\s*=\s*"([^"]*)"', "poster", False),
         ]
 
+        def _replace_attr(match: re.Match, attr_name: str, is_page: bool) -> str:
+            prefix = match.group(1)
+            url_value = match.group(2)
+            resolved = UiProxyService._resolve_url(url_value, base_url)
+            if resolved is None:
+                return match.group(0)
+            if is_page:
+                proxy_url = UiProxyService.to_proxy_url(resolved)
+            else:
+                proxy_url = UiProxyService.to_resource_proxy_url(resolved)
+            return f'{prefix}{attr_name}="{proxy_url}"'
+
         def _rewrite_outside(outside: str) -> str:
             for pattern, attr_name, is_page_url in attr_patterns:
-                def _replace_attr(match: re.Match) -> str:
-                    prefix = match.group(1)
-                    url_value = match.group(2)
-                    resolved = UiProxyService._resolve_url(url_value, base_url)
-                    if resolved is None:
-                        return match.group(0)
-                    if is_page_url:
-                        proxy_url = UiProxyService.to_proxy_url(resolved)
-                    else:
-                        proxy_url = UiProxyService.to_resource_proxy_url(resolved)
-                    return f'{prefix}{attr_name}="{proxy_url}"'
-                outside = re.sub(pattern, _replace_attr, outside, flags=re.IGNORECASE)
+                outside = re.sub(
+                    pattern,
+                    lambda m, an=attr_name, ip=is_page_url: _replace_attr(m, an, ip),
+                    outside,
+                    flags=re.IGNORECASE,
+                )
             return outside
 
         return UiProxyService._outside_scripts(html, _rewrite_outside)
@@ -314,16 +483,18 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _inject_early_script(html: str, origin: str) -> str:
+    def _inject_early_script(html: str, origin: str, target_url: str) -> str:
         """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
 
-        拦截机制（7 层防护）：
+        拦截机制（8 层防护）：
         1. document.write / writeln — 替换字符串中的目标 URL
         2. document.createElement — 拦截所有元素的 src/href/data/poster 属性
         3. Element.innerHTML setter — 重写 HTML 字符串中的属性 URL
         4. Element.insertAdjacentHTML — 同上
         5. DOMParser.parseFromString — 同上
-        6. MutationObserver — 兜底：对 DOM 中新增的 <script> 元素重写 src
+        6. HTMLImageElement.prototype.src — 拦截图片 src
+        7. CSS style 属性 — 拦截 background-image 等 CSS url()
+        8. fetch/XHR — 拦截网络请求
         """
         # _rwHtml: 重写 HTML 字符串中 src/href/data/poster 属性的 URL
         rw_html = (
@@ -335,15 +506,57 @@ class UiProxyService:
             'return m;});}'
         )
 
+        # _toProxy: 将任意 URL 转为代理 URL（处理绝对路径、根路径、相对路径、代理域名路径）
+        to_proxy = (
+            'function _toProxy(v){'
+            'if(typeof v!=="string"||!v)return v;'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0||v.indexOf("/api/")===0)return v;'
+            'if(v.indexOf("proxy-resource")>=0)return v;'
+            'if(v.indexOf(_T)===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(v);'
+            'if(v.indexOf("/")===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+v);'
+            'if(v.indexOf(_F)===0&&!_isProxyUrl(v))return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+v.substring(_F.length));'
+            'return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+v);'
+            '}'
+        )
+
         early_js = (
             '(function(){'
             'var _T="' + origin + '";'
+            'var _TURL="' + target_url + '";'
             'var _F=location.protocol+"//"+location.host;'
+            'var _PROXY_PATH="/ui-testing/";'
             'if(!_T||_T===_F)return;'
+            'var _targetLoc=document.createElement("a");_targetLoc.href=_TURL;'
+            'var _locProto=Location&&Location.prototype;'
+            'if(_locProto){'
+            '["host","hostname","origin","protocol","pathname","search","hash","href"].forEach(function(p){'
+            'var d=Object.getOwnPropertyDescriptor(_locProto,p);'
+            'if(d&&d.get){var g=d.get;'
+            'Object.defineProperty(_locProto,p,{get:function(){return _targetLoc[p];},set:d.set,configurable:true});}'
+            '});}'
+            'function _isProxyUrl(v){return typeof v==="string"&&v.indexOf(_PROXY_PATH)>=0;}'
             'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
-            + rw_html +
+            'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
+            'function _rewriteUrl(v){'
+            'if(typeof v!=="string")return v;'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0)return v;'
+            'if(v.indexOf(_F)===0)return _T+v.substring(_F.length);'
+            'if(v.indexOf("/")===0)return _T+v;'
+            'return v;}'
+            + to_proxy +
+            rw_html +
             'var _dw=document.write.bind(document);document.write=function(h){return _dw(_rw(h))};'
             'var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rw(h))};'
+            'var _ac=Element.prototype.appendChild;'
+            'Element.prototype.appendChild=function(child){'
+            'if(child&&child.tagName==="SCRIPT"&&child.src)child.src=_toProxy(child.src);'
+            'if(child&&child.tagName==="LINK"&&child.href)child.href=_toProxy(child.href);'
+            'return _ac.call(this,child);};'
+            'var _ib=Element.prototype.insertBefore;'
+            'Element.prototype.insertBefore=function(child,ref){'
+            'if(child&&child.tagName==="SCRIPT"&&child.src)child.src=_toProxy(child.src);'
+            'if(child&&child.tagName==="LINK"&&child.href)child.href=_toProxy(child.href);'
+            'return _ib.call(this,child,ref);};'
             'var _ce=document.createElement.bind(document);'
             'document.createElement=function(t){'
             'var el=_ce(t);'
@@ -351,7 +564,7 @@ class UiProxyService:
             'var d=Object.getOwnPropertyDescriptor(el.constructor.prototype,p);'
             'if(d&&d.set){var o=d.set;'
             'Object.defineProperty(el,p,{set:function(v){'
-            'if(typeof v==="string"&&v.indexOf(_F)===0)v=_T+v.substring(_F.length);'
+            'if(typeof v==="string")v=_toProxy(v);'
             'o.call(this,v);},get:d.get});}});'
             'return el;};'
             'var _ihp=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");'
@@ -361,13 +574,71 @@ class UiProxyService:
             'Element.prototype.insertAdjacentHTML=function(p,h){return _iah.call(this,p,_rwHtml(h))};'
             'var _pd=DOMParser.prototype.parseFromString;'
             'DOMParser.prototype.parseFromString=function(s,t){return _pd.call(this,_rwHtml(s),t)};'
-            'var _obs=new MutationObserver(function(mutations){'
-            'mutations.forEach(function(m){m.addedNodes.forEach(function(n){'
-            'if(n.nodeType!==1)return;'
-            'if(n.tagName==="SCRIPT"&&n.src&&n.src.indexOf(_F)===0)n.src=_T+n.src.substring(_F.length);'
-            'if(n.querySelectorAll)n.querySelectorAll("script[src]").forEach(function(s){'
-            'if(s.src.indexOf(_F)===0)s.src=_T+s.src.substring(_F.length);});});});});'
-            '_obs.observe(document.documentElement||document,{childList:true,subtree:true});'
+            'if(typeof HTMLImageElement!=="undefined"){'
+            'var _imgDesc=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");'
+            'if(_imgDesc&&_imgDesc.set){var _imgSet=_imgDesc.set;'
+            'Object.defineProperty(HTMLImageElement.prototype,"src",{set:function(v){'
+            'if(typeof v==="string")v=_toProxy(v);'
+            '_imgSet.call(this,v);},get:_imgDesc.get});}}'
+            'if(typeof HTMLElement!=="undefined"){'
+            'var _sa=Element.prototype.setAttribute;'
+            'Element.prototype.setAttribute=function(n,v){'
+            'if(n==="src"&&typeof v==="string"&&this instanceof HTMLImageElement)v=_toProxy(v);'
+            'return _sa.call(this,n,v);};}'
+            'var _saSet=Object.getOwnPropertyDescriptor(Element.prototype,"setAttribute");'
+            'if(_saSet&&_saSet.value){var _saOrig=_saSet.value;'
+            'Element.prototype.setAttribute=function(n,v){'
+            'if(n==="src"&&typeof v==="string")v=_toProxy(v);'
+            'return _saOrig.call(this,n,v);};}'
+            'var _origFetch=window.fetch;'
+            'window.fetch=function(url,opts){'
+            'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
+            'var _origUrl=_url;'
+            'if(_url.indexOf("/ui-testing/")===0)return _origFetch.call(this,url,opts);'
+            'if(_url.indexOf("proxy-resource")>=0)return _origFetch.call(this,url,opts);'
+            'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
+            'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
+            'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'
+            'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
+            'console.log("[EarlyScript] fetch:", _url.substring(0,100));'
+            'return _origFetch.call(this,_url,opts).then(function(resp){'
+            'if(!resp.ok)console.warn("[EarlyScript] fetch failed:", _origUrl.substring(0,80), "->", resp.status, resp.statusText);'
+            'return resp;}).catch(function(err){console.error("[EarlyScript] fetch error:", _origUrl.substring(0,80), err.message);throw err;});};'
+            'var _xhrOpen=XMLHttpRequest.prototype.open;'
+            'XMLHttpRequest.prototype.open=function(m,url){'
+            'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
+            'var _origUrl=_url;'
+            'if(_url.indexOf("/ui-testing/")===0)return _xhrOpen.apply(this,arguments);'
+            'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
+            'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
+            'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'
+            'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
+            'console.log("[EarlyScript] XHR:", m, _url.substring(0,100));'
+            'arguments[1]=_url;'
+            'var xhr=this;'
+            'xhr.addEventListener("load",function(){'
+            'if(xhr.status>=400)console.warn("[EarlyScript] XHR failed:", m, _origUrl.substring(0,80), "->", xhr.status, xhr.statusText);});'
+            'xhr.addEventListener("error",function(){'
+            'console.error("[EarlyScript] XHR error:", m, _origUrl.substring(0,80));});'
+            'return _xhrOpen.apply(this,arguments);};'
+            'window.addEventListener("error",function(e){'
+            'console.error("[EarlyScript] Uncaught error:", e.message, "at", e.filename, ":", e.lineno);});'
+            'window.addEventListener("unhandledrejection",function(e){'
+            'console.error("[EarlyScript] Unhandled promise rejection:", e.reason);});'
+            'if(window.history&&window.history.pushState){'
+            'var _origPush=window.history.pushState.bind(window.history);'
+            'window.history.pushState=function(state,title,url){'
+            'if(typeof url==="string"){url=_toProxy(url);}'
+            'return _origPush(state,title,url);};}'
+            'if(window.history&&window.history.replaceState){'
+            'var _origReplace=window.history.replaceState.bind(window.history);'
+            'window.history.replaceState=function(state,title,url){'
+            'if(typeof url==="string"){url=_toProxy(url);}'
+            'return _origReplace(state,title,url);};}'
+            'var _origOpen=window.open;'
+            'if(_origOpen){window.open=function(url,name,features){'
+            'if(typeof url==="string"){url=_toProxy(url);}'
+            'return _origOpen.call(this,url,name,features);};}'
             '})();'
         )
         early_script = f"<script>{early_js}</script>"

@@ -134,6 +134,26 @@ def _check_ui_proxy_host_allowed(url: str) -> Optional[ResponseReturnValue]:
     return None
 
 
+def _get_proxy_session_id(base_url: str = "") -> str:
+    """从 Cookie 或新创建的代理会话中获取 session ID。
+
+    Args:
+        base_url: 目标基础 URL（创建新会话时保存）
+    """
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+    sid = request.cookies.get("_proxy_session")
+    if sid:
+        jar = _proxy_session_store.get_cookie_jar(sid)
+        if jar is not None:
+            # 更新 base_url（如果提供了）
+            if base_url:
+                _proxy_session_store.set_base_url(sid, base_url)
+            return sid
+    # 创建新会话并保存 base_url
+    new_sid = _proxy_session_store.create_session(base_url)
+    return new_sid
+
+
 def ui_testing_proxy() -> ResponseReturnValue:
     """反向代理端点：获取外部 URL 并改写 HTML。"""
     target_url = request.args.get("url", "")
@@ -145,13 +165,29 @@ def ui_testing_proxy() -> ResponseReturnValue:
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
 
+    # 检测循环引用：目标地址不能是代理服务器自身
+    from urllib.parse import urlparse as _up2
+    parsed_target = _up2(target_url)
+    if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
+        return json_error("目标地址不能是代理服务器自身", 400, "UIT_PROXY_005")
+
     host_error = _check_ui_proxy_host_allowed(target_url)
     if host_error is not None:
         return host_error
 
+    # 提取基础 URL（scheme + netloc）作为会话的 base_url
+    base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
+    session_id = _get_proxy_session_id(base_url)
+
     started_at = time.perf_counter()
     try:
-        body, status_code, headers = UiProxyService.fetch_and_rewrite(target_url)
+        body, status_code, headers = UiProxyService.fetch_and_rewrite(
+            target_url,
+            session_id,
+            method=request.method,
+            req_headers=dict(request.headers),
+            req_body=request.get_data() if request.method != "GET" else None,
+        )
     except ValueError as e:
         logger.warning(
             "ui_proxy_invalid_url",
@@ -186,10 +222,16 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
     resp = make_response(body, status_code)
     for key, value in headers.items():
-        resp.headers[key] = value
+        if key == "_set_cookies":
+            for cookie_str in value:
+                resp.headers.add("Set-Cookie", cookie_str)
+        else:
+            resp.headers[key] = value
     resp.headers.pop("X-Frame-Options", None)
     resp.headers.pop("Content-Security-Policy", None)
     resp.headers["Access-Control-Allow-Origin"] = "*"
+    # 设置代理会话 Cookie（手动设置 header，避免 set_cookie 可能被覆盖）
+    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
     return resp
 
 
@@ -208,6 +250,8 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     if host_error is not None:
         return host_error
 
+    session_id = _get_proxy_session_id()
+
     started_at = time.perf_counter()
     try:
         body, status_code, headers = UiProxyService.fetch_resource(
@@ -215,6 +259,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
             method=request.method,
             req_headers=dict(request.headers),
             req_body=request.get_data(),
+            session_id=session_id,
         )
     except Exception as e:
         duration_ms = round((time.perf_counter() - started_at) * 1000)
@@ -232,10 +277,18 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
 
     duration_ms = round((time.perf_counter() - started_at) * 1000)
     content_type = headers.get("Content-Type", "")
-    logger.debug(
-        "ui_proxy_resource_ok",
+    log_level = logging.DEBUG
+    log_event = "ui.proxy.resource_success"
+    log_message = "ui_proxy_resource_ok"
+    if status_code >= 400:
+        log_level = logging.WARNING
+        log_event = "ui.proxy.resource_failed"
+        log_message = "ui_proxy_resource_error"
+    logger.log(
+        log_level,
+        log_message,
         extra={
-            "event": "ui.proxy.resource_success",
+            "event": log_event,
             "url": target_url,
             "method": request.method,
             "status_code": status_code,
@@ -245,12 +298,125 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
         },
     )
 
+    # 内容类型校验：请求静态资源但返回 text/html 说明目标服务器返回了错误页面
+    from urllib.parse import urlparse as _up
+    _ext = _up(target_url).path.rsplit(".", 1)[-1].lower() if "." in _up(target_url).path else ""
+    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf", "mp4", "webm", "ogg", "pdf", "zip"}
+    if _ext in _binary_exts and content_type.startswith("text/"):
+        logger.warning(
+            "ui_proxy_resource_wrong_content_type",
+            extra={
+                "event": "ui.proxy.resource.wrong_content_type",
+                "url": target_url,
+                "expected_ext": _ext,
+                "actual_content_type": content_type,
+            },
+        )
+        return make_response(b"", 404)
+
+    # CSS 文件改写：改写其中的 url() 引用为代理 URL
+    if content_type.startswith("text/css") or _ext == "css":
+        try:
+            css_text = body.decode("utf-8", errors="replace")
+            css_text = UiProxyService._rewrite_css_urls(css_text, target_url, target_url)
+            body = css_text.encode("utf-8")
+            content_type = "text/css; charset=utf-8"
+            headers["Content-Type"] = content_type
+        except Exception as e:
+            logger.warning("css_rewrite_failed: %s", e)
+
     resp = make_response(body, status_code)
     for key, value in headers.items():
-        resp.headers[key] = value
+        if key == "_set_cookies":
+            for cookie_str in value:
+                resp.headers.add("Set-Cookie", cookie_str)
+        else:
+            resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "*"
+    # 设置代理会话 Cookie
+    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+    return resp
+
+
+def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
+    """静态资源兜底：转发 SPA 动态 import() 加载的 /static/... 资源到目标服务器。
+
+    通过 Referer 中的 proxy URL 或 Cookie session 提取目标地址。
+    """
+    from postman_api_tester.services.ui_proxy_service import UiProxyService, _proxy_session_store
+
+    # 从请求路径构造目标 URL（移除前导 /）
+    resource_path = request.path.lstrip("/")
+    if not resource_path:
+        return make_response(b"", 404)
+
+    # 从 Referer 提取目标 URL（Referer 应包含 proxy?url=... 参数）
+    referer = request.headers.get("Referer", "")
+    target_url = ""
+    if referer:
+        parsed_ref = urlparse(referer)
+        url_param = parsed_ref.query
+        if "url=" in url_param:
+            from urllib.parse import parse_qs
+            params = parse_qs(url_param)
+            target_url = params.get("url", [""])[0]
+
+    # 如果 Referer 没有 proxy URL，从 Cookie session 中获取 base_url
+    if not target_url:
+        session_id = request.cookies.get("_proxy_session")
+        if session_id:
+            base_url = _proxy_session_store.get_base_url(session_id)
+            if base_url:
+                target_url = base_url
+
+    # 如果还是没有 target_url，使用最近一次会话的 base_url
+    if not target_url:
+        with _proxy_session_store._lock:
+            all_sessions = list(_proxy_session_store._sessions.items())
+        if all_sessions:
+            # 取最近活跃的会话
+            latest_sid = max(all_sessions, key=lambda item: item[1].get("last_active", 0))[0]
+            base_url = _proxy_session_store.get_base_url(latest_sid)
+            if base_url:
+                target_url = base_url
+
+    if not target_url:
+        return make_response(b"", 404)
+
+    target_url = unquote(target_url)
+    parsed_target = urlparse(target_url)
+    full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
+
+    session_id = _get_proxy_session_id()
+
+    try:
+        body, status_code, headers = UiProxyService.fetch_resource(
+            full_url,
+            method="GET",
+            session_id=session_id,
+        )
+    except Exception:
+        return make_response(b"", 404)
+
+    # 内容类型校验
+    content_type = headers.get("Content-Type", "")
+    from urllib.parse import urlparse as _up
+    _ext = _up(full_url).path.rsplit(".", 1)[-1].lower() if "." in _up(full_url).path else ""
+    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
+    if _ext in _binary_exts and content_type.startswith("text/"):
+        return make_response(b"", 404)
+
+    resp = make_response(body, status_code)
+    for key, value in headers.items():
+        if key == "_set_cookies":
+            for cookie_str in value:
+                resp.headers.add("Set-Cookie", cookie_str)
+        else:
+            resp.headers[key] = value
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
     return resp
 
 

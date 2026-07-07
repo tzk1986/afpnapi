@@ -143,9 +143,39 @@ _RECORDER_JS = r"""
   var recording = false;
   var inputBuffer = { element: null, value: '', timer: null, isPassword: false };
 
+  // 会话管理 — 跨页面导航保持同一录制会话
+  var _sessionId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  var _isResumed = false;
+  try {
+    var _stored = sessionStorage.getItem('_ui_rec_session_id');
+    var _active = sessionStorage.getItem('_ui_rec_active');
+    if (_stored && _active === '1') {
+      _sessionId = _stored;
+      recording = true;
+      _isResumed = true;
+      console.log('[UIRecorder] Resumed session:', _sessionId);
+    }
+  } catch(e) {}
+
+  function _sendToServer(payload) {
+    try { origFetch('/api/ui-recorder/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true
+    }); } catch(e) {}
+  }
+
   function sendEvent(data) {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: 'ui-recorder-event', data: data }, '*');
+    } else {
+      _sendToServer({
+        session_id: _sessionId,
+        event_type: 'step',
+        timestamp: Date.now(),
+        data: data
+      });
     }
   }
 
@@ -169,11 +199,9 @@ _RECORDER_JS = r"""
     var el = e.target;
     if (!el || !el.tagName) return;
 
-    // 链接拦截：阻止默认导航，通知父页面加载新代理 URL
+    // 链接点击：录制事件后允许自然导航（href 已被代理改写）
     var link = el.closest('a');
     if (link && link.href) {
-      e.preventDefault();
-      e.stopPropagation();
       sendEvent({
         action: 'click',
         selector: SelectorEngine.generate(el),
@@ -182,11 +210,9 @@ _RECORDER_JS = r"""
         page_url: location.href,
         page_title: document.title
       });
-      // 通知父页面导航
-      window.parent.postMessage({
-        type: 'ui-recorder-navigate',
-        url: link.href
-      }, '*');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'ui-recorder-navigate', url: link.href }, '*');
+      }
       return;
     }
 
@@ -228,7 +254,7 @@ _RECORDER_JS = r"""
     var isPassword = el.type === 'password';
     clearTimeout(inputBuffer.timer);
     inputBuffer.element = el;
-    inputBuffer.value = isPassword ? '{{password}}' : (el.value || el.textContent || '');
+    inputBuffer.value = el.value || el.textContent || '';
     inputBuffer.isPassword = isPassword;
 
     inputBuffer.timer = setTimeout(function() {
@@ -283,10 +309,9 @@ _RECORDER_JS = r"""
     }
   }
 
-  // 表单提交
+  // 表单提交 — 录制事件后允许自然提交（action 已被代理改写）
   function handleSubmit(e) {
     if (!recording) return;
-    e.preventDefault();
     sendEvent({
       action: 'submit',
       selector: SelectorEngine.generate(e.target),
@@ -295,8 +320,9 @@ _RECORDER_JS = r"""
       page_url: location.href,
       page_title: document.title
     });
-    // 通知父页面表单已提交
-    window.parent.postMessage({ type: 'ui-recorder-form-submit', form_action: e.target.action || '' }, '*');
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'ui-recorder-form-submit', form_action: e.target.action || '' }, '*');
+    }
   }
 
   // 键盘事件（特殊键）
@@ -320,6 +346,7 @@ _RECORDER_JS = r"""
   function _shouldProxy(url) {
     if (typeof url !== 'string' || !url) return false;
     if (url.indexOf('/ui-testing/') === 0) return false;
+    if (url.indexOf('/api/') === 0) return false;
     if (url.indexOf('data:') === 0 || url.indexOf('blob:') === 0) return false;
     if (_PROXY_ORIGIN && url.indexOf(_PROXY_ORIGIN) === 0) return true;
     if (url.charAt(0) === '/' && url.charAt(1) !== '/') return true;
@@ -630,6 +657,9 @@ _REPLAYER_JS = r"""
 
         self._highlightElement(el);
 
+        // 保存 action 执行前的 URL，用于延迟检测 SPA 导航
+        self._actionStartUrl = location.href;
+
         try {
           var actionResult = self._executeAction(action, el, step.value);
           if (actionResult === false) {
@@ -644,46 +674,72 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
+
+        // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
+        if (action === 'click' || action === 'submit' || action === 'dblclick') {
+          var urlBefore = self._actionStartUrl || location.href;
+          setTimeout(function() {
+            if (location.href !== urlBefore) {
+              self._notifyParent('navigate', { url: location.href });
+            }
+          }, 2000);
+        }
         self._executeNext();
       });
     },
 
     _executeAction: function(action, el, value) {
+      var urlBefore = location.href;
+      var result = true;
       switch (action) {
         case 'click':
           el.click();
-          return true;
+          break;
         case 'dblclick':
           el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
-          return true;
+          break;
         case 'type':
-          el.focus();
-          el.value = '';
-          el.dispatchEvent(new Event('focus', { bubbles: true }));
-          el.value = value || '';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
+          // 确保操作的是真实 input 元素（SPA 框架可能有 wrapper）
+          var inputEl = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ? el : el.querySelector('input, textarea');
+          if (!inputEl) inputEl = el;
+          inputEl.focus();
+          inputEl.value = value || '';
+          // Vue/Element UI 需要完整的事件序列才能更新响应式数据
+          inputEl.dispatchEvent(new Event('focus', { bubbles: true, composed: true }));
+          inputEl.dispatchEvent(new InputEvent('input', {
+            bubbles: true, composed: true, cancelable: true,
+            inputType: 'insertText', data: value || ''
+          }));
+          // compositionend 触发 Vue 的 IME 更新
+          inputEl.dispatchEvent(new CompositionEvent('compositionend', {
+            bubbles: true, composed: true, data: value || ''
+          }));
+          inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          // 强制触发 keyup 让某些框架捕获输入
+          inputEl.dispatchEvent(new KeyboardEvent('keyup', {
+            bubbles: true, composed: true, key: 'Enter'
+          }));
+          break;
         case 'select':
           el.value = value || '';
           el.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
+          break;
         case 'check':
           el.checked = true;
           el.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
+          break;
         case 'uncheck':
           el.checked = false;
           el.dispatchEvent(new Event('change', { bubbles: true }));
-          return true;
+          break;
         case 'submit':
           var form = el.tagName === 'FORM' ? el : el.closest('form');
           if (form) form.submit();
-          return true;
+          break;
         case 'keypress':
           el.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true }));
           el.dispatchEvent(new KeyboardEvent('keyup', { key: value, bubbles: true }));
-          return true;
+          break;
         case 'wait_for':
           return el ? true : false;
         case 'assert_visible':
@@ -692,8 +748,14 @@ _REPLAYER_JS = r"""
           var text = (el.textContent || '').trim();
           return text.indexOf(value || '') >= 0;
         default:
-          return true;
+          break;
       }
+      // 检测 SPA 导航：如果 URL 发生变化，通知父页面更新 iframe
+      var urlAfter = location.href;
+      if (urlAfter !== urlBefore) {
+        this._notifyParent('navigate', { url: urlAfter });
+      }
+      return result;
     },
 
     _waitForElement: function(step, timeout, callback) {

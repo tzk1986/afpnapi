@@ -107,6 +107,7 @@ from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_proxy as _route_ui_testing_proxy,
     ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
     ui_testing_recorder_page as _route_ui_testing_recorder_page,
+    ui_testing_static_fallback as _route_ui_testing_static_fallback,
 )
 from postman_api_tester.handlers.ui_execution_routes import (
     api_ui_testing_execute as _route_api_ui_testing_execute,
@@ -473,7 +474,7 @@ def ui_testing_editor_page(case_id: str) -> ResponseReturnValue:
     return _route_ui_testing_editor_page(case_id)
 
 
-@app.route("/ui-testing/proxy")
+@app.route("/ui-testing/proxy", methods=["GET", "POST"])
 def ui_testing_proxy() -> ResponseReturnValue:
     return _route_ui_testing_proxy()
 
@@ -481,6 +482,129 @@ def ui_testing_proxy() -> ResponseReturnValue:
 @app.route("/ui-testing/proxy-resource", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 def ui_testing_proxy_resource() -> ResponseReturnValue:
     return _route_ui_testing_proxy_resource()
+
+
+@app.route("/static/<path:filename>")
+def ui_testing_static_fallback(filename: str) -> ResponseReturnValue:
+    return _route_ui_testing_static_fallback(filename)
+
+
+@app.route("/<path:resource_path>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
+    """SPA 资源/API 兜底：拦截所有未被其他路由处理的请求，
+    转发到目标服务器。覆盖早期脚本 fetch 拦截器未覆盖的情况。"""
+    from flask import make_response, request
+    from urllib.parse import unquote as _uq
+    from urllib.parse import urlparse as _urlparse, parse_qs
+
+    _ext = resource_path.rsplit(".", 1)[-1].lower() if "." in resource_path else ""
+    _resource_exts = {
+        "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp",
+        "woff", "woff2", "ttf", "eot", "otf",
+        "css", "js",
+    }
+    # 跳过已知的 API 路径和页面路径（移除 static/ 让静态资源走 fallback）
+    _skip_prefixes = {"api/", "ui-testing/", "ui-recorder/", "favicon.ico"}
+    for prefix in _skip_prefixes:
+        if resource_path.startswith(prefix):
+            from flask import abort
+            abort(404)
+
+    # OPTIONS 预检请求直接返回
+    if request.method == "OPTIONS":
+        resp = make_response("", 204)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        return resp
+
+    # 检查是否为资源请求（有扩展名）或 API 请求（包含 /api/ 路径段）
+    is_resource = _ext in _resource_exts
+    is_api = "/api/" in resource_path or resource_path.startswith("api/")
+
+    if not is_resource and not is_api:
+        from flask import abort
+        abort(404)
+
+    # 从 Referer 提取目标 URL
+    referer = request.headers.get("Referer", "")
+
+    # 记录兜底请求：这些请求没有被早期脚本的 fetch/XHR 拦截器捕获
+    logger.warning(
+        "spa_fallback_request",
+        extra={
+            "event": "ui.proxy.fallback_request",
+            "method": request.method,
+            "path": resource_path,
+            "referer": referer if referer else "(none)",
+        },
+    )
+    target_url = ""
+    if referer:
+        try:
+            parsed_ref = _urlparse(referer)
+            params = parse_qs(parsed_ref.query)
+            target_url = params.get("url", [""])[0]
+        except Exception:
+            pass
+
+    # 从 Cookie session 中获取 base_url
+    if not target_url:
+        session_id = request.cookies.get("_proxy_session")
+        if session_id:
+            from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+            target_url = _proxy_session_store.get_base_url(session_id) or ""
+
+    # 如果还是没有 target_url，使用最近一次会话的 base_url
+    if not target_url:
+        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+        with _proxy_session_store._lock:
+            all_sessions = list(_proxy_session_store._sessions.items())
+        if all_sessions:
+            latest_sid = max(all_sessions, key=lambda item: item[1].get("last_active", 0))[0]
+            target_url = _proxy_session_store.get_base_url(latest_sid) or ""
+
+    if not target_url:
+        from flask import abort
+        abort(404)
+
+    target_url = _uq(target_url)
+    parsed_target = _urlparse(target_url)
+    full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
+
+    session_id = request.cookies.get("_proxy_session") or ""
+
+    try:
+        from postman_api_tester.services.ui_proxy_service import UiProxyService
+        body, status_code, headers = UiProxyService.fetch_resource(
+            full_url,
+            method=request.method,
+            req_headers=dict(request.headers),
+            req_body=request.get_data() if request.method not in ("GET", "HEAD") else None,
+            session_id=session_id if session_id else None,
+        )
+    except Exception:
+        return make_response(b"", 404)
+
+    # 内容类型校验
+    content_type = headers.get("Content-Type", "")
+    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
+    if _ext in _binary_exts and content_type.startswith("text/"):
+        return make_response(b"", 404)
+
+    resp = make_response(body, status_code)
+    for key, value in headers.items():
+        if key == "_set_cookies":
+            for cookie_str in value:
+                resp.headers.add("Set-Cookie", cookie_str)
+        else:
+            resp.headers[key] = value
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    if session_id:
+        resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+    return resp
 
 
 @app.route("/api/ui-testing/cases")
@@ -649,5 +773,9 @@ def favicon() -> ResponseReturnValue:
 
 # 入口已迁移到 postman_api_tester.report_server_app.ReportServerApp.run_app()
 # 命令行启动: python -c "from postman_api_tester.report_server_app import ReportServerApp; ReportServerApp.run_app(ReportServerApp.create_app())"
+
+if __name__ == "__main__":
+    from postman_api_tester.report_server_app import ReportServerApp
+    ReportServerApp.run_app(app)
 
 

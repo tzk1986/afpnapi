@@ -47,7 +47,7 @@ class ReportServerApp:
             配置完成的 Flask 应用实例
         """
         template_folder = str((PROJECT_ROOT / "templates").resolve())
-        app = Flask(__name__, template_folder=template_folder)
+        app = Flask(__name__, template_folder=template_folder, static_folder=None)
 
         # 加载配置
         app_config = config or {}
@@ -163,6 +163,11 @@ class ReportServerApp:
     @staticmethod
     def run_app(app: Flask) -> None:
         """运行应用。"""
+        # 导入 report_server 模块以注册路由（必须在 run_app 中导入，避免循环导入）
+        from postman_api_tester import report_server  # noqa: F401
+        # 使用 report_server.app 而不是传入的 app
+        app = report_server.app
+
         reports_dir = app.config.get("REPORTS_DIR")
         if reports_dir:
             reports_dir.mkdir(parents=True, exist_ok=True)
