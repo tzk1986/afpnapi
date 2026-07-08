@@ -102,7 +102,6 @@ class UIRecorder {
         page_title: document.title,
         input_type: this.inputBuffer.element.type || 'text',
         is_password: this.inputBuffer.isPassword || false,
-        actual_url: (this.inputBuffer.element.closest('form')?.action) || '',
       });
     }
     clearTimeout(this.inputBuffer.timer);
@@ -127,9 +126,6 @@ class UIRecorder {
       page_url: _getTargetUrl(),
       page_title: document.title,
       coordinates: { x: event.clientX, y: event.clientY },
-      // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-      // 修复完成后请注释或删除此字段
-      actual_url: el.href || (el.closest('a')?.href) || (el.closest('form')?.action) || '',
     });
   }
 
@@ -145,9 +141,6 @@ class UIRecorder {
       element_info: this.getElementInfo(el),
       page_url: _getTargetUrl(),
       page_title: document.title,
-      // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-      // 修复完成后请注释或删除此字段
-      actual_url: el.href || (el.closest('a')?.href) || (el.closest('form')?.action) || '',
     });
   }
 
@@ -175,9 +168,6 @@ class UIRecorder {
         page_title: document.title,
         input_type: this.inputBuffer.element.type || 'text',
         is_password: this.inputBuffer.isPassword,
-        // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-        // 修复完成后请注释或删除此字段
-        actual_url: (this.inputBuffer.element.closest('form')?.action) || '',
       });
       this.inputBuffer = { element: null, value: '', timer: null };
     }, 500);
@@ -201,9 +191,6 @@ class UIRecorder {
         },
         page_url: _getTargetUrl(),
         page_title: document.title,
-        // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-        // 修复完成后请注释或删除此字段
-        actual_url: (el.closest('form')?.action) || '',
       });
     }
 
@@ -215,9 +202,6 @@ class UIRecorder {
         element_info: this.getElementInfo(el),
         page_url: _getTargetUrl(),
         page_title: document.title,
-        // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-        // 修复完成后请注释或删除此字段
-        actual_url: (el.closest('form')?.action) || '',
       });
     }
 
@@ -229,9 +213,6 @@ class UIRecorder {
         element_info: this.getElementInfo(el),
         page_url: _getTargetUrl(),
         page_title: document.title,
-        // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-        // 修复完成后请注释或删除此字段
-        actual_url: (el.closest('form')?.action) || '',
       });
     }
   }
@@ -247,9 +228,6 @@ class UIRecorder {
       element_info: this.getElementInfo(event.target),
       page_url: _getTargetUrl(),
       page_title: document.title,
-      // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-      // 修复完成后请注释或删除此字段
-      actual_url: event.target.action || (event.target.closest('form')?.action) || '',
     });
   }
 
@@ -275,9 +253,6 @@ class UIRecorder {
         alt: event.altKey,
         meta: event.metaKey,
       },
-      // TODO: 调试用 — 记录实际请求地址，用于回放时比对验证
-      // 修复完成后请注释或删除此字段
-      actual_url: (event.target.closest('form')?.action) || '',
     });
   }
 
