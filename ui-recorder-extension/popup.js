@@ -124,26 +124,21 @@ btnStart.addEventListener('click', async () => {
 btnStop.addEventListener('click', async () => {
   btnStop.disabled = true;
   showMsg('正在停止录制...');
-  console.log('[Popup] Sending stop_recording message...');
 
   try {
     const result = await chrome.runtime.sendMessage({ type: 'stop_recording' });
-    console.log('[Popup] stop_recording result:', result);
 
     if (result && result.ok) {
       showMsg('录制已停止，共 ' + result.total_steps + ' 步', 'success');
       stepCountEl.textContent = result.total_steps || 0;
-      // 直接更新 UI 到未录制状态，不依赖 refreshState
       updateUI({ active: false });
     } else {
       showMsg(result?.error || '停止失败', 'error');
       btnStop.disabled = false;
     }
   } catch (e) {
-    console.error('[Popup] stop_recording exception:', e);
-    // 即使通信失败，也更新 UI 到未录制状态
     updateUI({ active: false });
-    showMsg('停止请求已发送，请刷新确认状态', 'success');
+    showMsg('停止请求已发送', 'success');
   }
 });
 

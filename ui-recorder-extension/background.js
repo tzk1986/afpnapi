@@ -183,80 +183,71 @@ async function stopRecording() {
 
 // 接收来自 content script 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log('[Background] onMessage received:', msg.type, 'active:', recordingState.active);
-  try {
-    if (msg.type === 'heartbeat') {
-      sendResponse({
-        active: recordingState.active,
-        session_id: recordingState.sessionId,
-      });
+  if (msg.type === 'heartbeat') {
+    sendResponse({ active: recordingState.active, session_id: recordingState.sessionId });
+    return true;
+  }
+
+  if (msg.type === 'step' || msg.type === 'navigation') {
+    if (!recordingState.active) {
+      sendResponse({ ok: false, error: 'not_recording' });
       return true;
     }
+    recordingState.stepCount++;
+    _persistState();
+    postEventToServer(msg.type, { ...msg.data, tab_id: sender.tab?.id, tab_url: sender.tab?.url, step_index: recordingState.stepCount });
+    sendResponse({ ok: true, step_index: recordingState.stepCount });
+    return true;
+  }
 
-    if (msg.type === 'step' || msg.type === 'navigation') {
-      if (!recordingState.active) {
-        console.warn('[Background] Dropped event, recording not active:', msg.type);
-        sendResponse({ ok: false, error: 'not_recording' });
-        return true;
-      }
+  if (msg.type === 'check_recording') {
+    sendResponse({ active: recordingState.active, session_id: recordingState.sessionId });
+    return true;
+  }
 
-      recordingState.stepCount++;
-      _persistState();
-      console.log('[Background] Step received:', msg.data?.action, 'count:', recordingState.stepCount);
-
-      postEventToServer(msg.type, {
-        ...msg.data,
-        tab_id: sender.tab?.id,
-        tab_url: sender.tab?.url,
-        step_index: recordingState.stepCount,
-      });
-
-      sendResponse({ ok: true, step_index: recordingState.stepCount });
-      return true;
-    }
-
-    if (msg.type === 'check_recording') {
-      sendResponse({
-        active: recordingState.active,
-        session_id: recordingState.sessionId,
-      });
-      return true;
-    }
-
-    if (msg.type === 'get_state') {
-      console.log('[Background] get_state responding:', recordingState.active, recordingState.sessionId);
-      sendResponse({
-        active: recordingState.active,
-        session_id: recordingState.sessionId,
-        server_url: recordingState.serverUrl,
-        step_count: recordingState.stepCount,
-        start_time: recordingState.startTime,
-      });
-      return true;
-    }
-  } catch (e) {
-    console.error('[Background] onMessage error:', e.message);
-    sendResponse({ ok: false, error: e.message });
+  if (msg.type === 'get_state') {
+    sendResponse({
+      active: recordingState.active,
+      session_id: recordingState.sessionId,
+      server_url: recordingState.serverUrl,
+      step_count: recordingState.stepCount,
+      start_time: recordingState.startTime,
+    });
     return true;
   }
 
   if (msg.type === 'start_recording') {
-    startRecording(msg.server_url).then(sendResponse).catch(function(err) {
-      console.error('[Background] startRecording error:', err);
-      sendResponse({ ok: false, error: err.message });
+    startRecording(msg.server_url).then(function(r) { sendResponse(r); }).catch(function(e) {
+      console.error('[Background] startRecording error:', e);
+      sendResponse({ ok: false, error: e.message || String(e) });
     });
     return true;
   }
 
   if (msg.type === 'stop_recording') {
-    console.log('[Background] Received stop_recording, active:', recordingState.active, 'session:', recordingState.sessionId);
-    stopRecording().then(function(result) {
-      console.log('[Background] stopRecording result:', result);
-      sendResponse(result);
-    }).catch(function(err) {
-      console.error('[Background] stopRecording error:', err);
-      sendResponse({ ok: false, error: err.message });
-    });
+    // 同步设置状态，即使后续异步操作失败也保证状态正确
+    const wasActive = recordingState.active;
+    const wasSessionId = recordingState.sessionId;
+    const wasStepCount = recordingState.stepCount;
+    recordingState.active = false;
+    chrome.action.setBadgeText({ text: '' });
+    _persistState();
+
+    // 异步通知服务端（失败不影响结果）
+    postEventToServer('session_end', {
+      session_id: wasSessionId,
+      end_time: Date.now(),
+      total_steps: wasStepCount,
+    }).catch(function() {});
+
+    // 通知所有 tab 停止（失败不影响结果）
+    chrome.tabs.query({}).then(function(tabs) {
+      tabs.forEach(function(tab) {
+        if (tab.id) chrome.tabs.sendMessage(tab.id, { type: 'stop' }).catch(function() {});
+      });
+    }).catch(function() {});
+
+    sendResponse({ ok: true, total_steps: wasStepCount });
     return true;
   }
 
