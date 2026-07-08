@@ -225,29 +225,31 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'stop_recording') {
-    // 同步设置状态，即使后续异步操作失败也保证状态正确
-    const wasActive = recordingState.active;
     const wasSessionId = recordingState.sessionId;
     const wasStepCount = recordingState.stepCount;
+    const wasStartTime = recordingState.startTime;
     recordingState.active = false;
     chrome.action.setBadgeText({ text: '' });
     _persistState();
 
-    // 异步通知服务端（失败不影响结果）
     postEventToServer('session_end', {
       session_id: wasSessionId,
       end_time: Date.now(),
       total_steps: wasStepCount,
     }).catch(function() {});
 
-    // 通知所有 tab 停止（失败不影响结果）
     chrome.tabs.query({}).then(function(tabs) {
       tabs.forEach(function(tab) {
         if (tab.id) chrome.tabs.sendMessage(tab.id, { type: 'stop' }).catch(function() {});
       });
     }).catch(function() {});
 
-    sendResponse({ ok: true, total_steps: wasStepCount });
+    sendResponse({
+      ok: true,
+      total_steps: wasStepCount,
+      session_id: wasSessionId,
+      start_time: wasStartTime,
+    });
     return true;
   }
 

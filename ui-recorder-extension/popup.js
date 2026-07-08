@@ -130,8 +130,28 @@ btnStop.addEventListener('click', async () => {
 
     if (result && result.ok) {
       showMsg('录制已停止，共 ' + result.total_steps + ' 步', 'success');
+      statusDot.classList.remove('active');
+      stateText.textContent = '未录制';
+      stateText.style.color = '#16a34a';
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      serverUrlInput.disabled = false;
       stepCountEl.textContent = result.total_steps || 0;
-      updateUI({ active: false });
+      // 保留 session_id
+      if (result.session_id) {
+        sessionIdEl.textContent = result.session_id.substring(0, 16) + '...';
+      }
+      // 计算并保留录制时长
+      if (result.start_time) {
+        const elapsed = Math.floor((Date.now() - result.start_time) / 1000);
+        const min = Math.floor(elapsed / 60);
+        const sec = elapsed % 60;
+        durationEl.textContent = min + ':' + String(sec).padStart(2, '0');
+      }
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
     } else {
       showMsg(result?.error || '停止失败', 'error');
       btnStop.disabled = false;
