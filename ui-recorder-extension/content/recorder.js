@@ -295,16 +295,25 @@ class UIRecorder {
   // ── 心跳机制：防止 Service Worker 在录制期间被杀 ──
   _startHeartbeat() {
     this._stopHeartbeat();
-    this._heartbeatTimer = setInterval(() => {
-      if (!this.recording) return;
+    var self = this;
+    this._heartbeatTimer = setInterval(function () {
+      if (!self.recording) return;
       try {
-        chrome.runtime.sendMessage({ type: 'heartbeat', session_id: this.sessionId }, () => {
+        chrome.runtime.sendMessage({ type: 'heartbeat', session_id: self.sessionId }, function () {
           if (chrome.runtime.lastError) {
-            console.warn('[UIRecorder] Heartbeat error:', chrome.runtime.lastError.message);
+            var msg = chrome.runtime.lastError.message || '';
+            if (msg.indexOf('Extension context invalidated') !== -1) {
+              // 插件已更新，旧 content script 无法通信，停止心跳
+              console.warn('[UIRecorder] Extension updated, stopping heartbeat');
+              self._stopHeartbeat();
+              return;
+            }
+            console.warn('[UIRecorder] Heartbeat error:', msg);
           }
         });
       } catch (e) {
         console.warn('[UIRecorder] Heartbeat exception:', e.message);
+        self._stopHeartbeat();
       }
     }, 15000);
   }
@@ -361,28 +370,42 @@ class UIRecorder {
 
   _sendMessageWithRetry(msg, attempt) {
     const maxRetries = 3;
+    var self = this;
     try {
-      chrome.runtime.sendMessage(msg, (response) => {
+      chrome.runtime.sendMessage(msg, function (response) {
         if (chrome.runtime.lastError) {
           const errMsg = chrome.runtime.lastError.message || '';
+          if (errMsg.indexOf('Extension context invalidated') !== -1) {
+            console.warn('[UIRecorder] Extension updated, stopping recording');
+            self.recording = false;
+            self._stopHeartbeat();
+            self._hideIndicator();
+            return;
+          }
           console.warn(`[UIRecorder] sendStep error (attempt ${attempt + 1}):`, errMsg, 'action:', msg.data?.action);
           if (attempt < maxRetries) {
             const delay = (attempt + 1) * 500;
-            setTimeout(() => this._sendMessageWithRetry(msg, attempt + 1), delay);
+            setTimeout(function () { self._sendMessageWithRetry(msg, attempt + 1); }, delay);
           } else {
-            this._pendingSteps.push(msg);
-            console.warn('[UIRecorder] Step queued for later, pending count:', this._pendingSteps.length);
+            self._pendingSteps.push(msg);
+            console.warn('[UIRecorder] Step queued for later, pending count:', self._pendingSteps.length);
           }
         } else {
-          this._flushPendingSteps();
+          self._flushPendingSteps();
         }
       });
     } catch (e) {
       console.warn('[UIRecorder] sendStep exception:', e.message);
+      if (e.message && e.message.indexOf('Extension context invalidated') !== -1) {
+        self.recording = false;
+        self._stopHeartbeat();
+        self._hideIndicator();
+        return;
+      }
       if (attempt < maxRetries) {
-        setTimeout(() => this._sendMessageWithRetry(msg, attempt + 1), 1000);
+        setTimeout(function () { self._sendMessageWithRetry(msg, attempt + 1); }, 1000);
       } else {
-        this._pendingSteps.push(msg);
+        self._pendingSteps.push(msg);
       }
     }
   }
@@ -451,13 +474,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // 页面加载后主动检查录制状态 — 确保导航后自动恢复录制
 console.log('[UIRecorder] Content script loaded on:', _getTargetUrl());
 try {
-  chrome.runtime.sendMessage({ type: 'check_recording' }, (response) => {
+  chrome.runtime.sendMessage({ type: 'check_recording' }, function (response) {
     if (chrome.runtime.lastError) {
-      console.warn('[UIRecorder] check_recording error:', chrome.runtime.lastError.message);
+      const msg = chrome.runtime.lastError.message || '';
+      if (msg.indexOf('Extension context invalidated') !== -1) return;
+      console.warn('[UIRecorder] check_recording error:', msg);
       // Service Worker 可能还没就绪，延迟重试
-      setTimeout(() => {
+      setTimeout(function () {
         try {
-          chrome.runtime.sendMessage({ type: 'check_recording' }, (resp2) => {
+          chrome.runtime.sendMessage({ type: 'check_recording' }, function (resp2) {
             if (chrome.runtime.lastError) return;
             if (resp2 && resp2.active && resp2.session_id) {
               console.log('[UIRecorder] Auto-resuming recording (retry):', resp2.session_id);
