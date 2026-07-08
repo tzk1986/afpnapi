@@ -103,11 +103,23 @@ class _ProxySessionStore:
     def clear_cookies_by_base_url(self, base_url: str) -> int:
         """清除指定 base_url 对应的所有 session cookie（回放前清理旧登录态）。
         返回清除的 session 数量。
+
+        注意：base_url 可能带路径（如 /login），但 session 存的是 origin。
+        所以只比较 origin（scheme + netloc），忽略路径差异。
         """
         cleared = 0
+        # 提取 origin 用于匹配（忽略路径）
+        from urllib.parse import urlparse
+        parsed = urlparse(base_url)
+        target_origin = f"{parsed.scheme}://{parsed.netloc}"
+
         with self._lock:
             for sid, s in self._sessions.items():
-                if s.get("base_url") == base_url:
+                session_base = s.get("base_url", "")
+                # 比较 origin
+                session_parsed = urlparse(session_base)
+                session_origin = f"{session_parsed.scheme}://{session_parsed.netloc}"
+                if session_origin == target_origin and target_origin:
                     old_count = len(s["cookies"])
                     s["cookies"] = requests.cookies.RequestsCookieJar()
                     s["last_active"] = time.time()
@@ -116,7 +128,8 @@ class _ProxySessionStore:
                         extra={
                             "event": "ui.proxy.session.cookies_cleared",
                             "session_id": sid[:8],
-                            "base_url": base_url,
+                            "session_base_url": session_base,
+                            "target_base_url": base_url,
                             "cookies_cleared": old_count,
                         },
                     )
@@ -126,7 +139,7 @@ class _ProxySessionStore:
                 "proxy_session_clear_summary",
                 extra={
                     "event": "ui.proxy.session.clear_summary",
-                    "base_url": base_url,
+                    "target_origin": target_origin,
                     "sessions_cleared": cleared,
                 },
             )
