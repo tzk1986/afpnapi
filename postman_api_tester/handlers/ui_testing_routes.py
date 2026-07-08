@@ -165,11 +165,13 @@ def ui_testing_proxy() -> ResponseReturnValue:
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
 
-    # 检测循环引用：目标地址不能是代理服务器自身
+    # 检测循环引用：目标地址不能是代理服务器自身（但允许 proxy-resource 请求）
     from urllib.parse import urlparse as _up2
     parsed_target = _up2(target_url)
     if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
-        return json_error("目标地址不能是代理服务器自身", 400, "UIT_PROXY_005")
+        # 允许 proxy-resource 请求（这是正常的代理链）
+        if "/ui-testing/proxy-resource" not in target_url:
+            return json_error("目标地址不能是代理服务器自身", 400, "UIT_PROXY_005")
 
     host_error = _check_ui_proxy_host_allowed(target_url)
     if host_error is not None:

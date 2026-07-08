@@ -12,12 +12,94 @@ let recordingState = {
   startTime: null,
 };
 
-// 初始化：从 storage 恢复 serverUrl
+// 从代理 URL 中提取真实目标 URL
+function _extractTargetUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    // 检查是否为代理 URL（包含 /ui-testing/proxy 或 /ui-testing/proxy-resource）
+    if (u.pathname.startsWith('/ui-testing/proxy')) {
+      const proxyUrl = u.searchParams.get('url');
+      if (proxyUrl) {
+        // 递归处理嵌套代理
+        return _extractTargetUrl(decodeURIComponent(proxyUrl));
+      }
+    }
+    // 不是代理 URL，直接返回
+    return url;
+  } catch (e) {
+    // URL 解析失败，返回原始 URL
+    return url;
+  }
+}
+
+// 状态恢复 Promise，确保消息处理前状态已就绪
+let _stateRestored = false;
+let _stateRestoreResolvers = [];
+
+function _waitForStateRestore() {
+  if (_stateRestored) return Promise.resolve();
+  return new Promise((resolve) => {
+    _stateRestoreResolvers.push(resolve);
+  });
+}
+
+function _markStateRestored() {
+  _stateRestored = true;
+  for (const r of _stateRestoreResolvers) r();
+  _stateRestoreResolvers = [];
+}
+
+// 持久化状态到 session storage（Service Worker 被杀后可恢复）
+function _persistState() {
+  try {
+    chrome.storage.session.set({
+      _recState: {
+        active: recordingState.active,
+        sessionId: recordingState.sessionId,
+        serverUrl: recordingState.serverUrl,
+        stepCount: recordingState.stepCount,
+        startTime: recordingState.startTime,
+      }
+    });
+  } catch (e) {
+    console.warn('[Background] _persistState error:', e.message);
+  }
+}
+
+// 初始化：从 storage 恢复 serverUrl + 录制状态
 chrome.storage.local.get(['serverUrl'], (result) => {
   if (result.serverUrl) {
     recordingState.serverUrl = result.serverUrl;
   }
 });
+
+// 从 session storage 恢复录制状态（Service Worker 重启后）
+try {
+  chrome.storage.session.get(['_recState'], (result) => {
+    if (chrome.runtime.lastError) {
+      console.warn('[Background] session.get error:', chrome.runtime.lastError.message);
+      _markStateRestored();
+      return;
+    }
+    if (result._recState && result._recState.active) {
+      recordingState.active = true;
+      recordingState.sessionId = result._recState.sessionId;
+      recordingState.serverUrl = result._recState.serverUrl || recordingState.serverUrl;
+      recordingState.stepCount = result._recState.stepCount || 0;
+      recordingState.startTime = result._recState.startTime || null;
+      chrome.action.setBadgeText({ text: 'REC' });
+      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+      console.log('[Background] Restored recording state:', recordingState.sessionId, 'steps:', recordingState.stepCount);
+    } else {
+      console.log('[Background] No active recording to restore');
+    }
+    _markStateRestored();
+  });
+} catch (e) {
+  console.warn('[Background] session restore error:', e.message);
+  _markStateRestored();
+}
 
 // 生成 session ID
 function generateSessionId() {
@@ -69,20 +151,39 @@ async function startRecording(serverUrl) {
 
   // 向当前活动 tab 发送启动消息
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  console.log('[Background] Active tab:', tab?.id, tab?.url);
   if (tab?.id) {
     try {
-      await chrome.tabs.sendMessage(tab.id, {
+      const resp = await chrome.tabs.sendMessage(tab.id, {
         type: 'start',
         session_id: recordingState.sessionId,
       });
+      console.log('[Background] Content script start response:', resp);
     } catch (e) {
-      console.warn('[Background] Cannot send start to tab:', e.message);
+      console.warn('[Background] Cannot send start to tab:', tab.id, e.message);
+      // 尝试注入 content script 后重试
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content/selector-engine.js', 'content/recorder.js'],
+        });
+        await new Promise(r => setTimeout(r, 200));
+        const resp2 = await chrome.tabs.sendMessage(tab.id, {
+          type: 'start',
+          session_id: recordingState.sessionId,
+        });
+        console.log('[Background] Content script start response (after inject):', resp2);
+      } catch (e2) {
+        console.warn('[Background] Inject + retry failed:', e2.message);
+      }
     }
   }
 
   // 更新 badge
   chrome.action.setBadgeText({ text: 'REC' });
   chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+
+  _persistState();
 
   return { ok: true, session_id: recordingState.sessionId };
 }
@@ -115,40 +216,76 @@ async function stopRecording() {
 
   chrome.action.setBadgeText({ text: '' });
 
+  _persistState();
+
   return { ok: true, total_steps: recordingState.stepCount };
 }
 
 // 接收来自 content script 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'step' || msg.type === 'navigation') {
-    if (!recordingState.active) return;
 
-    recordingState.stepCount++;
-
-    // 转发到服务端
-    postEventToServer(msg.type, {
-      ...msg.data,
-      tab_id: sender.tab?.id,
-      tab_url: sender.tab?.url,
-      step_index: recordingState.stepCount,
+  if (msg.type === 'heartbeat') {
+    // 心跳消息：保持 Service Worker 存活，返回录制状态
+    _waitForStateRestore().then(() => {
+      sendResponse({
+        active: recordingState.active,
+        session_id: recordingState.sessionId,
+      });
     });
+    return true;
+  }
 
-    sendResponse({ ok: true, step_index: recordingState.stepCount });
+  if (msg.type === 'step' || msg.type === 'navigation') {
+    // 等待状态恢复后再处理
+    _waitForStateRestore().then(() => {
+      if (!recordingState.active) {
+        console.warn('[Background] Dropped event, recording not active:', msg.type);
+        sendResponse({ ok: false, error: 'not_recording' });
+        return;
+      }
+
+      recordingState.stepCount++;
+      _persistState();
+      console.log('[Background] Step received:', msg.data?.action, 'count:', recordingState.stepCount);
+
+      postEventToServer(msg.type, {
+        ...msg.data,
+        tab_id: sender.tab?.id,
+        tab_url: sender.tab?.url,
+        step_index: recordingState.stepCount,
+      });
+
+      sendResponse({ ok: true, step_index: recordingState.stepCount });
+    });
+    return true;
+  }
+
+  if (msg.type === 'check_recording') {
+    _waitForStateRestore().then(() => {
+      sendResponse({
+        active: recordingState.active,
+        session_id: recordingState.sessionId,
+      });
+    });
+    return true;
   }
 
   if (msg.type === 'get_state') {
-    sendResponse({
-      active: recordingState.active,
-      session_id: recordingState.sessionId,
-      server_url: recordingState.serverUrl,
-      step_count: recordingState.stepCount,
-      start_time: recordingState.startTime,
+    _waitForStateRestore().then(() => {
+      sendResponse({
+        active: recordingState.active,
+        session_id: recordingState.sessionId,
+        server_url: recordingState.serverUrl,
+        step_count: recordingState.stepCount,
+        start_time: recordingState.startTime,
+      });
     });
+    return true;
   }
 
   if (msg.type === 'start_recording') {
     startRecording(msg.server_url).then(sendResponse);
-    return true; // async response
+    return true;
   }
 
   if (msg.type === 'stop_recording') {
@@ -174,21 +311,62 @@ chrome.tabs.onCreated.addListener(async (tab) => {
       postEventToServer('step', {
         action: 'new_tab',
         tab_url: tab.url || '',
-        page_url: tab.url || '',
+        page_url: _extractTargetUrl(tab.url) || '',
         page_title: tab.title || '',
         step_index: ++recordingState.stepCount,
       });
+      _persistState();
     }
   });
 });
 
-// tab 导航完成时，自动启动录制
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+// tab 导航完成时，确保 content script 存在并启动录制
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!recordingState.active) return;
   if (changeInfo.status !== 'complete') return;
 
-  chrome.tabs.sendMessage(tabId, {
-    type: 'start',
-    session_id: recordingState.sessionId,
-  }).catch(() => {});
+  // 跳过 chrome:// 和 edge:// 等内部页面
+  const url = tab.url || '';
+  if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+
+  try {
+    // 先尝试发送消息，如果 content script 不存在会报错
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'start',
+      session_id: recordingState.sessionId,
+    });
+  } catch (e) {
+    // content script 不存在，注入后重试
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content/selector-engine.js', 'content/recorder.js'],
+      });
+      await new Promise(r => setTimeout(r, 200));
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'start',
+        session_id: recordingState.sessionId,
+      });
+      console.log('[Background] Injected + started on tab:', tabId, url);
+    } catch (e2) {
+      console.warn('[Background] Failed to inject on tab:', tabId, e2.message);
+    }
+  }
+});
+
+// 扩展安装/更新时，注入到所有已打开的 tab
+chrome.runtime.onInstalled.addListener(async () => {
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  for (const tab of tabs) {
+    if (!tab.id) continue;
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content/selector-engine.js', 'content/recorder.js'],
+      });
+    } catch (e) {
+      // 忽略无法注入的 tab
+    }
+  }
+  console.log('[Background] Content scripts injected into', tabs.length, 'tabs');
 });
