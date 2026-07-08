@@ -193,11 +193,32 @@ _RECORDER_JS = r"""
     };
   }
 
+  // 刷新 inputBuffer：在 click/submit 前先发送挂起的输入步骤
+  function _flushInputBuffer() {
+    if (inputBuffer.element && inputBuffer.value) {
+      clearTimeout(inputBuffer.timer);
+      sendEvent({
+        action: 'type',
+        selector: SelectorEngine.generate(inputBuffer.element),
+        value: inputBuffer.value,
+        element_info: getElementInfo(inputBuffer.element),
+        page_url: location.href,
+        page_title: document.title,
+        input_type: inputBuffer.element.type || 'text',
+        is_password: inputBuffer.isPassword || false
+      });
+    }
+    clearTimeout(inputBuffer.timer);
+    inputBuffer = { element: null, value: '', timer: null, isPassword: false };
+  }
+
   // 点击事件
   function handleClick(e) {
     if (!recording) return;
     var el = e.target;
     if (!el || !el.tagName) return;
+
+    _flushInputBuffer();
 
     // 链接点击：录制事件后允许自然导航（href 已被代理改写）
     var link = el.closest('a');
@@ -312,6 +333,7 @@ _RECORDER_JS = r"""
   // 表单提交 — 录制事件后允许自然提交（action 已被代理改写）
   function handleSubmit(e) {
     if (!recording) return;
+    _flushInputBuffer();
     sendEvent({
       action: 'submit',
       selector: SelectorEngine.generate(e.target),

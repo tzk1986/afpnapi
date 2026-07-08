@@ -89,6 +89,26 @@ class UIRecorder {
     console.log('[UIRecorder] Recording stopped');
   }
 
+  // ── 刷新 inputBuffer：在 click/submit 前先发送挂起的输入步骤 ──
+  _flushInputBuffer() {
+    if (this.inputBuffer.element && this.inputBuffer.value) {
+      clearTimeout(this.inputBuffer.timer);
+      this.sendStep({
+        action: 'type',
+        selector: SelectorEngine.generate(this.inputBuffer.element),
+        value: this.inputBuffer.value,
+        element_info: this.getElementInfo(this.inputBuffer.element),
+        page_url: _getTargetUrl(),
+        page_title: document.title,
+        input_type: this.inputBuffer.element.type || 'text',
+        is_password: this.inputBuffer.isPassword || false,
+        actual_url: (this.inputBuffer.element.closest('form')?.action) || '',
+      });
+    }
+    clearTimeout(this.inputBuffer.timer);
+    this.inputBuffer = { element: null, value: '', timer: null };
+  }
+
   // ── 点击事件 ──
   handleClick(event) {
     if (!this.recording) return;
@@ -96,6 +116,8 @@ class UIRecorder {
     console.log('[UIRecorder] Click captured:', el.tagName, el.id || el.className || '');
     if (el.closest('[data-recorder-ignore]')) return;
     if (el.closest('#ui-recorder-indicator')) return;
+
+    this._flushInputBuffer();
 
     this.sendStep({
       action: 'click',
@@ -217,6 +239,7 @@ class UIRecorder {
   // ── 表单提交 ──
   handleSubmit(event) {
     if (!this.recording) return;
+    this._flushInputBuffer();
     this.sendStep({
       action: 'submit',
       selector: SelectorEngine.generate(event.target),
