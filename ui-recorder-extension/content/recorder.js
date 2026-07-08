@@ -303,8 +303,7 @@ class UIRecorder {
           if (chrome.runtime.lastError) {
             var msg = chrome.runtime.lastError.message || '';
             if (msg.indexOf('Extension context invalidated') !== -1) {
-              // 插件已更新，旧 content script 无法通信，停止心跳
-              console.warn('[UIRecorder] Extension updated, stopping heartbeat');
+              // 插件已更新，旧 content script 无法通信，静默停止心跳
               self._stopHeartbeat();
               return;
             }
@@ -376,7 +375,7 @@ class UIRecorder {
         if (chrome.runtime.lastError) {
           const errMsg = chrome.runtime.lastError.message || '';
           if (errMsg.indexOf('Extension context invalidated') !== -1) {
-            console.warn('[UIRecorder] Extension updated, stopping recording');
+            // 插件已更新，静默停止录制
             self.recording = false;
             self._stopHeartbeat();
             self._hideIndicator();
