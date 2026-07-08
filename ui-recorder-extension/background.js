@@ -55,15 +55,17 @@ chrome.storage.local.get(['serverUrl', '_recState'], (result) => {
   if (result.serverUrl) {
     recordingState.serverUrl = result.serverUrl;
   }
+  // 自动清除可能存在的脏数据：如果上次状态是 active 但本次加载时没有对应 tab
+  // 则重置为未录制状态，避免"幽灵录制"问题
   if (result._recState && result._recState.active) {
-    recordingState.active = true;
-    recordingState.sessionId = result._recState.sessionId;
-    recordingState.serverUrl = result._recState.serverUrl || recordingState.serverUrl;
-    recordingState.stepCount = result._recState.stepCount || 0;
-    recordingState.startTime = result._recState.startTime || null;
-    chrome.action.setBadgeText({ text: 'REC' });
-    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-    console.log('[Background] Restored recording state:', recordingState.sessionId, 'steps:', recordingState.stepCount);
+    console.log('[Background] Found previous active state, clearing to prevent ghost recording');
+    recordingState.active = false;
+    recordingState.sessionId = null;
+    recordingState.stepCount = 0;
+    recordingState.startTime = null;
+    // 清除存储中的脏状态
+    chrome.storage.local.remove('_recState');
+    chrome.action.setBadgeText({ text: '' });
   }
 });
 
@@ -189,6 +191,7 @@ async function stopRecording() {
 
 // 接收来自 content script 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log('[Background] onMessage received:', msg.type, 'active:', recordingState.active);
   try {
     if (msg.type === 'heartbeat') {
       sendResponse({
@@ -229,6 +232,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.type === 'get_state') {
+      console.log('[Background] get_state responding:', recordingState.active, recordingState.sessionId);
       sendResponse({
         active: recordingState.active,
         session_id: recordingState.sessionId,
@@ -253,7 +257,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'stop_recording') {
-    stopRecording().then(sendResponse).catch(function(err) {
+    console.log('[Background] Received stop_recording, active:', recordingState.active, 'session:', recordingState.sessionId);
+    stopRecording().then(function(result) {
+      console.log('[Background] stopRecording result:', result);
+      sendResponse(result);
+    }).catch(function(err) {
       console.error('[Background] stopRecording error:', err);
       sendResponse({ ok: false, error: err.message });
     });
