@@ -78,6 +78,12 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     if not case_data:
         return json_error(f"用例不存在: {case_id}", 404, "UIT_EXEC_001")
 
+    # 执行前清除代理 session cookie，确保重新登录
+    base_url = case_data.get("base_url", "")
+    if base_url:
+        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+        _proxy_session_store.clear_cookies_by_base_url(base_url)
+
     case_name = case_data.get("name", "")
     steps = case_data.get("steps", [])
     job_id = _execution_store.create_job(case_id, mode, case_name, steps_total=len(steps))
@@ -242,6 +248,8 @@ def _extract_network_requests(steps: list) -> list:
 
 def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
     """返回回放引擎初始化数据（steps + options）。"""
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
     job_data = _active_jobs.get(job_id)
     if not job_data:
         result = _execution_store.get_result(job_id)
@@ -251,6 +259,10 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
         if not case_data:
             return json_error("用例数据不存在", 404, "UIT_EXEC_001")
         steps = case_data.get("steps", [])
+        base_url = case_data.get("base_url", "")
+        # 回放前清除旧 session cookie，确保重新登录
+        if base_url:
+            _proxy_session_store.clear_cookies_by_base_url(base_url)
         return BaseHandler.json_response({
             "steps": [s for s in steps if s.get("action") != "api_call"],
             "options": {
@@ -258,17 +270,20 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
                 "timeout": UI_EXECUTION_DEFAULT_TIMEOUT_MS,
             },
             "case_name": case_data.get("name", ""),
-            "base_url": case_data.get("base_url", ""),
+            "base_url": base_url,
             "network_requests": _extract_network_requests(steps),
         })
 
     case_data = job_data["case_data"]
     steps = case_data.get("steps", [])
+    base_url = case_data.get("base_url", "")
+    if base_url:
+        _proxy_session_store.clear_cookies_by_base_url(base_url)
     return BaseHandler.json_response({
         "steps": [s for s in steps if s.get("action") != "api_call"],
         "options": job_data["options"],
         "case_name": case_data.get("name", ""),
-        "base_url": case_data.get("base_url", ""),
+        "base_url": base_url,
         "network_requests": _extract_network_requests(steps),
     })
 

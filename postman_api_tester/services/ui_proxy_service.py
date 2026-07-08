@@ -100,6 +100,14 @@ class _ProxySessionStore:
                     return sid
             return None
 
+    def clear_cookies_by_base_url(self, base_url: str) -> None:
+        """清除指定 base_url 对应的所有 session cookie（回放前清理旧登录态）。"""
+        with self._lock:
+            for s in self._sessions.values():
+                if s.get("base_url") == base_url:
+                    s["cookies"] = requests.cookies.RequestsCookieJar()
+                    s["last_active"] = time.time()
+
     def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
         with self._lock:
             s = self._sessions.get(session_id)
