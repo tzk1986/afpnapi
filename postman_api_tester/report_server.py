@@ -504,9 +504,15 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         "woff", "woff2", "ttf", "eot", "otf",
         "css", "js",
     }
-    # 跳过已知的 API 路径和页面路径（移除 static/ 让静态资源走 fallback）
-    _skip_prefixes = {"api/", "ui-testing/", "ui-recorder/", "favicon.ico"}
+    # 跳过代理自身的路径（不转发），但允许目标服务器的 /api/ 路径走兜底转发
+    _skip_prefixes = {"ui-testing/", "ui-recorder/", "favicon.ico"}
     for prefix in _skip_prefixes:
+        if resource_path.startswith(prefix):
+            from flask import abort
+            abort(404)
+    # 代理自身的 API 路径也跳过（不走兜底转发）
+    _proxy_api_prefixes = {"api/ui-testing/", "api/ui-recorder/", "api/postman/", "api/report/"}
+    for prefix in _proxy_api_prefixes:
         if resource_path.startswith(prefix):
             from flask import abort
             abort(404)
