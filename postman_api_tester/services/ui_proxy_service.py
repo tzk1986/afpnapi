@@ -520,11 +520,13 @@ class UiProxyService:
         )
 
         # _toProxy: 将任意 URL 转为代理 URL（处理绝对路径、根路径、相对路径、代理域名路径）
+        # 注意：/api/ 路径需要区分代理自身 API（/api/ui-testing/ 等）和目标服务器 API（/api/uims/ 等）
         to_proxy = (
             'function _toProxy(v){'
             'if(typeof v!=="string"||!v)return v;'
             'if(v.indexOf("data:")===0||v.indexOf("blob:")===0||v.indexOf("javascript:")===0)return v;'
-            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0||v.indexOf("/api/")===0)return v;'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0)return v;'
+            'if(v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0)return v;'
             'if(v.indexOf("proxy-resource")>=0)return v;'
             'if(v.indexOf(_T)===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(v);'
             'if(v.indexOf("/")===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+v);'
@@ -559,7 +561,7 @@ class UiProxyService:
             'Object.defineProperty(_locProto,"href",{get:function(){return _targetLoc.href;},'
             'set:function(v){'
             'if(typeof v==="string"){'
-            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0){_hrefSet.call(this,v);return;}'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0){_hrefSet.call(this,v);return;}'
             'if(v.indexOf(_T)===0){_targetLoc.href=v;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(v));return;}'
             'if(v.indexOf("/")===0){_targetLoc.href=_T+v;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(_T+v));return;}'
             'if(v.indexOf(_F)===0){var real=_T+v.substring(_F.length);_targetLoc.href=real;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(real));return;}'
@@ -570,7 +572,7 @@ class UiProxyService:
             'if(typeof orig==="function"){'
             '_locProto[m]=function(v){'
             'if(typeof v==="string"){'
-            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0)return orig.call(this,v);'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0)return orig.call(this,v);'
             'if(v.indexOf(_T)===0){_targetLoc.href=v;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(v));}'
             'if(v.indexOf("/")===0){_targetLoc.href=_T+v;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(_T+v));}'
             'if(v.indexOf(_F)===0){var real=_T+v.substring(_F.length);_targetLoc.href=real;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(real));}'
@@ -581,7 +583,7 @@ class UiProxyService:
             'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
             'function _rewriteUrl(v){'
             'if(typeof v!=="string")return v;'
-            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0)return v;'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0)return v;'
             'if(v.indexOf(_F)===0)return _T+v.substring(_F.length);'
             'if(v.indexOf("/")===0)return _T+v;'
             'return v;}'

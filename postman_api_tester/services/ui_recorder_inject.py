@@ -475,11 +475,29 @@ _REPLAYER_JS = r"""
         var startsWithSlash = selector.indexOf('/') === 0;
         console.log('[ReplayEngine] _tryFind startsWithSlash:', startsWithSlash, 'selector:', selector.substring(0, 20));
         if (startsWithSlash) return SelectorEngine._tryXpath(selector);
-        if (selector.indexOf('text=') === 0) {
-          var text = selector.substring(5).replace(/^["']|["']$/g, '');
+        // Playwright role 选择器: role=button[name="登录"]
+        var roleMatch = selector.match(/^role=(\w+)(?:\[name=["']?([^"'\]]+)["']?\])?$/);
+        if (roleMatch) {
+          var role = roleMatch[1].toLowerCase();
+          var name = roleMatch[2] || '';
           var all = document.querySelectorAll('*');
           for (var i = 0; i < all.length; i++) {
-            if (all[i].children.length === 0 && (all[i].textContent || '').trim() === text) return all[i];
+            var el = all[i];
+            var elRole = (el.getAttribute('role') || el.tagName || '').toLowerCase();
+            if (elRole !== role && el.tagName.toLowerCase() !== role) continue;
+            if (name) {
+              var elName = (el.getAttribute('name') || el.getAttribute('aria-label') || el.textContent || '').trim();
+              if (elName.indexOf(name) < 0) continue;
+            }
+            return el;
+          }
+          return null;
+        }
+        if (selector.indexOf('text=') === 0) {
+          var text = selector.substring(5).replace(/^["']|["']$/g, '');
+          var all2 = document.querySelectorAll('*');
+          for (var j = 0; j < all2.length; j++) {
+            if (all2[j].children.length === 0 && (all2[j].textContent || '').trim() === text) return all2[j];
           }
           return null;
         }
