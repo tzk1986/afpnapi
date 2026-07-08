@@ -37,8 +37,15 @@ async function init() {
 async function refreshState() {
   try {
     const state = await chrome.runtime.sendMessage({ type: 'get_state' });
+    if (!state) {
+      // sendMessage 返回 undefined，说明 background 未就绪
+      updateUI({ active: false });
+      showMsg('background 未就绪，请重试', 'error');
+      return;
+    }
     updateUI(state);
   } catch (e) {
+    updateUI({ active: false });
     showMsg('无法连接 background', 'error');
   }
 }
@@ -100,11 +107,11 @@ btnStart.addEventListener('click', async () => {
       server_url: url,
     });
 
-    if (result.ok) {
+    if (result && result.ok) {
       showMsg('录制已开始', 'success');
       await refreshState();
     } else {
-      showMsg(result.error || '启动失败', 'error');
+      showMsg(result?.error || '启动失败', 'error');
       btnStart.disabled = false;
     }
   } catch (e) {
@@ -121,17 +128,19 @@ btnStop.addEventListener('click', async () => {
   try {
     const result = await chrome.runtime.sendMessage({ type: 'stop_recording' });
 
-    if (result.ok) {
+    if (result && result.ok) {
       showMsg('录制已停止，共 ' + result.total_steps + ' 步', 'success');
       stepCountEl.textContent = result.total_steps || 0;
-      await refreshState();
+      // 直接更新 UI 到未录制状态，不依赖 refreshState
+      updateUI({ active: false });
     } else {
-      showMsg(result.error || '停止失败', 'error');
+      showMsg(result?.error || '停止失败', 'error');
       btnStop.disabled = false;
     }
   } catch (e) {
-    showMsg('停止失败: ' + e.message, 'error');
-    btnStop.disabled = false;
+    // 即使通信失败，也更新 UI 到未录制状态
+    updateUI({ active: false });
+    showMsg('停止请求已发送，请刷新确认状态', 'success');
   }
 });
 
