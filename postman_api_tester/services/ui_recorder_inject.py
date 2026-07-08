@@ -514,10 +514,12 @@ _REPLAYER_JS = r"""
     stopped: false,
     startTime: 0,
     results: [],
+    jobId: '',
 
     init: function(steps, options) {
       this.steps = steps || [];
       this.options = options || {};
+      this.jobId = options.job_id || '';
       this.currentIndex = -1;
       this.running = false;
       this.paused = false;
@@ -574,11 +576,13 @@ _REPLAYER_JS = r"""
         action: step.action,
         total: this.steps.length
       });
+      this._sendLog('step_start', step.action + ' step ' + this.currentIndex, { action: step.action });
 
       var delay = this.options.delay_between_steps || 500;
       if (this.currentIndex === 0) delay = 0;
 
       setTimeout(function() {
+        if (self.stopped || !self.running) return;
         self._executeStep(step, self.currentIndex, stepStart);
       }, delay);
     },
@@ -612,6 +616,7 @@ _REPLAYER_JS = r"""
       if (action === 'wait') {
         var ms = parseInt(step.value, 10) || 1000;
         setTimeout(function() {
+          if (self.stopped || !self.running) return;
           result.duration_ms = Date.now() - stepStart;
           self.results.push(result);
           self._notifyParent('step_complete', result);
@@ -645,12 +650,22 @@ _REPLAYER_JS = r"""
 
       // 需要查找元素的 action
       self._waitForElement(step, timeout, function(el) {
+        // 停止时也要调用 _executeNext() 保证执行链不断裂
+        var wasStopped = self.stopped || !self.running;
+
         if (!el) {
           result.status = 'failed';
           result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '');
           result.duration_ms = Date.now() - stepStart;
           self.results.push(result);
           self._notifyParent('step_complete', result);
+          self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn');
+          self._executeNext();
+          return;
+        }
+
+        // 如果已停止，不执行操作但仍推进
+        if (wasStopped) {
           self._executeNext();
           return;
         }
@@ -674,11 +689,13 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
+        self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms }, result.status === 'passed' ? 'info' : 'warn');
 
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
           var urlBefore = self._actionStartUrl || location.href;
           setTimeout(function() {
+            if (self.stopped) return;
             if (location.href !== urlBefore) {
               self._notifyParent('navigate', { url: location.href });
             }
@@ -770,11 +787,18 @@ _REPLAYER_JS = r"""
         var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
         if (found && found.element) {
           console.log('[ReplayEngine] element found after', attempts, 'attempts');
+          self._sendLog('element_found', '元素已找到', { attempts: attempts });
           callback(found.element);
           return;
         }
         if (Date.now() - start >= timeout) {
           console.log('[ReplayEngine] element NOT found after', attempts, 'attempts, timed out');
+          callback(null);
+          return;
+        }
+        // 停止时也要调用 callback 保证执行链不断裂
+        if (self.stopped || !self.running) {
+          console.log('[ReplayEngine] stopped during wait, canceling');
           callback(null);
           return;
         }
@@ -807,6 +831,7 @@ _REPLAYER_JS = r"""
         else failed++;
       }
       var duration = Date.now() - this.startTime;
+      this._sendLog('all_complete', (failed > 0 ? 'failed' : 'passed'), { passed: passed, failed: failed, duration_ms: duration });
       this._notifyParent('all_complete', {
         status: failed > 0 ? 'failed' : 'passed',
         total_steps: this.steps.length,
@@ -824,6 +849,24 @@ _REPLAYER_JS = r"""
           data: data || {}
         }, '*');
       }
+    },
+
+    _sendLog: function(event, message, detail, level) {
+      if (!this.jobId) return;
+      try {
+        fetch('/api/ui-testing/replay-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            job_id: this.jobId,
+            step_index: this.currentIndex,
+            event: event,
+            message: message,
+            detail: detail || {},
+            level: level || 'info'
+          })
+        }).catch(function() {});
+      } catch(e) {}
     }
   };
 

@@ -12,7 +12,7 @@ from .postman_api_tester import (
     run_postman_tests
 )
 
-__version__ = "1.29.16"
+__version__ = "1.29.19"
 __author__ = "API Testing Team"
 
 __all__ = [

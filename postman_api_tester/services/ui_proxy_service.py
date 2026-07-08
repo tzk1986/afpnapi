@@ -265,6 +265,10 @@ class UiProxyService:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "*/*",
         }
+        # 添加 Origin/Referer 使请求看起来来自目标服务器自身
+        target_origin = f"{parsed.scheme}://{parsed.netloc}"
+        headers["Origin"] = target_origin
+        headers["Referer"] = url
         if req_headers:
             for key in ("Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language"):
                 if key in req_headers:
@@ -530,11 +534,33 @@ class UiProxyService:
             'var _targetLoc=document.createElement("a");_targetLoc.href=_TURL;'
             'var _locProto=Location&&Location.prototype;'
             'if(_locProto){'
-            '["host","hostname","origin","protocol","pathname","search","hash","href"].forEach(function(p){'
+            '["host","hostname","origin","protocol","pathname","search","hash"].forEach(function(p){'
             'var d=Object.getOwnPropertyDescriptor(_locProto,p);'
             'if(d&&d.get){var g=d.get;'
             'Object.defineProperty(_locProto,p,{get:function(){return _targetLoc[p];},set:d.set,configurable:true});}'
-            '});}'
+            '});'
+            'var _hrefDesc=Object.getOwnPropertyDescriptor(_locProto,"href");'
+            'if(_hrefDesc&&_hrefDesc.set){var _hrefSet=_hrefDesc.set;'
+            'Object.defineProperty(_locProto,"href",{get:function(){return _targetLoc.href;},'
+            'set:function(v){'
+            'if(typeof v==="string"){'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0){_hrefSet.call(this,v);return;}'
+            'if(v.indexOf(_T)===0){_targetLoc.href=v;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(v));return;}'
+            'if(v.indexOf("/")===0){_targetLoc.href=_T+v;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(_T+v));return;}'
+            'if(v.indexOf(_F)===0){var real=_T+v.substring(_F.length);_targetLoc.href=real;_hrefSet.call(this,"/ui-testing/proxy?url="+encodeURIComponent(real));return;}'
+            '_targetLoc.href=v;}'
+            '_hrefSet.call(this,v);},configurable:true});'
+            '["assign","replace"].forEach(function(m){'
+            'var orig=_locProto[m];'
+            'if(typeof orig==="function"){'
+            '_locProto[m]=function(v){'
+            'if(typeof v==="string"){'
+            'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/")===0)return orig.call(this,v);'
+            'if(v.indexOf(_T)===0){_targetLoc.href=v;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(v));}'
+            'if(v.indexOf("/")===0){_targetLoc.href=_T+v;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(_T+v));}'
+            'if(v.indexOf(_F)===0){var real=_T+v.substring(_F.length);_targetLoc.href=real;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(real));}'
+            '}_targetLoc.href=v;return orig.call(this,v);};}});'
+            '}'
             'function _isProxyUrl(v){return typeof v==="string"&&v.indexOf(_PROXY_PATH)>=0;}'
             'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
             'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
@@ -604,7 +630,8 @@ class UiProxyService:
             'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'
             'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
             'console.log("[EarlyScript] fetch:", _url.substring(0,100));'
-            'return _origFetch.call(this,_url,opts).then(function(resp){'
+            'opts=opts||{};opts.credentials="include";arguments[1]=opts;'
+            'return _origFetch.apply(this,[_url].concat(Array.prototype.slice.call(arguments,1))).then(function(resp){'
             'if(!resp.ok)console.warn("[EarlyScript] fetch failed:", _origUrl.substring(0,80), "->", resp.status, resp.statusText);'
             'return resp;}).catch(function(err){console.error("[EarlyScript] fetch error:", _origUrl.substring(0,80), err.message);throw err;});};'
             'var _xhrOpen=XMLHttpRequest.prototype.open;'

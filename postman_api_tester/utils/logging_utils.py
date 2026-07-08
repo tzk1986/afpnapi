@@ -14,6 +14,7 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from threading import Lock
+import threading
 from typing import Any, Deque, Dict, Mapping, Optional
 
 _STANDARD_RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__.keys())
@@ -196,6 +197,10 @@ def configure_logging_from_config(service_name: str) -> None:
         log_file_max_bytes=LOG_FILE_MAX_BYTES,
         log_file_backup_count=LOG_FILE_BACKUP_COUNT,
     )
+    # 启动日志清理线程（仅当配置了日志文件时）
+    if LOG_FILE:
+        log_dir = str(Path(LOG_FILE).expanduser().resolve().parent)
+        _start_log_cleanup(log_dir)
 
 
 def get_log_sample_rate(default: float = 0.1) -> float:
@@ -265,3 +270,61 @@ def get_log_alert_snapshot() -> Dict[str, Any]:
         "current": current_rate_per_min,
         "error_count": error_count,
     }
+
+
+# ── 日志清理 ──
+
+_LOG_CLEANUP_INTERVAL = 86400  # 每天检查一次
+_LOG_RETENTION_DAYS = 7
+
+
+def cleanup_old_logs(log_dir: str, retention_days: int = _LOG_RETENTION_DAYS) -> int:
+    """清理指定目录下超过保留期的日志文件。
+
+    Args:
+        log_dir: 日志文件目录
+        retention_days: 保留天数，默认 7 天
+
+    Returns:
+        删除的文件数量
+    """
+    import glob
+
+    cutoff = time.time() - retention_days * 86400
+    removed = 0
+    log_path = Path(log_dir)
+    if not log_path.is_dir():
+        return 0
+
+    for pattern in ("*.log", "*.log.*"):
+        for filepath in log_path.glob(pattern):
+            try:
+                if filepath.stat().st_mtime < cutoff:
+                    filepath.unlink()
+                    removed += 1
+            except OSError:
+                pass
+    return removed
+
+
+def _start_log_cleanup(log_dir: str) -> None:
+    """启动后台日志清理线程。"""
+    def _cleanup_loop():
+        while True:
+            time.sleep(_LOG_CLEANUP_INTERVAL)
+            try:
+                removed = cleanup_old_logs(log_dir)
+                if removed:
+                    logging.getLogger(__name__).info(
+                        "log_cleanup",
+                        extra={
+                            "event": "log.cleanup",
+                            "removed_count": removed,
+                            "log_dir": log_dir,
+                        },
+                    )
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_cleanup_loop, daemon=True)
+    t.start()

@@ -228,7 +228,7 @@
             startTime = Date.now();
             startTimer();
             updateControlButtons();
-            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 30000 } });
+            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 30000, job_id: jobId } });
             setTimeout(function() {
                 sendToFrame({ type: 'ui-replay-control', action: 'start' });
             }, 100);
@@ -345,8 +345,12 @@
 
         function onNavigate(url) {
             if (!url) return;
+            // 对代理 URL 不显示原始 URL，避免暴露内部代理地址
+            var displayUrl = url.indexOf('proxy-resource') >= 0 || url.indexOf('/ui-testing/proxy') === 0
+                ? '正在加载页面...'
+                : url;
             document.getElementById('iframeLoading').style.display = 'flex';
-            document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
+            document.getElementById('iframeLoading').textContent = '正在导航到: ' + displayUrl;
             var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url);
             document.getElementById('replayFrame').src = proxyUrl;
             // 导航后需要重新注入回放引擎（iframe onload 会触发）

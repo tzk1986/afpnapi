@@ -339,6 +339,37 @@ def api_ui_testing_replay_engine_js() -> ResponseReturnValue:
     return resp
 
 
+def api_ui_testing_replay_log() -> ResponseReturnValue:
+    """接收回放引擎日志并写入后端日志系统。"""
+    payload = request.get_json(silent=True)
+    if not payload:
+        return json_error("无效的 JSON 数据", 400, "UIT_REPLAY_LOG_001")
+
+    job_id = payload.get("job_id", "")
+    step_index = payload.get("step_index", -1)
+    event = payload.get("event", "")
+    message = payload.get("message", "")
+    detail = payload.get("detail", {})
+
+    log_level = logging.DEBUG
+    if payload.get("level") == "error":
+        log_level = logging.ERROR
+    elif payload.get("level") == "warn":
+        log_level = logging.WARNING
+
+    logger.log(
+        log_level,
+        f"replay[{job_id}] step={step_index} {event}: {message}",
+        extra={
+            "event": f"ui.replay.{event}",
+            "job_id": job_id,
+            "step_index": step_index,
+            "detail": detail,
+        },
+    )
+    return BaseHandler.json_response({"ok": True})
+
+
 # ---- Phase 3: 设置管理 ----
 
 
