@@ -50,23 +50,15 @@ function _persistState() {
   }
 }
 
-// 初始化：从 local storage 恢复 serverUrl + 录制状态
-chrome.storage.local.get(['serverUrl', '_recState'], (result) => {
+// 初始化：从 local storage 恢复 serverUrl，录制状态一律从零开始
+chrome.storage.local.get(['serverUrl'], (result) => {
   if (result.serverUrl) {
     recordingState.serverUrl = result.serverUrl;
   }
-  // 自动清除可能存在的脏数据：如果上次状态是 active 但本次加载时没有对应 tab
-  // 则重置为未录制状态，避免"幽灵录制"问题
-  if (result._recState && result._recState.active) {
-    console.log('[Background] Found previous active state, clearing to prevent ghost recording');
-    recordingState.active = false;
-    recordingState.sessionId = null;
-    recordingState.stepCount = 0;
-    recordingState.startTime = null;
-    // 清除存储中的脏状态
-    chrome.storage.local.remove('_recState');
-    chrome.action.setBadgeText({ text: '' });
-  }
+  // 强制清除所有残留的录制状态（包括可能的脏数据）
+  chrome.storage.local.remove('_recState');
+  chrome.action.setBadgeText({ text: '' });
+  console.log('[Background] Initialized fresh, serverUrl:', recordingState.serverUrl);
 });
 
 // 生成 session ID
