@@ -546,8 +546,9 @@ class UiProxyService:
             'return v;}'
             + to_proxy +
             rw_html +
-            'var _dw=document.write.bind(document);document.write=function(h){return _dw(_rw(h))};'
-            'var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rw(h))};'
+            'function _rwTargetToProxy(s){return typeof s==="string"?s.replace(new RegExp(_T.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&")+"(?=[/])","g"),"/ui-testing/proxy-resource?url="+encodeURIComponent(_T)):s;}'
+            'var _dw=document.write.bind(document);document.write=function(h){return _dw(_rwTargetToProxy(_rw(h)))};'
+            'var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rwTargetToProxy(_rw(h)))};'
             'var _ac=Element.prototype.appendChild;'
             'Element.prototype.appendChild=function(child){'
             'if(child&&child.tagName==="SCRIPT"&&child.src)child.src=_toProxy(child.src);'
