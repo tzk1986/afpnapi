@@ -260,10 +260,9 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
             return json_error("用例数据不存在", 404, "UIT_EXEC_001")
         steps = case_data.get("steps", [])
         base_url = case_data.get("base_url", "")
-        # 回放前清除旧 session cookie，确保重新登录
         if base_url:
             _proxy_session_store.clear_cookies_by_base_url(base_url)
-        return BaseHandler.json_response({
+        resp = make_response(BaseHandler.json_response({
             "steps": [s for s in steps if s.get("action") != "api_call"],
             "options": {
                 "delay_between_steps": UI_EXECUTION_DEFAULT_DELAY_MS,
@@ -272,20 +271,25 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
             "case_name": case_data.get("name", ""),
             "base_url": base_url,
             "network_requests": _extract_network_requests(steps),
-        })
+        }))
+        # 清除浏览器旧 session cookie，确保 iframe 加载时创建新 session
+        resp.set_cookie("_proxy_session", "", expires=0, path="/")
+        return resp
 
     case_data = job_data["case_data"]
     steps = case_data.get("steps", [])
     base_url = case_data.get("base_url", "")
     if base_url:
         _proxy_session_store.clear_cookies_by_base_url(base_url)
-    return BaseHandler.json_response({
+    resp = make_response(BaseHandler.json_response({
         "steps": [s for s in steps if s.get("action") != "api_call"],
         "options": job_data["options"],
         "case_name": case_data.get("name", ""),
         "base_url": base_url,
         "network_requests": _extract_network_requests(steps),
-    })
+    }))
+    resp.set_cookie("_proxy_session", "", expires=0, path="/")
+    return resp
 
 
 def ui_testing_replay_page(job_id: str) -> ResponseReturnValue:
