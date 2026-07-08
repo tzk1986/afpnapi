@@ -91,6 +91,15 @@ class _ProxySessionStore:
                 s["base_url"] = base_url
                 s["last_active"] = time.time()
 
+    def find_session_by_base_url(self, base_url: str) -> Optional[str]:
+        """根据目标基础 URL 查找已有会话 ID。"""
+        with self._lock:
+            for sid, s in self._sessions.items():
+                if s.get("base_url") == base_url:
+                    s["last_active"] = time.time()
+                    return sid
+            return None
+
     def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
         with self._lock:
             s = self._sessions.get(session_id)

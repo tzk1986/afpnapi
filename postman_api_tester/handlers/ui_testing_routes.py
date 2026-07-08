@@ -141,14 +141,32 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         base_url: 目标基础 URL（创建新会话时保存）
     """
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+    from urllib.parse import parse_qs as _parse_qs
+
     sid = request.cookies.get("_proxy_session")
     if sid:
         jar = _proxy_session_store.get_cookie_jar(sid)
         if jar is not None:
-            # 更新 base_url（如果提供了）
             if base_url:
                 _proxy_session_store.set_base_url(sid, base_url)
             return sid
+
+    # Cookie 尚未存储时，从 Referer 提取目标 URL 以复用 session
+    referer = request.headers.get("Referer", "")
+    if referer and "/ui-testing/proxy?url=" in referer:
+        try:
+            ref_qs = referer.split("/ui-testing/proxy?url=", 1)[1].split("&")[0]
+            from urllib.parse import unquote as _uq2
+            ref_base_url = _uq2(ref_qs)
+            # 查找已有该 base_url 的 session
+            existing_sid = _proxy_session_store.find_session_by_base_url(ref_base_url)
+            if existing_sid:
+                return existing_sid
+            # 没有则创建并关联 base_url
+            return _proxy_session_store.create_session(ref_base_url)
+        except Exception:
+            pass
+
     # 创建新会话并保存 base_url
     new_sid = _proxy_session_store.create_session(base_url)
     return new_sid
