@@ -257,6 +257,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
     # 提取基础 URL（scheme + netloc）作为会话的 base_url
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
     session_id = _get_proxy_session_id(base_url)
+    replay_mode = request.args.get("replay", "") == "1"
 
     started_at = time.perf_counter()
     try:
@@ -266,6 +267,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             method=request.method,
             req_headers=dict(request.headers),
             req_body=request.get_data() if request.method != "GET" else None,
+            replay_mode=replay_mode,
         )
     except ValueError as e:
         logger.warning(

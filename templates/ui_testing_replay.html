@@ -127,7 +127,7 @@
                     // 加载目标页面到 iframe
                     var baseUrl = data.base_url || '';
                     if (baseUrl) {
-                        var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(baseUrl);
+                        var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(baseUrl) + '&replay=1';
                         document.getElementById('replayFrame').src = proxyUrl;
                     } else {
                         document.getElementById('iframeLoading').textContent = '用例无 base_url，请导航步骤指定页面';

@@ -240,6 +240,7 @@ class UiProxyService:
         method: str = "GET",
         req_headers: Optional[Dict[str, str]] = None,
         req_body: Optional[bytes] = None,
+        replay_mode: bool = False,
     ) -> Tuple[str, int, Dict[str, Any]]:
         """获取外部 URL 并改写 HTML。
 
@@ -339,7 +340,7 @@ class UiProxyService:
         response_headers.pop("Content-Security-Policy", None)
 
         if is_html:
-            body = cls.rewrite_html(resp.text, resp.url)
+            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode)
             response_headers["Content-Type"] = "text/html; charset=utf-8"
         else:
             body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
@@ -498,7 +499,7 @@ class UiProxyService:
         return resp.content, resp.status_code, response_headers
 
     @staticmethod
-    def rewrite_html(html: str, base_url: str) -> str:
+    def rewrite_html(html: str, base_url: str, replay_mode: bool = False) -> str:
         """改写 HTML 中的所有 URL 引用。
 
         处理：
@@ -513,7 +514,7 @@ class UiProxyService:
 
         result = html
 
-        result = UiProxyService._inject_early_script(result, origin, base_url)
+        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode)
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
@@ -684,7 +685,7 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _inject_early_script(html: str, origin: str, target_url: str) -> str:
+    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False) -> str:
         """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
 
         拦截机制（8 层防护）：
@@ -723,8 +724,13 @@ class UiProxyService:
             '}'
         )
 
+        storage_clear = ''
+        if replay_mode:
+            storage_clear = 'try{localStorage.clear();sessionStorage.clear();}catch(e){}'
+
         early_js = (
             '(function(){'
+            + storage_clear +
             'var _T="' + origin + '";'
             'var _TURL="' + target_url + '";'
             'var _F=location.protocol+"//"+location.host;'
