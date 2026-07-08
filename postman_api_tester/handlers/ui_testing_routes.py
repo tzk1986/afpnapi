@@ -254,6 +254,16 @@ def ui_testing_proxy() -> ResponseReturnValue:
         },
     )
 
+    # 重写 Location 响应头：将目标服务器的重定向 URL 改为代理 URL
+    if "Location" in headers:
+        loc = headers["Location"]
+        from urllib.parse import quote as _quote2
+        if loc.startswith(("http://", "https://")):
+            headers["Location"] = "/ui-testing/proxy?url=" + _quote2(loc, safe="")
+        elif loc.startswith("/"):
+            full_loc = base_url + loc
+            headers["Location"] = "/ui-testing/proxy?url=" + _quote2(full_loc, safe="")
+
     resp = make_response(body, status_code)
     for key, value in headers.items():
         if key == "_set_cookies":
@@ -359,6 +369,17 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
             headers["Content-Type"] = content_type
         except Exception as e:
             logger.warning("css_rewrite_failed: %s", e)
+
+    # 重写 Location 响应头：将目标服务器的重定向 URL 改为代理 URL
+    if "Location" in headers:
+        loc = headers["Location"]
+        from urllib.parse import quote as _quote
+        if loc.startswith(("http://", "https://")):
+            headers["Location"] = "/ui-testing/proxy?url=" + _quote(loc, safe="")
+        elif loc.startswith("/"):
+            _target_base = target_url.rsplit("/", 1)[0] if "/" in target_url else target_url
+            full_loc = _target_base + loc
+            headers["Location"] = "/ui-testing/proxy?url=" + _quote(full_loc, safe="")
 
     resp = make_response(body, status_code)
     for key, value in headers.items():
