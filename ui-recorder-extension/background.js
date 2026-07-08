@@ -33,27 +33,10 @@ function _extractTargetUrl(url) {
   }
 }
 
-// 状态恢复 Promise，确保消息处理前状态已就绪
-let _stateRestored = false;
-let _stateRestoreResolvers = [];
-
-function _waitForStateRestore() {
-  if (_stateRestored) return Promise.resolve();
-  return new Promise((resolve) => {
-    _stateRestoreResolvers.push(resolve);
-  });
-}
-
-function _markStateRestored() {
-  _stateRestored = true;
-  for (const r of _stateRestoreResolvers) r();
-  _stateRestoreResolvers = [];
-}
-
-// 持久化状态到 session storage（Service Worker 被杀后可恢复）
+// 持久化状态到 local storage（Service Worker 被杀后可恢复）
 function _persistState() {
   try {
-    chrome.storage.session.set({
+    chrome.storage.local.set({
       _recState: {
         active: recordingState.active,
         sessionId: recordingState.sessionId,
@@ -67,39 +50,22 @@ function _persistState() {
   }
 }
 
-// 初始化：从 storage 恢复 serverUrl + 录制状态
-chrome.storage.local.get(['serverUrl'], (result) => {
+// 初始化：从 local storage 恢复 serverUrl + 录制状态
+chrome.storage.local.get(['serverUrl', '_recState'], (result) => {
   if (result.serverUrl) {
     recordingState.serverUrl = result.serverUrl;
   }
+  if (result._recState && result._recState.active) {
+    recordingState.active = true;
+    recordingState.sessionId = result._recState.sessionId;
+    recordingState.serverUrl = result._recState.serverUrl || recordingState.serverUrl;
+    recordingState.stepCount = result._recState.stepCount || 0;
+    recordingState.startTime = result._recState.startTime || null;
+    chrome.action.setBadgeText({ text: 'REC' });
+    chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+    console.log('[Background] Restored recording state:', recordingState.sessionId, 'steps:', recordingState.stepCount);
+  }
 });
-
-// 从 session storage 恢复录制状态（Service Worker 重启后）
-try {
-  chrome.storage.session.get(['_recState'], (result) => {
-    if (chrome.runtime.lastError) {
-      console.warn('[Background] session.get error:', chrome.runtime.lastError.message);
-      _markStateRestored();
-      return;
-    }
-    if (result._recState && result._recState.active) {
-      recordingState.active = true;
-      recordingState.sessionId = result._recState.sessionId;
-      recordingState.serverUrl = result._recState.serverUrl || recordingState.serverUrl;
-      recordingState.stepCount = result._recState.stepCount || 0;
-      recordingState.startTime = result._recState.startTime || null;
-      chrome.action.setBadgeText({ text: 'REC' });
-      chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
-      console.log('[Background] Restored recording state:', recordingState.sessionId, 'steps:', recordingState.stepCount);
-    } else {
-      console.log('[Background] No active recording to restore');
-    }
-    _markStateRestored();
-  });
-} catch (e) {
-  console.warn('[Background] session restore error:', e.message);
-  _markStateRestored();
-}
 
 // 生成 session ID
 function generateSessionId() {
@@ -223,25 +189,20 @@ async function stopRecording() {
 
 // 接收来自 content script 的消息
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-
-  if (msg.type === 'heartbeat') {
-    // 心跳消息：保持 Service Worker 存活，返回录制状态
-    _waitForStateRestore().then(() => {
+  try {
+    if (msg.type === 'heartbeat') {
       sendResponse({
         active: recordingState.active,
         session_id: recordingState.sessionId,
       });
-    });
-    return true;
-  }
+      return true;
+    }
 
-  if (msg.type === 'step' || msg.type === 'navigation') {
-    // 等待状态恢复后再处理
-    _waitForStateRestore().then(() => {
+    if (msg.type === 'step' || msg.type === 'navigation') {
       if (!recordingState.active) {
         console.warn('[Background] Dropped event, recording not active:', msg.type);
         sendResponse({ ok: false, error: 'not_recording' });
-        return;
+        return true;
       }
 
       recordingState.stepCount++;
@@ -256,22 +217,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       });
 
       sendResponse({ ok: true, step_index: recordingState.stepCount });
-    });
-    return true;
-  }
+      return true;
+    }
 
-  if (msg.type === 'check_recording') {
-    _waitForStateRestore().then(() => {
+    if (msg.type === 'check_recording') {
       sendResponse({
         active: recordingState.active,
         session_id: recordingState.sessionId,
       });
-    });
-    return true;
-  }
+      return true;
+    }
 
-  if (msg.type === 'get_state') {
-    _waitForStateRestore().then(() => {
+    if (msg.type === 'get_state') {
       sendResponse({
         active: recordingState.active,
         session_id: recordingState.sessionId,
@@ -279,12 +236,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         step_count: recordingState.stepCount,
         start_time: recordingState.startTime,
       });
-    });
+      return true;
+    }
+  } catch (e) {
+    console.error('[Background] onMessage error:', e.message);
+    sendResponse({ ok: false, error: e.message });
     return true;
   }
 
   if (msg.type === 'start_recording') {
-    startRecording(msg.server_url).then(sendResponse);
+    startRecording(msg.server_url).then(sendResponse).catch(function(err) {
+      console.error('[Background] startRecording error:', err);
+      sendResponse({ ok: false, error: err.message });
+    });
     return true;
   }
 
@@ -295,6 +259,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     });
     return true;
   }
+
+  sendResponse({ ok: false, error: 'unknown_message' });
+  return true;
 });
 
 // 新 tab 创建时，如果正在录制，自动注入 content script 并启动
