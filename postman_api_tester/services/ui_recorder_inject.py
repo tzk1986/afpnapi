@@ -576,7 +576,7 @@ _REPLAYER_JS = r"""
         action: step.action,
         total: this.steps.length
       });
-      this._sendLog('step_start', step.action + ' step ' + this.currentIndex, { action: step.action });
+      if (typeof this._sendLog === 'function') try { this._sendLog('step_start', step.action + ' step ' + this.currentIndex, { action: step.action }); } catch(e) {}
 
       var delay = this.options.delay_between_steps || 500;
       if (this.currentIndex === 0) delay = 0;
@@ -659,7 +659,7 @@ _REPLAYER_JS = r"""
           result.duration_ms = Date.now() - stepStart;
           self.results.push(result);
           self._notifyParent('step_complete', result);
-          self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn');
+          if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn'); } catch(e) {}
           self._executeNext();
           return;
         }
@@ -689,7 +689,7 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms }, result.status === 'passed' ? 'info' : 'warn');
+        if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
 
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
@@ -787,7 +787,7 @@ _REPLAYER_JS = r"""
         var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
         if (found && found.element) {
           console.log('[ReplayEngine] element found after', attempts, 'attempts');
-          self._sendLog('element_found', '元素已找到', { attempts: attempts });
+          if (typeof self._sendLog === 'function') try { self._sendLog('element_found', '元素已找到', { attempts: attempts }); } catch(e) {}
           callback(found.element);
           return;
         }
@@ -831,7 +831,7 @@ _REPLAYER_JS = r"""
         else failed++;
       }
       var duration = Date.now() - this.startTime;
-      this._sendLog('all_complete', (failed > 0 ? 'failed' : 'passed'), { passed: passed, failed: failed, duration_ms: duration });
+      if (typeof this._sendLog === 'function') try { this._sendLog('all_complete', (failed > 0 ? 'failed' : 'passed'), { passed: passed, failed: failed, duration_ms: duration }); } catch(e) {}
       this._notifyParent('all_complete', {
         status: failed > 0 ? 'failed' : 'passed',
         total_steps: this.steps.length,

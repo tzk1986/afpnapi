@@ -314,7 +314,8 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
         },
     )
 
-    # 内容类型校验：请求静态资源但返回 text/html 说明目标服务器返回了错误页面
+    # 内容类型告警：请求静态资源但返回 text/html 说明目标服务器可能返回了错误页面
+    # 不直接拦截返回 404，让原始响应返回给浏览器（可能是验证码等动态生成的资源）
     from urllib.parse import urlparse as _up
     _ext = _up(target_url).path.rsplit(".", 1)[-1].lower() if "." in _up(target_url).path else ""
     _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf", "mp4", "webm", "ogg", "pdf", "zip"}
@@ -326,9 +327,9 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
                 "url": target_url,
                 "expected_ext": _ext,
                 "actual_content_type": content_type,
+                "body_preview": body[:200].decode("utf-8", errors="replace"),
             },
         )
-        return make_response(b"", 404)
 
     # CSS 文件改写：改写其中的 url() 引用为代理 URL
     if content_type.startswith("text/css") or _ext == "css":
