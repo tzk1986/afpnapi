@@ -274,10 +274,9 @@ class UiProxyService:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "*/*",
         }
-        # 添加 Origin/Referer 使请求看起来来自目标服务器自身
+        # Referer 设为基础页面 URL（不设为具体资源 URL，避免目标服务器校验 Origin 不匹配）
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
-        headers["Origin"] = target_origin
-        headers["Referer"] = url
+        headers["Referer"] = target_origin + "/"
         if req_headers:
             for key in ("Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language"):
                 if key in req_headers:
