@@ -776,6 +776,7 @@ _REPLAYER_JS = r"""
     },
 
     _waitForElement: function(step, timeout, callback) {
+      var self = this;
       var selector = step.selector;
       var start = Date.now();
       var interval = 200;
