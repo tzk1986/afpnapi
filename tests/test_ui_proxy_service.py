@@ -62,9 +62,10 @@ class TestRewriteHtml:
         result = UiProxyService.rewrite_html(html, "http://10.50.11.120:9001/login")
         assert "window.location.protocol" in result
         assert "window.location.host" in result
-        script_body = result.split("</script>")[0]
-        assert "proxy-resource" not in script_body
-        assert "proxy?url" not in script_body
+        # 用户原始脚本在早期注入脚本之后，按 </script> 分割后第 [1] 段为用户脚本
+        user_script = result.split("</script>")[1]
+        assert "proxy-resource" not in user_script
+        assert "proxy?url" not in user_script
 
     def test_skip_script_content_preserves_html_attrs(self) -> None:
         html = (

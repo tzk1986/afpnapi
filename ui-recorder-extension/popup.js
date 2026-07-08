@@ -2,6 +2,13 @@
  * UI 录制器 Popup 控制面板
  */
 
+// 从 manifest 动态读取版本号，避免硬编码遗漏
+(function() {
+  const m = chrome.runtime.getManifest();
+  const versionEl = document.getElementById('versionLabel');
+  if (versionEl) versionEl.textContent = 'v' + m.version;
+})();
+
 const serverUrlInput = document.getElementById('serverUrl');
 const btnStart = document.getElementById('btnStart');
 const btnStop = document.getElementById('btnStop');

@@ -162,16 +162,30 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
     target_url = unquote(target_url)
 
+    # 自动解包嵌套代理 URL：当 target_url 本身也是代理 URL 时，提取真实目标
+    _max_unwrap = 5
+    for _ in range(_max_unwrap):
+        from urllib.parse import urlparse as _up2
+        _parsed = _up2(target_url)
+        if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
+            _inner = _parsed.path.startswith("/ui-testing/proxy")
+            if _inner:
+                from urllib.parse import parse_qs as _pqs
+                _qs = _pqs(_parsed.query)
+                _inner_url = _qs.get("url", [""])[0]
+                if _inner_url:
+                    logger.debug("unwrap_nested_proxy", extra={"from": target_url[:80], "to": _inner_url[:80]})
+                    target_url = _inner_url
+                    continue
+        break
+
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
 
-    # 检测循环引用：目标地址不能是代理服务器自身（但允许 proxy-resource 请求）
-    from urllib.parse import urlparse as _up2
+    # 检测循环引用：目标地址不能是代理服务器自身
     parsed_target = _up2(target_url)
     if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
-        # 允许 proxy-resource 请求（这是正常的代理链）
-        if "/ui-testing/proxy-resource" not in target_url:
-            return json_error("目标地址不能是代理服务器自身", 400, "UIT_PROXY_005")
+        return json_error(f"目标地址不能是代理服务器自身: {target_url[:100]}", 400, "UIT_PROXY_005")
 
     host_error = _check_ui_proxy_host_allowed(target_url)
     if host_error is not None:

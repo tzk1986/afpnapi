@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "UI Test Recorder",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "录制页面操作并发送到 UI 测试平台",
-  "permissions": ["activeTab", "storage", "tabs"],
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

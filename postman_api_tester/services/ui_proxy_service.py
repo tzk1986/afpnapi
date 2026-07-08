@@ -510,6 +510,7 @@ class UiProxyService:
         to_proxy = (
             'function _toProxy(v){'
             'if(typeof v!=="string"||!v)return v;'
+            'if(v.indexOf("data:")===0||v.indexOf("blob:")===0||v.indexOf("javascript:")===0)return v;'
             'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0||v.indexOf("/api/")===0)return v;'
             'if(v.indexOf("proxy-resource")>=0)return v;'
             'if(v.indexOf(_T)===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(v);'
@@ -594,6 +595,7 @@ class UiProxyService:
             'window.fetch=function(url,opts){'
             'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
             'var _origUrl=_url;'
+            'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("/ui-testing/")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("proxy-resource")>=0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
@@ -608,6 +610,7 @@ class UiProxyService:
             'XMLHttpRequest.prototype.open=function(m,url){'
             'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
             'var _origUrl=_url;'
+            'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf("/ui-testing/")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
