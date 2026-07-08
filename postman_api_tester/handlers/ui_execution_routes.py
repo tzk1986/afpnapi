@@ -218,6 +218,28 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
     return BaseHandler.json_response({"ok": True})
 
 
+def _extract_network_requests(steps: list) -> list:
+    """从 steps 中提取 api_call 步骤的网络请求数据，供回放引擎比对。"""
+    network_requests = []
+    for step in steps:
+        if step.get("action") != "api_call":
+            continue
+        net_req = step.get("network_request")
+        if not net_req:
+            continue
+        net_resp = step.get("network_response") or {}
+        network_requests.append({
+            "url": net_req.get("url", ""),
+            "url_path": net_req.get("url_path", ""),
+            "method": net_req.get("method", "GET"),
+            "headers": net_req.get("headers", {}),
+            "body": net_req.get("body", ""),
+            "response_status": net_resp.get("status", 0),
+            "response_body": net_resp.get("body", ""),
+        })
+    return network_requests
+
+
 def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
     """返回回放引擎初始化数据（steps + options）。"""
     job_data = _active_jobs.get(job_id)
@@ -228,22 +250,26 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
         case_data = _case_store.get_case(result.get("case_id", ""))
         if not case_data:
             return json_error("用例数据不存在", 404, "UIT_EXEC_001")
+        steps = case_data.get("steps", [])
         return BaseHandler.json_response({
-            "steps": case_data.get("steps", []),
+            "steps": [s for s in steps if s.get("action") != "api_call"],
             "options": {
                 "delay_between_steps": UI_EXECUTION_DEFAULT_DELAY_MS,
                 "timeout": UI_EXECUTION_DEFAULT_TIMEOUT_MS,
             },
             "case_name": case_data.get("name", ""),
             "base_url": case_data.get("base_url", ""),
+            "network_requests": _extract_network_requests(steps),
         })
 
     case_data = job_data["case_data"]
+    steps = case_data.get("steps", [])
     return BaseHandler.json_response({
-        "steps": case_data.get("steps", []),
+        "steps": [s for s in steps if s.get("action") != "api_call"],
         "options": job_data["options"],
         "case_name": case_data.get("name", ""),
         "base_url": case_data.get("base_url", ""),
+        "network_requests": _extract_network_requests(steps),
     })
 
 

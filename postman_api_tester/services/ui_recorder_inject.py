@@ -522,6 +522,137 @@ _REPLAYER_JS = r"""
     }
   };
 
+  // ====== 网络请求比对器 ======
+  var NetworkComparator = {
+    recorded: [],
+    _installed: false,
+
+    init: function(networkRequests) {
+      this.recorded = networkRequests || [];
+      if (this.recorded.length === 0 || this._installed) return;
+      this._installed = true;
+      this._interceptFetch();
+      this._interceptXHR();
+      console.log('[NetworkComparator] Installed, recorded requests:', this.recorded.length);
+    },
+
+    _interceptFetch: function() {
+      var self = this;
+      var orig = window.fetch;
+      window.fetch = function(url, opts) {
+        var reqUrl = typeof url === 'string' ? url : (url && url.href ? url.href : String(url));
+        var method = (opts && opts.method) || 'GET';
+        var reqHeaders = {};
+        if (opts && opts.headers) {
+          try {
+            if (typeof opts.headers.forEach === 'function') {
+              opts.headers.forEach(function(v, k) { reqHeaders[k] = v; });
+            } else if (typeof opts.headers === 'object') {
+              for (var k in opts.headers) { if (opts.headers.hasOwnProperty(k)) reqHeaders[k] = opts.headers[k]; }
+            }
+          } catch(e) {}
+        }
+        return orig.apply(this, arguments).then(function(resp) {
+          self._onRequest(reqUrl, method.toUpperCase(), reqHeaders, resp.status);
+          return resp;
+        });
+      };
+    },
+
+    _interceptXHR: function() {
+      var self = this;
+      var origOpen = XMLHttpRequest.prototype.open;
+      var origSend = XMLHttpRequest.prototype.send;
+      var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.__nc_method = (method || 'GET').toUpperCase();
+        this.__nc_url = typeof url === 'string' ? url : String(url);
+        this.__nc_headers = {};
+        return origOpen.apply(this, arguments);
+      };
+
+      XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        if (this.__nc_headers) this.__nc_headers[name] = value;
+        return origSetHeader.apply(this, arguments);
+      };
+
+      XMLHttpRequest.prototype.send = function(body) {
+        var xhr = this;
+        xhr.addEventListener('loadend', function() {
+          if (xhr.__nc_url) {
+            self._onRequest(xhr.__nc_url, xhr.__nc_method, xhr.__nc_headers || {}, xhr.status);
+          }
+        });
+        return origSend.apply(this, arguments);
+      };
+    },
+
+    _getPath: function(url) {
+      try {
+        var u = new URL(url, location.href);
+        return u.pathname;
+      } catch(e) {
+        return url;
+      }
+    },
+
+    _findMatch: function(url, method) {
+      var path = this._getPath(url);
+      for (var i = 0; i < this.recorded.length; i++) {
+        var rec = this.recorded[i];
+        var recPath = rec.url_path || this._getPath(rec.url);
+        if (recPath === path && rec.method === method) {
+          return rec;
+        }
+      }
+      return null;
+    },
+
+    _compareHeaders: function(recordedHeaders, actualHeaders) {
+      var diffs = [];
+      var skipRe = /^(host|cookie|connection|content-length|accept-encoding|sec-|x-forwarded|x-real-ip|referer|user-agent|origin)/i;
+      var actualLower = {};
+      for (var k in actualHeaders) {
+        if (actualHeaders.hasOwnProperty(k)) actualLower[k.toLowerCase()] = actualHeaders[k];
+      }
+      for (var key in recordedHeaders) {
+        if (!recordedHeaders.hasOwnProperty(key)) continue;
+        if (skipRe.test(key)) continue;
+        var lowerKey = key.toLowerCase();
+        var actualVal = actualLower[lowerKey];
+        if (actualVal === undefined || actualVal === null) {
+          diffs.push({ key: key, type: 'missing', recorded: recordedHeaders[key], actual: null });
+        } else if (recordedHeaders[key] !== actualVal) {
+          diffs.push({ key: key, type: 'changed', recorded: recordedHeaders[key], actual: actualVal });
+        }
+      }
+      return diffs;
+    },
+
+    _onRequest: function(url, method, actualHeaders, status) {
+      var match = this._findMatch(url, method);
+      if (!match) return;
+
+      var headerDiffs = this._compareHeaders(match.headers || {}, actualHeaders);
+      var statusMatch = match.response_status === status;
+
+      if (headerDiffs.length > 0 || !statusMatch) {
+        var detail = {
+          url: url,
+          method: method,
+          header_diffs: headerDiffs,
+          recorded_status: match.response_status,
+          actual_status: status,
+        };
+        console.warn('[NetworkComparator] Mismatch:', url, detail);
+        if (typeof ReplayEngine !== 'undefined' && ReplayEngine._sendLog) {
+          ReplayEngine._sendLog('network_mismatch', '请求结构与录制不一致: ' + method + ' ' + url, detail, 'warn');
+        }
+      }
+    }
+  };
+
   // ====== 回放引擎 ======
   var ReplayEngine = {
     steps: [],
@@ -543,6 +674,9 @@ _REPLAYER_JS = r"""
       this.paused = false;
       this.stopped = false;
       this.results = [];
+      if (options.network_requests && options.network_requests.length > 0) {
+        NetworkComparator.init(options.network_requests);
+      }
       this._notifyParent('ready', { step_count: this.steps.length });
     },
 

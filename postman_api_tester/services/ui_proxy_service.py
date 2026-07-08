@@ -131,6 +131,25 @@ class _ProxySessionStore:
                 result.append("; ".join(parts))
             return result
 
+    def dump_sessions(self) -> List[Dict]:
+        """导出所有活跃会话的摘要（调试用）。"""
+        with self._lock:
+            result = []
+            for sid, s in self._sessions.items():
+                jar = s["cookies"]
+                result.append({
+                    "session_id": sid[:8],
+                    "base_url": s.get("base_url", ""),
+                    "last_active_ago": round(time.time() - s["last_active"]),
+                    "cookies": [{
+                        "name": c.name,
+                        "value_preview": c.value[:30] + "..." if len(c.value) > 30 else c.value,
+                        "domain": c.domain,
+                        "path": c.path,
+                    } for c in jar],
+                })
+            return result
+
     def cleanup_expired(self) -> int:
         now = time.time()
         removed = 0
@@ -212,15 +231,52 @@ class UiProxyService:
             cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
             if cookie_jar:
                 session.cookies = cookie_jar
+                logger.info(
+                    "proxy_page_request_cookies",
+                    extra={
+                        "event": "ui.proxy.page.req.cookies",
+                        "session_id": session_id[:8],
+                        "url": url,
+                        "method": method,
+                        "cookies_sent": {c.name: c.value[:20] + "..." if len(c.value) > 20 else c.value for c in cookie_jar},
+                    },
+                )
 
         resp = session.request(
             method, url, headers=headers, data=req_body,
             timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
         )
 
+        # 记录目标服务器返回的 Set-Cookie
+        resp_set_cookies = []
+        for k, v in resp.headers.items():
+            if k.lower() == "set-cookie":
+                resp_set_cookies.append(v)
+        if resp_set_cookies:
+            logger.info(
+                "proxy_page_response_set_cookie",
+                extra={
+                    "event": "ui.proxy.page.resp.set_cookie",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "set_cookie_headers": resp_set_cookies[:5],
+                },
+            )
+
         # 存储目标服务器返回的 Cookie
         if session_id:
             _proxy_session_store.update_cookies(session_id, session.cookies)
+            updated_jar = _proxy_session_store.get_cookie_jar(session_id)
+            logger.debug(
+                "proxy_page_cookies_after_update",
+                extra={
+                    "event": "ui.proxy.page.cookies.updated",
+                    "session_id": session_id[:8],
+                    "url": url,
+                    "cookies_in_jar": [c.name for c in updated_jar] if updated_jar else [],
+                },
+            )
 
         content_type = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml" in content_type
@@ -270,32 +326,120 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
+        _HOP_BY_HOP = frozenset({
+            "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+            "te", "trailers", "transfer-encoding", "upgrade",
+            "host", "content-length", "cookie",
+            "x-forwarded-for", "x-forwarded-proto", "x-real-ip",
+        })
         headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "*/*",
         }
-        # Referer 设为基础页面 URL（不设为具体资源 URL，避免目标服务器校验 Origin 不匹配）
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
         headers["Referer"] = target_origin + "/"
         if req_headers:
-            for key in ("Content-Type", "Authorization", "X-Requested-With", "Accept", "Accept-Language"):
-                if key in req_headers:
-                    headers[key] = req_headers[key]
+            for key, value in req_headers.items():
+                if key.lower() not in _HOP_BY_HOP:
+                    headers[key] = value
+
+        # 修正 Origin：设为目标服务器 origin（非代理 origin），模拟浏览器同源请求
+        if "Origin" in headers and "/api/" in url:
+            headers["Origin"] = target_origin
+
+        # 记录 API 请求的完整请求头
+        if "/api/" in url:
+            logger.info(
+                "proxy_resource_request_headers",
+                extra={
+                    "event": "ui.proxy.resource.req.headers",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "method": method,
+                    "headers_sent": {k: v[:60] if len(v) > 60 else v for k, v in headers.items()},
+                },
+            )
 
         session = requests.Session()
         if session_id:
             cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
             if cookie_jar:
                 session.cookies = cookie_jar
+                logger.info(
+                    "proxy_resource_request_cookies",
+                    extra={
+                        "event": "ui.proxy.resource.req.cookies",
+                        "session_id": session_id[:8],
+                        "url": url,
+                        "method": method,
+                        "cookies_sent": {c.name: c.value[:20] + "..." if len(c.value) > 20 else c.value for c in cookie_jar},
+                    },
+                )
+
+        # 记录 POST 请求体（仅 API 请求）
+        if method == "POST" and req_body and "/api/" in url:
+            body_preview = req_body[:500].decode("utf-8", errors="replace") if isinstance(req_body, bytes) else str(req_body)[:500]
+            logger.info(
+                "proxy_resource_request_body",
+                extra={
+                    "event": "ui.proxy.resource.req.body",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "content_type": headers.get("Content-Type", ""),
+                    "body_preview": body_preview,
+                },
+            )
 
         resp = session.request(
             method, url, headers=headers, data=req_body,
             timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
         )
 
+        # 记录目标服务器返回的 Set-Cookie
+        resp_set_cookies = []
+        for k, v in resp.headers.items():
+            if k.lower() == "set-cookie":
+                resp_set_cookies.append(v)
+        if resp_set_cookies:
+            logger.info(
+                "proxy_resource_response_set_cookie",
+                extra={
+                    "event": "ui.proxy.resource.resp.set_cookie",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "set_cookie_headers": resp_set_cookies[:5],
+                },
+            )
+
+        # 记录 API 响应体（仅非二进制内容）
+        resp_ct = resp.headers.get("Content-Type", "")
+        if "/api/" in url and ("json" in resp_ct or "text" in resp_ct):
+            resp_body_preview = resp.text[:500] if resp.text else ""
+            logger.info(
+                "proxy_resource_response_body",
+                extra={
+                    "event": "ui.proxy.resource.resp.body",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "body_preview": resp_body_preview,
+                },
+            )
+
         # 存储目标服务器返回的 Cookie
         if session_id:
             _proxy_session_store.update_cookies(session_id, session.cookies)
+            updated_jar = _proxy_session_store.get_cookie_jar(session_id)
+            logger.debug(
+                "proxy_resource_cookies_after_update",
+                extra={
+                    "event": "ui.proxy.resource.cookies.updated",
+                    "session_id": session_id[:8],
+                    "url": url,
+                    "cookies_in_jar": [c.name for c in updated_jar] if updated_jar else [],
+                },
+            )
 
         response_headers: Dict[str, str] = {}
         for key in ("Content-Type", "Cache-Control", "ETag"):
@@ -576,7 +720,7 @@ class UiProxyService:
             'if(v.indexOf("/")===0){_targetLoc.href=_T+v;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(_T+v));}'
             'if(v.indexOf(_F)===0){var real=_T+v.substring(_F.length);_targetLoc.href=real;return orig.call(this,"/ui-testing/proxy?url="+encodeURIComponent(real));}'
             '}_targetLoc.href=v;return orig.call(this,v);};}});'
-            '}'
+            '}}'
             'function _isProxyUrl(v){return typeof v==="string"&&v.indexOf(_PROXY_PATH)>=0;}'
             'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
             'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
@@ -640,6 +784,7 @@ class UiProxyService:
             'var _origUrl=_url;'
             'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("/ui-testing/")===0)return _origFetch.call(this,url,opts);'
+            'if(_url.indexOf("/api/ui-testing/")===0||_url.indexOf("/api/ui-recorder/")===0||_url.indexOf("/api/postman/")===0||_url.indexOf("/api/report/")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("proxy-resource")>=0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
@@ -656,6 +801,7 @@ class UiProxyService:
             'var _origUrl=_url;'
             'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf("/ui-testing/")===0)return _xhrOpen.apply(this,arguments);'
+            'if(_url.indexOf("/api/ui-testing/")===0||_url.indexOf("/api/ui-recorder/")===0||_url.indexOf("/api/postman/")===0||_url.indexOf("/api/report/")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
             'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'

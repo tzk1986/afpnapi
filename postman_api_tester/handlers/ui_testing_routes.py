@@ -149,7 +149,24 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         if jar is not None:
             if base_url:
                 _proxy_session_store.set_base_url(sid, base_url)
+            logger.info(
+                "proxy_session_reuse",
+                extra={
+                    "event": "ui.proxy.session.reuse",
+                    "session_id": sid[:8],
+                    "base_url": base_url or _proxy_session_store.get_base_url(sid),
+                    "cookies_in_jar": [c.name for c in jar],
+                },
+            )
             return sid
+        logger.warning(
+            "proxy_session_cookie_but_not_found",
+            extra={
+                "event": "ui.proxy.session.missing",
+                "session_id": sid[:8],
+                "browser_cookies": dict(request.cookies),
+            },
+        )
 
     # Cookie 尚未存储时，从 Referer 提取目标 URL 以复用 session
     referer = request.headers.get("Referer", "")
@@ -161,14 +178,42 @@ def _get_proxy_session_id(base_url: str = "") -> str:
             # 查找已有该 base_url 的 session
             existing_sid = _proxy_session_store.find_session_by_base_url(ref_base_url)
             if existing_sid:
+                existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
+                logger.info(
+                    "proxy_session_reuse_via_referer",
+                    extra={
+                        "event": "ui.proxy.session.reuse_referer",
+                        "session_id": existing_sid[:8],
+                        "base_url": ref_base_url,
+                        "cookies_in_jar": [c.name for c in existing_jar] if existing_jar else [],
+                    },
+                )
                 return existing_sid
             # 没有则创建并关联 base_url
-            return _proxy_session_store.create_session(ref_base_url)
+            new_sid = _proxy_session_store.create_session(ref_base_url)
+            logger.info(
+                "proxy_session_created_via_referer",
+                extra={
+                    "event": "ui.proxy.session.new_referer",
+                    "session_id": new_sid[:8],
+                    "base_url": ref_base_url,
+                },
+            )
+            return new_sid
         except Exception:
             pass
 
     # 创建新会话并保存 base_url
     new_sid = _proxy_session_store.create_session(base_url)
+    logger.info(
+        "proxy_session_created_new",
+        extra={
+            "event": "ui.proxy.session.new",
+            "session_id": new_sid[:8],
+            "base_url": base_url,
+            "browser_cookies": dict(request.cookies),
+        },
+    )
     return new_sid
 
 
@@ -265,10 +310,12 @@ def ui_testing_proxy() -> ResponseReturnValue:
             headers["Location"] = "/ui-testing/proxy?url=" + _quote2(full_loc, safe="")
 
     resp = make_response(body, status_code)
+    set_cookies_sent = []
     for key, value in headers.items():
         if key == "_set_cookies":
             for cookie_str in value:
                 resp.headers.add("Set-Cookie", cookie_str)
+                set_cookies_sent.append(cookie_str[:80])
         else:
             resp.headers[key] = value
     resp.headers.pop("X-Frame-Options", None)
@@ -276,6 +323,18 @@ def ui_testing_proxy() -> ResponseReturnValue:
     resp.headers["Access-Control-Allow-Origin"] = "*"
     # 设置代理会话 Cookie（手动设置 header，避免 set_cookie 可能被覆盖）
     resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+
+    logger.info(
+        "proxy_page_response_to_browser",
+        extra={
+            "event": "ui.proxy.page.resp_to_browser",
+            "session_id": session_id[:8],
+            "url": target_url,
+            "status_code": status_code,
+            "browser_sent_cookies": dict(request.cookies),
+            "set_cookies_returned": set_cookies_sent,
+        },
+    )
     return resp
 
 
@@ -382,10 +441,12 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
             headers["Location"] = "/ui-testing/proxy?url=" + _quote(full_loc, safe="")
 
     resp = make_response(body, status_code)
+    set_cookies_sent = []
     for key, value in headers.items():
         if key == "_set_cookies":
             for cookie_str in value:
                 resp.headers.add("Set-Cookie", cookie_str)
+                set_cookies_sent.append(cookie_str[:80])
         else:
             resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -393,6 +454,21 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     resp.headers["Access-Control-Allow-Headers"] = "*"
     # 设置代理会话 Cookie
     resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+
+    # 仅对 API 请求记录 cookie 详情（跳过静态资源）
+    if "/api/" in target_url or target_url.endswith("/login") or target_url.endswith("/kaptcha"):
+        logger.info(
+            "proxy_resource_response_to_browser",
+            extra={
+                "event": "ui.proxy.resource.resp_to_browser",
+                "session_id": session_id[:8],
+                "url": target_url,
+                "method": request.method,
+                "status_code": status_code,
+                "browser_sent_cookies": dict(request.cookies),
+                "set_cookies_returned": set_cookies_sent,
+            },
+        )
     return resp
 
 
@@ -672,3 +748,14 @@ def api_ui_testing_recording_save_as_case(session_id: str = "") -> ResponseRetur
         },
     )
     return BaseHandler.json_response({"case_id": case_id}, 201, "Created")
+
+
+def ui_proxy_sessions_debug() -> ResponseReturnValue:
+    """调试端点：导出所有活跃代理会话的 cookie 状态。"""
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+    sessions = _proxy_session_store.dump_sessions()
+    return BaseHandler.json_response({
+        "active_sessions": len(sessions),
+        "sessions": sessions,
+    })
+

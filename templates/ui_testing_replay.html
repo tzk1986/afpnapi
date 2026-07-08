@@ -106,6 +106,7 @@
         var timerInterval = null;
         var iframeReady = false;
         var replayStarted = false;
+        var networkRequests = [];
 
         // 加载执行任务数据
         function loadJobData() {
@@ -118,6 +119,7 @@
                     }
                     var data = result.data;
                     steps = data.steps || [];
+                    networkRequests = data.network_requests || [];
                     document.getElementById('execTitle').textContent = data.case_name || '用例回放';
                     document.title = '回放 - ' + (data.case_name || '');
                     renderStepsList();
@@ -228,7 +230,7 @@
             startTime = Date.now();
             startTimer();
             updateControlButtons();
-            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 30000, job_id: jobId } });
+            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 30000, job_id: jobId, network_requests: networkRequests } });
             setTimeout(function() {
                 sendToFrame({ type: 'ui-replay-control', action: 'start' });
             }, 100);

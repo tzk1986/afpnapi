@@ -180,6 +180,18 @@ def api_ui_recorder_session_delete(session_id: str) -> ResponseReturnValue:
     return BaseHandler.json_response(None, 404, "Session not found")
 
 
+def api_ui_recorder_clear_recording() -> ResponseReturnValue:
+    """批量清除所有状态为 recording 的脏数据。"""
+    sessions = _store.list_sessions()
+    removed = 0
+    for s in sessions:
+        if s.get("status") == "recording":
+            if _store.delete_session(s["session_id"]):
+                removed += 1
+    logger.info("Cleared %d stuck recording sessions", removed)
+    return BaseHandler.json_response({"ok": True, "cleared": removed})
+
+
 def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
     """导出录制会话为 JSON，兼容 UI 测试模块导入格式。"""
     session = _store.get_session(session_id)

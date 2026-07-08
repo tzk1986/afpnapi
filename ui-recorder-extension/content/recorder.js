@@ -6,8 +6,7 @@
 // 从代理 URL 中提取真实目标 URL（处理早期脚本未注入时的情况）
 function _getTargetUrl() {
   try {
-    // 优先使用 _getTargetUrl()（如果早期脚本已注入，会返回目标 URL）
-    const href = _getTargetUrl();
+    const href = window.location.href;
     const u = new URL(href);
     // 检查是否为代理 URL
     if (u.pathname.startsWith('/ui-testing/proxy')) {
@@ -19,8 +18,7 @@ function _getTargetUrl() {
     // 不是代理 URL，直接返回
     return href;
   } catch (e) {
-    // URL 解析失败，返回原始 _getTargetUrl()
-    return _getTargetUrl();
+    return window.location.href;
   }
 }
 

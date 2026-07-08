@@ -165,7 +165,7 @@ LOG_FORMAT = _cfg_str("LOG_FORMAT", "structured")
 LOG_SAMPLE_RATE = _cfg_float("LOG_SAMPLE_RATE", 0.1)
 LOG_ALERT_ERROR_WINDOW_SECONDS = max(60, _cfg_int("LOG_ALERT_ERROR_WINDOW_SECONDS", 300))
 LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, _cfg_float("LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", 10.0))
-LOG_FILE = _cfg_str("LOG_FILE", "")
+LOG_FILE = _cfg_str("LOG_FILE", "reports/report_server.log")
 LOG_FILE_MAX_BYTES = max(0, _cfg_int("LOG_FILE_MAX_BYTES", 10 * 1024 * 1024))
 LOG_FILE_BACKUP_COUNT = max(0, _cfg_int("LOG_FILE_BACKUP_COUNT", 5))
 

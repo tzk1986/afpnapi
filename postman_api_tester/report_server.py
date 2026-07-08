@@ -88,6 +88,7 @@ from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_session_detail as _route_api_ui_recorder_session_detail,
     api_ui_recorder_session_delete as _route_api_ui_recorder_session_delete,
     api_ui_recorder_session_export as _route_api_ui_recorder_session_export,
+    api_ui_recorder_clear_recording as _route_api_ui_recorder_clear_recording,
     ui_recorder_demo_page as _route_ui_recorder_demo_page,
     ui_recorder_page as _route_ui_recorder_page,
 )
@@ -106,6 +107,7 @@ from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_index_page as _route_ui_testing_index_page,
     ui_testing_proxy as _route_ui_testing_proxy,
     ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
+    ui_proxy_sessions_debug as _route_ui_proxy_sessions_debug,
     ui_testing_recorder_page as _route_ui_testing_recorder_page,
     ui_testing_static_fallback as _route_ui_testing_static_fallback,
 )
@@ -457,6 +459,11 @@ def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
     return _route_api_ui_recorder_session_export(session_id)
 
 
+@app.route("/api/ui-recorder/sessions/clear-recording", methods=["POST"])
+def api_ui_recorder_clear_recording() -> ResponseReturnValue:
+    return _route_api_ui_recorder_clear_recording()
+
+
 # ---------------------------------------------------------------
 # Web UI 自动化测试
 # ---------------------------------------------------------------
@@ -483,6 +490,12 @@ def ui_testing_proxy() -> ResponseReturnValue:
 @app.route("/ui-testing/proxy-resource", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 def ui_testing_proxy_resource() -> ResponseReturnValue:
     return _route_ui_testing_proxy_resource()
+
+
+@app.route("/api/ui-testing/proxy-sessions", methods=["GET"])
+def ui_proxy_sessions_debug() -> ResponseReturnValue:
+    """调试端点：查看代理会话 cookie 状态。"""
+    return _route_ui_proxy_sessions_debug()
 
 
 @app.route("/static/<path:filename>")

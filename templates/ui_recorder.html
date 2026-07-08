@@ -212,6 +212,7 @@
     <div class="panel">
       <div class="panel-header">
         <span><span class="refresh-indicator"></span>录制会话</span>
+        <button class="btn" onclick="clearAllRecordingSessions()" style="padding:4px 10px;font-size:12px;background:#fee2e2;color:#dc2626;border-color:#fca5a5;" title="清除所有卡住的录制会话">清理脏数据</button>
         <button class="btn" onclick="refreshSessions()" style="padding:4px 10px;font-size:12px;">刷新</button>
       </div>
       <div class="session-list" id="sessionList">
@@ -407,14 +408,34 @@
     async function deleteSession(sessionId) {
       if (!confirm('确认删除此录制会话？')) return;
       try {
-        await fetch('/api/ui-recorder/session/' + sessionId, { method: 'DELETE' });
+        const resp = await fetch('/api/ui-recorder/session/' + sessionId, { method: 'DELETE' });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          alert('删除失败: ' + (data.message || '未知错误'));
+          return;
+        }
         if (currentSessionId === sessionId) {
           currentSessionId = null;
           document.getElementById('detailContent').innerHTML = '<div class="detail-empty">选择左侧会话查看详情</div>';
         }
         refreshSessions();
       } catch (e) {
-        alert('删除失败');
+        alert('删除失败: ' + e.message);
+      }
+    }
+
+    async function clearAllRecordingSessions() {
+      if (!confirm('确认清除所有状态为"录制中"的会话？此操作不可恢复。')) return;
+      try {
+        const resp = await fetch('/api/ui-recorder/sessions/clear-recording', { method: 'POST' });
+        if (resp.ok) {
+          alert('已清除脏数据');
+          refreshSessions();
+        } else {
+          alert('清除失败');
+        }
+      } catch (e) {
+        alert('清除失败: ' + e.message);
       }
     }
 

@@ -289,7 +289,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'stop_recording') {
-    stopRecording().then(sendResponse);
+    stopRecording().then(sendResponse).catch(function(err) {
+      console.error('[Background] stopRecording error:', err);
+      sendResponse({ ok: false, error: err.message });
+    });
     return true;
   }
 });
