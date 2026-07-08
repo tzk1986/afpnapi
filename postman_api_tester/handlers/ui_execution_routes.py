@@ -261,7 +261,16 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
         steps = case_data.get("steps", [])
         base_url = case_data.get("base_url", "")
         if base_url:
-            _proxy_session_store.clear_cookies_by_base_url(base_url)
+            cleared = _proxy_session_store.clear_cookies_by_base_url(base_url)
+            logger.info(
+                "ui_execution_init_cookies_cleared",
+                extra={
+                    "event": "ui.execution.init.cookies_cleared",
+                    "job_id": job_id,
+                    "base_url": base_url,
+                    "cleared": cleared,
+                },
+            )
         resp = make_response(BaseHandler.json_response({
             "steps": [s for s in steps if s.get("action") != "api_call"],
             "options": {
@@ -280,7 +289,16 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
     steps = case_data.get("steps", [])
     base_url = case_data.get("base_url", "")
     if base_url:
-        _proxy_session_store.clear_cookies_by_base_url(base_url)
+        cleared = _proxy_session_store.clear_cookies_by_base_url(base_url)
+        logger.info(
+            "ui_execution_init_cookies_cleared",
+            extra={
+                "event": "ui.execution.init.cookies_cleared",
+                "job_id": job_id,
+                "base_url": base_url,
+                "cleared": cleared,
+            },
+        )
     resp = make_response(BaseHandler.json_response({
         "steps": [s for s in steps if s.get("action") != "api_call"],
         "options": job_data["options"],

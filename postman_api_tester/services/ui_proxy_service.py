@@ -100,13 +100,37 @@ class _ProxySessionStore:
                     return sid
             return None
 
-    def clear_cookies_by_base_url(self, base_url: str) -> None:
-        """清除指定 base_url 对应的所有 session cookie（回放前清理旧登录态）。"""
+    def clear_cookies_by_base_url(self, base_url: str) -> int:
+        """清除指定 base_url 对应的所有 session cookie（回放前清理旧登录态）。
+        返回清除的 session 数量。
+        """
+        cleared = 0
         with self._lock:
-            for s in self._sessions.values():
+            for sid, s in self._sessions.items():
                 if s.get("base_url") == base_url:
+                    old_count = len(s["cookies"])
                     s["cookies"] = requests.cookies.RequestsCookieJar()
                     s["last_active"] = time.time()
+                    logger.info(
+                        "proxy_session_cookies_cleared",
+                        extra={
+                            "event": "ui.proxy.session.cookies_cleared",
+                            "session_id": sid[:8],
+                            "base_url": base_url,
+                            "cookies_cleared": old_count,
+                        },
+                    )
+                    cleared += 1
+        if cleared > 0:
+            logger.info(
+                "proxy_session_clear_summary",
+                extra={
+                    "event": "ui.proxy.session.clear_summary",
+                    "base_url": base_url,
+                    "sessions_cleared": cleared,
+                },
+            )
+        return cleared
 
     def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
         with self._lock:
