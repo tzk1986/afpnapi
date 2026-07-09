@@ -725,8 +725,6 @@ class UiProxyService:
         )
 
         storage_clear = ''
-        if replay_mode:
-            storage_clear = 'try{localStorage.clear();sessionStorage.clear();}catch(e){}'
 
         early_js = (
             '(function(){'
