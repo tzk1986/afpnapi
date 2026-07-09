@@ -255,8 +255,28 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
     # 提取基础 URL（scheme + netloc）作为会话的 base_url
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
-    session_id = _get_proxy_session_id(base_url)
+    recording_mode = request.args.get("recording", "") == "1"
     replay_mode = request.args.get("replay", "") == "1"
+
+    # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
+    if recording_mode:
+        old_sid = request.cookies.get("_proxy_session")
+        if old_sid:
+            from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+            _proxy_session_store.delete_session(old_sid)
+            logger.info("recording_clear_old_session", extra={
+                "event": "ui.recording.session_cleared",
+                "old_session_id": old_sid[:8],
+            })
+        # 创建新会话（不带之前的 cookie）
+        session_id = _proxy_session_store.create_session(base_url)
+        logger.info("recording_new_session_created", extra={
+            "event": "ui.recording.session.new",
+            "session_id": session_id[:8],
+            "base_url": base_url,
+        })
+    else:
+        session_id = _get_proxy_session_id(base_url)
 
     started_at = time.perf_counter()
     try:

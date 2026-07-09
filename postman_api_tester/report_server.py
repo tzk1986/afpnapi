@@ -595,8 +595,13 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     # 对于页面请求，使用 resource_path 作为目标路径；对于资源/API，也使用 resource_path
     full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
 
-    session_id = request.cookies.get("_proxy_session") or ""
+    # 从 target_url 中提取 base_url，确保代理会话的 base_url 正确设置
+    base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
     replay_mode = params.get("replay", [""])[0] == "1"
+
+    # 调用 _get_proxy_session_id 获取 session_id，确保 base_url 被正确设置
+    from postman_api_tester.handlers.ui_testing_routes import _get_proxy_session_id
+    session_id = _get_proxy_session_id(base_url)
 
     try:
         from postman_api_tester.services.ui_proxy_service import UiProxyService

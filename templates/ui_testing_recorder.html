@@ -181,7 +181,10 @@
             placeholder.style.display = 'none';
             frame.style.display = 'block';
 
-            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url);
+            // 录制器打开 URL 时，先清除代理会话 cookie，确保从干净状态开始
+            document.cookie = "_proxy_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+
+            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&recording=1';
             frame.src = proxyUrl;
             document.getElementById('btnRecord').disabled = false;
             document.getElementById('statusUrl').textContent = url;
