@@ -57,6 +57,12 @@
         .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
         .empty-steps { text-align: center; padding: 40px; color: #9ca3af; }
 
+        .steps-table tr.selected-row td { background: #eff6ff !important; }
+        .steps-table tr.drag-over td { border-top: 2px solid #3b82f6; }
+        .steps-table tr.dragging td { opacity: 0.4; }
+        .steps-table .step-num { cursor: grab; user-select: none; }
+        .steps-table .step-num:active { cursor: grabbing; }
+
         .save-status { font-size: 12px; color: #6b7280; margin-left: 12px; }
         .save-status.saved { color: #10b981; }
         .save-status.error { color: #ef4444; }
@@ -121,6 +127,8 @@
         var caseId = '{{ case_id }}';
         var caseData = null;
         var steps = [];
+        var selectedStepIndex = null;
+        var draggedStepIndex = null;
 
         var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title'];
 
@@ -185,9 +193,14 @@
                 var desc = step.description || buildStepDescription(step);
                 var pageDomain = '';
                 if (step.page_url) { try { pageDomain = new URL(step.page_url).hostname; } catch(e) { pageDomain = step.page_url; } }
+                var rowClass = (i === selectedStepIndex) ? ' selected-row' : '';
 
-                return '<tr>' +
-                    '<td class="step-num">' + (i + 1) + '</td>' +
+                return '<tr onclick="selectStep(event, ' + i + ')" ' +
+                    'ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)" ' +
+                    'class="' + rowClass + '">' +
+                    '<td class="step-num" draggable="true" ' +
+                    'ondragstart="onDragStart(event, ' + i + ')" ' +
+                    'ondragend="onDragEnd(event)">' + (i + 1) + '</td>' +
                     '<td><select onchange="updateStep(' + i + ', \'action\', this.value)">' +
                         ACTION_OPTIONS.map(function(a) {
                             return '<option value="' + a + '"' + (a === step.action ? ' selected' : '') + '>' + a + '</option>';
@@ -214,6 +227,13 @@
             return map[action] || 'action-default';
         }
 
+        function selectStep(event, index) {
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' ||
+                event.target.tagName === 'BUTTON' || event.target.tagName === 'TD') return;
+            selectedStepIndex = (selectedStepIndex === index) ? null : index;
+            renderSteps();
+        }
+
         function updateStep(index, field, value) {
             if (!steps[index]) return;
             if (field === 'selector' && typeof steps[index].selector === 'object') {
@@ -225,25 +245,35 @@
         }
 
         function addStep() {
-            steps.push({ action: 'click', selector: '', value: '', description: '', element_info: {} });
+            var idx = (selectedStepIndex !== null) ? selectedStepIndex : steps.length;
+            steps.splice(idx, 0, { action: 'click', selector: '', value: '', description: '', element_info: {} });
+            selectedStepIndex = idx;
             renderSteps();
             markDirty();
         }
 
         function addWaitStep() {
-            steps.push({ action: 'wait', selector: '', value: '1000', description: '等待 1000ms' });
+            var idx = (selectedStepIndex !== null) ? selectedStepIndex : steps.length;
+            steps.splice(idx, 0, { action: 'wait', selector: '', value: '1000', description: '等待 1000ms' });
+            selectedStepIndex = idx;
             renderSteps();
             markDirty();
         }
 
         function addAssertStep() {
-            steps.push({ action: 'assert_visible', selector: '', value: '', description: '断言元素可见' });
+            var idx = (selectedStepIndex !== null) ? selectedStepIndex : steps.length;
+            steps.splice(idx, 0, { action: 'assert_visible', selector: '', value: '', description: '断言元素可见' });
+            selectedStepIndex = idx;
             renderSteps();
             markDirty();
         }
 
         function removeStep(index) {
             steps.splice(index, 1);
+            if (selectedStepIndex !== null) {
+                if (selectedStepIndex === index) selectedStepIndex = null;
+                else if (selectedStepIndex > index) selectedStepIndex--;
+            }
             renderSteps();
             markDirty();
         }
@@ -256,6 +286,62 @@
             steps[newIndex] = tmp;
             renderSteps();
             markDirty();
+        }
+
+        function onDragStart(event, index) {
+            draggedStepIndex = index;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(index));
+            event.target.classList.add('dragging');
+        }
+
+        function onDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            var row = event.target.closest('tr');
+            if (row && draggedStepIndex !== null) row.classList.add('drag-over');
+        }
+
+        function onDragLeave(event) {
+            var row = event.target.closest('tr');
+            if (row) row.classList.remove('drag-over');
+        }
+
+        function onDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var row = event.target.closest('tr');
+            if (!row || draggedStepIndex === null) return;
+            var tbody = document.getElementById('stepsBody');
+            var rows = Array.prototype.slice.call(tbody.children);
+            var targetIndex = rows.indexOf(row);
+            row.classList.remove('drag-over');
+            if (targetIndex === draggedStepIndex || isNaN(targetIndex)) { draggedStepIndex = null; return; }
+
+            var item = steps.splice(draggedStepIndex, 1)[0];
+            if (draggedStepIndex < targetIndex) {
+                steps.splice(targetIndex - 1, 0, item);
+                targetIndex = targetIndex - 1;
+            } else {
+                steps.splice(targetIndex, 0, item);
+            }
+
+            if (selectedStepIndex === draggedStepIndex) selectedStepIndex = targetIndex;
+            else if (draggedStepIndex < targetIndex) {
+                if (selectedStepIndex > draggedStepIndex && selectedStepIndex <= targetIndex) selectedStepIndex--;
+            } else {
+                if (selectedStepIndex >= targetIndex && selectedStepIndex < draggedStepIndex) selectedStepIndex++;
+            }
+
+            draggedStepIndex = null;
+            renderSteps();
+            markDirty();
+        }
+
+        function onDragEnd(event) {
+            event.target.classList.remove('dragging');
+            document.querySelectorAll('.steps-table tr').forEach(function(r) { r.classList.remove('drag-over'); });
+            draggedStepIndex = null;
         }
 
         function markDirty() {
