@@ -223,8 +223,8 @@
                     updateControlButtons();
                     break;
                 case '_proxy_nav':
-                    var navLabel = data.method ? ('[' + data.method + ']') : '[href]';
-                    console.log('[ProxyNav]', navLabel, 'navigate to:', data.href, 'from:', data.loc);
+                    var navLabel = data.method ? ('[' + data.method + ']') : (data.event ? '[' + data.event + ']' : '[href]');
+                    console.log('[ProxyNav]', navLabel, data);
                     fetch('/api/ui-testing/replay-log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -232,8 +232,8 @@
                             job_id: jobId,
                             step_index: currentStepIndex,
                             event: 'proxy_nav',
-                            message: navLabel + ' ' + (data.href || '') + ' from ' + (data.loc || ''),
-                            detail: { method: data.method || 'href', href: data.href, loc: data.loc },
+                            message: navLabel + ' ' + (data.href || data.pathname || '') + ' from ' + (data.loc || ''),
+                            detail: data,
                             level: 'info'
                         })
                     }).catch(function() {});
