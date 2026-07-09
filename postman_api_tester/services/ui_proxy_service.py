@@ -771,6 +771,7 @@ class UiProxyService:
             'if(_locHD&&_locHD.configurable){Object.defineProperty(window.location,"hash",{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;},configurable:true});}'
             'window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_loaded",pathname:_targetLoc.pathname,href:_targetLoc.href,realPathname:window.location.pathname,pathnameConfigurable:!!_locPD&&!!_locPD.configurable}},"*");'
             '}catch(e){try{window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_error",error:String(e)}},"*");}catch(e2){}}'
+            'try{fetch("/api/ui-testing/replay-log",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:"early_script_loaded",pathname:_targetLoc.pathname,href:_targetLoc.href,realPathname:window.location.pathname,pathnameConfigurable:!!_locPD&&!!_locPD.configurable})}).catch(function(){});}catch(e){}'
             'function _isProxyUrl(v){return typeof v==="string"&&v.indexOf(_PROXY_PATH)>=0;}'
             'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
             'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
