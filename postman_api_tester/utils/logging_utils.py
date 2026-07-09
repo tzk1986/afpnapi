@@ -275,7 +275,7 @@ def get_log_alert_snapshot() -> Dict[str, Any]:
 # ── 日志清理 ──
 
 _LOG_CLEANUP_INTERVAL = 86400  # 每天检查一次
-_LOG_RETENTION_DAYS = 7
+_LOG_RETENTION_DAYS = 10
 
 
 def cleanup_old_logs(log_dir: str, retention_days: int = _LOG_RETENTION_DAYS) -> int:
