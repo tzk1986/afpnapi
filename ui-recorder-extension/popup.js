@@ -38,7 +38,6 @@ async function refreshState() {
   try {
     const state = await chrome.runtime.sendMessage({ type: 'get_state' });
     if (!state) {
-      // sendMessage 返回 undefined，说明 background 未就绪
       updateUI({ active: false });
       showMsg('background 未就绪，请重试', 'error');
       return;
@@ -50,12 +49,14 @@ async function refreshState() {
   }
 }
 
-// 根据状态更新 UI
+// 根据状态更新 UI：三态 —— 录制中 / 已结束 / 未录制
 function updateUI(state) {
   if (state.active) {
+    // ── 录制中 ──
     statusDot.classList.add('active');
     stateText.textContent = '录制中';
     stateText.style.color = '#ef4444';
+    btnStart.textContent = '开始录制';
     btnStart.disabled = true;
     btnStop.disabled = false;
     serverUrlInput.disabled = true;
@@ -69,28 +70,50 @@ function updateUI(state) {
       durationEl.textContent = min + ':' + String(sec).padStart(2, '0');
     }
 
-    // 定时刷新步骤数和时长
     if (!refreshTimer) {
       refreshTimer = setInterval(refreshState, 1000);
     }
+    return;
+  }
+
+  // ── 非录制状态：区分"已结束"和"未录制" ──
+  statusDot.classList.remove('active');
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+
+  const hasSession = state.session_id && (state.step_count > 0 || state.start_time);
+  if (hasSession) {
+    // ── 已结束：保留上次录制统计，按钮改为"重新录制" ──
+    stateText.textContent = '已结束';
+    stateText.style.color = '#16a34a';
+    btnStart.textContent = '重新录制';
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    serverUrlInput.disabled = false;
+    stepCountEl.textContent = state.step_count || 0;
+    sessionIdEl.textContent = (state.session_id || '').substring(0, 16) + '...';
+    if (state.start_time) {
+      const elapsed = Math.floor((Date.now() - state.start_time) / 1000);
+      const min = Math.floor(elapsed / 60);
+      const sec = elapsed % 60;
+      durationEl.textContent = min + ':' + String(sec).padStart(2, '0');
+    }
   } else {
-    statusDot.classList.remove('active');
+    // ── 未录制：初始状态 ──
     stateText.textContent = '未录制';
     stateText.style.color = '';
+    btnStart.textContent = '开始录制';
     btnStart.disabled = false;
     btnStop.disabled = true;
     serverUrlInput.disabled = false;
     sessionIdEl.textContent = '--';
     durationEl.textContent = '--';
-
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
-      refreshTimer = null;
-    }
   }
 }
 
-// 开始录制
+// 开始录制 / 重新录制
 btnStart.addEventListener('click', async () => {
   const url = serverUrlInput.value.trim().replace(/\/+$/, '');
   if (!url) {
@@ -130,18 +153,18 @@ btnStop.addEventListener('click', async () => {
 
     if (result && result.ok) {
       showMsg('录制已停止，共 ' + result.total_steps + ' 步', 'success');
+      // 切换到"已结束"状态
       statusDot.classList.remove('active');
-      stateText.textContent = '未录制';
+      stateText.textContent = '已结束';
       stateText.style.color = '#16a34a';
+      btnStart.textContent = '重新录制';
       btnStart.disabled = false;
       btnStop.disabled = true;
       serverUrlInput.disabled = false;
       stepCountEl.textContent = result.total_steps || 0;
-      // 保留 session_id
       if (result.session_id) {
         sessionIdEl.textContent = result.session_id.substring(0, 16) + '...';
       }
-      // 计算并保留录制时长
       if (result.start_time) {
         const elapsed = Math.floor((Date.now() - result.start_time) / 1000);
         const min = Math.floor(elapsed / 60);
