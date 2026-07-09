@@ -84,6 +84,10 @@
         .modal-close:hover { color: #1f2937; }
         .modal-no-img { color: #9ca3af; font-size: 13px; text-align: center; padding: 40px; }
 
+        /* 错误日志 Modal */
+        .log-modal .modal-content { max-width: 80vw; }
+        .log-content { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; max-height: 60vh; overflow-y: auto; }
+
         .action-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; font-family: monospace; }
         .action-click { background: #dbeafe; color: #1d4ed8; }
         .action-type { background: #fef3c7; color: #b45309; }
@@ -230,7 +234,7 @@
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
                         <td class="duration-cell">{{ step.duration_s }}s</td>
                         <td class="error-text" title="{{ step.error }}">{{ step.error }}</td>
-                        <td>{% if step.status == 'failed' %}<a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewScreenshot(this)">查看</a>{% endif %}</td>
+                        <td>{% if step.status == 'failed' %}<a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewErrorLog(this)">日志</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -384,7 +388,7 @@
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
                     cells[6].title = s.error || '';
-                    cells[7].innerHTML = s.status === 'failed' ? '<a class="screenshot-link" data-step="' + i + '" onclick="viewScreenshot(this)">查看</a>' : '';
+                    cells[7].innerHTML = s.status === 'failed' ? '<a class="screenshot-link" data-step="' + i + '" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="' + i + '" onclick="viewErrorLog(this)">日志</a>' : '';
                 } else {
                     tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i));
                 }
@@ -396,7 +400,7 @@
             var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
             var cur = isCurrentStep(s) ? ' current' : '';
             var screenshotCell = s.status === 'failed'
-                ? '<a class="screenshot-link" data-step="' + idx + '" onclick="viewScreenshot(this)">查看</a>'
+                ? '<a class="screenshot-link" data-step="' + idx + '" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="' + idx + '" onclick="viewErrorLog(this)">日志</a>'
                 : '';
             return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
@@ -506,6 +510,32 @@
             document.getElementById('screenshotModal').classList.remove('show');
         }
 
+        // ---- 错误日志查看 ----
+        function viewErrorLog(el) {
+            var stepIdx = parseInt(el.getAttribute('data-step'));
+            var step = allSteps[stepIdx];
+            if (!step) return;
+            var modal = document.getElementById('errorLogModal');
+            var titleEl = document.getElementById('errorLogTitle');
+            var contentEl = document.getElementById('errorLogContent');
+            titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 错误日志';
+            var parts = [];
+            if (step.error) parts.push('错误信息:\n' + step.error);
+            if (step.selector) {
+                var sel = formatSelector(step.selector);
+                if (sel) parts.push('选择器:\n' + sel);
+            }
+            if (step.value) parts.push('输入值:\n' + step.value);
+            parts.push('操作: ' + step.action);
+            parts.push('耗时: ' + ((step.duration_ms || 0) / 1000).toFixed(2) + 's');
+            contentEl.textContent = parts.join('\n\n') || '无详细日志';
+            modal.classList.add('show');
+        }
+
+        function closeErrorLogModal() {
+            document.getElementById('errorLogModal').classList.remove('show');
+        }
+
         function exportPDF() {
             document.body.classList.add('pdf-exporting');
             window.print();
@@ -549,6 +579,15 @@
             <h3 id="screenshotTitle">失败截图</h3>
             <img id="screenshotImg" src="" alt="截图">
             <div class="modal-no-img" id="screenshotNoImg" style="display:none">暂无截图</div>
+        </div>
+    </div>
+
+    <!-- 错误日志 Modal -->
+    <div class="modal-overlay log-modal" id="errorLogModal" onclick="if(event.target===this)closeErrorLogModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeErrorLogModal()">&times;</button>
+            <h3 id="errorLogTitle">步骤错误日志</h3>
+            <div class="log-content" id="errorLogContent"></div>
         </div>
     </div>
 </body>
