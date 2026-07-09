@@ -219,6 +219,9 @@
                 case 'ui-replay-navigate':
                     onNavigate(data.url);
                     break;
+                case 'ui-replay-screenshot':
+                    captureScreenshot(data.step_index);
+                    break;
                 case 'ui-replay-paused':
                     isPaused = true;
                     updateControlButtons();
@@ -330,12 +333,6 @@
             stopTimer();
             document.getElementById('execIcon').textContent = data.status === 'passed' ? '✓' : '✗';
 
-            // 标记未执行的步骤为 skipped
-            for (var i = currentStepIndex + 1; i < steps.length; i++) {
-                var el = document.getElementById('step-' + i);
-                if (el) el.className = 'step-item skipped';
-            }
-
             // 上报完成到后端
             fetch('/api/ui-testing/execution/' + jobId + '/finalize', {
                 method: 'POST',
@@ -352,8 +349,9 @@
             }).catch(function() {});
 
             // 显示汇总
+            var statusTitle = data.status === 'passed' ? '全部通过' : '执行失败';
             var summaryHtml = '<div class="summary-bar ' + data.status + '">' +
-                '<div class="summary-title">' + (data.status === 'passed' ? '全部通过' : '执行失败') + '</div>' +
+                '<div class="summary-title">' + statusTitle + '</div>' +
                 '<div class="summary-stats">' +
                     '<span>总步骤: <strong>' + data.total_steps + '</strong></span>' +
                     '<span>通过: <strong style="color:#10b981">' + data.passed + '</strong></span>' +
@@ -382,6 +380,25 @@
             document.getElementById('replayFrame').src = proxyUrl;
             // 导航后需要重新注入回放引擎（iframe onload 会触发）
             replayStarted = false;
+        }
+
+        function captureScreenshot(stepIndex) {
+            var frame = document.getElementById('replayFrame');
+            if (!frame || !frame.contentDocument) return;
+            try {
+                var html = frame.contentDocument.documentElement.outerHTML;
+                fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step_index: stepIndex,
+                        html: html,
+                        page_url: frame.contentWindow.location.href
+                    })
+                }).catch(function() {});
+            } catch(e) {
+                console.warn('Screenshot capture failed:', e);
+            }
         }
 
         function updateControlButtons() {

@@ -763,7 +763,7 @@ _REPLAYER_JS = r"""
 
     _executeStep: function(step, index, stepStart) {
       var self = this;
-      var timeout = this.options.timeout || 30000;
+      var timeout = this.options.timeout || 5000;
       var action = step.action || '';
       console.log('[ReplayEngine] _executeStep', index, action, 'selector:', JSON.stringify(step.selector || '').substring(0, 100));
       var result = {
@@ -831,10 +831,15 @@ _REPLAYER_JS = r"""
           result.status = 'failed';
           result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '');
           result.duration_ms = Date.now() - stepStart;
-          self.results.push(result);
-          self._notifyParent('step_complete', result);
-          if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn'); } catch(e) {}
-          self._executeNext();
+          // 截图当前页面状态
+          self._captureScreenshot(function(screenshotData) {
+            result.screenshot = screenshotData || null;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn'); } catch(e) {}
+            // 元素未找到时记录错误并继续执行后续步骤
+            self._executeNext();
+          });
           return;
         }
 
@@ -996,6 +1001,20 @@ _REPLAYER_JS = r"""
           el.style.transition = origTransition;
         }, 300);
       }, 300);
+    },
+
+    _captureScreenshot: function(callback) {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'ui-replay-screenshot',
+            data: { step_index: this.currentIndex }
+          }, '*');
+        }
+        if (callback) callback(null);
+      } catch(e) {
+        if (callback) callback(null);
+      }
     },
 
     _finishAll: function() {

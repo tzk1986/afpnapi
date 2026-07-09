@@ -118,6 +118,7 @@ from postman_api_tester.handlers.ui_execution_routes import (
     api_ui_testing_execution_init as _route_api_ui_testing_execution_init,
     api_ui_testing_execution_report as _route_api_ui_testing_execution_report,
     api_ui_testing_execution_screenshot as _route_api_ui_testing_execution_screenshot,
+    api_ui_testing_execution_screenshot_post as _route_api_ui_testing_execution_screenshot_post,
     api_ui_testing_execution_status as _route_api_ui_testing_execution_status,
     api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
     api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
@@ -764,6 +765,11 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
 @app.route("/api/ui-testing/execution/<path:job_id>/screenshot/<int:step_index>")
 def api_ui_testing_execution_screenshot(job_id: str, step_index: int) -> ResponseReturnValue:
     return _route_api_ui_testing_execution_screenshot(job_id, step_index)
+
+
+@app.route("/api/ui-testing/execution/<path:job_id>/screenshot", methods=["POST"])
+def api_ui_testing_execution_screenshot_save(job_id: str) -> ResponseReturnValue:
+    return _route_api_ui_testing_execution_screenshot_post(job_id)
 
 
 @app.route("/api/ui-testing/replay-engine-js")

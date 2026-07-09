@@ -224,6 +224,33 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
     return BaseHandler.json_response({"ok": True})
 
 
+def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
+    """前端回放引擎上报失败步骤截图（HTML 快照）。"""
+    payload = request.get_json(silent=True)
+    if not payload:
+        return BaseHandler.json_response({"ok": True})
+
+    step_index = payload.get("step_index")
+    html_content = payload.get("html", "")
+    if step_index is None or not html_content:
+        return BaseHandler.json_response({"ok": True})
+
+    screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
+    screenshot_dir.mkdir(parents=True, exist_ok=True)
+    screenshot_path = screenshot_dir / f"step_{step_index}_fail.html"
+
+    try:
+        screenshot_path.write_text(html_content, encoding="utf-8")
+        logger.info(
+            "ui_screenshot_saved",
+            extra={"event": "ui.execution.screenshot_saved", "job_id": job_id, "step_index": step_index},
+        )
+    except Exception as e:
+        logger.warning(f"Failed to save screenshot: {e}")
+
+    return BaseHandler.json_response({"ok": True})
+
+
 def _extract_network_requests(steps: list) -> list:
     """从 steps 中提取 api_call 步骤的网络请求数据，供回放引擎比对。"""
     network_requests = []
