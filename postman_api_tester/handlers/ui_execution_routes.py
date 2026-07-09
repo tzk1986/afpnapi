@@ -408,6 +408,11 @@ def api_ui_testing_replay_log() -> ResponseReturnValue:
     if not payload:
         return json_error("无效的 JSON 数据", 400, "UIT_REPLAY_LOG_001")
 
+    # 诊断：记录所有 replay-log 请求体
+    event = payload.get("event", "")
+    if event.startswith("early_"):
+        logger.info(f"replay-log DIAGNOSTIC: {payload}", extra={"event": f"ui.replay.{event}", "detail": payload})
+
     job_id = payload.get("job_id", "")
     step_index = payload.get("step_index", -1)
     event = payload.get("event", "")

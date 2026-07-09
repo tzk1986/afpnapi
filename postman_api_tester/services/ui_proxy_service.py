@@ -902,6 +902,9 @@ class UiProxyService:
         )
         early_script = f"<script>{early_js}</script>"
 
+        # 诊断：确认早期脚本已注入
+        logger.info(f"early_script_injected: len={len(early_js)}, target_url={target_url}, replay_mode={replay_mode}")
+
         lower = html.lower()
         if "<head>" in lower:
             idx = lower.index("<head>") + len("<head>")
