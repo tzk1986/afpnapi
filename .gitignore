@@ -4,6 +4,7 @@ __pycache__/
 
 # 报告 data
 reports/
+logs/
 *.log
 uploaded_collections/
 variables.json

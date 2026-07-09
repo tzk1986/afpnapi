@@ -726,7 +726,23 @@ class UiProxyService:
 
         storage_clear = ''
         if replay_mode:
-            storage_clear = 'try{localStorage.clear();sessionStorage.clear();}catch(e){}'
+            storage_clear = (
+                'try{'
+                'var _lsKeys=Object.keys(localStorage);'
+                'var _ssKeys=Object.keys(sessionStorage);'
+                'if(window.parent&&window.parent.postMessage){'
+                'window.parent.postMessage({type:"_proxy_nav",event:"storage_before_clear",lsKeys:_lsKeys,ssKeys:_ssKeys},"*");'
+                '}'
+                'localStorage.clear();sessionStorage.clear();'
+                'if(window.parent&&window.parent.postMessage){'
+                'window.parent.postMessage({type:"_proxy_nav",event:"storage_after_clear",lsKeys:Object.keys(localStorage),ssKeys:Object.keys(sessionStorage)},"*");'
+                '}'
+                '}catch(e){'
+                'if(window.parent&&window.parent.postMessage){'
+                'window.parent.postMessage({type:"_proxy_nav",event:"storage_clear_error",error:String(e)},"*");'
+                '}'
+                '}'
+            )
 
         early_js = (
             '(function(){'
