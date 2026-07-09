@@ -222,6 +222,11 @@
                     isRunning = false;
                     updateControlButtons();
                     break;
+                case '_proxy_nav':
+                    // 早期脚本上报的导航日志
+                    var navLabel = data.method ? ('[' + data.method + ']') : '[href]';
+                    console.log('[ProxyNav]', navLabel, 'navigate to:', data.href, 'from:', data.loc);
+                    break;
             }
         });
 
