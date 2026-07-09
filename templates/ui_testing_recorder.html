@@ -184,7 +184,13 @@
             // 录制器打开 URL 时，先清除代理会话 cookie，确保从干净状态开始
             document.cookie = "_proxy_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
-            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&recording=1';
+            // 使用和界面回放相同的 URL 结构，让浏览器 pathname 就是目标路径
+            // 这样 SPA 框架（Vue Router 等）能正确匹配路由
+            var urlObj = new URL(url);
+            var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+            var baseUrl = urlObj.protocol + '//' + urlObj.host;
+            var proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                '_proxy_url=' + encodeURIComponent(baseUrl) + '&recording=1';
             frame.src = proxyUrl;
             document.getElementById('btnRecord').disabled = false;
             document.getElementById('statusUrl').textContent = url;
@@ -222,7 +228,10 @@
             // Notify iframe to start recording
             var frame = document.getElementById('browserFrame');
             if (frame.contentWindow) {
+                console.log('[RecorderParent] Sending start command to iframe');
                 frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'start' }, '*');
+            } else {
+                console.error('[RecorderParent] iframe.contentWindow is null');
             }
 
             // Update UI
@@ -272,8 +281,11 @@
         window.addEventListener('message', function(e) {
             if (!e.data) return;
 
+            console.log('[RecorderParent] Received message:', e.data.type, e.data.action);
+
             // Recorder event from iframe
             if (e.data.type === 'ui-recorder-event') {
+                console.log('[RecorderParent] ui-recorder-event, recording=', recording, 'step=', e.data.data);
                 if (!recording) return;
                 var step = e.data.data;
                 steps.push(step);

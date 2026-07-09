@@ -8,6 +8,7 @@
 """
 
 import logging
+from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 
 from flask.typing import ResponseReturnValue
 
@@ -599,14 +600,38 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     # 从 target_url 中提取 base_url，确保代理会话的 base_url 正确设置
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
     replay_mode = params.get("replay", [""])[0] == "1"
+    recording_mode = params.get("recording", [""])[0] == "1"
 
-    # 调用 _get_proxy_session_id 获取 session_id，确保 base_url 被正确设置
-    from postman_api_tester.handlers.ui_testing_routes import _get_proxy_session_id
-    session_id = _get_proxy_session_id(base_url)
+    # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
+    if recording_mode:
+        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+        old_sid = request.cookies.get("_proxy_session")
+        if old_sid:
+            _proxy_session_store.delete_session(old_sid)
+            logger.info("spa_fallback_recording_clear_session", extra={
+                "event": "ui.proxy.fallback.recording_clear",
+                "old_session_id": old_sid[:8],
+            })
+        session_id = _proxy_session_store.create_session(base_url)
+        logger.info("spa_fallback_recording_new_session", extra={
+            "event": "ui.proxy.fallback.recording_new",
+            "session_id": session_id[:8],
+            "base_url": base_url,
+        })
+    else:
+        # 调用 _get_proxy_session_id 获取 session_id，确保 base_url 被正确设置
+        from postman_api_tester.handlers.ui_testing_routes import _get_proxy_session_id
+        session_id = _get_proxy_session_id(base_url)
 
     try:
         from postman_api_tester.services.ui_proxy_service import UiProxyService
         if is_page:
+            # 回放模式：获取回放引擎 JS 代码并注入到每个页面
+            replay_engine_js = ""
+            if replay_mode:
+                origin = f"{parsed_target.scheme}://{parsed_target.netloc}"
+                replay_engine_js = get_replayer_js(origin)
+
             # 页面请求：使用 fetch_and_rewrite 改写 HTML
             body, status_code, headers = UiProxyService.fetch_and_rewrite(
                 full_url,
@@ -615,6 +640,8 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
                 req_headers=dict(request.headers),
                 req_body=request.get_data() if request.method != "GET" else None,
                 replay_mode=replay_mode,
+                recording_mode=recording_mode,
+                replay_engine_js=replay_engine_js,
             )
         else:
             # 资源/API 请求：使用 fetch_resource

@@ -220,10 +220,24 @@ def _get_proxy_session_id(base_url: str = "") -> str:
 def ui_testing_proxy() -> ResponseReturnValue:
     """反向代理端点：获取外部 URL 并改写 HTML。"""
     target_url = request.args.get("url", "")
+    logger.info("proxy_request_incoming", extra={
+        "event": "ui.proxy.request_in",
+        "raw_url_param": target_url[:100] if target_url else "(empty)",
+        "full_request_url": request.url[:200],
+        "method": request.method,
+        "recording": request.args.get("recording", ""),
+        "replay": request.args.get("replay", ""),
+        "cookies": dict(request.cookies),
+    })
+
     if not target_url:
         return json_error("缺少 url 参数", 400, "UIT_PROXY_001")
 
     target_url = unquote(target_url)
+    logger.info("proxy_url_decoded", extra={
+        "event": "ui.proxy.url_decoded",
+        "decoded_url": target_url[:200],
+    })
 
     # 自动解包嵌套代理 URL：当 target_url 本身也是代理 URL 时，提取真实目标
     _max_unwrap = 5
@@ -258,6 +272,14 @@ def ui_testing_proxy() -> ResponseReturnValue:
     recording_mode = request.args.get("recording", "") == "1"
     replay_mode = request.args.get("replay", "") == "1"
 
+    logger.info("proxy_mode_detected", extra={
+        "event": "ui.proxy.mode_detected",
+        "base_url": base_url,
+        "recording_mode": recording_mode,
+        "replay_mode": replay_mode,
+        "target_path": parsed_target.path,
+    })
+
     # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
     if recording_mode:
         old_sid = request.cookies.get("_proxy_session")
@@ -278,7 +300,19 @@ def ui_testing_proxy() -> ResponseReturnValue:
     else:
         session_id = _get_proxy_session_id(base_url)
 
+    logger.info("proxy_session_ready", extra={
+        "event": "ui.proxy.session_ready",
+        "session_id": session_id[:8],
+        "target_url": target_url[:200],
+    })
+
     started_at = time.perf_counter()
+    logger.info("proxy_fetch_start", extra={
+        "event": "ui.proxy.fetch_start",
+        "target_url": target_url[:200],
+        "session_id": session_id[:8],
+        "method": request.method,
+    })
     try:
         body, status_code, headers = UiProxyService.fetch_and_rewrite(
             target_url,
@@ -287,7 +321,16 @@ def ui_testing_proxy() -> ResponseReturnValue:
             req_headers=dict(request.headers),
             req_body=request.get_data() if request.method != "GET" else None,
             replay_mode=replay_mode,
+            recording_mode=recording_mode,
+            replay_engine_js="",  # /ui-testing/proxy 路由不需要回放引擎
         )
+        logger.info("proxy_fetch_completed", extra={
+            "event": "ui.proxy.fetch_completed",
+            "target_url": target_url[:200],
+            "status_code": status_code,
+            "body_size": len(body) if isinstance(body, (str, bytes)) else 0,
+            "duration_ms": round((time.perf_counter() - started_at) * 1000),
+        })
     except ValueError as e:
         logger.warning(
             "ui_proxy_invalid_url",

@@ -6,6 +6,11 @@
 """
 
 
+def get_early_recorder_js() -> str:
+    """返回早期注入的 JavaScript 代码（在 <head> 中，Vue.js 之前）。"""
+    return _EARLY_RECORDER_JS
+
+
 def get_recorder_js(origin: str = "") -> str:
     """返回完整的录制器 JavaScript 代码。"""
     code = _RECORDER_JS
@@ -13,6 +18,103 @@ def get_recorder_js(origin: str = "") -> str:
     code = code.replace("'use strict';", "'use strict';" + origin_decl, 1)
     return code
 
+
+_EARLY_RECORDER_JS = r"""
+(function() {
+  'use strict';
+  // 早期事件捕获器 — 在 Vue.js 等框架初始化之前捕获事件
+  // 注入到 <head>，确保最先执行
+
+  // 全局事件队列，主录制器脚本会消费这些事件
+  window.__UI_RECORDER_EVENT_QUEUE = window.__UI_RECORDER_EVENT_QUEUE || [];
+
+  // 录制状态（从 sessionStorage 恢复）
+  var _recordingActive = false;
+  try {
+    var _active = sessionStorage.getItem('_ui_rec_active');
+    if (_active === '1') {
+      _recordingActive = true;
+      console.log('[EarlyRecorder] Recording active from sessionStorage');
+    }
+  } catch(e) {}
+
+  // 监听来自父页面的控制消息（用于启动/停止录制）
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'ui-recorder-control') {
+      if (e.data.action === 'start') {
+        _recordingActive = true;
+        try {
+          sessionStorage.setItem('_ui_rec_active', '1');
+        } catch(e) {}
+        console.log('[EarlyRecorder] Recording started via message');
+      } else if (e.data.action === 'stop') {
+        _recordingActive = false;
+        try {
+          sessionStorage.removeItem('_ui_rec_active');
+        } catch(e) {}
+        console.log('[EarlyRecorder] Recording stopped via message');
+      }
+    }
+  }, { capture: true, passive: true });
+
+  // 捕获事件并保存到队列
+  function captureEvent(type, e) {
+    if (!_recordingActive) return;
+
+    var el = e.target;
+    if (!el || !el.tagName) return;
+
+    // 立即提取所有需要的数据（事件对象会被浏览器回收）
+    var eventData = {
+      type: type,
+      timestamp: Date.now(),
+      tagName: el.tagName.toLowerCase(),
+      tagType: el.type || '',
+      tagText: (el.textContent || '').trim().substring(0, 100),
+      tagValue: el.value || '',
+      tagChecked: el.checked || false,
+      tagHref: el.href || '',
+      tagName2: el.name || '',
+      tagPlaceholder: el.placeholder || '',
+      tagId: el.id || '',
+      tagClass: el.className || '',
+      ariaLabel: el.getAttribute('aria-label') || '',
+      testId: el.getAttribute('data-testid') || '',
+      // 鼠标位置
+      clientX: e.clientX || 0,
+      clientY: e.clientY || 0,
+      // 键盘按键
+      key: e.key || '',
+      ctrlKey: e.ctrlKey || false,
+      shiftKey: e.shiftKey || false,
+      altKey: e.altKey || false,
+      metaKey: e.metaKey || false,
+      // 页面信息
+      pageUrl: location.href,
+      pageTitle: document.title,
+      // 元素引用（用于主脚本查找）
+      _targetRef: el
+    };
+
+    window.__UI_RECORDER_EVENT_QUEUE.push(eventData);
+    console.log('[EarlyRecorder] Event captured:', type, el.tagName, el.type);
+  }
+
+  // 在 capture 阶段捕获所有事件（最先执行，框架无法阻止）
+  var eventTypes = ['click', 'dblclick', 'input', 'change', 'submit', 'keydown'];
+  var captureOptions = { capture: true, passive: true };
+
+  for (var i = 0; i < eventTypes.length; i++) {
+    (function(type) {
+      window.addEventListener(type, function(e) {
+        captureEvent(type, e);
+      }, captureOptions);
+    })(eventTypes[i]);
+  }
+
+  console.log('[EarlyRecorder] Early event capture installed');
+})();
+"""
 
 _RECORDER_JS = r"""
 (function() {
@@ -157,6 +259,64 @@ _RECORDER_JS = r"""
     }
   } catch(e) {}
 
+  // ====== 事件队列处理器 ======
+  // 消费早期注入脚本捕获的事件
+  var _queueProcessed = 0;
+  function _processEventQueue() {
+    if (!window.__UI_RECORDER_EVENT_QUEUE) return;
+    var queue = window.__UI_RECORDER_EVENT_QUEUE;
+
+    while (_queueProcessed < queue.length) {
+      var eventData = queue[_queueProcessed];
+      _queueProcessed++;
+
+      if (!recording) continue;
+
+      // 使用缓存的元素引用
+      var el = eventData._targetRef;
+      if (!el || !el.tagName) continue;
+
+      // 检查元素是否仍在 DOM 中（Vue 可能已重新渲染）
+      if (!document.contains(el)) {
+        console.log('[UIRecorder] Element removed from DOM, skipping event');
+        continue;
+      }
+
+      // 根据事件类型分发处理
+      if (eventData.type === 'click') {
+        _handleCapturedClick(eventData, el);
+      } else if (eventData.type === 'dblclick') {
+        _handleCapturedDblClick(eventData, el);
+      } else if (eventData.type === 'input') {
+        _handleCapturedInput(eventData, el);
+      } else if (eventData.type === 'change') {
+        _handleCapturedChange(eventData, el);
+      } else if (eventData.type === 'submit') {
+        _handleCapturedSubmit(eventData, el);
+      } else if (eventData.type === 'keydown') {
+        _handleCapturedKeydown(eventData, el);
+      }
+    }
+  }
+
+  // 每 100ms 处理一次队列
+  setInterval(_processEventQueue, 100);
+
+  // 从缓存的事件数据重建元素信息
+  function _buildElementInfo(eventData) {
+    return {
+      tag: eventData.tagName,
+      text: eventData.tagText,
+      type: eventData.tagType,
+      href: eventData.tagHref,
+      name: eventData.tagName2,
+      placeholder: eventData.tagPlaceholder,
+      visible: true,  // 假设可见
+      aria_label: eventData.ariaLabel,
+      test_id: eventData.testId
+    };
+  }
+
   function _sendToServer(payload) {
     try { origFetch('/api/ui-recorder/event', {
       method: 'POST',
@@ -167,9 +327,12 @@ _RECORDER_JS = r"""
   }
 
   function sendEvent(data) {
+    console.log('[UIRecorder] sendEvent called:', data.action, 'recording=', recording, 'hasParent=', !!(window.parent && window.parent !== window));
     if (window.parent && window.parent !== window) {
+      console.log('[UIRecorder] Sending via postMessage to parent');
       window.parent.postMessage({ type: 'ui-recorder-event', data: data }, '*');
     } else {
+      console.log('[UIRecorder] Sending via _sendToServer');
       _sendToServer({
         session_id: _sessionId,
         event_type: 'step',
@@ -212,8 +375,162 @@ _RECORDER_JS = r"""
     inputBuffer = { element: null, value: '', timer: null, isPassword: false };
   }
 
-  // 点击事件
+  // 处理队列中的点击事件
+  function _handleCapturedClick(eventData, el) {
+    _flushInputBuffer();
+
+    // 链接点击
+    var link = el.closest('a');
+    if (link && link.href) {
+      // 检查是否是 target="_blank" 链接
+      var target = link.getAttribute('target') || '';
+      if (target === '_blank') {
+        console.log('[UIRecorder] New tab link clicked:', link.href);
+        sendEvent({
+          action: 'new_tab',
+          selector: SelectorEngine.generate(el),
+          value: link.href,
+          element_info: _buildElementInfo(eventData),
+          page_url: eventData.pageUrl,
+          page_title: eventData.pageTitle
+        });
+        // 通知父页面导航到新 URL
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'ui-recorder-navigate', url: link.href, new_tab: true }, '*');
+        }
+        // 阻止默认行为（避免真正打开新标签页）
+        return;
+      }
+
+      sendEvent({
+        action: 'click',
+        selector: SelectorEngine.generate(el),
+        value: '',
+        element_info: _buildElementInfo(eventData),
+        page_url: eventData.pageUrl,
+        page_title: eventData.pageTitle
+      });
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'ui-recorder-navigate', url: link.href }, '*');
+      }
+      return;
+    }
+
+    sendEvent({
+      action: 'click',
+      selector: SelectorEngine.generate(el),
+      value: '',
+      element_info: _buildElementInfo(eventData),
+      page_url: eventData.pageUrl,
+      page_title: eventData.pageTitle,
+      coordinates: { x: eventData.clientX, y: eventData.clientY }
+    });
+  }
+
+  // 处理队列中的双击事件
+  function _handleCapturedDblClick(eventData, el) {
+    sendEvent({
+      action: 'dblclick',
+      selector: SelectorEngine.generate(el),
+      value: '',
+      element_info: _buildElementInfo(eventData),
+      page_url: eventData.pageUrl,
+      page_title: eventData.pageTitle
+    });
+  }
+
+  // 处理队列中的输入事件
+  function _handleCapturedInput(eventData, el) {
+    if (!el.matches('input, textarea, [contenteditable]')) return;
+
+    var isPassword = eventData.tagType === 'password';
+    clearTimeout(inputBuffer.timer);
+    inputBuffer.element = el;
+    inputBuffer.value = eventData.tagValue;
+    inputBuffer.isPassword = isPassword;
+
+    inputBuffer.timer = setTimeout(function() {
+      sendEvent({
+        action: 'type',
+        selector: SelectorEngine.generate(inputBuffer.element),
+        value: inputBuffer.value,
+        element_info: getElementInfo(inputBuffer.element),
+        page_url: location.href,
+        page_title: document.title,
+        input_type: inputBuffer.element.type || 'text',
+        is_password: inputBuffer.isPassword
+      });
+      inputBuffer = { element: null, value: '', timer: null, isPassword: false };
+    }, 500);
+  }
+
+  // 处理队列中的 change 事件
+  function _handleCapturedChange(eventData, el) {
+    if (el.tagName === 'SELECT') {
+      var selectedOption = el.options[el.selectedIndex];
+      sendEvent({
+        action: 'select',
+        selector: SelectorEngine.generate(el),
+        value: eventData.tagValue,
+        element_info: Object.assign(_buildElementInfo(eventData), { selected_text: selectedOption ? selectedOption.text : '' }),
+        page_url: eventData.pageUrl,
+        page_title: eventData.pageTitle
+      });
+    }
+    if (eventData.tagType === 'checkbox') {
+      sendEvent({
+        action: eventData.tagChecked ? 'check' : 'uncheck',
+        selector: SelectorEngine.generate(el),
+        value: String(eventData.tagChecked),
+        element_info: _buildElementInfo(eventData),
+        page_url: eventData.pageUrl,
+        page_title: eventData.pageTitle
+      });
+    }
+    if (eventData.tagType === 'radio') {
+      sendEvent({
+        action: 'select_radio',
+        selector: SelectorEngine.generate(el),
+        value: eventData.tagValue,
+        element_info: _buildElementInfo(eventData),
+        page_url: eventData.pageUrl,
+        page_title: eventData.pageTitle
+      });
+    }
+  }
+
+  // 处理队列中的 submit 事件
+  function _handleCapturedSubmit(eventData, el) {
+    _flushInputBuffer();
+    sendEvent({
+      action: 'submit',
+      selector: SelectorEngine.generate(el),
+      value: '',
+      element_info: _buildElementInfo(eventData),
+      page_url: eventData.pageUrl,
+      page_title: eventData.pageTitle
+    });
+  }
+
+  // 处理队列中的 keydown 事件
+  function _handleCapturedKeydown(eventData, el) {
+    var specialKeys = ['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Delete', 'Backspace'];
+    if (specialKeys.indexOf(eventData.key) === -1) return;
+    if (eventData.key === 'Enter' && el.matches('input, textarea')) return;
+    sendEvent({
+      action: 'keypress',
+      selector: SelectorEngine.generate(el),
+      value: eventData.key,
+      element_info: _buildElementInfo(eventData),
+      page_url: eventData.pageUrl,
+      page_title: eventData.pageTitle,
+      modifiers: { ctrl: eventData.ctrlKey, shift: eventData.shiftKey, alt: eventData.altKey, meta: eventData.metaKey }
+    });
+  }
+
+  // 点击事件（备用，直接监听）
   function handleClick(e) {
+    console.log('[UIRecorder] handleClick triggered, recording=', recording, 'target=', e.target.tagName, 'type=', e.target.type);
     if (!recording) return;
     var el = e.target;
     if (!el || !el.tagName) return;
@@ -268,6 +585,7 @@ _RECORDER_JS = r"""
 
   // 输入事件（防抖 500ms）
   function handleInput(e) {
+    console.log('[UIRecorder] handleInput triggered, recording=', recording, 'target=', e.target.tagName, 'type=', e.target.type);
     if (!recording) return;
     var el = e.target;
     if (!el.matches('input, textarea, [contenteditable]')) return;
@@ -422,28 +740,85 @@ _RECORDER_JS = r"""
     return origSend.apply(this, arguments);
   };
 
+  // 拦截 window.open：录制新标签页打开
+  var origWindowOpen = window.open;
+  window.open = function(url, target, features) {
+    if (recording && url) {
+      console.log('[UIRecorder] window.open intercepted:', url, 'target:', target);
+      sendEvent({
+        action: 'new_tab',
+        selector: null,
+        value: url,
+        element_info: { tag: 'window.open', target: target || '' },
+        page_url: location.href,
+        page_title: document.title
+      });
+      // 通知父页面导航到新 URL
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'ui-recorder-navigate', url: url, new_tab: true }, '*');
+      }
+      // 返回一个模拟的窗口对象（避免脚本报错）
+      return { closed: false, close: function() {}, focus: function() {}, postMessage: function() {} };
+    }
+    return origWindowOpen.apply(this, arguments);
+  };
+
   // 监听来自父页面的控制消息
   window.addEventListener('message', function(e) {
+    console.log('[UIRecorder] Received message:', e.data.type, e.data.action);
     if (e.data && e.data.type === 'ui-recorder-control') {
       if (e.data.action === 'start') {
         recording = true;
-        console.log('[UIRecorder] Recording started');
+        // 保存录制状态到 sessionStorage，页面导航后自动恢复
+        try {
+          sessionStorage.setItem('_ui_rec_session_id', _sessionId);
+          sessionStorage.setItem('_ui_rec_active', '1');
+        } catch(e) {}
+        console.log('[UIRecorder] Recording started, recording=', recording, 'session=', _sessionId);
       } else if (e.data.action === 'stop') {
         recording = false;
         clearTimeout(inputBuffer.timer);
         inputBuffer = { element: null, value: '', timer: null, isPassword: false };
+        // 清除录制状态
+        try {
+          sessionStorage.removeItem('_ui_rec_session_id');
+          sessionStorage.removeItem('_ui_rec_active');
+        } catch(e) {}
         console.log('[UIRecorder] Recording stopped');
       }
     }
   });
 
-  // 绑定事件（capture 阶段，确保先于页面脚本）
-  document.addEventListener('click', handleClick, true);
-  document.addEventListener('dblclick', handleDblClick, true);
-  document.addEventListener('input', handleInput, true);
-  document.addEventListener('change', handleChange, true);
-  document.addEventListener('submit', handleSubmit, true);
-  document.addEventListener('keydown', handleKeydown, true);
+  console.log('[UIRecorder] Script initialized, _PROXY_ORIGIN=', _PROXY_ORIGIN, 'recording=', recording);
+
+  // 使用被动事件监听器，确保即使 Vue 调用 preventDefault 也能捕获
+  var eventOptions = { capture: true, passive: true };
+
+  // 绑定到 window（最高层级，最先捕获）
+  window.addEventListener('click', handleClick, eventOptions);
+  window.addEventListener('dblclick', handleDblClick, eventOptions);
+  window.addEventListener('input', handleInput, eventOptions);
+  window.addEventListener('change', handleChange, eventOptions);
+  window.addEventListener('submit', handleSubmit, eventOptions);
+  window.addEventListener('keydown', handleKeydown, eventOptions);
+  console.log('[UIRecorder] Event listeners attached to window');
+
+  // 同时绑定到 document 和 document.body 以确保兼容性
+  document.addEventListener('click', handleClick, eventOptions);
+  document.addEventListener('dblclick', handleDblClick, eventOptions);
+  document.addEventListener('input', handleInput, eventOptions);
+  document.addEventListener('change', handleChange, eventOptions);
+  document.addEventListener('submit', handleSubmit, eventOptions);
+  document.addEventListener('keydown', handleKeydown, eventOptions);
+  console.log('[UIRecorder] Event listeners attached to document');
+
+  // 测试：直接在 body 上绑定，看是否能捕获
+  if (document.body) {
+    document.body.addEventListener('click', function(e) {
+      console.log('[UIRecorder] Body click captured, target=', e.target.tagName);
+    }, { capture: true, passive: true });
+    console.log('[UIRecorder] Test listener attached to body');
+  }
 
   // 通知父页面录制器已就绪
   window.parent.postMessage({ type: 'ui-recorder-ready' }, '*');
@@ -688,21 +1063,46 @@ _REPLAYER_JS = r"""
     jobId: '',
 
     init: function(steps, options) {
-      this.steps = steps || [];
-      this.options = options || {};
-      this.jobId = options.job_id || '';
-      this.currentIndex = -1;
-      this.running = false;
-      this.paused = false;
-      this.stopped = false;
-      this.results = [];
+      // 检查是否有保存的回放状态（跨页面导航后恢复）
+      var savedState = null;
+      try {
+        var saved = sessionStorage.getItem('_ui_replay_state');
+        if (saved) {
+          savedState = JSON.parse(saved);
+          console.log('[ReplayEngine] Found saved state:', savedState);
+        }
+      } catch(e) {}
+
+      if (savedState && savedState.steps && savedState.steps.length > 0) {
+        // 恢复保存的状态
+        this.steps = savedState.steps;
+        this.options = savedState.options || {};
+        this.jobId = savedState.jobId || '';
+        this.currentIndex = savedState.currentIndex || -1;
+        this.results = savedState.results || [];
+        this.running = false;
+        this.paused = false;
+        this.stopped = false;
+        console.log('[ReplayEngine] Resumed from saved state, continuing from step', this.currentIndex + 1);
+      } else {
+        // 正常初始化
+        this.steps = steps || [];
+        this.options = options || {};
+        this.jobId = options.job_id || '';
+        this.currentIndex = -1;
+        this.running = false;
+        this.paused = false;
+        this.stopped = false;
+        this.results = [];
+      }
+
       if (options.network_requests && options.network_requests.length > 0) {
         NetworkComparator.init(options.network_requests);
       }
       var timeout = this.options.timeout || 5000;
-      console.log('[ReplayEngine] init — steps:', this.steps.length, 'timeout:', timeout, 'delay:', this.options.delay_between_steps, 'jobId:', this.jobId);
-      if (typeof this._sendLog === 'function') try { this._sendLog('replay_init', '回放引擎初始化', { steps: this.steps.length, timeout: timeout, delay: this.options.delay_between_steps }, 'info'); } catch(e) {}
-      this._notifyParent('ready', { step_count: this.steps.length });
+      console.log('[ReplayEngine] init — steps:', this.steps.length, 'timeout:', timeout, 'delay:', this.options.delay_between_steps, 'jobId:', this.jobId, 'currentIndex:', this.currentIndex);
+      if (typeof this._sendLog === 'function') try { this._sendLog('replay_init', '回放引擎初始化', { steps: this.steps.length, timeout: timeout, delay: this.options.delay_between_steps, resumed: !!savedState }, 'info'); } catch(e) {}
+      this._notifyParent('ready', { step_count: this.steps.length, current_index: this.currentIndex, resumed: !!savedState });
     },
 
     start: function() {
@@ -786,7 +1186,22 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
+        // 保存当前回放到 sessionStorage，新页面加载后恢复
+        self._saveState();
         self._notifyParent('navigate', { url: step.value || '' });
+        return;
+      }
+
+      // new_tab 动作：模拟打开新标签页（实际是在 iframe 中导航）
+      if (action === 'new_tab') {
+        result.duration_ms = Date.now() - stepStart;
+        self.results.push(result);
+        self._notifyParent('step_complete', result);
+        // 保存当前回放到 sessionStorage，新页面加载后恢复
+        self._saveState();
+        // 通知父页面导航到新 URL（标记为新标签页）
+        self._notifyParent('navigate', { url: step.value || '', new_tab: true });
+        console.log('[ReplayEngine] new_tab action: navigating to', step.value);
         return;
       }
 
@@ -991,6 +1406,23 @@ _REPLAYER_JS = r"""
       check();
     },
 
+    _saveState: function() {
+      // 保存当前回放状态到 sessionStorage，用于跨页面导航后恢复
+      try {
+        var state = {
+          steps: this.steps,
+          options: this.options,
+          jobId: this.jobId,
+          currentIndex: this.currentIndex,
+          results: this.results
+        };
+        sessionStorage.setItem('_ui_replay_state', JSON.stringify(state));
+        console.log('[ReplayEngine] State saved to sessionStorage, currentIndex:', this.currentIndex);
+      } catch(e) {
+        console.warn('[ReplayEngine] Failed to save state:', e);
+      }
+    },
+
     _highlightElement: function(el) {
       if (!el || !el.style) return;
       var origOutline = el.style.outline;
@@ -1037,6 +1469,11 @@ _REPLAYER_JS = r"""
         duration_ms: duration,
         results: this.results
       });
+      // 清除保存的回放状态
+      try {
+        sessionStorage.removeItem('_ui_replay_state');
+        console.log('[ReplayEngine] Saved state cleared');
+      } catch(e) {}
     },
 
     _notifyParent: function(eventType, data) {

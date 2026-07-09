@@ -249,6 +249,8 @@ class UiProxyService:
         req_headers: Optional[Dict[str, str]] = None,
         req_body: Optional[bytes] = None,
         replay_mode: bool = False,
+        recording_mode: bool = False,
+        replay_engine_js: str = "",
     ) -> Tuple[str, int, Dict[str, Any]]:
         """获取外部 URL 并改写 HTML。
 
@@ -258,6 +260,9 @@ class UiProxyService:
             method: HTTP 方法（GET/POST）
             req_headers: 原始请求头（转发 Content-Type 等）
             req_body: 原始请求体（POST 时使用）
+            replay_mode: 是否为回放模式
+            recording_mode: 是否为录制模式
+            replay_engine_js: 回放引擎 JavaScript 代码（回放模式时注入）
 
         Returns:
             (body, status_code, response_headers)
@@ -348,7 +353,7 @@ class UiProxyService:
         response_headers.pop("Content-Security-Policy", None)
 
         if is_html:
-            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode)
+            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode, recording_mode=recording_mode, replay_engine_js=replay_engine_js)
             response_headers["Content-Type"] = "text/html; charset=utf-8"
         else:
             body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
@@ -507,7 +512,7 @@ class UiProxyService:
         return resp.content, resp.status_code, response_headers
 
     @staticmethod
-    def rewrite_html(html: str, base_url: str, replay_mode: bool = False) -> str:
+    def rewrite_html(html: str, base_url: str, replay_mode: bool = False, recording_mode: bool = False, replay_engine_js: str = "") -> str:
         """改写 HTML 中的所有 URL 引用。
 
         处理：
@@ -522,13 +527,18 @@ class UiProxyService:
 
         result = html
 
-        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode)
+        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode, recording_mode=recording_mode)
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
         result = UiProxyService._rewrite_style_tag_urls(result, base_url, origin)
         result = UiProxyService._remove_frame_busting(result)
-        result = UiProxyService._inject_recorder_script(result, origin)
+
+        # 回放模式：注入回放引擎脚本（确保新页面加载后也能继续执行）
+        if replay_mode and replay_engine_js:
+            result = UiProxyService._inject_replay_engine_script(result, replay_engine_js)
+        else:
+            result = UiProxyService._inject_recorder_script(result, origin)
 
         return result
 
@@ -693,7 +703,7 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False) -> str:
+    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False, recording_mode: bool = False) -> str:
         """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
 
         拦截机制（8 层防护）：
@@ -733,7 +743,7 @@ class UiProxyService:
         )
 
         storage_clear = ''
-        if replay_mode:
+        if replay_mode or recording_mode:
             storage_clear = (
                 'try{'
                 'var _lsKeys=Object.keys(localStorage);'
@@ -933,10 +943,42 @@ class UiProxyService:
 
     @staticmethod
     def _inject_recorder_script(html: str, origin: str = "") -> str:
-        """在 </body> 前注入录制器脚本。"""
-        from postman_api_tester.services.ui_recorder_inject import get_recorder_js
+        """在 <head> 注入早期事件捕获脚本，在 </body> 前注入主录制器脚本。"""
+        from postman_api_tester.services.ui_recorder_inject import get_recorder_js, get_early_recorder_js
 
-        script_tag = f"<script>\n{get_recorder_js(origin)}\n</script>"
+        # 早期脚本：在 <head> 中注入，在 Vue.js 之前捕获事件
+        early_js = get_early_recorder_js()
+        early_script_tag = f"<script>\n{early_js}\n</script>"
+
+        lower = html.lower()
+        if "<head>" in lower:
+            idx = lower.index("<head>") + len("<head>")
+            html = html[:idx] + early_script_tag + html[idx:]
+            lower = html.lower()  # 重新计算索引
+        elif "<html>" in lower:
+            idx = lower.index("<html>") + len("<html>")
+            html = html[:idx] + early_script_tag + html[idx:]
+            lower = html.lower()
+
+        # 主脚本：在 </body> 前注入
+        recorder_js = get_recorder_js(origin)
+        logger.info(f"recorder_script_injected: len={len(recorder_js)}, origin={origin}")
+        script_tag = f"<script>\n{recorder_js}\n</script>"
+
+        if "</body>" in lower:
+            idx = lower.index("</body>")
+            html = html[:idx] + script_tag + html[idx:]
+        elif "</html>" in lower:
+            idx = lower.index("</html>")
+            html = html[:idx] + script_tag + html[idx:]
+        else:
+            html += script_tag
+
+        return html
+    @staticmethod
+    def _inject_replay_engine_script(html: str, replay_engine_js: str) -> str:
+        """在 </body> 前注入回放引擎脚本。"""
+        script_tag = f"<script>\n{replay_engine_js}\n</script>"
 
         lower = html.lower()
         if "</body>" in lower:
