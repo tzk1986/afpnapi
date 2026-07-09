@@ -60,6 +60,9 @@ class UIRecorder {
     window.addEventListener('hashchange', this._onHashChangeBound);
 
     this._patchHistoryAPI();
+    try { this._injectNetworkInterceptor(); } catch (e) {
+      console.warn('[UIRecorder] Network interceptor injection failed (DOM recording still works):', e.message);
+    }
     this._startHeartbeat();
     this._showIndicator();
     console.log('[UIRecorder] Recording started, session:', sessionId);
@@ -79,6 +82,9 @@ class UIRecorder {
     }
     if (this._onHashChangeBound) {
       window.removeEventListener('hashchange', this._onHashChangeBound);
+    }
+    if (this._onNetworkEventBound) {
+      window.removeEventListener('message', this._onNetworkEventBound);
     }
 
     this._stopHeartbeat();
@@ -288,6 +294,61 @@ class UIRecorder {
     };
 
     console.log('[UIRecorder] History API patched for SPA navigation');
+  }
+
+  // ── 注入网络拦截器到页面上下文（MAIN world） ──
+  _injectNetworkInterceptor() {
+    if (document.getElementById('ui-recorder-network-interceptor')) return;
+    try {
+      const script = document.createElement('script');
+      script.id = 'ui-recorder-network-interceptor';
+      script.src = chrome.runtime.getURL('content/network-interceptor.js');
+      script.onload = () => script.remove();
+      (document.head || document.documentElement).appendChild(script);
+
+      this._onNetworkEventBound = this._onNetworkEvent.bind(this);
+      window.addEventListener('message', this._onNetworkEventBound);
+      console.log('[UIRecorder] Network interceptor injected');
+    } catch (e) {
+      console.warn('[UIRecorder] Failed to inject network interceptor:', e.message);
+    }
+  }
+
+  // ── 处理网络拦截器发来的事件（不影响 DOM 录制） ──
+  _onNetworkEvent(event) {
+    try {
+      if (!event.data || event.data.type !== '__UI_RECORDER_NETWORK__') return;
+      if (!this.recording) return;
+
+      const netData = event.data.data;
+      if (!netData || !netData.url) return;
+
+      this.sendStep({
+        action: 'api_call',
+        selector: null,
+        value: '',
+        element_info: {},
+        page_url: _getTargetUrl(),
+        page_title: document.title,
+        network_request: {
+          url: netData.url,
+          url_path: netData.url_path || '',
+          method: netData.method || 'GET',
+          headers: netData.request_headers || {},
+          body: netData.request_body || '',
+        },
+        network_response: {
+          status: netData.response_status || 0,
+          headers: netData.response_headers || {},
+          body: netData.response_body || '',
+          content_type: netData.response_content_type || '',
+        },
+        duration_ms: netData.duration_ms || 0,
+        timestamp: netData.timestamp || Date.now(),
+      });
+    } catch (e) {
+      // 网络事件处理失败不影响 DOM 录制
+    }
   }
 
   // ── 心跳机制：防止 Service Worker 在录制期间被杀 ──

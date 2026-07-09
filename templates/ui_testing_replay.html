@@ -223,9 +223,20 @@
                     updateControlButtons();
                     break;
                 case '_proxy_nav':
-                    // 早期脚本上报的导航日志
                     var navLabel = data.method ? ('[' + data.method + ']') : '[href]';
                     console.log('[ProxyNav]', navLabel, 'navigate to:', data.href, 'from:', data.loc);
+                    fetch('/api/ui-testing/replay-log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            job_id: jobId,
+                            step_index: currentStepIndex,
+                            event: 'proxy_nav',
+                            message: navLabel + ' ' + (data.href || '') + ' from ' + (data.loc || ''),
+                            detail: { method: data.method || 'href', href: data.href, loc: data.loc },
+                            level: 'info'
+                        })
+                    }).catch(function() {});
                     break;
             }
         });

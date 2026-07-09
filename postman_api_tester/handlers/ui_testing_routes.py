@@ -231,15 +231,14 @@ def ui_testing_proxy() -> ResponseReturnValue:
         from urllib.parse import urlparse as _up2
         _parsed = _up2(target_url)
         if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
-            _inner = _parsed.path.startswith("/ui-testing/proxy")
-            if _inner:
-                from urllib.parse import parse_qs as _pqs
-                _qs = _pqs(_parsed.query)
-                _inner_url = _qs.get("url", [""])[0]
-                if _inner_url:
-                    logger.debug("unwrap_nested_proxy", extra={"from": target_url[:80], "to": _inner_url[:80]})
-                    target_url = _inner_url
-                    continue
+            # 任何指向代理自身的路径，都尝试提取 url 参数
+            from urllib.parse import parse_qs as _pqs
+            _qs = _pqs(_parsed.query)
+            _inner_url = _qs.get("url", [""])[0]
+            if _inner_url and _inner_url.startswith(("http://", "https://")):
+                logger.debug("unwrap_nested_proxy", extra={"from": target_url[:80], "to": _inner_url[:80]})
+                target_url = _inner_url
+                continue
         break
 
     if not target_url.startswith(("http://", "https://")):

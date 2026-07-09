@@ -4,12 +4,52 @@
 需要安装 playwright: pip install playwright && playwright install chromium
 """
 
+import json
 import logging
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# 无头执行日志目录
+_HEADLESS_LOG_DIR = Path("logs/headless")
+_HEADLESS_LOG_RETENTION_DAYS = 10
+
+
+def _cleanup_old_logs() -> None:
+    """清理超过保留天数的无头执行日志。"""
+    if not _HEADLESS_LOG_DIR.exists():
+        return
+    cutoff = datetime.now() - timedelta(days=_HEADLESS_LOG_RETENTION_DAYS)
+    cleaned = 0
+    for f in _HEADLESS_LOG_DIR.glob("exec_*.jsonl"):
+        try:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime)
+            if mtime < cutoff:
+                f.unlink()
+                cleaned += 1
+        except OSError:
+            pass
+    if cleaned > 0:
+        logger.info("headless_log_cleanup: removed %d old log files", cleaned)
+
+
+def _log_request(job_id: str, step_index: int, request_data: Dict[str, Any]) -> None:
+    """将无头执行中的网络请求追加到日志文件。"""
+    _HEADLESS_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = _HEADLESS_LOG_DIR / f"exec_{job_id}.jsonl"
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "step_index": step_index,
+        **request_data,
+    }
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 try:
     from playwright.sync_api import (
@@ -83,12 +123,46 @@ class UiHeadlessEngine:
         steps_failed = 0
         start_time = time.time()
 
+        _cleanup_old_logs()
+
+        current_step_index = [-1]  # 用 list 以便在闭包中修改
+
+        def _on_request(request: Any) -> None:
+            """拦截并记录无头执行中的网络请求。"""
+            url = request.url
+            # 只记录 API 请求，跳过静态资源
+            if "/api/" not in url:
+                return
+            _log_request(job_id, current_step_index[0], {
+                "event": "request",
+                "method": request.method,
+                "url": url,
+                "headers": dict(request.headers),
+            })
+
+        def _on_response(response: Any) -> None:
+            """记录响应状态。"""
+            url = response.url
+            if "/api/" not in url:
+                return
+            _log_request(job_id, current_step_index[0], {
+                "event": "response",
+                "method": response.request.method,
+                "url": url,
+                "status": response.status,
+                "status_text": response.status_text,
+            })
+
         try:
             launcher = getattr(pw, self._browser_type, pw.chromium)
             browser = launcher.launch(headless=True)
             context = browser.new_context(viewport={"width": viewport_w, "height": viewport_h})
             page = context.new_page()
             page.set_default_timeout(timeout_ms)
+
+            # 监听网络请求
+            page.on("request", _on_request)
+            page.on("response", _on_response)
 
             # 自动导航到 base_url（回放模式下 iframe 已指向 base_url，无头模式需要显式跳转）
             if base_url:

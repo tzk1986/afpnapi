@@ -388,7 +388,16 @@
     async function importToUITesting(sessionId) {
       try {
         const exportResp = await fetch('/api/ui-recorder/session/' + sessionId + '/export');
+        if (!exportResp.ok) {
+          const errData = await exportResp.json().catch(() => ({}));
+          alert('导出失败: ' + (errData.message || '未知错误 (HTTP ' + exportResp.status + ')'));
+          return;
+        }
         const exportData = await exportResp.json();
+        if (!exportData || !exportData.steps || exportData.steps.length === 0) {
+          alert('导入失败: 录制会话中没有操作步骤');
+          return;
+        }
         const createResp = await fetch('/api/ui-testing/cases', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -401,7 +410,7 @@
           alert('导入失败: ' + (result.message || '未知错误'));
         }
       } catch (e) {
-        alert('导入失败');
+        alert('导入失败: ' + (e.message || '未知错误'));
       }
     }
 
