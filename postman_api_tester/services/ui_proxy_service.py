@@ -152,6 +152,14 @@ class _ProxySessionStore:
                 s["last_active"] = time.time()
                 s["cookies"].update(resp_cookies)
 
+    def delete_session(self, session_id: str) -> bool:
+        """删除指定会话。"""
+        with self._lock:
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                return True
+            return False
+
     def get_set_cookie_headers(self, session_id: str) -> List[str]:
         """将存储的 Cookie 转为浏览器可接收的 Set-Cookie 头列表。
 
