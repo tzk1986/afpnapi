@@ -22,11 +22,13 @@ def get_recorder_js(origin: str = "") -> str:
 _EARLY_RECORDER_JS = r"""
 (function() {
   'use strict';
+  console.log('[EarlyRecorder] Script starting...');
   // 早期事件捕获器 — 在 Vue.js 等框架初始化之前捕获事件
   // 注入到 <head>，确保最先执行
 
   // 全局事件队列，主录制器脚本会消费这些事件
   window.__UI_RECORDER_EVENT_QUEUE = window.__UI_RECORDER_EVENT_QUEUE || [];
+  console.log('[EarlyRecorder] Event queue initialized');
 
   // 录制状态（从 sessionStorage 恢复）
   var _recordingActive = false;
@@ -36,17 +38,20 @@ _EARLY_RECORDER_JS = r"""
       _recordingActive = true;
       console.log('[EarlyRecorder] Recording active from sessionStorage');
     }
-  } catch(e) {}
+  } catch(e) {
+    console.warn('[EarlyRecorder] sessionStorage access failed:', e);
+  }
 
   // 监听来自父页面的控制消息（用于启动/停止录制）
   window.addEventListener('message', function(e) {
+    console.log('[EarlyRecorder] Message received:', e.data);
     if (e.data && e.data.type === 'ui-recorder-control') {
       if (e.data.action === 'start') {
         _recordingActive = true;
         try {
           sessionStorage.setItem('_ui_rec_active', '1');
         } catch(e) {}
-        console.log('[EarlyRecorder] Recording started via message');
+        console.log('[EarlyRecorder] Recording started via message, _recordingActive=', _recordingActive);
       } else if (e.data.action === 'stop') {
         _recordingActive = false;
         try {
@@ -55,14 +60,23 @@ _EARLY_RECORDER_JS = r"""
         console.log('[EarlyRecorder] Recording stopped via message');
       }
     }
-  }, { capture: true, passive: true });
+  });
 
   // 捕获事件并保存到队列
   function captureEvent(type, e) {
-    if (!_recordingActive) return;
+    console.log('[EarlyRecorder] captureEvent called:', type, 'recordingActive=', _recordingActive);
+    if (!_recordingActive) {
+      console.log('[EarlyRecorder] Event ignored (not recording)');
+      return;
+    }
 
     var el = e.target;
-    if (!el || !el.tagName) return;
+    if (!el || !el.tagName) {
+      console.log('[EarlyRecorder] Event ignored (no valid target)');
+      return;
+    }
+
+    console.log('[EarlyRecorder] Capturing event:', type, el.tagName, el.type);
 
     // 立即提取所有需要的数据（事件对象会被浏览器回收）
     var eventData = {
@@ -97,7 +111,7 @@ _EARLY_RECORDER_JS = r"""
     };
 
     window.__UI_RECORDER_EVENT_QUEUE.push(eventData);
-    console.log('[EarlyRecorder] Event captured:', type, el.tagName, el.type);
+    console.log('[EarlyRecorder] Event captured and queued:', type, el.tagName, 'queue length:', window.__UI_RECORDER_EVENT_QUEUE.length);
   }
 
   // 在 capture 阶段捕获所有事件（最先执行，框架无法阻止）
@@ -112,7 +126,7 @@ _EARLY_RECORDER_JS = r"""
     })(eventTypes[i]);
   }
 
-  console.log('[EarlyRecorder] Early event capture installed');
+  console.log('[EarlyRecorder] Early event capture installed, listeners:', eventTypes.join(', '));
 })();
 """
 
@@ -262,38 +276,61 @@ _RECORDER_JS = r"""
   // ====== 事件队列处理器 ======
   // 消费早期注入脚本捕获的事件
   var _queueProcessed = 0;
+  console.log('[UIRecorder] Queue processor initializing');
+
   function _processEventQueue() {
-    if (!window.__UI_RECORDER_EVENT_QUEUE) return;
+    if (!window.__UI_RECORDER_EVENT_QUEUE) {
+      console.log('[UIRecorder] Queue processor: no queue found');
+      return;
+    }
     var queue = window.__UI_RECORDER_EVENT_QUEUE;
+
+    if (queue.length > _queueProcessed) {
+      console.log('[UIRecorder] Queue processor: found', queue.length - _queueProcessed, 'new events, recording=', recording);
+    }
 
     while (_queueProcessed < queue.length) {
       var eventData = queue[_queueProcessed];
       _queueProcessed++;
 
-      if (!recording) continue;
+      if (!recording) {
+        console.log('[UIRecorder] Queue processor: skipping event (not recording)');
+        continue;
+      }
+
+      console.log('[UIRecorder] Queue processor: processing event', eventData.type, eventData.tagName);
 
       // 使用缓存的元素引用
       var el = eventData._targetRef;
-      if (!el || !el.tagName) continue;
+      if (!el || !el.tagName) {
+        console.log('[UIRecorder] Queue processor: skipping (no valid element)');
+        continue;
+      }
 
       // 检查元素是否仍在 DOM 中（Vue 可能已重新渲染）
       if (!document.contains(el)) {
-        console.log('[UIRecorder] Element removed from DOM, skipping event');
+        console.log('[UIRecorder] Queue processor: element removed from DOM, skipping');
         continue;
       }
 
       // 根据事件类型分发处理
       if (eventData.type === 'click') {
+        console.log('[UIRecorder] Queue processor: handling click');
         _handleCapturedClick(eventData, el);
       } else if (eventData.type === 'dblclick') {
+        console.log('[UIRecorder] Queue processor: handling dblclick');
         _handleCapturedDblClick(eventData, el);
       } else if (eventData.type === 'input') {
+        console.log('[UIRecorder] Queue processor: handling input');
         _handleCapturedInput(eventData, el);
       } else if (eventData.type === 'change') {
+        console.log('[UIRecorder] Queue processor: handling change');
         _handleCapturedChange(eventData, el);
       } else if (eventData.type === 'submit') {
+        console.log('[UIRecorder] Queue processor: handling submit');
         _handleCapturedSubmit(eventData, el);
       } else if (eventData.type === 'keydown') {
+        console.log('[UIRecorder] Queue processor: handling keydown');
         _handleCapturedKeydown(eventData, el);
       }
     }
@@ -301,6 +338,7 @@ _RECORDER_JS = r"""
 
   // 每 100ms 处理一次队列
   setInterval(_processEventQueue, 100);
+  console.log('[UIRecorder] Queue processor started (100ms interval)');
 
   // 从缓存的事件数据重建元素信息
   function _buildElementInfo(eventData) {
