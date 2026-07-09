@@ -229,7 +229,7 @@
 
         function selectStep(event, index) {
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' ||
-                event.target.tagName === 'BUTTON' || event.target.tagName === 'TD') return;
+                event.target.tagName === 'BUTTON') return;
             selectedStepIndex = (selectedStepIndex === index) ? null : index;
             renderSteps();
         }

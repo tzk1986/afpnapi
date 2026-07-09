@@ -69,6 +69,7 @@
         <h1>
             <span id="execIcon">▶</span>
             <span id="execTitle">正在加载...</span>
+            <span id="currentUrl" style="margin-left:12px;font-size:12px;color:#9ca3af;font-family:monospace;"></span>
         </h1>
         <div class="status-info">
             <span>步骤 <span class="step-counter" id="stepCounter">0/0</span></span>
@@ -366,20 +367,22 @@
 
         function onNavigate(url) {
             if (!url) return;
-            // 对代理 URL 不显示原始 URL，避免暴露内部代理地址
-            var displayUrl = url.indexOf('proxy-resource') >= 0 || url.indexOf('/ui-testing/proxy') === 0
-                ? '正在加载页面...'
-                : url;
-            document.getElementById('iframeLoading').style.display = 'flex';
-            document.getElementById('iframeLoading').textContent = '正在导航到: ' + displayUrl;
-            // 提取 pathname，让 window.location.pathname 直接等于目标路径
+            // SPA 同域导航：不需要刷新 iframe，只需要更新 URL 显示
             var urlObj = new URL(url, window.location.origin);
-            var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-            var proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                '_proxy_url=' + encodeURIComponent(url);
-            document.getElementById('replayFrame').src = proxyUrl;
-            // 导航后需要重新注入回放引擎（iframe onload 会触发）
-            replayStarted = false;
+            var currentUrl = document.getElementById('currentUrl');
+            if (currentUrl) currentUrl.textContent = urlObj.pathname + urlObj.search;
+            // 只有跨域导航才需要刷新 iframe（通过早期脚本代理处理）
+            if (url.indexOf('/ui-testing/proxy') === 0 && url.indexOf('_proxy_url=') > 0) {
+                // 这是代理 URL 格式，说明是真正的页面跳转，需要刷新
+                var displayUrl = '正在加载页面...';
+                document.getElementById('iframeLoading').style.display = 'flex';
+                document.getElementById('iframeLoading').textContent = '正在导航到: ' + displayUrl;
+                var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                var proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                    '_proxy_url=' + encodeURIComponent(url);
+                document.getElementById('replayFrame').src = proxyUrl;
+                replayStarted = false;
+            }
         }
 
         function captureScreenshot(stepIndex) {

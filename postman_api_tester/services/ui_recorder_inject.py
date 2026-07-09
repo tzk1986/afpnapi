@@ -699,6 +699,9 @@ _REPLAYER_JS = r"""
       if (options.network_requests && options.network_requests.length > 0) {
         NetworkComparator.init(options.network_requests);
       }
+      var timeout = this.options.timeout || 5000;
+      console.log('[ReplayEngine] init — steps:', this.steps.length, 'timeout:', timeout, 'delay:', this.options.delay_between_steps, 'jobId:', this.jobId);
+      if (typeof this._sendLog === 'function') try { this._sendLog('replay_init', '回放引擎初始化', { steps: this.steps.length, timeout: timeout, delay: this.options.delay_between_steps }, 'info'); } catch(e) {}
       this._notifyParent('ready', { step_count: this.steps.length });
     },
 
