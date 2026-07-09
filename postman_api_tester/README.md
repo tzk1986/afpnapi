@@ -1,8 +1,14 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.29.0
-发布日期：2026-07-07
+版本：v1.29.59
+发布日期：2026-07-09
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.29.59）：
+- **日志目录统一**：`report_server.log` 从 `reports/` 移到 `logs/`，与无头执行日志统一目录，保留期改为 10 天自动清理
+- **无头执行请求日志**：`logs/headless/exec_{job_id}.jsonl` 记录 Playwright 执行过程中的 API 请求（method/url/headers/status）
+- **网络请求录制**：Chrome 插件录制时捕获 fetch/XHR 请求结构，回放时自动比对差异
+- **SPA 404 修复**：pushState/replaceState 不再改写为代理 URL，window.location 补丁兜底
 
 本版新增重点（v1.29.0）：
 - **UI 报告存档**：执行报告统一存储到 `uireports/` 目录（不提交 git），首页新增"报告列表"按钮
@@ -222,6 +228,9 @@ d:/tangzk/py/seldom-api-testing/
 │  └─ 最终交付清单.md                # 交付时的文件清单
 ├─ templates/                        # 外置 HTML 模板（报告首页、数据视图等）
 ├─ reports/                          # 默认报告输出目录（html/details/meta）
+├─ logs/                             # 日志目录（统一 10 天自动清理）
+│  ├─ report_server.log                  # 回放日志、网络比对日志、导航日志
+│  └─ headless/                          # 无头执行请求日志（JSONL 格式）
 ├─ uploaded_collections/             # 报告中心上传执行时保存的 Collection 与导出文件
 ├─ requirements.txt                  # 依赖安装入口
 ├─ allow_report_server_firewall.ps1  # Windows 防火墙放通 5000 端口脚本
@@ -238,6 +247,7 @@ d:/tangzk/py/seldom-api-testing/
 - `python -m postman_api_tester` 启动报告服务（通过包级 `__main__.py` 入口）。
 - `templates/` 是报告中心页面模板，页面显示问题优先看这里。
 - `reports/` 是测试执行后的默认产物目录，报告中心默认也从这里读数据。
+- `logs/` 是日志目录，包含回放日志（`report_server.log`）和无头执行请求日志（`headless/exec_{job_id}.jsonl`），统一 10 天自动清理。
 - `uploaded_collections/` 是通过报告中心网页上传执行时产生的中间文件目录。
 
 ### 0.1 调用路径总览（目录迁移后）
