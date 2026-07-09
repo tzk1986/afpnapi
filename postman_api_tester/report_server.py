@@ -541,32 +541,34 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     # 检查是否为资源请求（有扩展名）或 API 请求（包含 /api/ 路径段）
     is_resource = _ext in _resource_exts
     is_api = "/api/" in resource_path or resource_path.startswith("api/")
+    # 页面请求：没有扩展名且不是 API（如 /home, /login, /dashboard）
+    is_page = not is_resource and not is_api
 
-    if not is_resource and not is_api:
-        from flask import abort
-        abort(404)
+    # 从 URL 参数提取目标 URL（新方案：_proxy_url 参数）
+    params = parse_qs(request.query_string.decode("utf-8", errors="replace"))
+    target_url = params.get("_proxy_url", [""])[0] or params.get("url", [""])[0]
 
-    # 从 Referer 提取目标 URL
+    # 从 Referer 提取目标 URL（旧方案兼容）
     referer = request.headers.get("Referer", "")
+    if not target_url and referer:
+        try:
+            parsed_ref = _urlparse(referer)
+            ref_params = parse_qs(parsed_ref.query)
+            target_url = ref_params.get("_proxy_url", [""])[0] or ref_params.get("url", [""])[0]
+        except Exception:
+            pass
 
-    # 记录兜底请求：这些请求没有被早期脚本的 fetch/XHR 拦截器捕获
+    # 记录兜底请求
     logger.warning(
         "spa_fallback_request",
         extra={
             "event": "ui.proxy.fallback_request",
             "method": request.method,
             "path": resource_path,
+            "is_page": is_page,
             "referer": referer if referer else "(none)",
         },
     )
-    target_url = ""
-    if referer:
-        try:
-            parsed_ref = _urlparse(referer)
-            params = parse_qs(parsed_ref.query)
-            target_url = params.get("url", [""])[0]
-        except Exception:
-            pass
 
     # 从 Cookie session 中获取 base_url
     if not target_url:
@@ -590,27 +592,61 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
 
     target_url = _uq(target_url)
     parsed_target = _urlparse(target_url)
+    # 对于页面请求，使用 resource_path 作为目标路径；对于资源/API，也使用 resource_path
     full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
 
     session_id = request.cookies.get("_proxy_session") or ""
+    replay_mode = params.get("replay", [""])[0] == "1"
 
     try:
         from postman_api_tester.services.ui_proxy_service import UiProxyService
-        body, status_code, headers = UiProxyService.fetch_resource(
-            full_url,
-            method=request.method,
-            req_headers=dict(request.headers),
-            req_body=request.get_data() if request.method not in ("GET", "HEAD") else None,
-            session_id=session_id if session_id else None,
-        )
+        if is_page:
+            # 页面请求：使用 fetch_and_rewrite 改写 HTML
+            body, status_code, headers = UiProxyService.fetch_and_rewrite(
+                full_url,
+                session_id if session_id else None,
+                method=request.method,
+                req_headers=dict(request.headers),
+                req_body=request.get_data() if request.method != "GET" else None,
+                replay_mode=replay_mode,
+            )
+        else:
+            # 资源/API 请求：使用 fetch_resource
+            body, status_code, headers = UiProxyService.fetch_resource(
+                full_url,
+                method=request.method,
+                req_headers=dict(request.headers),
+                req_body=request.get_data() if request.method not in ("GET", "HEAD") else None,
+                session_id=session_id if session_id else None,
+            )
     except Exception:
         return make_response(b"", 404)
 
-    # 内容类型校验
-    content_type = headers.get("Content-Type", "")
-    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
-    if _ext in _binary_exts and content_type.startswith("text/"):
-        return make_response(b"", 404)
+    # 内容类型校验（仅对资源请求）
+    if is_resource:
+        content_type = headers.get("Content-Type", "")
+        _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
+        if _ext in _binary_exts and content_type.startswith("text/"):
+            return make_response(b"", 404)
+
+    # 重写 Location 响应头（页面请求的重定向）
+    if is_page and "Location" in headers:
+        loc = headers["Location"]
+        from urllib.parse import quote as _quote2
+        base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
+        if loc.startswith(("http://", "https://")):
+            # 绝对 URL：提取 pathname
+            loc_parsed = _urlparse(loc)
+            loc_path = loc_parsed.pathname + ('?' + loc_parsed.query if loc_parsed.query else '') + \
+                ('#' + loc_parsed.fragment if loc_parsed.fragment else '')
+            sep = '&' if '?' in loc_path else '?'
+            headers["Location"] = loc_path + sep + '_proxy_url=' + _quote2(loc, safe='')
+        elif loc.startswith("/"):
+            # 相对路径：构造完整 URL
+            full_loc = base_url + loc
+            loc_path = loc
+            sep = '&' if '?' in loc_path else '?'
+            headers["Location"] = loc_path + sep + '_proxy_url=' + _quote2(full_loc, safe='')
 
     resp = make_response(body, status_code)
     for key, value in headers.items():

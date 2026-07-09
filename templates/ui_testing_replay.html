@@ -127,7 +127,12 @@
                     // 加载目标页面到 iframe
                     var baseUrl = data.base_url || '';
                     if (baseUrl) {
-                        var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(baseUrl) + '&replay=1';
+                        // 从 baseUrl 提取 pathname，让 iframe 的 window.location.pathname 直接等于目标路径
+                        // 这样 Vue Router 等 SPA 框架可以正确匹配路由
+                        var urlObj = new URL(baseUrl);
+                        var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                        var proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                            '_proxy_url=' + encodeURIComponent(baseUrl) + '&replay=1';
                         document.getElementById('replayFrame').src = proxyUrl;
                     } else {
                         document.getElementById('iframeLoading').textContent = '用例无 base_url，请导航步骤指定页面';
@@ -369,7 +374,11 @@
                 : url;
             document.getElementById('iframeLoading').style.display = 'flex';
             document.getElementById('iframeLoading').textContent = '正在导航到: ' + displayUrl;
-            var proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url);
+            // 提取 pathname，让 window.location.pathname 直接等于目标路径
+            var urlObj = new URL(url, window.location.origin);
+            var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+            var proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                '_proxy_url=' + encodeURIComponent(url);
             document.getElementById('replayFrame').src = proxyUrl;
             // 导航后需要重新注入回放引擎（iframe onload 会触发）
             replayStarted = false;
