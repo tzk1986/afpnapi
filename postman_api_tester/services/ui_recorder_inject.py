@@ -31,11 +31,14 @@ _EARLY_RECORDER_JS = r"""
   console.log('[EarlyRecorder] Event queue initialized');
 
   // 录制状态（从 sessionStorage 恢复）
+  // 使用全局变量，主脚本也能访问
+  window.__UI_RECORDER_RECORDING = false;
   var _recordingActive = false;
   try {
     var _active = sessionStorage.getItem('_ui_rec_active');
     if (_active === '1') {
       _recordingActive = true;
+      window.__UI_RECORDER_RECORDING = true;
       console.log('[EarlyRecorder] Recording active from sessionStorage');
     }
   } catch(e) {
@@ -48,12 +51,14 @@ _EARLY_RECORDER_JS = r"""
     if (e.data && e.data.type === 'ui-recorder-control') {
       if (e.data.action === 'start') {
         _recordingActive = true;
+        window.__UI_RECORDER_RECORDING = true;
         try {
           sessionStorage.setItem('_ui_rec_active', '1');
         } catch(e) {}
-        console.log('[EarlyRecorder] Recording started via message, _recordingActive=', _recordingActive);
+        console.log('[EarlyRecorder] Recording started via message, _recordingActive=', _recordingActive, 'global=', window.__UI_RECORDER_RECORDING);
       } else if (e.data.action === 'stop') {
         _recordingActive = false;
+        window.__UI_RECORDER_RECORDING = false;
         try {
           sessionStorage.removeItem('_ui_rec_active');
         } catch(e) {}
@@ -285,15 +290,18 @@ _RECORDER_JS = r"""
     }
     var queue = window.__UI_RECORDER_EVENT_QUEUE;
 
+    // 使用全局录制状态（早期脚本设置）
+    var isRecording = recording || (window.__UI_RECORDER_RECORDING === true);
+
     if (queue.length > _queueProcessed) {
-      console.log('[UIRecorder] Queue processor: found', queue.length - _queueProcessed, 'new events, recording=', recording);
+      console.log('[UIRecorder] Queue processor: found', queue.length - _queueProcessed, 'new events, recording=', isRecording);
     }
 
     while (_queueProcessed < queue.length) {
       var eventData = queue[_queueProcessed];
       _queueProcessed++;
 
-      if (!recording) {
+      if (!isRecording) {
         console.log('[UIRecorder] Queue processor: skipping event (not recording)');
         continue;
       }
@@ -807,14 +815,17 @@ _RECORDER_JS = r"""
     if (e.data && e.data.type === 'ui-recorder-control') {
       if (e.data.action === 'start') {
         recording = true;
+        // 同步到全局变量（早期脚本也使用）
+        window.__UI_RECORDER_RECORDING = true;
         // 保存录制状态到 sessionStorage，页面导航后自动恢复
         try {
           sessionStorage.setItem('_ui_rec_session_id', _sessionId);
           sessionStorage.setItem('_ui_rec_active', '1');
         } catch(e) {}
-        console.log('[UIRecorder] Recording started, recording=', recording, 'session=', _sessionId);
+        console.log('[UIRecorder] Recording started, recording=', recording, 'global=', window.__UI_RECORDER_RECORDING, 'session=', _sessionId);
       } else if (e.data.action === 'stop') {
         recording = false;
+        window.__UI_RECORDER_RECORDING = false;
         clearTimeout(inputBuffer.timer);
         inputBuffer = { element: null, value: '', timer: null, isPassword: false };
         // 清除录制状态
