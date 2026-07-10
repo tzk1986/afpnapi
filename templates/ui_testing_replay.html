@@ -449,13 +449,21 @@
         // 计时器
         function startTimer() {
             timerInterval = setInterval(function() {
+                if (!isRunning) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    return;
+                }
                 var elapsed = (Date.now() - startTime) / 1000;
                 document.getElementById('timer').textContent = elapsed.toFixed(1) + 's';
             }, 100);
         }
 
         function stopTimer() {
-            if (timerInterval) clearInterval(timerInterval);
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
         }
 
         function truncate(str, max) {
