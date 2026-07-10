@@ -229,6 +229,7 @@
                     break;
                 case 'ui-replay-stopped':
                     isRunning = false;
+                    stopTimer();
                     updateControlButtons();
                     break;
                 case '_proxy_nav':
