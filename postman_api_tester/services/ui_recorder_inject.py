@@ -946,7 +946,7 @@ _REPLAYER_JS = r"""
 
   // ====== 选择器引擎（回放模式，仅查找）======
   var SelectorEngine = {
-    find: function(selectorStr, selectorObj) {
+    find: function(selectorStr, selectorObj, elementInfo) {
       if (!selectorStr && !selectorObj) return null;
       var primary = '';
       var fallbackCss = '';
@@ -965,11 +965,11 @@ _REPLAYER_JS = r"""
       if (el) { console.log('[ReplayEngine] find OK: primary matched'); return { element: el, strategy: 'primary' }; }
       console.log('[ReplayEngine] find primary failed, trying fallback_css');
       if (fallbackCss) {
-        // 获取 element_info.text 用于多匹配时筛选
+        // 获取 element_info.text 用于多匹配时筛选（从 step.element_info 独立字段获取）
         var expectedText = '';
-        console.log('[ReplayEngine] find selectorObj.element_info:', selectorObj ? JSON.stringify(selectorObj.element_info || 'undefined') : 'null');
-        if (selectorObj && selectorObj.element_info && selectorObj.element_info.text) {
-          expectedText = selectorObj.element_info.text;
+        console.log('[ReplayEngine] find elementInfo:', elementInfo ? JSON.stringify(elementInfo).substring(0, 100) : 'null');
+        if (elementInfo && elementInfo.text) {
+          expectedText = elementInfo.text;
         }
         el = SelectorEngine._tryFind(fallbackCss, expectedText);
         if (el) { console.log('[ReplayEngine] find OK: fallback_css matched'); return { element: el, strategy: 'fallback_css' }; }
@@ -1683,7 +1683,7 @@ _REPLAYER_JS = r"""
 
       function check() {
         attempts++;
-        var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
+        var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector, step.element_info || null);
         if (found && found.element) {
           console.log('[ReplayEngine] element found after', attempts, 'attempts, strategy:', found.strategy);
           if (typeof self._sendLog === 'function') try { self._sendLog('element_found', '元素已找到', { attempts: attempts, strategy: found.strategy }); } catch(e) {}
