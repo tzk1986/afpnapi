@@ -274,10 +274,24 @@
         }
 
         function stopReplay() {
-            sendToFrame({ type: 'ui-replay-control', action: 'stop' });
+            if (!isRunning) return;
             isRunning = false;
             stopTimer();
             updateControlButtons();
+
+            // 方式1: 直接在 iframe 窗口上设置停止标志（同源，最可靠）
+            var frame = document.getElementById('replayFrame');
+            try {
+                if (frame.contentWindow) {
+                    frame.contentWindow.__REPLAY_STOP__ = true;
+                    console.log('[Parent] Set __REPLAY_STOP__ flag');
+                }
+            } catch(e) { console.error('Failed to set stop flag:', e); }
+
+            // 方式2: postMessage（异步，作为备用）
+            sendToFrame({ type: 'ui-replay-control', action: 'stop' });
+
+            // 方式3: 通知后端取消任务
             fetch('/api/ui-testing/execution/' + jobId + '/cancel', { method: 'POST' })
                 .then(function(r) { return r.json(); })
                 .catch(function(e) { console.error('取消任务失败:', e); });

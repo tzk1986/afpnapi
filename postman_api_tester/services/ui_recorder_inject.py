@@ -1220,7 +1220,14 @@ _REPLAYER_JS = r"""
 
     _executeNext: function() {
       var self = this;
-      if (this.stopped || !this.running) return;
+      // 检查停止标志（内部标志 + 父页面设置的全局标志）
+      if (this.stopped || !this.running || (window.__REPLAY_STOP__ === true)) {
+        if (window.__REPLAY_STOP__ === true) {
+          console.log('[ReplayEngine] Global stop flag detected, stopping...');
+          this.stop();
+        }
+        return;
+      }
       if (this.paused) return;
 
       this.currentIndex++;
@@ -1539,7 +1546,7 @@ _REPLAYER_JS = r"""
           return;
         }
         // 停止时也要调用 callback 保证执行链不断裂
-        if (self.stopped || !self.running) {
+        if (self.stopped || !self.running || (window.__REPLAY_STOP__ === true)) {
           console.log('[ReplayEngine] stopped during wait, canceling');
           callback(null);
           return;
