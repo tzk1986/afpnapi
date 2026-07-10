@@ -958,16 +958,23 @@ _REPLAYER_JS = r"""
         fallbackCss = selectorObj.fallback_css || '';
         fallbackXpath = selectorObj.fallback_xpath || '';
       }
+      console.log('[ReplayEngine] find primary:', primary.substring(0, 60));
+      console.log('[ReplayEngine] find fallback_css:', fallbackCss.substring(0, 60));
+      console.log('[ReplayEngine] find fallback_xpath:', fallbackXpath.substring(0, 60));
       var el = SelectorEngine._tryFind(primary);
-      if (el) return { element: el, strategy: 'primary' };
+      if (el) { console.log('[ReplayEngine] find OK: primary matched'); return { element: el, strategy: 'primary' }; }
+      console.log('[ReplayEngine] find primary failed, trying fallback_css');
       if (fallbackCss) {
         el = SelectorEngine._tryFind(fallbackCss);
-        if (el) return { element: el, strategy: 'fallback_css' };
+        if (el) { console.log('[ReplayEngine] find OK: fallback_css matched'); return { element: el, strategy: 'fallback_css' }; }
+        console.log('[ReplayEngine] find fallback_css failed');
       }
       if (fallbackXpath) {
         el = SelectorEngine._tryXpath(fallbackXpath);
-        if (el) return { element: el, strategy: 'fallback_xpath' };
+        if (el) { console.log('[ReplayEngine] find OK: fallback_xpath matched'); return { element: el, strategy: 'fallback_xpath' }; }
+        console.log('[ReplayEngine] find fallback_xpath failed');
       }
+      console.log('[ReplayEngine] find ALL FAILED');
       return null;
     },
     _tryFind: function(selector) {
@@ -1039,8 +1046,22 @@ _REPLAYER_JS = r"""
           }
           return null;
         }
-        console.log('[ReplayEngine] _tryFind falling back to querySelector');
-        return document.querySelector(selector);
+        console.log('[ReplayEngine] _tryFind falling back to querySelector:', selector.substring(0, 60));
+        var qsaResult = document.querySelectorAll(selector);
+        console.log('[ReplayEngine] _tryFind querySelectorAll count:', qsaResult.length);
+        if (qsaResult.length > 0) {
+          // 如果有多个匹配，返回第一个可见的
+          for (var qi = 0; qi < qsaResult.length; qi++) {
+            if (qsaResult[qi].offsetParent !== null || qsaResult[qi].tagName === 'HTML') {
+              console.log('[ReplayEngine] _tryFind querySelector found visible element');
+              return qsaResult[qi];
+            }
+          }
+          // 全部不可见，返回第一个
+          console.log('[ReplayEngine] _tryFind querySelector found only hidden elements');
+          return qsaResult[0];
+        }
+        return null;
       } catch(e) {
         console.error('[ReplayEngine] _tryFind ERROR:', e.message);
         return null;
@@ -1453,6 +1474,26 @@ _REPLAYER_JS = r"""
       }
 
       // 需要查找元素的 action
+      // 诊断：如果是 click 且选择器包含 el-select-dropdown，记录此时 dropdown 状态
+      if (action === 'click') {
+        var _selStr = typeof step.selector === 'string' ? step.selector : (step.selector ? step.selector.primary : '');
+        if (_selStr.indexOf('el-select-dropdown') >= 0 || _selStr.indexOf('el-dropdown') >= 0) {
+          var _dd = document.querySelectorAll('.el-select-dropdown, .el-dropdown-menu');
+          console.log('[ReplayEngine] DEBUG click on dropdown option: selector=', _selStr.substring(0, 80));
+          console.log('[ReplayEngine] DEBUG dropdown containers in DOM:', _dd.length);
+          for (var _di = 0; _di < _dd.length; _di++) {
+            console.log('[ReplayEngine] DEBUG dropdown[' + _di + '] visible:', _dd[_di].offsetParent !== null,
+              'classList:', _dd[_di].className.substring(0, 60));
+          }
+          // 列出所有 li 选项
+          var _allItems = document.querySelectorAll('.el-select-dropdown__item');
+          console.log('[ReplayEngine] DEBUG dropdown items:', _allItems.length);
+          for (var _ii = 0; _ii < _allItems.length; _ii++) {
+            console.log('[ReplayEngine] DEBUG item[' + _ii + ']:', (_allItems[_ii].textContent || '').trim(),
+              'visible:', _allItems[_ii].offsetParent !== null);
+          }
+        }
+      }
       self._waitForElement(step, timeout, function(el) {
         // 停止时也要调用 _executeNext() 保证执行链不断裂
         var wasStopped = self.stopped || !self.running;
