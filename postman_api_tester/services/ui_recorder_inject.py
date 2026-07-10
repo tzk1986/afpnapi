@@ -140,14 +140,15 @@ _RECORDER_JS = r"""
   'use strict';
 
   // ====== 选择器引擎（内联版）======
+  // 优先级：test-id > ARIA role > id > name > text（唯一性校验） > CSS 短路径 > XPath
   var SelectorEngine = {
     generate: function(el) {
       var strategies = [
         function() { return SelectorEngine.byTestId(el); },
         function() { return SelectorEngine.byAriaRole(el); },
-        function() { return SelectorEngine.byText(el); },
         function() { return SelectorEngine.byId(el); },
         function() { return SelectorEngine.byNameAttr(el); },
+        function() { return SelectorEngine.byText(el); },
         function() { return SelectorEngine.byCssShort(el); },
         function() { return SelectorEngine.byXPath(el); }
       ];
@@ -172,11 +173,20 @@ _RECORDER_JS = r"""
       if (role && name) return { selector: 'role=' + role + '[name="' + name + '"]', strategy: 'role' };
       return null;
     },
+    /** text 选择器增加唯一性校验 — 页面上必须只匹配1个元素 */
     byText: function(el) {
       var text = (el.textContent || '').trim();
-      if (text && text.length > 0 && text.length <= 50 && el.children.length === 0) {
-        return { selector: 'text="' + text.replace(/"/g, '\\"') + '"', strategy: 'text' };
+      if (!text || text.length === 0 || text.length > 50 || el.children.length !== 0) return null;
+      var selector = 'text="' + text.replace(/"/g, '\\"') + '"';
+      var matchCount = 0;
+      var all = document.querySelectorAll('*');
+      for (var mi = 0; mi < all.length; mi++) {
+        if (all[mi].children.length === 0 && (all[mi].textContent || '').trim() === text) {
+          matchCount++;
+          if (matchCount > 1) break;
+        }
       }
+      if (matchCount === 1) return { selector: selector, strategy: 'text' };
       return null;
     },
     byId: function(el) {
@@ -190,14 +200,56 @@ _RECORDER_JS = r"""
       if (name) return { selector: '[name="' + name + '"]', strategy: 'name' };
       return null;
     },
+    /** 检测元素是否在 dropdown/popover 容器内 */
+    _isInDropdownContext: function(el) {
+      var current = el;
+      while (current && current !== document.body) {
+        var cls = current.className || '';
+        if (typeof cls === 'string') {
+          var patterns = ['el-select-dropdown', 'el-dropdown-menu', 'el-picker-panel',
+            'ant-select-dropdown', 'ant-dropdown-menu', 'ant-picker-panel',
+            'popover', 'tooltip', '[role="listbox"]', '[role="menu"]', '[role="dialog"]'];
+          for (var pi = 0; pi < patterns.length; pi++) {
+            var p = patterns[pi];
+            if (p.indexOf('[') === 0) {
+              if (current.matches && current.matches(p)) return true;
+            } else {
+              if (cls.indexOf(p) >= 0) return true;
+            }
+          }
+        }
+        current = current.parentElement;
+      }
+      return false;
+    },
+    /** CSS 路径：在 dropdown/popover 内时包含容器边界上下文 */
     byCssShort: function(el) {
       var path = [];
       var current = el;
+      var stoppedEarly = false;
+      var inDropdown = SelectorEngine._isInDropdownContext(el);
+      var dropdownBoundary = null;
+      if (inDropdown) {
+        var tmp = el;
+        while (tmp && tmp !== document.body) {
+          var tc = tmp.className || '';
+          if (typeof tc === 'string' && (
+            tc.indexOf('el-select-dropdown') >= 0 || tc.indexOf('el-dropdown-menu') >= 0 ||
+            tc.indexOf('ant-select-dropdown') >= 0 || tc.indexOf('ant-dropdown-menu') >= 0 ||
+            (tmp.getAttribute('role') || '').match(/^(listbox|menu|dialog)$/)
+          )) {
+            dropdownBoundary = tmp;
+            break;
+          }
+          tmp = tmp.parentElement;
+        }
+      }
       while (current && current !== document.body && current !== document.documentElement) {
         var segment = current.tagName.toLowerCase();
         if (current.id) {
           segment = '#' + SelectorEngine._escapeCss(current.id);
           path.unshift(segment);
+          stoppedEarly = true;
           break;
         }
         var classList = current.classList;
@@ -214,9 +266,13 @@ _RECORDER_JS = r"""
           }
         }
         path.unshift(segment);
+        if (dropdownBoundary && current === dropdownBoundary) {
+          stoppedEarly = true;
+          break;
+        }
         current = current.parentElement;
         var candidate = path.join(' > ');
-        try { if (document.querySelectorAll(candidate).length === 1) break; } catch(e) { break; }
+        try { if (document.querySelectorAll(candidate).length === 1) { stoppedEarly = true; break; } } catch(e) { break; }
       }
       var selector = path.join(' > ');
       return selector ? { selector: selector, strategy: 'css' } : null;
@@ -949,7 +1005,7 @@ _REPLAYER_JS = r"""
             console.log('[ReplayEngine] Found date picker containers:', datePickerContainers.length);
             for (var c = 0; c < datePickerContainers.length; c++) {
               var container = datePickerContainers[c];
-              if (container.offsetParent === null) continue; // 跳过隐藏容器
+              if (container.offsetParent === null) continue;
               var cells = container.querySelectorAll('td, [class*="cell"], [class*="day"], [class*="date"]');
               for (var k = 0; k < cells.length; k++) {
                 var cell = cells[k];
@@ -957,6 +1013,21 @@ _REPLAYER_JS = r"""
                   console.log('[ReplayEngine] Found date cell in date picker');
                   return cell;
                 }
+              }
+            }
+          }
+
+          // 优先在可见的 dropdown/popover 中查找（处理 el-select 等自定义下拉框）
+          var dropdownContainers = document.querySelectorAll('.el-select-dropdown, .el-dropdown-menu, .ant-select-dropdown, .ant-dropdown-menu, [role="listbox"], [role="menu"]');
+          for (var dc = 0; dc < dropdownContainers.length; dc++) {
+            var dcEl = dropdownContainers[dc];
+            if (dcEl.offsetParent === null) continue;
+            var items = dcEl.querySelectorAll('.el-select-dropdown__item, .el-dropdown-menu__item, .ant-select-item, [role="option"], li, div');
+            for (var di = 0; di < items.length; di++) {
+              var item = items[di];
+              if (item.offsetParent !== null && item.children.length === 0 && (item.textContent || '').trim() === text) {
+                console.log('[ReplayEngine] Found text in visible dropdown');
+                return item;
               }
             }
           }

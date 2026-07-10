@@ -1,15 +1,19 @@
 /**
  * 多策略选择器生成引擎
- * 优先级：test-id > ARIA role > text > id > name > CSS 短路径 > XPath
+ * 优先级：test-id > ARIA role > id > name > text（唯一性校验） > CSS 短路径 > XPath
+ *
+ * 关键改进：
+ * 1. text 选择器增加唯一性校验（document.querySelectorAll 必须只匹配1个元素）
+ * 2. CSS 路径在 dropdown/popover 容器内时包含容器上下文，避免同文本多元素歧义
  */
 class SelectorEngine {
   static generate(el) {
     const strategies = [
       () => this.byTestId(el),
       () => this.byAriaRole(el),
-      () => this.byText(el),
       () => this.byId(el),
       () => this.byNameAttr(el),
+      () => this.byText(el),
       () => this.byCssShort(el),
       () => this.byXPath(el),
     ];
@@ -52,9 +56,19 @@ class SelectorEngine {
 
   static byText(el) {
     const text = (el.textContent || '').trim();
-    if (text && text.length > 0 && text.length <= 50 && el.children.length === 0) {
-      return { selector: `text="${text.replace(/"/g, '\\"')}"`, strategy: 'text' };
+    if (!text || text.length === 0 || text.length > 50 || el.children.length !== 0) return null;
+    const selector = `text="${text.replace(/"/g, '\\"')}"`;
+    // 唯一性校验：text 选择器必须在页面上只匹配1个元素
+    let matchCount = 0;
+    const all = document.querySelectorAll('*');
+    for (let i = 0; i < all.length; i++) {
+      if (all[i].children.length === 0 && (all[i].textContent || '').trim() === text) {
+        matchCount++;
+        if (matchCount > 1) break;
+      }
     }
+    if (matchCount === 1) return { selector, strategy: 'text' };
+    // 文本不唯一，降级到 CSS 路径
     return null;
   }
 
@@ -71,14 +85,63 @@ class SelectorEngine {
     return null;
   }
 
+  /** 检测元素是否在 dropdown/popover 容器内 */
+  static _isInDropdownContext(el) {
+    let current = el;
+    while (current && current !== document.body) {
+      const cls = current.className || '';
+      if (typeof cls === 'string') {
+        const dropdownPatterns = [
+          'el-select-dropdown', 'el-dropdown-menu', 'el-picker-panel',
+          'ant-select-dropdown', 'ant-dropdown-menu', 'ant-picker-panel',
+          'popover', 'tooltip', 'menu', 'dropdown',
+          '[role="listbox"]', '[role="menu"]', '[role="dialog"]'
+        ];
+        for (const pattern of dropdownPatterns) {
+          if (pattern.startsWith('[')) {
+            if (current.matches && current.matches(pattern)) return true;
+          } else {
+            if (cls.indexOf(pattern) >= 0) return true;
+          }
+        }
+      }
+      current = current.parentElement;
+    }
+    return false;
+  }
+
   static byCssShort(el) {
     const path = [];
     let current = el;
+    let stoppedEarly = false;
+
+    // 如果在 dropdown/popover 内，先收集到容器边界的路径
+    const inDropdown = this._isInDropdownContext(el);
+    let dropdownBoundary = null;
+    if (inDropdown) {
+      let tmp = el;
+      while (tmp && tmp !== document.body) {
+        const cls = tmp.className || '';
+        if (typeof cls === 'string' && (
+          cls.indexOf('el-select-dropdown') >= 0 ||
+          cls.indexOf('el-dropdown-menu') >= 0 ||
+          cls.indexOf('ant-select-dropdown') >= 0 ||
+          cls.indexOf('ant-dropdown-menu') >= 0 ||
+          (tmp.getAttribute('role') || '').match(/^(listbox|menu|dialog)$/)
+        )) {
+          dropdownBoundary = tmp;
+          break;
+        }
+        tmp = tmp.parentElement;
+      }
+    }
+
     while (current && current !== document.body && current !== document.documentElement) {
       let segment = current.tagName.toLowerCase();
       if (current.id) {
         segment = `#${this._escapeCss(current.id)}`;
         path.unshift(segment);
+        stoppedEarly = true;
         break;
       }
       const classList = current.classList;
@@ -95,10 +158,18 @@ class SelectorEngine {
         }
       }
       path.unshift(segment);
+      // 到达 dropdown 边界时停止向上追溯
+      if (dropdownBoundary && current === dropdownBoundary) {
+        stoppedEarly = true;
+        break;
+      }
       current = current.parentElement;
       const candidate = path.join(' > ');
       try {
-        if (document.querySelectorAll(candidate).length === 1) break;
+        if (document.querySelectorAll(candidate).length === 1) {
+          stoppedEarly = true;
+          break;
+        }
       } catch (e) {
         break;
       }
