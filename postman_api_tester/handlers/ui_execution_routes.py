@@ -35,6 +35,30 @@ _settings_store = UiSettingsStore()
 # 当前活跃任务计数（浏览器回放模式，简易并发控制）
 _active_jobs: Dict[str, Dict[str, Any]] = {}
 
+# 僵尸任务超时时间（30 分钟）
+_STALE_JOB_TIMEOUT_SECONDS = 30 * 60
+
+
+def _cleanup_stale_jobs() -> None:
+    """清理超时的僵尸任务。
+
+    浏览器回放模式依赖前端调用 finalize 清理任务，
+    如果用户关闭页面或回放崩溃，任务会永远留在内存中。
+    此函数清理创建时间超过 30 分钟的任务。
+    """
+    now = time.time()
+    stale_jobs = [
+        job_id
+        for job_id, info in _active_jobs.items()
+        if now - info.get("created_at", 0) > _STALE_JOB_TIMEOUT_SECONDS
+    ]
+    for job_id in stale_jobs:
+        _active_jobs.pop(job_id, None)
+        logger.info(
+            "ui_execution_stale_cleanup",
+            extra={"event": "ui.execution.stale_cleanup", "job_id": job_id},
+        )
+
 
 def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     """创建执行任务，返回 job_id。
@@ -62,6 +86,9 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
             return json_error("Playwright 未安装，请运行: pip install playwright && playwright install chromium", 400, "UIT_EXEC_010")
         if not _execution_manager.can_start():
             return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
+
+    # 清理僵尸任务
+    _cleanup_stale_jobs()
 
     if len(_active_jobs) >= UI_EXECUTION_MAX_CONCURRENT:
         logger.warning(
