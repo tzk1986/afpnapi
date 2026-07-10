@@ -20,6 +20,8 @@
         .btn-secondary:hover { background: #eff6ff; }
         .btn-danger { background: #ef4444; color: #fff; }
         .btn-danger:hover { background: #dc2626; }
+        .btn-warning { background: #f59e0b; color: #fff; }
+        .btn-warning:hover { background: #d97706; }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -235,8 +237,11 @@
             if (startedAt.length > 19) startedAt = startedAt.substring(0, 19);
             startedAt = startedAt.replace('T', ' ');
 
-            var actionsHtml = '<div class="actions-cell">' +
-                '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">查看</a>' +
+            var actionsHtml = '<div class="actions-cell">';
+            if (item.status === 'running' || item.status === 'ready') {
+                actionsHtml += '<button class="btn btn-sm btn-warning" onclick="cancelJob(\'' + item.job_id + '\')">停止</button>';
+            }
+            actionsHtml += '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">查看</a>' +
                 '<button class="btn btn-sm btn-danger" onclick="deleteReport(\'' + item.job_id + '\', \'' + escapeHtml(item.case_name) + '\')">删除</button>' +
                 '</div>';
 
@@ -295,6 +300,22 @@
                     }
                 })
                 .catch(function(e) { showToast('删除失败: ' + e.message, 'error'); });
+        }
+
+        function cancelJob(jobId) {
+            if (!confirm('确定要停止该任务吗？')) return;
+            fetch('/api/ui-testing/execution/' + jobId + '/cancel', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(resp) {
+                    var data = resp.data || resp;
+                    if (data.ok) {
+                        showToast('任务已停止', 'success');
+                        loadReports();
+                    } else {
+                        showToast('停止失败: ' + (resp.message || '未知错误'), 'error');
+                    }
+                })
+                .catch(function(e) { showToast('停止失败: ' + e.message, 'error'); });
         }
 
         function escapeHtml(str) {
