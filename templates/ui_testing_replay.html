@@ -385,6 +385,11 @@
 
         function onNavigate(url) {
             if (!url) return;
+            console.log('[onNavigate] url=', url);
+            console.log('[onNavigate] has /ui-testing/proxy:', url.indexOf('/ui-testing/proxy') >= 0);
+            console.log('[onNavigate] has _proxy_url=:', url.indexOf('_proxy_url=') > 0);
+            console.log('[onNavigate] starts with http:', url.indexOf('http://') === 0 || url.indexOf('https://') === 0);
+
             var urlObj = new URL(url, window.location.origin);
             var currentUrl = document.getElementById('currentUrl');
             if (currentUrl) currentUrl.textContent = urlObj.pathname + urlObj.search;
@@ -410,6 +415,8 @@
                 proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
                     '_proxy_url=' + encodeURIComponent(baseUrl);
             }
+
+            console.log('[onNavigate] shouldNavigate=', shouldNavigate, 'proxyUrl=', proxyUrl);
 
             if (shouldNavigate) {
                 document.getElementById('iframeLoading').style.display = 'flex';
