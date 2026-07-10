@@ -1131,6 +1131,7 @@ _REPLAYER_JS = r"""
     startTime: 0,
     results: [],
     jobId: '',
+    _currentTimeoutId: null,
 
     init: function(steps, options) {
       console.log('[ReplayEngine] init called, steps from parent:', steps ? steps.length : 0);
@@ -1206,6 +1207,11 @@ _REPLAYER_JS = r"""
     stop: function() {
       this.stopped = true;
       this.running = false;
+      this.paused = false;
+      if (this._currentTimeoutId) {
+        clearTimeout(this._currentTimeoutId);
+        this._currentTimeoutId = null;
+      }
       this._notifyParent('stopped', {
         index: this.currentIndex,
         results: this.results
@@ -1239,7 +1245,7 @@ _REPLAYER_JS = r"""
       var delay = this.options.delay_between_steps || 500;
       if (this.currentIndex === 0) delay = 0;
 
-      setTimeout(function() {
+      self._currentTimeoutId = setTimeout(function() {
         if (self.stopped || !self.running) return;
         self._executeStep(step, self.currentIndex, stepStart);
       }, delay);
@@ -1539,7 +1545,7 @@ _REPLAYER_JS = r"""
           return;
         }
         if (attempts <= 3) console.log('[ReplayEngine] attempt', attempts, 'failed, retrying...');
-        setTimeout(check, interval);
+        self._currentTimeoutId = setTimeout(check, interval);
       }
       check();
     },
