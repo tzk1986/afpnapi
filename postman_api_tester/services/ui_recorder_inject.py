@@ -1483,6 +1483,51 @@ _REPLAYER_JS = r"""
           inputEl.dispatchEvent(new KeyboardEvent('keyup', {
             bubbles: true, composed: true, key: 'Enter'
           }));
+          // Element UI el-select 可搜索下拉框：输入后自动点击匹配选项
+          // Element UI 的下拉 popper 渲染在 body 上，类名 el-select-dropdown
+          var isElSelect = false;
+          var parent = inputEl.parentElement;
+          while (parent && parent !== document.body) {
+            var cls = parent.className || '';
+            if (typeof cls === 'string' && cls.indexOf('el-select') >= 0) { isElSelect = true; break; }
+            parent = parent.parentElement;
+          }
+          if (isElSelect && value) {
+            var _typeVal = value;
+            var _self = self;
+            setTimeout(function() {
+              // 在 body 中查找可见的下拉选项（Element UI popper 挂载在 body）
+              var dropdowns = document.querySelectorAll('.el-select-dropdown');
+              var visibleDropdown = null;
+              for (var di = 0; di < dropdowns.length; di++) {
+                if (dropdowns[di].offsetParent !== null) { visibleDropdown = dropdowns[di]; break; }
+              }
+              if (!visibleDropdown) {
+                // 尝试 Ant Design / 其他框架的下拉
+                var altDropdowns = document.querySelectorAll('[role="listbox"], .ant-select-dropdown, [class*="dropdown"][class*="menu"]');
+                for (var ai = 0; ai < altDropdowns.length; ai++) {
+                  if (altDropdowns[ai].offsetParent !== null) { visibleDropdown = altDropdowns[ai]; break; }
+                }
+              }
+              if (visibleDropdown) {
+                // 按文本内容查找匹配的选项
+                var items = visibleDropdown.querySelectorAll('.el-select-dropdown__item, [role="option"], .ant-select-item, li, div[class*="item"]');
+                for (var ii = 0; ii < items.length; ii++) {
+                  var itemText = (items[ii].textContent || '').trim();
+                  if (itemText === _typeVal || itemText.indexOf(_typeVal) >= 0) {
+                    console.log('[ReplayEngine] el-select auto-click option:', itemText);
+                    items[ii].click();
+                    // 触发 mousedown+mouseup 确保框架捕获
+                    items[ii].dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                    items[ii].dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                    break;
+                  }
+                }
+              } else {
+                console.log('[ReplayEngine] el-select dropdown not visible, skipping auto-click');
+              }
+            }, 300);
+          }
           break;
         case 'select':
           el.value = value || '';
