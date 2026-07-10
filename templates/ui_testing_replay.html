@@ -108,6 +108,7 @@
         var iframeReady = false;
         var replayStarted = false;
         var networkRequests = [];
+        var initialTargetOrigin = ''; // 初始目标应用的 origin，用于判断 SPA 路由变化
 
         // 加载执行任务数据
         function loadJobData() {
@@ -128,6 +129,9 @@
                     // 加载目标页面到 iframe
                     var baseUrl = data.base_url || '';
                     if (baseUrl) {
+                        // 保存初始目标应用的 origin，用于后续判断 SPA 路由变化
+                        var originObj = new URL(baseUrl);
+                        initialTargetOrigin = originObj.protocol + '//' + originObj.host;
                         // 从 baseUrl 提取 pathname，让 iframe 的 window.location.pathname 直接等于目标路径
                         // 这样 Vue Router 等 SPA 框架可以正确匹配路由
                         var urlObj = new URL(baseUrl);
@@ -386,9 +390,6 @@
         function onNavigate(url) {
             if (!url) return;
             console.log('[onNavigate] url=', url);
-            console.log('[onNavigate] has /ui-testing/proxy:', url.indexOf('/ui-testing/proxy') >= 0);
-            console.log('[onNavigate] has _proxy_url=:', url.indexOf('_proxy_url=') > 0);
-            console.log('[onNavigate] starts with http:', url.indexOf('http://') === 0 || url.indexOf('https://') === 0);
 
             var urlObj = new URL(url, window.location.origin);
             var currentUrl = document.getElementById('currentUrl');
@@ -397,23 +398,58 @@
             var shouldNavigate = false;
             var proxyUrl = '';
 
-            // 判断是否是代理 URL（包含 /ui-testing/proxy 路径）
-            if (url.indexOf('/ui-testing/proxy') >= 0) {
-                // 代理 URL 内的 SPA 路由变化，不需要刷新 iframe
-                if (url.indexOf('_proxy_url=') > 0) {
-                    // 带有 _proxy_url 参数，说明是真正的跨页跳转
-                    shouldNavigate = true;
-                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                    proxyUrl = targetPath;
+            // 判断1：URL 中包含 _proxy_url 参数（代理 pushState 后的形式）
+            if (url.indexOf('_proxy_url=') > 0 || url.indexOf('_proxy_url%3D') > 0) {
+                // 从 _proxy_url 参数中提取原始 target origin
+                var proxyUrlParam = '';
+                try {
+                    var searchStr = urlObj.search;
+                    var idx = searchStr.indexOf('_proxy_url=');
+                    if (idx >= 0) {
+                        proxyUrlParam = decodeURIComponent(searchStr.substring(idx + 11).split('&')[0]);
+                    }
+                } catch(e) {}
+                if (proxyUrlParam) {
+                    try {
+                        var targetOriginObj = new URL(proxyUrlParam);
+                        var targetOrigin = targetOriginObj.protocol + '//' + targetOriginObj.host;
+                        if (initialTargetOrigin && targetOrigin === initialTargetOrigin) {
+                            // 同origin，只是 SPA 路由变化，不刷新 iframe
+                            console.log('[onNavigate] 同origin SPA路由变化（含_proxy_url），不刷新 iframe');
+                            shouldNavigate = false;
+                        } else if (!initialTargetOrigin) {
+                            // initialTargetOrigin 未设置，保守处理：不刷新
+                            console.log('[onNavigate] initialTargetOrigin 未设置，保守处理不刷新');
+                            shouldNavigate = false;
+                        } else {
+                            // 不同origin，真正的外部URL导航
+                            shouldNavigate = true;
+                            console.log('[onNavigate] 跨origin导航（含_proxy_url）');
+                            var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                            proxyUrl = targetPath;
+                        }
+                    } catch(e) {
+                        console.warn('[onNavigate] 解析_proxy_url失败:', e);
+                    }
                 }
-                // 否则是 SPA 局部更新，不刷新 iframe
-            } else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
-                // 外部 URL，需要构造代理 URL
-                shouldNavigate = true;
-                var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                var baseUrl = urlObj.protocol + '//' + urlObj.host;
-                proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                    '_proxy_url=' + encodeURIComponent(baseUrl);
+            }
+            // 判断2：代理 URL（包含 /ui-testing/proxy 路径但不含 _proxy_url）
+            else if (url.indexOf('/ui-testing/proxy') >= 0) {
+                // SPA 局部更新，不刷新 iframe
+            }
+            // 判断3：完整URL — 区分同origin SPA路由 vs 真正跨origin导航
+            else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
+                var navOrigin = urlObj.protocol + '//' + urlObj.host;
+                if (initialTargetOrigin && navOrigin === initialTargetOrigin) {
+                    console.log('[onNavigate] 同origin SPA路由变化，不刷新 iframe');
+                } else {
+                    shouldNavigate = true;
+                    console.log('[onNavigate] 跨origin导航，构造代理URL');
+                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                    var navBaseUrl = urlObj.protocol + '//' + urlObj.host;
+                    proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                        '_proxy_url=' + encodeURIComponent(navBaseUrl);
+                }
             }
 
             console.log('[onNavigate] shouldNavigate=', shouldNavigate, 'proxyUrl=', proxyUrl);
@@ -422,7 +458,6 @@
                 document.getElementById('iframeLoading').style.display = 'flex';
                 document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
                 document.getElementById('replayFrame').src = proxyUrl;
-                // 只有真正跨页导航时才重置 replayStarted
                 replayStarted = false;
             }
         }
