@@ -967,6 +967,7 @@ _REPLAYER_JS = r"""
       if (fallbackCss) {
         // 获取 element_info.text 用于多匹配时筛选
         var expectedText = '';
+        console.log('[ReplayEngine] find selectorObj.element_info:', selectorObj ? JSON.stringify(selectorObj.element_info || 'undefined') : 'null');
         if (selectorObj && selectorObj.element_info && selectorObj.element_info.text) {
           expectedText = selectorObj.element_info.text;
         }
@@ -984,6 +985,7 @@ _REPLAYER_JS = r"""
     },
     _tryFind: function(selector, expectedText) {
       console.log('[ReplayEngine] _tryFind called with:', typeof selector, JSON.stringify(selector).substring(0, 80));
+      console.log('[ReplayEngine] _tryFind expectedText:', JSON.stringify(expectedText));
       if (!selector) return null;
       try {
         var startsWithSlash = selector.indexOf('/') === 0;
