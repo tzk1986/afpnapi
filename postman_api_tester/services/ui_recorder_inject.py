@@ -1112,15 +1112,20 @@ _REPLAYER_JS = r"""
     jobId: '',
 
     init: function(steps, options) {
+      console.log('[ReplayEngine] init called, steps from parent:', steps ? steps.length : 0);
       // 检查是否有保存的回放状态（跨页面导航后恢复）
       var savedState = null;
       try {
         var saved = sessionStorage.getItem('_ui_replay_state');
         if (saved) {
           savedState = JSON.parse(saved);
-          console.log('[ReplayEngine] Found saved state:', savedState);
+          console.log('[ReplayEngine] Found saved state, currentIndex:', savedState.currentIndex, 'total steps:', savedState.steps.length);
+        } else {
+          console.log('[ReplayEngine] No saved state found in sessionStorage');
         }
-      } catch(e) {}
+      } catch(e) {
+        console.error('[ReplayEngine] Failed to load saved state:', e);
+      }
 
       if (savedState && savedState.steps && savedState.steps.length > 0) {
         // 恢复保存的状态
@@ -1132,7 +1137,7 @@ _REPLAYER_JS = r"""
         this.running = false;
         this.paused = false;
         this.stopped = false;
-        console.log('[ReplayEngine] Resumed from saved state, continuing from step', this.currentIndex + 1);
+        console.log('[ReplayEngine] Resumed from saved state, continuing from step', this.currentIndex + 1, 'of', this.steps.length);
       } else {
         // 正常初始化
         this.steps = steps || [];
@@ -1143,6 +1148,7 @@ _REPLAYER_JS = r"""
         this.paused = false;
         this.stopped = false;
         this.results = [];
+        console.log('[ReplayEngine] Normal init, starting from step 0');
       }
 
       if (options.network_requests && options.network_requests.length > 0) {
@@ -1155,11 +1161,13 @@ _REPLAYER_JS = r"""
     },
 
     start: function() {
+      console.log('[ReplayEngine] start called, running:', this.running, 'currentIndex:', this.currentIndex, 'total steps:', this.steps.length);
       if (this.running) return;
       this.running = true;
       this.paused = false;
       this.stopped = false;
       this.startTime = Date.now();
+      console.log('[ReplayEngine] Starting execution from step', this.currentIndex + 1);
       this._executeNext();
     },
 
@@ -1193,6 +1201,9 @@ _REPLAYER_JS = r"""
         this._finishAll();
         return;
       }
+
+      // 保存当前状态，以防下一步导致页面导航
+      self._saveState();
 
       var step = this.steps[this.currentIndex];
       var stepStart = Date.now();
@@ -1235,8 +1246,6 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        // 保存当前回放到 sessionStorage，新页面加载后恢复
-        self._saveState();
         self._notifyParent('navigate', { url: step.value || '' });
         return;
       }
@@ -1246,8 +1255,6 @@ _REPLAYER_JS = r"""
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        // 保存当前回放到 sessionStorage，新页面加载后恢复
-        self._saveState();
         // 通知父页面导航到新 URL（标记为新标签页）
         self._notifyParent('navigate', { url: step.value || '', new_tab: true });
         console.log('[ReplayEngine] new_tab action: navigating to', step.value);
@@ -1466,9 +1473,9 @@ _REPLAYER_JS = r"""
           results: this.results
         };
         sessionStorage.setItem('_ui_replay_state', JSON.stringify(state));
-        console.log('[ReplayEngine] State saved to sessionStorage, currentIndex:', this.currentIndex);
+        console.log('[ReplayEngine] State saved to sessionStorage, currentIndex:', this.currentIndex, 'total steps:', this.steps.length, 'results:', this.results.length);
       } catch(e) {
-        console.warn('[ReplayEngine] Failed to save state:', e);
+        console.error('[ReplayEngine] Failed to save state:', e);
       }
     },
 
