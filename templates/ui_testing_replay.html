@@ -385,7 +385,6 @@
 
         function onNavigate(url) {
             if (!url) return;
-            // SPA 同域导航：不需要刷新 iframe，只需要更新 URL 显示
             var urlObj = new URL(url, window.location.origin);
             var currentUrl = document.getElementById('currentUrl');
             if (currentUrl) currentUrl.textContent = urlObj.pathname + urlObj.search;
@@ -393,13 +392,16 @@
             var shouldNavigate = false;
             var proxyUrl = '';
 
-            // 判断是否是代理 URL 格式
-            if (url.indexOf('/ui-testing/proxy') === 0 && url.indexOf('_proxy_url=') > 0) {
-                // 这是代理 URL 格式，说明是真正的页面跳转，需要刷新
-                shouldNavigate = true;
-                var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                    '_proxy_url=' + encodeURIComponent(url);
+            // 判断是否是代理 URL（包含 /ui-testing/proxy 路径）
+            if (url.indexOf('/ui-testing/proxy') >= 0) {
+                // 代理 URL 内的 SPA 路由变化，不需要刷新 iframe
+                if (url.indexOf('_proxy_url=') > 0) {
+                    // 带有 _proxy_url 参数，说明是真正的跨页跳转
+                    shouldNavigate = true;
+                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                    proxyUrl = targetPath;
+                }
+                // 否则是 SPA 局部更新，不刷新 iframe
             } else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
                 // 外部 URL，需要构造代理 URL
                 shouldNavigate = true;
@@ -413,6 +415,7 @@
                 document.getElementById('iframeLoading').style.display = 'flex';
                 document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
                 document.getElementById('replayFrame').src = proxyUrl;
+                // 只有真正跨页导航时才重置 replayStarted
                 replayStarted = false;
             }
         }
