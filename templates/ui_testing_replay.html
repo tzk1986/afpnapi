@@ -277,6 +277,9 @@
             isRunning = false;
             stopTimer();
             updateControlButtons();
+            fetch('/api/ui-testing/execution/' + jobId + '/cancel', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .catch(function(e) { console.error('取消任务失败:', e); });
         }
 
         function sendToFrame(msg) {
