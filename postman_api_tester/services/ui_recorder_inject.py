@@ -941,6 +941,27 @@ _REPLAYER_JS = r"""
         }
         if (selector.indexOf('text=') === 0) {
           var text = selector.substring(5).replace(/^["']|["']$/g, '');
+          console.log('[ReplayEngine] _tryFind text selector:', text);
+
+          // 优先在日期选择器中查找（处理日期控件）
+          var datePickerContainers = document.querySelectorAll('.el-picker-panel, .el-date-picker, .el-month-table, .el-year-table, [class*="calendar"], [class*="datepicker"], [class*="date-picker"]');
+          if (datePickerContainers.length > 0) {
+            console.log('[ReplayEngine] Found date picker containers:', datePickerContainers.length);
+            for (var c = 0; c < datePickerContainers.length; c++) {
+              var container = datePickerContainers[c];
+              if (container.offsetParent === null) continue; // 跳过隐藏容器
+              var cells = container.querySelectorAll('td, [class*="cell"], [class*="day"], [class*="date"]');
+              for (var k = 0; k < cells.length; k++) {
+                var cell = cells[k];
+                if ((cell.textContent || '').trim() === text && cell.offsetParent !== null) {
+                  console.log('[ReplayEngine] Found date cell in date picker');
+                  return cell;
+                }
+              }
+            }
+          }
+
+          // 全局查找（原有逻辑）
           var all2 = document.querySelectorAll('*');
           for (var j = 0; j < all2.length; j++) {
             if (all2[j].children.length === 0 && (all2[j].textContent || '').trim() === text) return all2[j];
@@ -1261,6 +1282,57 @@ _REPLAYER_JS = r"""
         return;
       }
 
+      // date_select 动作：处理日期选择器
+      if (action === 'date_select') {
+        // 等待日期输入框出现
+        self._waitForElement(step, timeout, function(dateInput) {
+          if (!dateInput) {
+            result.status = 'failed';
+            result.error = '日期输入框未找到';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            self._executeNext();
+            return;
+          }
+
+          try {
+            // 直接设置日期值（比点击更可靠）
+            var dateValue = step.value || '';
+            console.log('[ReplayEngine] date_select: setting value', dateValue, 'on', dateInput.tagName, dateInput.type);
+
+            // 聚焦并设置值
+            dateInput.focus();
+            dateInput.value = dateValue;
+
+            // 触发完整的事件序列，确保框架响应
+            dateInput.dispatchEvent(new Event('focus', { bubbles: true }));
+            dateInput.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true }));
+            dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // 对于有日期选择器的输入框，也尝试点击打开选择器
+            if (dateInput.type === 'date' || dateInput.type === 'datetime-local' || (dateInput.className || '').indexOf('date') >= 0) {
+              dateInput.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+              dateInput.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            }
+
+            result.status = 'passed';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            console.log('[ReplayEngine] date_select completed successfully');
+          } catch(e) {
+            result.status = 'error';
+            result.error = e.message;
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+          }
+          self._executeNext();
+        });
+        return;
+      }
+
       if (action === 'wait') {
         var ms = parseInt(step.value, 10) || 1000;
         setTimeout(function() {
@@ -1363,7 +1435,16 @@ _REPLAYER_JS = r"""
       var result = true;
       switch (action) {
         case 'click':
-          el.click();
+          // 对于日期输入框，使用鼠标事件触发，确保日期选择器弹出
+          if (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'datetime-local' || el.getAttribute('class') || '').indexOf('date') >= 0) {
+            console.log('[ReplayEngine] Clicking date input, dispatching mouse events');
+            el.focus();
+            el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+            el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+          } else {
+            el.click();
+          }
           break;
         case 'dblclick':
           el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
@@ -1434,14 +1515,15 @@ _REPLAYER_JS = r"""
       var start = Date.now();
       var interval = 200;
       var attempts = 0;
-      console.log('[ReplayEngine] _waitForElement selector:', JSON.stringify(typeof selector === 'string' ? selector : (selector ? selector.primary : 'null')));
+      var selectorStr = typeof selector === 'string' ? selector : (selector ? selector.primary : 'null');
+      console.log('[ReplayEngine] _waitForElement selector:', JSON.stringify(selectorStr), 'action:', step.action);
 
       function check() {
         attempts++;
         var found = SelectorEngine.find(typeof selector === 'string' ? selector : '', selector);
         if (found && found.element) {
-          console.log('[ReplayEngine] element found after', attempts, 'attempts');
-          if (typeof self._sendLog === 'function') try { self._sendLog('element_found', '元素已找到', { attempts: attempts }); } catch(e) {}
+          console.log('[ReplayEngine] element found after', attempts, 'attempts, strategy:', found.strategy);
+          if (typeof self._sendLog === 'function') try { self._sendLog('element_found', '元素已找到', { attempts: attempts, strategy: found.strategy }); } catch(e) {}
           callback(found.element);
           return;
         }

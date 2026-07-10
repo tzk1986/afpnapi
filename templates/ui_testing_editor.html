@@ -49,6 +49,7 @@
         .action-type { background: #fef3c7; color: #b45309; }
         .action-navigate { background: #e0e7ff; color: #4338ca; }
         .action-new_tab { background: #fce7f3; color: #be185d; }
+        .action-date_select { background: #fef3c7; color: #b45309; }
         .action-select { background: #d1fae5; color: #047857; }
         .action-submit { background: #fce7f3; color: #be185d; }
         .action-wait { background: #fef9c3; color: #a16207; }
@@ -131,7 +132,7 @@
         var selectedStepIndex = null;
         var draggedStepIndex = null;
 
-        var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'new_tab', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title'];
+        var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'new_tab', 'date_select', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title'];
 
         function loadCase() {
             fetch('/api/ui-testing/cases/' + caseId)
@@ -222,7 +223,8 @@
 
         function getActionClass(action) {
             var map = { click: 'action-click', dblclick: 'action-click', type: 'action-type', keypress: 'action-type',
-                        navigate: 'action-navigate', new_tab: 'action-new_tab', select: 'action-select', check: 'action-select', uncheck: 'action-select',
+                        navigate: 'action-navigate', new_tab: 'action-new_tab', date_select: 'action-date_select',
+                        select: 'action-select', check: 'action-select', uncheck: 'action-select',
                         submit: 'action-submit', wait: 'action-wait', wait_for: 'action-wait',
                         assert_visible: 'action-assert', assert_text: 'action-assert', assert_url: 'action-assert', assert_title: 'action-assert' };
             return map[action] || 'action-default';
