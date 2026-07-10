@@ -965,7 +965,12 @@ _REPLAYER_JS = r"""
       if (el) { console.log('[ReplayEngine] find OK: primary matched'); return { element: el, strategy: 'primary' }; }
       console.log('[ReplayEngine] find primary failed, trying fallback_css');
       if (fallbackCss) {
-        el = SelectorEngine._tryFind(fallbackCss);
+        // 获取 element_info.text 用于多匹配时筛选
+        var expectedText = '';
+        if (selectorObj && selectorObj.element_info && selectorObj.element_info.text) {
+          expectedText = selectorObj.element_info.text;
+        }
+        el = SelectorEngine._tryFind(fallbackCss, expectedText);
         if (el) { console.log('[ReplayEngine] find OK: fallback_css matched'); return { element: el, strategy: 'fallback_css' }; }
         console.log('[ReplayEngine] find fallback_css failed');
       }
@@ -977,7 +982,7 @@ _REPLAYER_JS = r"""
       console.log('[ReplayEngine] find ALL FAILED');
       return null;
     },
-    _tryFind: function(selector) {
+    _tryFind: function(selector, expectedText) {
       console.log('[ReplayEngine] _tryFind called with:', typeof selector, JSON.stringify(selector).substring(0, 80));
       if (!selector) return null;
       try {
@@ -1049,19 +1054,40 @@ _REPLAYER_JS = r"""
         console.log('[ReplayEngine] _tryFind falling back to querySelector:', selector.substring(0, 60));
         var qsaResult = document.querySelectorAll(selector);
         console.log('[ReplayEngine] _tryFind querySelectorAll count:', qsaResult.length);
-        if (qsaResult.length > 0) {
-          // 如果有多个匹配，返回第一个可见的
-          for (var qi = 0; qi < qsaResult.length; qi++) {
-            if (qsaResult[qi].offsetParent !== null || qsaResult[qi].tagName === 'HTML') {
-              console.log('[ReplayEngine] _tryFind querySelector found visible element');
-              return qsaResult[qi];
-            }
-          }
-          // 全部不可见，返回第一个
-          console.log('[ReplayEngine] _tryFind querySelector found only hidden elements');
+        if (qsaResult.length === 0) return null;
+        if (qsaResult.length === 1) {
+          console.log('[ReplayEngine] _tryFind querySelector found unique element');
           return qsaResult[0];
         }
-        return null;
+        // 多个匹配：如果提供了 expectedText，按文本精确匹配
+        if (expectedText) {
+          console.log('[ReplayEngine] _tryFind multiple matches, filtering by expectedText:', expectedText.substring(0, 30));
+          for (var mi = 0; mi < qsaResult.length; mi++) {
+            var elText = (qsaResult[mi].textContent || '').trim();
+            if (elText === expectedText) {
+              console.log('[ReplayEngine] _tryFind found exact text match');
+              return qsaResult[mi];
+            }
+          }
+          // 精确匹配失败，尝试包含匹配
+          for (var mi2 = 0; mi2 < qsaResult.length; mi2++) {
+            var elText2 = (qsaResult[mi2].textContent || '').trim();
+            if (elText2.indexOf(expectedText) >= 0 || expectedText.indexOf(elText2) >= 0) {
+              console.log('[ReplayEngine] _tryFind found partial text match');
+              return qsaResult[mi2];
+            }
+          }
+          console.log('[ReplayEngine] _tryFind text filter found no match');
+        }
+        // 没有 expectedText 或文本匹配失败，返回第一个可见元素
+        for (var qi = 0; qi < qsaResult.length; qi++) {
+          if (qsaResult[qi].offsetParent !== null || qsaResult[qi].tagName === 'HTML') {
+            console.log('[ReplayEngine] _tryFind querySelector found visible element');
+            return qsaResult[qi];
+          }
+        }
+        console.log('[ReplayEngine] _tryFind querySelector found only hidden elements');
+        return qsaResult[0];
       } catch(e) {
         console.error('[ReplayEngine] _tryFind ERROR:', e.message);
         return null;
