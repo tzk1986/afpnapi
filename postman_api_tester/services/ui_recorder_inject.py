@@ -1482,15 +1482,23 @@ _REPLAYER_JS = r"""
         return;
       }
 
-      // new_tab 动作：保存回放状态并导航到新页面（使用上一步 click 捕获的链接 href）
+      // new_tab 动作：保存回放状态并导航到新页面
       if (action === 'new_tab') {
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
         // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
-        // 优先使用 step.value，其次使用上一步 click 捕获的链接 href
+        // 获取导航 URL：优先 step.value，其次上一步 click 捕获的链接 href，
+        // 再次下一步的 tab_url/page_url（录制数据中包含）
         var navUrl = step.value || self._lastClickHref || '';
+        if (!navUrl) {
+          var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
+          if (_nextStep) {
+            navUrl = _nextStep.tab_url || _nextStep.page_url || '';
+            console.log('[ReplayEngine] new_tab: using next step tab_url:', navUrl ? navUrl.substring(0, 80) : 'empty');
+          }
+        }
         if (navUrl) {
           self._notifyParent('navigate', { url: navUrl, new_tab: true });
           console.log('[ReplayEngine] new_tab action: navigating to', navUrl.substring(0, 80));
