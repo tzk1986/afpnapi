@@ -1482,16 +1482,20 @@ _REPLAYER_JS = r"""
         return;
       }
 
-      // new_tab 动作：在当前窗口导航到新 URL（避免新标签页导致后续步骤找不到元素）
+      // new_tab 动作：保存回放状态（页面跳转由上一步 click 的链接点击自然触发）
       if (action === 'new_tab') {
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        // 保存回放状态到父页面，恢复时 _executeNext() 会 currentIndex++ 跳过 new_tab 自身
+        // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
-        // 通知父页面在当前窗口导航到新 URL
-        self._notifyParent('navigate', { url: step.value || '', new_tab: true });
-        console.log('[ReplayEngine] new_tab action: navigating to', step.value, ', currentIndex:', self.currentIndex);
+        // 仅当 step.value 非空时才通知父页面导航（录制时可能捕获到了链接 href）
+        if (step.value) {
+          self._notifyParent('navigate', { url: step.value, new_tab: true });
+          console.log('[ReplayEngine] new_tab action: navigating to', step.value);
+        } else {
+          console.log('[ReplayEngine] new_tab action: no url in step.value, relying on previous click navigation');
+        }
         return;
       }
 
@@ -1671,11 +1675,7 @@ _REPLAYER_JS = r"""
       var result = true;
       switch (action) {
         case 'click':
-          // 检查下一步是否为 new_tab — 如果是，此 click 会触发新页面导航，
-          // 合成事件不会触发链接默认行为，但也不做额外导航，由 new_tab 步骤统一处理
-          var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
-          var _nextIsNewTab = _nextStep && _nextStep.action === 'new_tab';
-          console.log('[ReplayEngine] click start: tag=', el ? el.tagName : 'null', 'nextIsNewTab=', _nextIsNewTab);
+          console.log('[ReplayEngine] click start: tag=', el ? el.tagName : 'null');
           // 对于日期输入框，使用鼠标事件触发，确保日期选择器弹出
           if (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'datetime-local' || el.getAttribute('class') || '').indexOf('date') >= 0) {
             console.log('[ReplayEngine] Clicking date input, dispatching mouse events');
@@ -1690,9 +1690,6 @@ _REPLAYER_JS = r"""
             } catch(clickErr) {
               console.error('[ReplayEngine] el.click() failed:', clickErr);
             }
-          }
-          if (_nextIsNewTab) {
-            console.log('[ReplayEngine] click followed by new_tab, new_tab step will handle navigation');
           }
           console.log('[ReplayEngine] click end');
           break;
