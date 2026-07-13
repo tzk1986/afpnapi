@@ -1482,19 +1482,20 @@ _REPLAYER_JS = r"""
         return;
       }
 
-      // new_tab 动作：保存回放状态（页面跳转由上一步 click 的链接点击自然触发）
+      // new_tab 动作：保存回放状态并导航到新页面（使用上一步 click 捕获的链接 href）
       if (action === 'new_tab') {
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
         // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
-        // 仅当 step.value 非空时才通知父页面导航（录制时可能捕获到了链接 href）
-        if (step.value) {
-          self._notifyParent('navigate', { url: step.value, new_tab: true });
-          console.log('[ReplayEngine] new_tab action: navigating to', step.value);
+        // 优先使用 step.value，其次使用上一步 click 捕获的链接 href
+        var navUrl = step.value || self._lastClickHref || '';
+        if (navUrl) {
+          self._notifyParent('navigate', { url: navUrl, new_tab: true });
+          console.log('[ReplayEngine] new_tab action: navigating to', navUrl.substring(0, 80));
         } else {
-          console.log('[ReplayEngine] new_tab action: no url in step.value, relying on previous click navigation');
+          console.log('[ReplayEngine] new_tab action: no url available, skipping navigation');
         }
         return;
       }
@@ -1676,6 +1677,12 @@ _REPLAYER_JS = r"""
       switch (action) {
         case 'click':
           console.log('[ReplayEngine] click start: tag=', el ? el.tagName : 'null');
+          // 捕获链接元素的 href，供后续 new_tab 步骤使用
+          var _clickLink = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
+          if (_clickLink && _clickLink.href && _clickLink.href.indexOf('javascript:') !== 0 && _clickLink.href !== '#') {
+            self._lastClickHref = _clickLink.href;
+            console.log('[ReplayEngine] click on link, captured href:', _clickLink.href.substring(0, 80));
+          }
           // 对于日期输入框，使用鼠标事件触发，确保日期选择器弹出
           if (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'datetime-local' || el.getAttribute('class') || '').indexOf('date') >= 0) {
             console.log('[ReplayEngine] Clicking date input, dispatching mouse events');
