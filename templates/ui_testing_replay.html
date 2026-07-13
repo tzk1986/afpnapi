@@ -109,6 +109,7 @@
         var replayStarted = false;
         var networkRequests = [];
         var initialTargetOrigin = ''; // 初始目标应用的 origin，用于判断 SPA 路由变化
+        var savedReplayState = null; // 跨页面导航时保存的回放状态（由引擎通过 postMessage 传来）
 
         // 加载执行任务数据
         function loadJobData() {
@@ -186,18 +187,6 @@
             injectReplayEngine();
         });
 
-        function injectReplayEngine() {
-            var frame = document.getElementById('replayFrame');
-            try {
-                var doc = frame.contentDocument || frame.contentWindow.document;
-                var script = doc.createElement('script');
-                script.textContent = getReplayerJs();
-                doc.head.appendChild(script);
-            } catch(e) {
-                console.error('Failed to inject replay engine:', e);
-            }
-        }
-
         // 监听来自 iframe 的 postMessage
         window.addEventListener('message', function(e) {
             if (!e.data || !e.data.type) return;
@@ -222,7 +211,11 @@
                     onAllComplete(data);
                     break;
                 case 'ui-replay-navigate':
-                    onNavigate(data.url);
+                    onNavigate(data);
+                    break;
+                case 'ui-replay-save-state':
+                    savedReplayState = data;
+                    console.log('[Parent] Replay state saved from engine, currentIndex:', data.currentIndex);
                     break;
                 case 'ui-replay-screenshot':
                     captureScreenshot(data.step_index);
@@ -260,7 +253,13 @@
             startTime = Date.now();
             startTimer();
             updateControlButtons();
-            sendToFrame({ type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 5000, job_id: jobId, network_requests: networkRequests } });
+            var initMsg = { type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 5000, job_id: jobId, network_requests: networkRequests } };
+            if (savedReplayState) {
+                initMsg.savedState = savedReplayState;
+                console.log('[Parent] Passing saved replay state to engine, currentIndex:', savedReplayState.currentIndex);
+                savedReplayState = null; // 用完即清，避免后续 SPA 路由误用
+            }
+            sendToFrame(initMsg);
             setTimeout(function() {
                 sendToFrame({ type: 'ui-replay-control', action: 'start' });
             }, 100);
@@ -387,9 +386,11 @@
             updateControlButtons();
         }
 
-        function onNavigate(url) {
+        function onNavigate(navData) {
+            var url = (typeof navData === 'string') ? navData : (navData.url || '');
+            var isNewTab = (typeof navData === 'object' && navData.new_tab) || false;
             if (!url) return;
-            console.log('[onNavigate] url=', url);
+            console.log('[onNavigate] url=', url, 'new_tab=', isNewTab);
 
             var urlObj = new URL(url, window.location.origin);
             var currentUrl = document.getElementById('currentUrl');
@@ -426,7 +427,7 @@
                             shouldNavigate = true;
                             console.log('[onNavigate] 跨origin导航（含_proxy_url）');
                             var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                            proxyUrl = targetPath;
+                            proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
                         }
                     } catch(e) {
                         console.warn('[onNavigate] 解析_proxy_url失败:', e);
@@ -440,7 +441,15 @@
             // 判断3：完整URL — 区分同origin SPA路由 vs 真正跨origin导航
             else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
                 var navOrigin = urlObj.protocol + '//' + urlObj.host;
-                if (initialTargetOrigin && navOrigin === initialTargetOrigin) {
+                if (isNewTab) {
+                    // new_tab 始终导航（即使同 origin，也是跳转到新页面而非 SPA 路由）
+                    shouldNavigate = true;
+                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                    var navBaseUrl = urlObj.protocol + '//' + urlObj.host;
+                    proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                        '_proxy_url=' + encodeURIComponent(navBaseUrl) + '&replay=1';
+                    console.log('[onNavigate] new_tab 强制导航，构造代理URL');
+                } else if (initialTargetOrigin && navOrigin === initialTargetOrigin) {
                     console.log('[onNavigate] 同origin SPA路由变化，不刷新 iframe');
                 } else {
                     shouldNavigate = true;
@@ -448,8 +457,15 @@
                     var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
                     var navBaseUrl = urlObj.protocol + '//' + urlObj.host;
                     proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                        '_proxy_url=' + encodeURIComponent(navBaseUrl);
+                        '_proxy_url=' + encodeURIComponent(navBaseUrl) + '&replay=1';
                 }
+            }
+
+            // new_tab 兜底：如果以上条件都没匹配到，强制导航
+            if (isNewTab && !shouldNavigate && !proxyUrl) {
+                shouldNavigate = true;
+                proxyUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
+                console.log('[onNavigate] new_tab 兜底导航, url=', url);
             }
 
             console.log('[onNavigate] shouldNavigate=', shouldNavigate, 'proxyUrl=', proxyUrl);
@@ -525,7 +541,7 @@
 
         // 改为通过 API 获取回放引擎 JS 并注入
         function injectReplayEngine() {
-            fetch('/api/ui-testing/replay-engine-js')
+            fetch('/api/ui-testing/replay-engine-js?t=' + Date.now())
                 .then(function(r) { return r.text(); })
                 .then(function(js) {
                     var frame = document.getElementById('replayFrame');

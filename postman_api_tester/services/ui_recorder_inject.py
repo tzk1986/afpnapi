@@ -132,6 +132,32 @@ _EARLY_RECORDER_JS = r"""
   }
 
   console.log('[EarlyRecorder] Early event capture installed, listeners:', eventTypes.join(', '));
+
+  // 回放模式：转换 target="_blank" 为 _self，避免点击时打开新标签页
+  if (window.__UI_REPLAY_MODE) {
+    function _convertBlankLinks() {
+      var links = document.querySelectorAll('a[target="_blank"]');
+      for (var i = 0; i < links.length; i++) links[i].setAttribute('target', '_self');
+    }
+    _convertBlankLinks();
+    // MutationObserver 持续转换动态添加的链接
+    if (window.MutationObserver) {
+      var _mo = new MutationObserver(function(mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          for (var j = 0; j < mutations[i].addedNodes.length; j++) {
+            var node = mutations[i].addedNodes[j];
+            if (node.nodeType === 1) {
+              if (node.tagName === 'A' && node.getAttribute('target') === '_blank') node.setAttribute('target', '_self');
+              var descs = node.querySelectorAll('a[target="_blank"]');
+              for (var k = 0; k < descs.length; k++) descs[k].setAttribute('target', '_self');
+            }
+          }
+        }
+      });
+      _mo.observe(document.documentElement, { childList: true, subtree: true });
+    }
+    console.log('[EarlyRecorder] New tab prevention installed (early script)');
+  }
 })();
 """
 
@@ -1240,6 +1266,56 @@ _REPLAYER_JS = r"""
     }
   };
 
+  // ====== 回放模式拦截：阻止所有方式打开新标签页 ======
+  (function() {
+    // 1. 拦截 window.open：返回模拟对象，不真正打开新窗口
+    var _origOpen = window.open;
+    window.open = function(url, target, features) {
+      console.log('[ReplayEngine] window.open blocked, url:', url);
+      return { closed: false, close: function(){}, focus: function(){}, postMessage: function(){} };
+    };
+
+    // 2. 转换所有 target="_blank" 链接为当前窗口打开
+    function _convertBlankTargets() {
+      var links = document.querySelectorAll('a[target="_blank"]');
+      for (var i = 0; i < links.length; i++) {
+        links[i].setAttribute('target', '_self');
+      }
+    }
+    _convertBlankTargets();
+
+    // 3. MutationObserver 监听新元素，持续转换 target="_blank"
+    if (window.MutationObserver) {
+      var _blankObserver = new MutationObserver(function(mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var added = mutations[i].addedNodes;
+          for (var j = 0; j < added.length; j++) {
+            if (added[j].nodeType === 1) { // Element node
+              if (added[j].tagName === 'A' && added[j].getAttribute('target') === '_blank') {
+                added[j].setAttribute('target', '_self');
+              }
+              var descendants = added[j].querySelectorAll('a[target="_blank"]');
+              for (var k = 0; k < descendants.length; k++) {
+                descendants[k].setAttribute('target', '_self');
+              }
+            }
+          }
+        }
+      });
+      _blankObserver.observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    // 4. 事件捕获阶段拦截 click：如果是 target="_blank" 链接，先转换再放行
+    document.addEventListener('click', function(e) {
+      var link = e.target.closest('a');
+      if (link && link.getAttribute('target') === '_blank') {
+        link.setAttribute('target', '_self');
+      }
+    }, true);
+
+    console.log('[ReplayEngine] New tab prevention installed');
+  })();
+
   // ====== 回放引擎 ======
   var ReplayEngine = {
     steps: [],
@@ -1253,20 +1329,22 @@ _REPLAYER_JS = r"""
     jobId: '',
     _currentTimeoutId: null,
 
-    init: function(steps, options) {
-      console.log('[ReplayEngine] init called, steps from parent:', steps ? steps.length : 0);
-      // 检查是否有保存的回放状态（跨页面导航后恢复）
-      var savedState = null;
-      try {
-        var saved = sessionStorage.getItem('_ui_replay_state');
-        if (saved) {
-          savedState = JSON.parse(saved);
-          console.log('[ReplayEngine] Found saved state, currentIndex:', savedState.currentIndex, 'total steps:', savedState.steps.length);
-        } else {
-          console.log('[ReplayEngine] No saved state found in sessionStorage');
+    init: function(steps, options, parentSavedState) {
+      console.log('[ReplayEngine] init called, steps from parent:', steps ? steps.length : 0, 'parentSavedState:', !!parentSavedState);
+      // 优先使用父页面传递的状态（跨页面导航后恢复），其次 sessionStorage
+      var savedState = parentSavedState || null;
+      if (!savedState) {
+        try {
+          var saved = sessionStorage.getItem('_ui_replay_state');
+          if (saved) {
+            savedState = JSON.parse(saved);
+            console.log('[ReplayEngine] Found saved state in sessionStorage, currentIndex:', savedState.currentIndex);
+          } else {
+            console.log('[ReplayEngine] No saved state found in sessionStorage');
+          }
+        } catch(e) {
+          console.error('[ReplayEngine] Failed to load saved state:', e);
         }
-      } catch(e) {
-        console.error('[ReplayEngine] Failed to load saved state:', e);
       }
 
       if (savedState && savedState.steps && savedState.steps.length > 0) {
@@ -1404,14 +1482,16 @@ _REPLAYER_JS = r"""
         return;
       }
 
-      // new_tab 动作：模拟打开新标签页（实际是在 iframe 中导航）
+      // new_tab 动作：在当前窗口导航到新 URL（避免新标签页导致后续步骤找不到元素）
       if (action === 'new_tab') {
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        // 通知父页面导航到新 URL（标记为新标签页）
+        // 保存回放状态到父页面，恢复时 _executeNext() 会 currentIndex++ 跳过 new_tab 自身
+        self._saveStateToParent();
+        // 通知父页面在当前窗口导航到新 URL
         self._notifyParent('navigate', { url: step.value || '', new_tab: true });
-        console.log('[ReplayEngine] new_tab action: navigating to', step.value);
+        console.log('[ReplayEngine] new_tab action: navigating to', step.value, ', currentIndex:', self.currentIndex);
         return;
       }
 
@@ -1562,12 +1642,13 @@ _REPLAYER_JS = r"""
         } catch(e) {
           result.status = 'error';
           result.error = e.message || String(e);
+          console.error('[ReplayEngine] _executeAction threw error:', e.message, 'stack:', e.stack ? e.stack.substring(0, 200) : '');
         }
 
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
-        if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
+        if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
 
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
@@ -1584,10 +1665,17 @@ _REPLAYER_JS = r"""
     },
 
     _executeAction: function(action, el, value) {
+      var self = this;
+      console.log('[ReplayEngine] _executeAction ENTER: action=', action, 'el=', el ? el.tagName : 'null');
       var urlBefore = location.href;
       var result = true;
       switch (action) {
         case 'click':
+          // 检查下一步是否为 new_tab — 如果是，此 click 会触发新页面导航，
+          // 合成事件不会触发链接默认行为，但也不做额外导航，由 new_tab 步骤统一处理
+          var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
+          var _nextIsNewTab = _nextStep && _nextStep.action === 'new_tab';
+          console.log('[ReplayEngine] click start: tag=', el ? el.tagName : 'null', 'nextIsNewTab=', _nextIsNewTab);
           // 对于日期输入框，使用鼠标事件触发，确保日期选择器弹出
           if (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'datetime-local' || el.getAttribute('class') || '').indexOf('date') >= 0) {
             console.log('[ReplayEngine] Clicking date input, dispatching mouse events');
@@ -1596,8 +1684,17 @@ _REPLAYER_JS = r"""
             el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
             el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
           } else {
-            el.click();
+            try {
+              el.click();
+              console.log('[ReplayEngine] el.click() succeeded');
+            } catch(clickErr) {
+              console.error('[ReplayEngine] el.click() failed:', clickErr);
+            }
           }
+          if (_nextIsNewTab) {
+            console.log('[ReplayEngine] click followed by new_tab, new_tab step will handle navigation');
+          }
+          console.log('[ReplayEngine] click end');
           break;
         case 'dblclick':
           el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
@@ -1708,8 +1805,24 @@ _REPLAYER_JS = r"""
     },
 
     _saveState: function() {
-      // 保存当前回放状态到 sessionStorage，用于跨页面导航后恢复
+      // 保存当前回放状态到 sessionStorage 和父页面，用于跨页面导航后恢复
+      var state = {
+        steps: this.steps,
+        options: this.options,
+        jobId: this.jobId,
+        currentIndex: this.currentIndex,
+        results: this.results
+      };
       try {
+        sessionStorage.setItem('_ui_replay_state', JSON.stringify(state));
+      } catch(e) {}
+      this._saveStateToParent();
+      console.log('[ReplayEngine] State saved, currentIndex:', this.currentIndex, 'total steps:', this.steps.length);
+    },
+
+    _saveStateToParent: function() {
+      // 将回放状态保存到父页面变量，跨页面导航时由父页面传回（比 sessionStorage 更可靠）
+      if (window.parent && window.parent !== window) {
         var state = {
           steps: this.steps,
           options: this.options,
@@ -1717,10 +1830,11 @@ _REPLAYER_JS = r"""
           currentIndex: this.currentIndex,
           results: this.results
         };
-        sessionStorage.setItem('_ui_replay_state', JSON.stringify(state));
-        console.log('[ReplayEngine] State saved to sessionStorage, currentIndex:', this.currentIndex, 'total steps:', this.steps.length, 'results:', this.results.length);
-      } catch(e) {
-        console.error('[ReplayEngine] Failed to save state:', e);
+        window.parent.postMessage({
+          type: 'ui-replay-save-state',
+          data: state
+        }, '*');
+        console.log('[ReplayEngine] State sent to parent for preservation, currentIndex:', this.currentIndex);
       }
     },
 
@@ -1812,7 +1926,7 @@ _REPLAYER_JS = r"""
 
     var action = e.data.action;
     if (action === 'init') {
-      ReplayEngine.init(e.data.steps || [], e.data.options || {});
+      ReplayEngine.init(e.data.steps || [], e.data.options || {}, e.data.savedState || null);
     } else if (action === 'start') {
       ReplayEngine.start();
     } else if (action === 'pause') {
