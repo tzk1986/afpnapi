@@ -205,6 +205,49 @@ def _get_proxy_session_id(base_url: str = "") -> str:
 
     # 创建新会话并保存 base_url
     new_sid = _proxy_session_store.create_session(base_url)
+
+    # 加载浏览器原始 JSESSIONID 到代理 session jar，确保后续请求使用浏览器的已认证 session
+    browser_jsessionid = request.cookies.get("JSESSIONID")
+    if browser_jsessionid:
+        import requests
+        from http.cookiejar import Cookie as _Cookie
+        # 构造 cookie 对象并加载到 proxy session jar
+        cookie_jar = _proxy_session_store.get_cookie_jar(new_sid)
+        if cookie_jar is not None:
+            try:
+                # 解析 base_url 获取 domain 和 path
+                from urllib.parse import urlparse
+                parsed = urlparse(base_url or "")
+                domain = parsed.netloc if parsed.netloc else ""
+                path = parsed.path if parsed.path else "/"
+                # 创建新的 cookie 并添加到 jar
+                c = _Cookie(
+                    version=0, name="JSESSIONID", value=browser_jsessionid,
+                    port=None, port_specified=False,
+                    domain=domain, domain_specified=bool(domain), domain_initial_dot=False,
+                    path=path, path_specified=True,
+                    secure=False, expires=None, discard=True, comment=None,
+                    comment_url=None, rest={}, rfc2109=False,
+                )
+                cookie_jar.set_cookie(c)
+                logger.info(
+                    "proxy_session_loaded_browser_cookie",
+                    extra={
+                        "event": "ui.proxy.session.browser_cookie_loaded",
+                        "session_id": new_sid[:8],
+                        "jsessionid_prefix": browser_jsessionid[:20] + "...",
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    "proxy_session_load_browser_cookie_failed",
+                    extra={
+                        "event": "ui.proxy.session.browser_cookie_failed",
+                        "session_id": new_sid[:8],
+                        "error": str(e),
+                    },
+                )
+
     logger.info(
         "proxy_session_created_new",
         extra={

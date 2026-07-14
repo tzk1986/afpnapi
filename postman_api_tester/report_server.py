@@ -663,7 +663,8 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
             return make_response(b"", 404)
 
     # 重写 Location 响应头（页面请求的重定向）
-    if is_page and "Location" in headers:
+    # 跳过已包含 _proxy_url 的 Location（由 ui_proxy_service 改写）
+    if is_page and "Location" in headers and "_proxy_url" not in headers["Location"]:
         loc = headers["Location"]
         from urllib.parse import quote as _quote2
         base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"

@@ -1,12 +1,13 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.28
+版本：v1.30.33
 发布日期：2026-07-09
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点（v1.30.28）：
-- **el-select 回放多匹配文本筛选**：fallback CSS 选择器匹配多个元素时，按 element_info.text 精确匹配文本内容，解决旧录制用例选择器不唯一导致点击错误元素的问题
-- **el-select 回放诊断日志**：click 步骤选择器包含 el-select-dropdown 时输出 dropdown 容器状态、选项列表，辅助排查"元素未找到"问题
+本版新增重点（v1.30.33）：
+- **合成事件链接点击显式导航**：回放引擎使用 el.click() 派发合成事件，浏览器不会自动执行链接导航。修复后 click 链接时显式设置 location.href 跳转到链接目标，确保页面导航发生
+- **click 拦截 href 转代理 URL**：早期脚本捕获阶段转换 target="_blank" 为 _self + href 改写为代理 URL
+- **new_tab 三层拦截**：(1) 拦截 window.open；(2) click 事件捕获阶段转换；(3) click 执行前转换
 
 本版新增重点（v1.30.24）：
 - **el-select 下拉选择修复**：移除 type 操作中对 el-select 输入框的 Enter keyup 事件（会关闭下拉框），让录制的 click 步骤在保持下拉框打开状态下完成选项选择

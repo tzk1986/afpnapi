@@ -303,8 +303,22 @@ class UiProxyService:
 
         resp = session.request(
             method, url, headers=headers, data=req_body,
-            timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+            timeout=cls.REQUEST_TIMEOUT, allow_redirects=False,
         )
+
+        # 记录重定向响应（不自动跟随，由浏览器处理）
+        if resp.status_code in (301, 302, 303, 307, 308):
+            location = resp.headers.get("Location", "")
+            logger.info(
+                "proxy_page_redirect_response",
+                extra={
+                    "event": "ui.proxy.page.redirect",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "location": location,
+                },
+            )
 
         # 记录目标服务器返回的 Set-Cookie
         resp_set_cookies = []
@@ -351,6 +365,35 @@ class UiProxyService:
 
         response_headers.pop("X-Frame-Options", None)
         response_headers.pop("Content-Security-Policy", None)
+
+        # 处理重定向响应：改写 Location 为代理 URL
+        if resp.status_code in (301, 302, 303, 307, 308):
+            location = resp.headers.get("Location", "")
+            if location:
+                # 构造代理 URL：将目标 URL 转为代理路径
+                loc_parsed = urlparse(location)
+                if loc_parsed.scheme and loc_parsed.netloc:
+                    # 绝对 URL：转为代理路径
+                    target_origin = f"{loc_parsed.scheme}://{loc_parsed.netloc}"
+                    proxy_path = loc_parsed.path
+                    if loc_parsed.query:
+                        proxy_path += "?" + loc_parsed.query
+                    if loc_parsed.fragment:
+                        proxy_path += "#" + loc_parsed.fragment
+                    proxy_path += ("&" if loc_parsed.query else "?") + \
+                        "_proxy_url=" + quote(target_origin, safe='') + "&replay=1"
+                    response_headers["Location"] = proxy_path
+                else:
+                    # 相对 URL：基于当前请求的 origin 构造
+                    target_origin = f"{parsed.scheme}://{parsed.netloc}"
+                    abs_location = location if location.startswith("/") else "/" + location
+                    proxy_path = abs_location + \
+                        ("&" if "?" in abs_location else "?") + \
+                        "_proxy_url=" + quote(target_origin, safe='') + "&replay=1"
+                    response_headers["Location"] = proxy_path
+
+            body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
+            return body, resp.status_code, response_headers
 
         if is_html:
             body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode, recording_mode=recording_mode, replay_engine_js=replay_engine_js)
@@ -919,10 +962,55 @@ class UiProxyService:
             'try{var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r.href;var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";url=_path+_sep+"_proxy_url="+encodeURIComponent(_r.href);}catch(e){}}'
             'return _origReplace(state,title,url);};}'
             'var _origOpen=window.open;'
-            'if(_origOpen){window.open=function(url,name,features){'
-            'if(typeof url==="string"){url=_toPageProxy(url);}'
-            'return _origOpen.call(this,url,name,features);};}'
-            '})();'
+            'if(_origOpen){'
+            + (
+                'window.open=function(url,name,features){'
+                'console.log("[ProxyEarly] window.open blocked in replay mode, url:",url);'
+                'return{closed:false,close:function(){},focus:function(){},postMessage:function(){}};'
+                '};'
+            if replay_mode else (
+                'window.open=function(url,name,features){'
+                'if(typeof url==="string"){url=_toPageProxy(url);}'
+                'return _origOpen.call(this,url,name,features);};'
+            ))
+            + '}'
+            + (
+                'function _convertBlank(){'
+                'var links=document.querySelectorAll("a[target=\\"_blank\\"]");'
+                'for(var i=0;i<links.length;i++)links[i].setAttribute("target","_self");'
+                '}'
+                'document.addEventListener("click",function(e){'
+                'var link=e.target.closest("a");'
+                'if(!link||!link.href||link.href.indexOf("javascript:")===0)return;'
+                'if(link.getAttribute("target")==="_blank"){'
+                'link.setAttribute("target","_self");'
+                'try{'
+                'var _u=new URL(link.href,location.href);'
+                'var _fullUrl=_u.href;'
+                'var _pathUrl=_u.pathname+(_u.search?_u.search:"")+(_u.hash?_u.hash:"");'
+                'var _sep=_pathUrl.indexOf("?")>=0?"&":"?";'
+                'link.href=_pathUrl+_sep+"_proxy_url="+encodeURIComponent(_fullUrl);'
+                '}catch(ex){}'
+                '}'
+                '},true);'
+                'if(document.readyState==="loading"){'
+                'document.addEventListener("DOMContentLoaded",function(){_convertBlank()});'
+                '}else{_convertBlank();}'
+                'if(window.MutationObserver){'
+                'var _mo=new MutationObserver(function(mutations){'
+                'for(var i=0;i<mutations.length;i++){'
+                'for(var j=0;j<mutations[i].addedNodes.length;j++){'
+                'var node=mutations[i].addedNodes[j];'
+                'if(node.nodeType===1){'
+                'if(node.tagName==="A"&&node.getAttribute("target")==="_blank")node.setAttribute("target","_self");'
+                'var descs=node.querySelectorAll("a[target=\\"_blank\\"]");'
+                'for(var k=0;k<descs.length;k++)descs[k].setAttribute("target","_self");'
+                '}}}});'
+                '_mo.observe(document.documentElement,{childList:true,subtree:true});'
+                '}'
+                'console.log("[ProxyEarly] new_tab prevention installed (click intercept + href proxy conversion)");'
+            if replay_mode else '')
+            + '})();'
         )
         early_script = f"<script>{early_js}</script>"
 
