@@ -146,11 +146,34 @@ class _ProxySessionStore:
         return cleared
 
     def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
+        """更新 session cookie，确保同名 cookie 被替换而非共存。
+
+        解决问题：浏览器 JSESSIONID 加载后，目标服务器响应 Set-Cookie 返回新 JSESSIONID，
+        如果直接 update() 会因 domain/path 不同导致 jar 中出现两个同名 JSESSIONID。
+        """
         with self._lock:
             s = self._sessions.get(session_id)
-            if s:
-                s["last_active"] = time.time()
-                s["cookies"].update(resp_cookies)
+            if not s:
+                return
+            s["last_active"] = time.time()
+            jar = s["cookies"]
+
+            # 先清除 jar 中与新 cookie 同名的所有旧 cookie
+            new_cookie_names = {c.name for c in resp_cookies}
+            cookies_to_remove = [
+                (c.name, c.domain, c.path)
+                for c in jar
+                if c.name in new_cookie_names
+            ]
+            for name, domain, path in cookies_to_remove:
+                try:
+                    jar.clear(domain, path, name)
+                except KeyError:
+                    pass  # cookie 已被清除
+
+            # 添加新的 cookies
+            for c in resp_cookies:
+                jar.set_cookie(c)
 
     def delete_session(self, session_id: str) -> bool:
         """删除指定会话。"""
