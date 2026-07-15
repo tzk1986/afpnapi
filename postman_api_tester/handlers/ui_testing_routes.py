@@ -324,10 +324,10 @@ def ui_testing_proxy() -> ResponseReturnValue:
     })
 
     # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
     if recording_mode:
         old_sid = request.cookies.get("_proxy_session")
         if old_sid:
-            from postman_api_tester.services.ui_proxy_service import _proxy_session_store
             _proxy_session_store.delete_session(old_sid)
             logger.info("recording_clear_old_session", extra={
                 "event": "ui.recording.session_cleared",
@@ -343,10 +343,34 @@ def ui_testing_proxy() -> ResponseReturnValue:
     else:
         session_id = _get_proxy_session_id(base_url)
 
+    # 详细记录 session 中的 cookie 信息（用于诊断 new_tab 跳转问题）
+    session_cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
+    session_cookies_detail = {}
+    if session_cookie_jar:
+        for c in session_cookie_jar:
+            session_cookies_detail[c.name] = {
+                "value": c.value[:30] + "..." if len(c.value) > 30 else c.value,
+                "domain": c.domain,
+                "path": c.path,
+            }
+    else:
+        logger.warning(
+            "proxy_session_jar_is_none",
+            extra={
+                "event": "ui.proxy.session.jar_none",
+                "session_id": session_id[:8],
+                "target_url": target_url[:100],
+            },
+        )
+
     logger.info("proxy_session_ready", extra={
         "event": "ui.proxy.session_ready",
         "session_id": session_id[:8],
         "target_url": target_url[:200],
+        "base_url": base_url,
+        "session_cookies": session_cookies_detail,
+        "browser_cookies": dict(request.cookies),
+        "_proxy_session_store_id": id(_proxy_session_store),
     })
 
     started_at = time.perf_counter()

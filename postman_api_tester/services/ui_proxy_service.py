@@ -63,6 +63,7 @@ class _ProxySessionStore:
                 "cookies": requests.cookies.RequestsCookieJar(),
                 "base_url": base_url,
                 "last_active": time.time(),
+                "token": "",  # 存储从 API 请求捕获的 Token
             }
         return sid
 
@@ -72,6 +73,33 @@ class _ProxySessionStore:
             if s:
                 s["last_active"] = time.time()
                 return s["cookies"]
+            return None
+
+    def set_token(self, session_id: str, token: str) -> None:
+        """存储 Token（从 API 请求捕获，用于后续页面请求）。"""
+        if not token or token == "null":
+            return
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s and s.get("token") != token:
+                s["token"] = token
+                s["last_active"] = time.time()
+                logger.info(
+                    "proxy_session_token_stored",
+                    extra={
+                        "event": "ui.proxy.session.token_stored",
+                        "session_id": session_id[:8],
+                        "token_preview": token[:30] + "..." if len(token) > 30 else token,
+                    },
+                )
+
+    def get_token(self, session_id: str) -> Optional[str]:
+        """获取存储的 Token。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                return s.get("token", "")
             return None
 
     def get_base_url(self, session_id: str) -> Optional[str]:
@@ -307,6 +335,34 @@ class UiProxyService:
             for key in ("Content-Type",):
                 if key in req_headers:
                     headers[key] = req_headers[key]
+            # 转发 Token 请求头（用于目标服务器认证）
+            token_value = req_headers.get("Token", "")
+            # 如果浏览器没有发送 Token，从 session store 获取之前 API 请求捕获的 Token
+            if (not token_value or token_value == "null") and session_id:
+                stored_token = _proxy_session_store.get_token(session_id)
+                if stored_token:
+                    token_value = stored_token
+                    logger.info(
+                        "proxy_page_token_from_store",
+                        extra={
+                            "event": "ui.proxy.page.token_from_store",
+                            "session_id": session_id[:8],
+                            "url": url,
+                            "token_preview": token_value[:30] + "..." if len(token_value) > 30 else token_value,
+                        },
+                    )
+            logger.info(
+                "proxy_page_token_debug",
+                extra={
+                    "event": "ui.proxy.page.token_debug",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "token_in_req_headers": token_value[:20] + "..." if len(token_value) > 20 else token_value,
+                    "token_is_null": token_value == "null" or not token_value,
+                },
+            )
+            if token_value and token_value != "null":
+                headers["Token"] = token_value
 
         session = requests.Session()
         if session_id:
@@ -324,9 +380,34 @@ class UiProxyService:
                     },
                 )
 
+        # 记录发送给目标服务器的完整请求头
+        logger.info(
+            "proxy_page_request_headers",
+            extra={
+                "event": "ui.proxy.page.req.headers",
+                "session_id": session_id[:8] if session_id else None,
+                "url": url,
+                "method": method,
+                "headers_sent": headers,
+            },
+        )
+
         resp = session.request(
             method, url, headers=headers, data=req_body,
             timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+        )
+
+        # 记录目标服务器返回的完整响应头
+        resp_headers_dict = dict(resp.headers)
+        logger.info(
+            "proxy_page_response_headers",
+            extra={
+                "event": "ui.proxy.page.resp.headers",
+                "session_id": session_id[:8] if session_id else None,
+                "url": url,
+                "status_code": resp.status_code,
+                "response_headers": resp_headers_dict,
+            },
         )
 
         # 记录目标服务器返回的 Set-Cookie
@@ -381,6 +462,20 @@ class UiProxyService:
         else:
             body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
 
+        # 记录响应内容摘要（用于诊断 new_tab 返回登录页问题）
+        if is_html and len(body) < 10000:
+            logger.info(
+                "proxy_page_response_content_preview",
+                extra={
+                    "event": "ui.proxy.page.resp.content_preview",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "body_size": len(body),
+                    "content_preview": body[:500],
+                },
+            )
+
         return body, resp.status_code, response_headers
 
     @classmethod
@@ -428,6 +523,12 @@ class UiProxyService:
         # 修正 Origin：设为目标服务器 origin（非代理 origin），模拟浏览器同源请求
         if "Origin" in headers and "/api/" in url:
             headers["Origin"] = target_origin
+
+        # 捕获 Token 并存储到 session（用于后续页面请求）
+        if session_id and req_headers:
+            token_value = req_headers.get("Token", "")
+            if token_value and token_value != "null":
+                _proxy_session_store.set_token(session_id, token_value)
 
         # 记录 API 请求的完整请求头
         if "/api/" in url:

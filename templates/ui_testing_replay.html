@@ -442,13 +442,10 @@
             else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
                 var navOrigin = urlObj.protocol + '//' + urlObj.host;
                 if (isNewTab) {
-                    // new_tab 始终导航（即使同 origin，也是跳转到新页面而非 SPA 路由）
+                    // new_tab 直接走 /ui-testing/proxy 端点，确保使用正确的 session
                     shouldNavigate = true;
-                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                    var navBaseUrl = urlObj.protocol + '//' + urlObj.host;
-                    proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                        '_proxy_url=' + encodeURIComponent(navBaseUrl) + '&replay=1';
-                    console.log('[onNavigate] new_tab 强制导航，构造代理URL');
+                    proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&replay=1';
+                    console.log('[onNavigate] new_tab 走 proxy 端点，url=', url.substring(0, 80));
                 } else if (initialTargetOrigin && navOrigin === initialTargetOrigin) {
                     console.log('[onNavigate] 同origin SPA路由变化，不刷新 iframe');
                 } else {
@@ -461,11 +458,11 @@
                 }
             }
 
-            // new_tab 兜底：如果以上条件都没匹配到，强制导航
+            // new_tab 兜底：如果以上条件都没匹配到，强制走 proxy 端点
             if (isNewTab && !shouldNavigate && !proxyUrl) {
                 shouldNavigate = true;
-                proxyUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
-                console.log('[onNavigate] new_tab 兜底导航, url=', url);
+                proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&replay=1';
+                console.log('[onNavigate] new_tab 兜底走 proxy 端点, url=', url.substring(0, 80));
             }
 
             console.log('[onNavigate] shouldNavigate=', shouldNavigate, 'proxyUrl=', proxyUrl);
