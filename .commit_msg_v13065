@@ -1,1 +1,0 @@
-v1.30.65: 修复类型注解 — 给 _cleanup_loop 补 -> None；response_headers Dict[str,str] 改 Dict[str,Any] 容纳 _set_cookies 的 list[str]；消除变量重定义；report_server 中 body 标注为 Union[str, bytes] 匹配 fetch_and_rewrite/fetch_resource 双返回类型。mypy 从 8 错降至 1 错（剩余为预先存在的 lambda 推断问题）
