@@ -306,7 +306,7 @@ _proxy_session_store = _ProxySessionStore()
 
 # 定时清理过期会话
 def _start_session_cleanup() -> None:
-    def _cleanup_loop():
+    def _cleanup_loop() -> None:
         while True:
             time.sleep(300)
             try:
@@ -532,7 +532,7 @@ class UiProxyService:
             else:
                 rewritten_location = "/"
 
-            response_headers: Dict[str, str] = {
+            response_headers: Dict[str, Any] = {
                 "Location": rewritten_location,
             }
             if session_id:
@@ -542,7 +542,7 @@ class UiProxyService:
         content_type = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml" in content_type
 
-        response_headers: Dict[str, str] = {}
+        response_headers = {}
         for key in ("Content-Type", "Cache-Control", "ETag"):
             if key in resp.headers:
                 response_headers[key] = resp.headers[key]
@@ -722,7 +722,7 @@ class UiProxyService:
                 },
             )
 
-        response_headers: Dict[str, str] = {}
+        response_headers: Dict[str, Any] = {}
         for key in ("Content-Type", "Cache-Control", "ETag"):
             if key in resp.headers:
                 response_headers[key] = resp.headers[key]

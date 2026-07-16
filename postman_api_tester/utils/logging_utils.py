@@ -308,7 +308,7 @@ def cleanup_old_logs(log_dir: str, retention_days: int = _LOG_RETENTION_DAYS) ->
 
 def _start_log_cleanup(log_dir: str) -> None:
     """启动后台日志清理线程。"""
-    def _cleanup_loop():
+    def _cleanup_loop() -> None:
         while True:
             time.sleep(_LOG_CLEANUP_INTERVAL)
             try:
