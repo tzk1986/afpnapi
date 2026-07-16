@@ -186,22 +186,58 @@ class _ProxySessionStore:
             s["last_active"] = time.time()
             jar = s["cookies"]
 
-            # 先清除 jar 中与新 cookie 同名的所有旧 cookie
-            new_cookie_names = {c.name for c in resp_cookies}
-            cookies_to_remove = [
-                (c.name, c.domain, c.path)
-                for c in jar
-                if c.name in new_cookie_names
-            ]
-            for name, domain, path in cookies_to_remove:
-                try:
-                    jar.clear(domain, path, name)
-                except KeyError:
-                    pass  # cookie 已被清除
+            # 诊断日志：记录更新前的 jar 状态
+            jar_before = [c.name for c in jar]
+            resp_names = [c.name for c in resp_cookies]
+            logger.info(
+                "proxy_update_cookies_debug",
+                extra={
+                    "event": "ui.proxy.update_cookies.debug",
+                    "session_id": session_id[:8],
+                    "jar_before": jar_before,
+                    "resp_cookies": resp_names,
+                    "resp_cookies_len": len(resp_names),
+                },
+            )
+
+            # 如果没有新 cookie，直接返回（避免意外清空）
+            if not resp_names:
+                logger.info(
+                    "proxy_update_cookies_skip",
+                    extra={
+                        "event": "ui.proxy.update_cookies.skip",
+                        "session_id": session_id[:8],
+                        "jar_unchanged": jar_before,
+                    },
+                )
+                return
+
+            # 先清除 jar 中与新 cookie 同名的所有旧 cookie（按名称匹配，不依赖 domain/path）
+            new_cookie_names = set(resp_names)
+            for domain in list(jar._cookies.keys()):
+                for path in list(jar._cookies[domain].keys()):
+                    for name in new_cookie_names:
+                        jar._cookies[domain][path].pop(name, None)
+                    if not jar._cookies[domain][path]:
+                        del jar._cookies[domain][path]
+                if not jar._cookies[domain]:
+                    del jar._cookies[domain]
 
             # 添加新的 cookies
             for c in resp_cookies:
                 jar.set_cookie(c)
+
+            # 诊断日志：记录更新后的 jar 状态
+            jar_after = [c.name for c in jar]
+            logger.info(
+                "proxy_update_cookies_done",
+                extra={
+                    "event": "ui.proxy.update_cookies.done",
+                    "session_id": session_id[:8],
+                    "jar_after": jar_after,
+                    "added": resp_names,
+                },
+            )
 
     def delete_session(self, session_id: str) -> bool:
         """删除指定会话。"""
@@ -325,11 +361,13 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
+        target_origin = f"{parsed.scheme}://{parsed.netloc}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                           "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Referer": target_origin + "/",
         }
         if req_headers:
             for key in ("Content-Type",):
@@ -367,7 +405,18 @@ class UiProxyService:
         session = requests.Session()
         if session_id:
             cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
-            if cookie_jar:
+            logger.info(
+                "proxy_page_request_cookies_debug",
+                extra={
+                    "event": "ui.proxy.page.req.cookies_debug",
+                    "session_id": session_id[:8],
+                    "url": url,
+                    "cookie_jar_is_none": cookie_jar is None,
+                    "cookie_jar_len": len(cookie_jar) if cookie_jar else 0,
+                    "cookie_names": [c.name for c in cookie_jar] if cookie_jar else [],
+                },
+            )
+            if cookie_jar and len(cookie_jar) > 0:
                 session.cookies = cookie_jar
                 logger.info(
                     "proxy_page_request_cookies",
@@ -394,8 +443,22 @@ class UiProxyService:
 
         resp = session.request(
             method, url, headers=headers, data=req_body,
-            timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+            timeout=cls.REQUEST_TIMEOUT, allow_redirects=False,
         )
+
+        # 诊断：记录是否有重定向发生
+        if resp.status_code in (301, 302, 303, 307, 308):
+            location = resp.headers.get("Location", "")
+            logger.info(
+                "proxy_page_redirect_detected",
+                extra={
+                    "event": "ui.proxy.page.redirect",
+                    "session_id": session_id[:8] if session_id else None,
+                    "url": url,
+                    "status_code": resp.status_code,
+                    "location": location,
+                },
+            )
 
         # 记录目标服务器返回的完整响应头
         resp_headers_dict = dict(resp.headers)
@@ -427,9 +490,9 @@ class UiProxyService:
                 },
             )
 
-        # 存储目标服务器返回的 Cookie
+        # 存储目标服务器返回的 Cookie（仅传响应中的新 cookie，不传整个 session jar）
         if session_id:
-            _proxy_session_store.update_cookies(session_id, session.cookies)
+            _proxy_session_store.update_cookies(session_id, resp.cookies)
             updated_jar = _proxy_session_store.get_cookie_jar(session_id)
             logger.debug(
                 "proxy_page_cookies_after_update",
@@ -440,6 +503,41 @@ class UiProxyService:
                     "cookies_in_jar": [c.name for c in updated_jar] if updated_jar else [],
                 },
             )
+
+        # 处理重定向响应：改写 Location 为代理 URL，返回给浏览器处理
+        if resp.status_code in (301, 302, 303, 307, 308):
+            location = resp.headers.get("Location", "")
+            # 改写 Location 为代理 URL
+            if location:
+                from urllib.parse import urlparse as _urlparse
+                parsed_loc = _urlparse(location)
+                if parsed_loc.scheme and parsed_loc.netloc:
+                    # 绝对 URL：改写为代理 URL
+                    rewritten_location = f"/ui-testing/proxy?url={location}&replay=1" if replay_mode else f"/ui-testing/proxy?url={location}"
+                else:
+                    # 相对 URL：拼接为基础 URL 再改写
+                    from urllib.parse import urljoin
+                    abs_location = urljoin(url, location)
+                    rewritten_location = f"/ui-testing/proxy?url={abs_location}&replay=1" if replay_mode else f"/ui-testing/proxy?url={abs_location}"
+
+                logger.info(
+                    "proxy_page_redirect_rewrite",
+                    extra={
+                        "event": "ui.proxy.page.redirect.rewrite",
+                        "session_id": session_id[:8] if session_id else None,
+                        "original_location": location,
+                        "rewritten_location": rewritten_location,
+                    },
+                )
+            else:
+                rewritten_location = "/"
+
+            response_headers: Dict[str, str] = {
+                "Location": rewritten_location,
+            }
+            if session_id:
+                response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
+            return "", resp.status_code, response_headers
 
         content_type = resp.headers.get("Content-Type", "")
         is_html = "text/html" in content_type or "application/xhtml" in content_type
@@ -610,9 +708,9 @@ class UiProxyService:
                 },
             )
 
-        # 存储目标服务器返回的 Cookie
+        # 存储目标服务器返回的 Cookie（仅传响应中的新 cookie，不传整个 session jar）
         if session_id:
-            _proxy_session_store.update_cookies(session_id, session.cookies)
+            _proxy_session_store.update_cookies(session_id, resp.cookies)
             updated_jar = _proxy_session_store.get_cookie_jar(session_id)
             logger.debug(
                 "proxy_resource_cookies_after_update",
@@ -868,16 +966,22 @@ class UiProxyService:
 
         storage_clear = ''
         if replay_mode or recording_mode:
+            # 回放模式：仅登录页清空 storage 和 cookie（确保初始状态干净），其他页面保留（Token 等认证信息）
+            # 录制模式：所有页面都清空
+            is_login_check = 'true' if recording_mode else '(_targetLoc.pathname.indexOf("/login")>=0)'
             storage_clear = (
                 'try{'
+                'if(' + is_login_check + '){'
                 'var _lsKeys=Object.keys(localStorage);'
                 'var _ssKeys=Object.keys(sessionStorage);'
                 'if(window.parent&&window.parent.postMessage){'
                 'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_before_clear",lsKeys:_lsKeys,ssKeys:_ssKeys}},"*");'
                 '}'
                 'localStorage.clear();sessionStorage.clear();'
+                'document.cookie.split(";").forEach(function(c){document.cookie=c.replace(/^ +/,"").replace(/=.*/,"=;expires="+new Date().toUTCString()+";path=/;");});'
                 'if(window.parent&&window.parent.postMessage){'
-                'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_after_clear",lsKeys:Object.keys(localStorage),ssKeys:Object.keys(sessionStorage)}},"*");'
+                'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_after_clear",lsKeys:Object.keys(localStorage),ssKeys:Object.keys(sessionStorage),cookies_cleared:true}},"*");'
+                '}'
                 '}'
                 '}catch(e){'
                 'if(window.parent&&window.parent.postMessage){'
@@ -907,6 +1011,7 @@ class UiProxyService:
             '}'
             'var _locPD=Object.getOwnPropertyDescriptor(window.location,"pathname");'
             'if(_locPD&&_locPD.configurable){Object.defineProperty(window.location,"pathname",{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;},configurable:true});}'
+            'else{try{Object.defineProperty(window.location,"pathname",{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;},configurable:true});}catch(e){}}'
             'var _locSD=Object.getOwnPropertyDescriptor(window.location,"search");'
             'if(_locSD&&_locSD.configurable){Object.defineProperty(window.location,"search",{get:function(){return _targetLoc.search;},set:function(v){_targetLoc.search=v;},configurable:true});}'
             'var _locHD=Object.getOwnPropertyDescriptor(window.location,"hash");'
@@ -1055,6 +1160,7 @@ class UiProxyService:
                 'return _origOpen.call(this,url,name,features);};'
             ))
             + '}'
+            'try{if(typeof window.__PROXY_SETUP__==="undefined"){window.__PROXY_SETUP__=true;var _tPath=_targetLoc.pathname+(_targetLoc.search||"")+(_targetLoc.hash||"");window.history.replaceState(null,"",_tPath);try{window.dispatchEvent(new PopStateEvent("popstate",{}));}catch(e){var _pe=document.createEvent("HTMLEvents");_pe.initEvent("popstate",true,true);window.dispatchEvent(_pe);}}}catch(e){}'
             + (
                 'function _convertBlank(){'
                 'var links=document.querySelectorAll("a[target=\\"_blank\\"]");'

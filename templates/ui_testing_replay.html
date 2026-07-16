@@ -111,18 +111,22 @@
         var initialTargetOrigin = ''; // 初始目标应用的 origin，用于判断 SPA 路由变化
         var savedReplayState = null; // 跨页面导航时保存的回放状态（由引擎通过 postMessage 传来）
 
+        var clearLoginOption = true; // 默认清除登录信息
+
         // 加载执行任务数据
         function loadJobData() {
-            fetch('/api/ui-testing/execution/' + jobId + '/init')
+            return fetch('/api/ui-testing/execution/' + jobId + '/init')
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
                     if (!result.data) {
                         document.getElementById('execTitle').textContent = '加载失败';
-                        return;
+                        return clearLoginOption;
                     }
                     var data = result.data;
                     steps = data.steps || [];
                     networkRequests = data.network_requests || [];
+                    var options = data.options || {};
+                    clearLoginOption = options.clear_login !== false; // 默认 true
                     document.getElementById('execTitle').textContent = data.case_name || '用例回放';
                     document.title = '回放 - ' + (data.case_name || '');
                     renderStepsList();
@@ -146,7 +150,8 @@
                 })
                 .catch(function(e) {
                     document.getElementById('execTitle').textContent = '加载失败: ' + e.message;
-                });
+                })
+                .then(function() { return clearLoginOption; });
         }
 
         function renderStepsList() {
@@ -198,7 +203,8 @@
                     // 引擎就绪，自动开始
                     if (!replayStarted && steps.length > 0) {
                         replayStarted = true;
-                        startReplay();
+                        // 如果之前已经在运行（跨页面导航），保留计时器
+                        startReplay(isRunning);
                     }
                     break;
                 case 'ui-replay-step_start':
@@ -248,9 +254,11 @@
             }
         });
 
-        function startReplay() {
+        function startReplay(resumeFromPrevious) {
             isRunning = true;
-            startTime = Date.now();
+            if (!resumeFromPrevious) {
+                startTime = Date.now();
+            }
             startTimer();
             updateControlButtons();
             var initMsg = { type: 'ui-replay-control', action: 'init', steps: steps, options: { delay_between_steps: 500, timeout: 5000, job_id: jobId, network_requests: networkRequests } };
@@ -362,7 +370,7 @@
                 body: JSON.stringify({
                     status: data.status,
                     summary: {
-                        total_duration_ms: data.duration_ms,
+                        total_duration_ms: Date.now() - startTime,
                         steps_total: data.total_steps,
                         steps_passed: data.passed,
                         steps_failed: data.failed
@@ -378,7 +386,7 @@
                     '<span>总步骤: <strong>' + data.total_steps + '</strong></span>' +
                     '<span>通过: <strong style="color:#10b981">' + data.passed + '</strong></span>' +
                     '<span>失败: <strong style="color:#ef4444">' + data.failed + '</strong></span>' +
-                    '<span>耗时: <strong>' + (data.duration_ms / 1000).toFixed(1) + 's</strong></span>' +
+                    '<span>耗时: <strong>' + ((Date.now() - startTime) / 1000).toFixed(1) + 's</strong></span>' +
                 '</div>' +
                 '</div>';
             document.getElementById('summaryArea').innerHTML = summaryHtml;
@@ -556,8 +564,31 @@
                 });
         }
 
-        // 启动
-        loadJobData();
+        // 回放开始前清除所有 cookie 和 storage，确保初始状态干净（仅当 clear_login 为 true 时）
+        function clearAllBeforeReplay(clearLogin) {
+            if (!clearLogin) {
+                console.log('[Replay] 保留登录信息，跳过清除');
+                return;
+            }
+            try {
+                // 清除当前域的所有 cookie
+                document.cookie.split(';').forEach(function(c) {
+                    var name = c.replace(/^\s+/, '').replace(/=.*/, '');
+                    document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+                });
+                // 清除 storage
+                localStorage.clear();
+                sessionStorage.clear();
+                console.log('[Replay] Cleared all cookies and storage before replay');
+            } catch(e) {
+                console.warn('[Replay] Failed to clear before replay:', e);
+            }
+        }
+
+        // 启动：加载数据后根据 clear_login 选项决定是否清除
+        loadJobData().then(function(clearLogin) {
+            clearAllBeforeReplay(clearLogin);
+        });
     </script>
 </body>
 </html>
