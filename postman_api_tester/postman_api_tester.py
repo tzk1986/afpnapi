@@ -7,9 +7,7 @@
 - 对外建议调用 run_postman_tests；其余函数主要用于流程拆分与可测试性。
 """
 
-import json
 import logging
-import os
 import sys
 import threading
 from datetime import datetime

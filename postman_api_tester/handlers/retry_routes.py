@@ -1,7 +1,7 @@
 """重试失败用例与全量重试路由处理函数。"""
 
 from functools import partial
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue

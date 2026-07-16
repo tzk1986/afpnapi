@@ -6,7 +6,7 @@
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from flask import make_response, render_template, request, send_file
 from flask.typing import ResponseReturnValue

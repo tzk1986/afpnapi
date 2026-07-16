@@ -391,7 +391,6 @@ class PostmanTestExecutor:
                 headers['token'] = self._auth_token
 
         try:
-            import requests as _requests
             response_time_ms: int = 0
             if method not in {'get', 'post', 'put', 'delete', 'patch'}:
                 return self._build_result_base(

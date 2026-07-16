@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import re
-import sys
 from datetime import datetime
 from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
@@ -41,7 +40,6 @@ from postman_api_tester.runtime_utils import (
     checkpoint_file_path as _checkpoint_file_path,
     checkpoint_key as _checkpoint_key,
     compute_collection_fingerprint as _compute_collection_fingerprint,
-    item_path_text as _item_path_text,
     load_checkpoint as _load_checkpoint,
     save_checkpoint_atomic as _save_checkpoint_atomic,
 )

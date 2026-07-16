@@ -6,11 +6,8 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
-from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from postman_api_tester.utils.extract_utils import extract_from_response

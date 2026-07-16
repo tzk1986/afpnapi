@@ -288,7 +288,6 @@ def cleanup_old_logs(log_dir: str, retention_days: int = _LOG_RETENTION_DAYS) ->
     Returns:
         删除的文件数量
     """
-    import glob
 
     cutoff = time.time() - retention_days * 86400
     removed = 0

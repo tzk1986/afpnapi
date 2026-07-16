@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from urllib.parse import quote, unquote, urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 
 import requests
 

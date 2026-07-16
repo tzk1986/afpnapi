@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from postman_api_tester.parser import ApiConfig
 from postman_api_tester.utils.variable_functions import evaluate_function
