@@ -3,13 +3,11 @@
 提供页面渲染（首页、录制器、编辑器）和 API（代理、用例 CRUD、录制会话管理）。
 """
 
-import json
 import logging
 import threading
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import unquote, urlparse
 
@@ -141,7 +139,6 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         base_url: 目标基础 URL（创建新会话时保存）
     """
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
-    from urllib.parse import parse_qs as _parse_qs
 
     sid = request.cookies.get("_proxy_session")
     if sid:
@@ -209,7 +206,6 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     # 加载浏览器原始 JSESSIONID 到代理 session jar，确保后续请求使用浏览器的已认证 session
     browser_jsessionid = request.cookies.get("JSESSIONID")
     if browser_jsessionid:
-        import requests
         from http.cookiejar import Cookie as _Cookie
         # 构造 cookie 对象并加载到 proxy session jar
         cookie_jar = _proxy_session_store.get_cookie_jar(new_sid)

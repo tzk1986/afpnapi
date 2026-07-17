@@ -15,6 +15,7 @@ uireports/
 .backup/
 .coverage
 server.log
+.commit_msg_*
 
 # 独立测试脚本
 ups_test/

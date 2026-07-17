@@ -23,9 +23,9 @@ from postman_api_tester.report_repository import load_report_details_map
 from postman_api_tester.report_server_utils import (
     normalize_manual_case,
     normalize_manual_exclusions,
-    sanitize_export_name,
     strip_auth_headers,
 )
+from postman_api_tester.utils.file_utils import sanitize_export_name
 from postman_api_tester.utils.request_builder import (
     set_request_body,
     set_request_headers,

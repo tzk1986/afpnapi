@@ -1,6 +1,5 @@
 """测试 token、重新请求与代理请求路由处理函数。"""
 
-from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlparse
 

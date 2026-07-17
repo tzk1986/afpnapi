@@ -1,7 +1,7 @@
 """报告服务端通用工具函数。"""
 
 import socket
-from typing import Optional, SupportsInt
+from typing import SupportsInt
 
 
 def get_local_ip() -> str:

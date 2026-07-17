@@ -3,7 +3,6 @@
 import logging
 import uuid
 from functools import partial
-from typing import Any, Dict
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue

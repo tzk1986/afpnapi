@@ -25,7 +25,6 @@ from postman_api_tester.report_server_config import (
     REPORT_EXPORT_ALLOW_REPORT_ONLY,
     REPORT_EXPORT_DEFAULT_SCOPE,
     REPORT_EXPORT_INCLUDE_AUTH_DEFAULT,
-    REPORT_EXPORT_STREAM_THRESHOLD,
 )
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 from postman_api_tester.services.report_export_service import (

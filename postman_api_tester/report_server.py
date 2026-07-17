@@ -624,7 +624,9 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         session_id = _get_proxy_session_id(base_url)
 
     try:
+        from typing import Union
         from postman_api_tester.services.ui_proxy_service import UiProxyService
+        body: Union[str, bytes]
         if is_page:
             # 回放模式：获取回放引擎 JS 代码并注入到每个页面
             replay_engine_js = ""

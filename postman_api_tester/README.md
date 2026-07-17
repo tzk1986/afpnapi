@@ -1,12 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.63
+版本：v1.30.65
 发布日期：2026-07-16
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点（v1.30.63）：
-- **汇总耗时累计修复**：回放页面底部汇总区域的"耗时"改为使用父页面累计时间（与顶部计时器一致），不再使用引擎返回的单页面 duration_ms
-- **new_tab 计时器不重置**：new_tab 导航时保留 startTime，确保跨页面总计时连续累计
+本版新增重点（v1.30.65）：
+- **代码质量优化**：ruff F401 清理 73 个未使用导入（跨 26 个文件）；修复 `report_export_service` 从 `utils/file_utils` 而非 `report_server_utils` 导入 `sanitize_export_name`（消除潜在运行时 ImportError）
+- **类型注解修复**：`ui_proxy_service` 中 `_set_cookies` 类型从 `Dict[str,str]` 改为 `Dict[str,Any]` 以容纳 `list[str]`；`report_server` 中 `body` 标注为 `Union[str, bytes]` 匹配双返回类型；mypy 从 8 错降至 1 错
 
 本版新增重点（v1.30.33）：
 - **合成事件链接点击显式导航**：回放引擎使用 el.click() 派发合成事件，浏览器不会自动执行链接导航。修复后 click 链接时显式设置 location.href 跳转到链接目标，确保页面导航发生

@@ -5,10 +5,10 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 from flask import jsonify
 from flask.typing import ResponseReturnValue
-from postman_api_tester.exceptions import PostmanTestException, ValidationError
+from postman_api_tester.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 

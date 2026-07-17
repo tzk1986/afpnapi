@@ -1,6 +1,5 @@
 """报告结果与分析路由处理函数。"""
 
-from typing import Dict
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue

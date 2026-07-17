@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Optional
 
 from postman_api_tester.config import (
     UI_EXECUTION_RESULTS_DIR,
-    UI_EXECUTION_RETENTION_DAYS,
 )
 
 logger = logging.getLogger(__name__)

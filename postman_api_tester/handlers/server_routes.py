@@ -5,47 +5,18 @@
 - 静态文件服务、报告删除、最新报告跳转
 """
 
-import json
 import logging
 import os
-import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from flask import jsonify, redirect, render_template, request, send_from_directory, send_file, url_for
+from flask import jsonify, redirect, send_from_directory, send_file, url_for
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.report_server_config import (
     DEFAULT_ENV_NAME,
-    ENABLE_ADHOC_RUN,
-    ENABLE_ASSERTIONS,
-    ENABLE_JUNIT_EXPORT,
-    ENABLE_MANUAL_CASES,
-    ENABLE_REPORT_ANALYTICS,
-    ENABLE_REPORT_ANALYTICS_CHARTS,
-    ENABLE_REPORT_LIST_FILTER,
-    ENABLE_RESPONSE_TIME,
-    ENABLE_RETRY_FAILURES,
-    ENABLE_SELECTIVE_RUN,
     ENVIRONMENTS,
-    MANUAL_CASE_FOLDER_NAME,
-    REPORT_ANALYTICS_ENABLE_SAMPLES,
-    REPORT_ANALYTICS_TOP_N_DEFAULT,
-    REPORT_ANALYTICS_TREND_LIMIT_DEFAULT,
-    REPORT_EXPORT_ALLOW_REPORT_ONLY,
-    REPORT_EXPORT_CHANNEL_MODE,
-    REPORT_EXPORT_DEFAULT_SCOPE,
-    REPORT_EXPORT_INCLUDE_AUTH_DEFAULT,
-    REPORT_EXPORT_STREAM_THRESHOLD,
-    REPORT_VIEW_PAGE_SIZE_DEFAULT,
-    RUN_RESULTS_PER_PAGE_DEFAULT,
-    RUN_RESULTS_PER_PAGE_MAX,
-    RUN_RESULTS_PER_PAGE_MIN,
-    RUN_STATUS_POLL_INTERVAL_MS,
-    ADHOC_DEFAULT_COLLECTION_NAME,
-    ADHOC_MAX_ITEMS,
-    COLLECTION_PREVIEW_MAX_ITEMS,
 )
 from postman_api_tester.handlers.base_handler import BaseHandler
 from postman_api_tester.report_repository import (
@@ -63,7 +34,6 @@ from postman_api_tester.utils.logging_utils import (
     get_log_alert_snapshot,
     get_log_metrics_snapshot,
 )
-from postman_api_tester.utils.server_utils import get_local_ip
 
 logger = logging.getLogger(__name__)
 
