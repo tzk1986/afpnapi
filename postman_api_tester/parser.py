@@ -79,10 +79,10 @@ class PostmanApiParser:
             raise ParseError(f"文件不存在: {self.file_path}")
 
         try:
-            with open(self.file_path, 'r', encoding='utf-8') as f:
+            with open(self.file_path, encoding='utf-8') as f:
                 self.data = json.load(f)
         except json.JSONDecodeError as e:
-            raise ParseError(f"JSON文件格式错误: {e}")
+            raise ParseError(f"JSON文件格式错误: {e}") from e
 
     def extract_base_url(self) -> str:
         """

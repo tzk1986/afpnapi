@@ -56,8 +56,6 @@ try:
         Browser,
         BrowserContext,
         Page,
-        Playwright,
-        TimeoutError as PwTimeout,
         sync_playwright,
     )
 
@@ -280,8 +278,6 @@ class UiHeadlessEngine:
             primary = selector.get("primary", "")
             fallback_css = selector.get("fallback_css", "")
             fallback_xpath = selector.get("fallback_xpath", "")
-            strategy = selector.get("strategy", "")
-
             if primary:
                 if primary.startswith("/") or primary.startswith("("):
                     return ("xpath", primary)

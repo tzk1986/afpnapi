@@ -97,7 +97,7 @@ class CheckpointManager:
             return None
 
         try:
-            with open(checkpoint_path, "r", encoding="utf-8") as f:
+            with open(checkpoint_path, encoding="utf-8") as f:
                 data: Dict[str, Any] = json.load(f)
             logger.info(
                 "checkpoint_loaded",

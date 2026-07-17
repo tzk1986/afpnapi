@@ -25,7 +25,7 @@ def extract_produced_variables(api: ApiConfig) -> Set[str]:
     raw_extract = api.get("x_extract")
     if not isinstance(raw_extract, dict):
         return set()
-    return {k for k in raw_extract.keys() if isinstance(k, str)}
+    return {k for k in raw_extract if isinstance(k, str)}
 
 
 def _collect_strings(obj: Any, accumulator: List[str]) -> None:

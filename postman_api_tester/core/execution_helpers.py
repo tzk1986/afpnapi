@@ -375,7 +375,7 @@ def _finalize_checkpoint_state(
             completed=(execution_error is None),
             last_error=str(execution_error or ""),
         )
-    except (OSError, IOError, TypeError, ValueError) as exc:
+    except (OSError, TypeError, ValueError) as exc:
         logger.warning("写入 checkpoint 失败: %s", exc)
 
 

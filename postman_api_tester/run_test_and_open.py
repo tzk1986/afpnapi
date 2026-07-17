@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
 快速测试运行脚本 - 一键运行测试和打开报告
 版本: 1.0.2
@@ -42,19 +41,19 @@ def main() -> None:
     print("\n" + "="*80)
     print("Postman API 快速测试工具".center(80))
     print("="*80)
-    
+
     # 获取Postman文件列表
     postman_files = [f for f in os.listdir('.') if f.endswith('.postman.json') or f.endswith('.json')]
-    
+
     if not postman_files:
         print("\n✗ 未找到Postman JSON文件!")
         print("请将Postman导出的JSON文件放在当前目录")
         return
-    
+
     print("\n📁 找到以下Postman文件:")
     for idx, file in enumerate(postman_files, 1):
         print(f"  {idx}. {file}")
-    
+
     # 选择文件
     while True:
         try:
@@ -69,7 +68,7 @@ def main() -> None:
                 print(f"✗ 请输入1-{len(postman_files)}之间的数字")
         except ValueError:
             print("✗ 请输入有效的数字")
-    
+
     # 可选：输入基础URL
     base_url: Optional[str] = input("\n请输入基础URL (可选，按回车跳过): ").strip()
     if not base_url:
@@ -79,14 +78,14 @@ def main() -> None:
     default_report_dir = getattr(cfg, "REPORT_OUTPUT_DIR", "").strip() or str(PROJECT_ROOT / "reports")
     report_dir_input = input(f"\n请输入报告输出目录 (可选，默认: {default_report_dir}): ").strip()
     output_dir = report_dir_input or default_report_dir
-    
+
     # 可选：选择每页显示条数
     print("\n📊 每页显示条数选项:")
     print("  1. 20条 (默认)")
     print("  2. 30条")
     print("  3. 50条")
     print("  4. 100条")
-    
+
     page_sizes = {1: 20, 2: 30, 3: 50, 4: 100}
     while True:
         try:
@@ -101,14 +100,14 @@ def main() -> None:
                 print("✗ 请选择1-4之间的选项")
         except ValueError:
             print("✗ 请输入有效的数字")
-    
+
     # 运行测试
-    print(f"\n▶ 开始运行测试...")
+    print("\n▶ 开始运行测试...")
     print(f"  文件: {postman_file}")
     if base_url:
         print(f"  基础URL: {base_url}")
     print(f"  每页显示: {results_per_page}条")
-    
+
     try:
         report = run_postman_tests(
             postman_file,
@@ -119,31 +118,31 @@ def main() -> None:
 
         # 获取完整路径
         report_path = os.path.abspath(report.generated_report_file)
-        
-        print(f"\n✓ 测试完成！")
+
+        print("\n✓ 测试完成！")
         print(f"✓ 报告已生成: {report_path}")
         print(f"✓ 报告输出目录: {os.path.abspath(output_dir)}")
-        
+
         # 启动Flask服务器
         print("\n🚀 启动报告服务器...")
         try:
             import subprocess
             import time
-            
+
             # 启动Flask服务器
             server_cmd = [sys.executable, '-m', 'postman_api_tester.report_server']
             server_process = subprocess.Popen(server_cmd, cwd=PROJECT_ROOT)
-            
+
             # 等待服务器启动
             time.sleep(2)
-            
+
             # 打开浏览器
             webbrowser.open('http://localhost:5000')
             local_ip = get_local_ip()
             print("✓ 已在浏览器中打开报告 (http://localhost:5000)")
             print("✓ 服务器正在后台运行，支持Token测试和重新请求功能")
             print(f"✓ 局域网访问地址: http://{local_ip}:5000")
-            
+
             print("\n💡 使用提示:")
             print("  • 首页可查看历史报告列表并选择两份报告做差异对比")
             print("  • 在首页直接查看测试结果表格")
@@ -156,7 +155,7 @@ def main() -> None:
             print("  • 同局域网开发可通过上面的局域网地址直接访问报告中心")
             print(f"  • 当前报告目录: {os.path.abspath(output_dir)}")
             print("\n按 Ctrl+C 停止服务器...")
-            
+
             # 等待用户中断
             try:
                 server_process.wait()
@@ -165,14 +164,14 @@ def main() -> None:
                 server_process.terminate()
                 server_process.wait()
                 print("✓ 服务器已停止")
-                
+
         except Exception as e:
             print(f"✗ 启动服务器失败: {e}")
             print("将直接打开HTML文件...")
             webbrowser.open('file://' + report_path)
             print("✓ 已在浏览器中打开报告")
             print("注意：Token测试和重新请求功能需要服务器支持")
-        
+
     except Exception as e:
         print(f"\n✗ 测试执行失败: {e}")
         import traceback
