@@ -836,11 +836,16 @@ class UiProxyService:
                 proxy_url = UiProxyService.to_resource_proxy_url(resolved)
             return f'{prefix}{attr_name}="{proxy_url}"'
 
+        def _make_replacer(attr_name: str, is_page: bool) -> Callable[[re.Match], str]:
+            def _replacer(match: re.Match) -> str:
+                return _replace_attr(match, attr_name, is_page)
+            return _replacer
+
         def _rewrite_outside(outside: str) -> str:
             for pattern, attr_name, is_page_url in attr_patterns:
                 outside = re.sub(
                     pattern,
-                    lambda m, an=attr_name, ip=is_page_url: _replace_attr(m, an, ip),
+                    _make_replacer(attr_name, is_page_url),
                     outside,
                     flags=re.IGNORECASE,
                 )
