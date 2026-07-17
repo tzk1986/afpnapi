@@ -106,6 +106,8 @@
         var replayFinished = false;
         var startTime = 0;
         var timerInterval = null;
+        var pausedAt = 0;
+        var totalPausedMs = 0;
         var iframeReady = false;
         var replayStarted = false;
         var networkRequests = [];
@@ -240,7 +242,7 @@
                         '<div class="summary-title">已手动停止</div>' +
                         '<div class="summary-stats">' +
                             '<span>已执行: <strong>' + (data.index + 1) + '</strong> 步</span>' +
-                            '<span>耗时: <strong>' + ((Date.now() - startTime) / 1000).toFixed(1) + 's</strong></span>' +
+                            '<span>耗时: <strong>' + (getElapsedMs() / 1000).toFixed(1) + 's</strong></span>' +
                         '</div></div>';
                     document.getElementById('summaryArea').innerHTML = stoppedSummary;
                     updateControlButtons();
@@ -283,11 +285,22 @@
             }, 100);
         }
 
+        function getElapsedMs() {
+            var paused = totalPausedMs;
+            if (pausedAt > 0) paused += Date.now() - pausedAt;
+            return Date.now() - startTime - paused;
+        }
+
         function pauseReplay() {
             if (isPaused) {
+                if (pausedAt > 0) {
+                    totalPausedMs += Date.now() - pausedAt;
+                    pausedAt = 0;
+                }
                 sendToFrame({ type: 'ui-replay-control', action: 'resume' });
                 isPaused = false;
             } else {
+                pausedAt = Date.now();
                 sendToFrame({ type: 'ui-replay-control', action: 'pause' });
                 isPaused = true;
             }
@@ -320,7 +333,7 @@
 
             // 兜底：如果引擎未运行（不会收到 ui-replay-stopped 消息），直接显示汇总
             document.getElementById('btnExport').style.display = 'inline-block';
-            var elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : '0.0';
+            var elapsed = startTime ? (getElapsedMs() / 1000).toFixed(1) : '0.0';
             var stoppedSummary = '<div class="summary-bar failed">' +
                 '<div class="summary-title">已手动停止</div>' +
                 '<div class="summary-stats">' +
@@ -392,7 +405,7 @@
                 body: JSON.stringify({
                     status: data.status,
                     summary: {
-                        total_duration_ms: Date.now() - startTime,
+                        total_duration_ms: getElapsedMs(),
                         steps_total: data.total_steps,
                         steps_passed: data.passed,
                         steps_failed: data.failed
@@ -408,7 +421,7 @@
                     '<span>总步骤: <strong>' + data.total_steps + '</strong></span>' +
                     '<span>通过: <strong style="color:#10b981">' + data.passed + '</strong></span>' +
                     '<span>失败: <strong style="color:#ef4444">' + data.failed + '</strong></span>' +
-                    '<span>耗时: <strong>' + ((Date.now() - startTime) / 1000).toFixed(1) + 's</strong></span>' +
+                    '<span>耗时: <strong>' + (getElapsedMs() / 1000).toFixed(1) + 's</strong></span>' +
                 '</div>' +
                 '</div>';
             document.getElementById('summaryArea').innerHTML = summaryHtml;
@@ -542,7 +555,7 @@
                     timerInterval = null;
                     return;
                 }
-                var elapsed = (Date.now() - startTime) / 1000;
+                var elapsed = getElapsedMs() / 1000;
                 document.getElementById('timer').textContent = elapsed.toFixed(1) + 's';
             }, 100);
         }
