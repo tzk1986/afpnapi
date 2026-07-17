@@ -1810,6 +1810,12 @@ _REPLAYER_JS = r"""
           callback(null);
           return;
         }
+        // 暂停时跳过本次检查，并延长起始时间使暂停不计入超时
+        if (self.paused) {
+          start += interval;
+          self._currentTimeoutId = setTimeout(check, interval);
+          return;
+        }
         if (attempts <= 3) console.log('[ReplayEngine] attempt', attempts, 'failed, retrying...');
         self._currentTimeoutId = setTimeout(check, interval);
       }

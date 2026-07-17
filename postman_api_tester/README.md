@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.67
+版本：v1.30.68
 发布日期：2026-07-17
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.30.68）：
+- **UI 回放停止/暂停按钮修复**：停止按钮页面加载后即可用（不再依赖 `isRunning`）；`stopReplay()` 去掉 `isRunning` 守卫，始终执行清理；新增 `replayFinished` 标志区分"未完成"与"已结束"；引擎 `_waitForElement` 暂停时冻结超时计时
 
 本版新增重点（v1.30.67）：
 - **mypy 零错达成**：`ui_proxy_service.py` 中 `lambda m, an=..., ip=...:` 默认参数闭包改写为 `_make_replacer` 闭包工厂（mypy 8 → 0 错）；94 个源文件 mypy 全通过

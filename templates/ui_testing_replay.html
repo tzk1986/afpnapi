@@ -90,7 +90,7 @@
             <div id="summaryArea"></div>
             <div class="steps-footer" id="controlsArea">
                 <button class="btn btn-warning" id="btnPause" onclick="pauseReplay()" disabled>暂停</button>
-                <button class="btn btn-danger" id="btnStop" onclick="stopReplay()" disabled>停止</button>
+                <button class="btn btn-danger" id="btnStop" onclick="stopReplay()">停止</button>
                 <button class="btn btn-secondary" id="btnExport" onclick="exportReport()" style="display:none">查看报告</button>
             </div>
         </div>
@@ -103,6 +103,7 @@
         var currentStepIndex = -1;
         var isRunning = false;
         var isPaused = false;
+        var replayFinished = false;
         var startTime = 0;
         var timerInterval = null;
         var iframeReady = false;
@@ -232,7 +233,16 @@
                     break;
                 case 'ui-replay-stopped':
                     isRunning = false;
+                    replayFinished = true;
                     stopTimer();
+                    document.getElementById('btnExport').style.display = 'inline-block';
+                    var stoppedSummary = '<div class="summary-bar failed">' +
+                        '<div class="summary-title">已手动停止</div>' +
+                        '<div class="summary-stats">' +
+                            '<span>已执行: <strong>' + (data.index + 1) + '</strong> 步</span>' +
+                            '<span>耗时: <strong>' + ((Date.now() - startTime) / 1000).toFixed(1) + 's</strong></span>' +
+                        '</div></div>';
+                    document.getElementById('summaryArea').innerHTML = stoppedSummary;
                     updateControlButtons();
                     break;
                 case '_proxy_nav':
@@ -285,8 +295,9 @@
         }
 
         function stopReplay() {
-            if (!isRunning) return;
+            if (replayFinished) return;
             isRunning = false;
+            replayFinished = true;
             stopTimer();
             updateControlButtons();
 
@@ -306,6 +317,16 @@
             fetch('/api/ui-testing/execution/' + jobId + '/cancel', { method: 'POST' })
                 .then(function(r) { return r.json(); })
                 .catch(function(e) { console.error('取消任务失败:', e); });
+
+            // 兜底：如果引擎未运行（不会收到 ui-replay-stopped 消息），直接显示汇总
+            document.getElementById('btnExport').style.display = 'inline-block';
+            var elapsed = startTime ? ((Date.now() - startTime) / 1000).toFixed(1) : '0.0';
+            var stoppedSummary = '<div class="summary-bar failed">' +
+                '<div class="summary-title">已手动停止</div>' +
+                '<div class="summary-stats">' +
+                    '<span>耗时: <strong>' + elapsed + 's</strong></span>' +
+                '</div></div>';
+            document.getElementById('summaryArea').innerHTML = stoppedSummary;
         }
 
         function sendToFrame(msg) {
@@ -360,6 +381,7 @@
 
         function onAllComplete(data) {
             isRunning = false;
+            replayFinished = true;
             stopTimer();
             document.getElementById('execIcon').textContent = data.status === 'passed' ? '✓' : '✗';
 
@@ -503,9 +525,9 @@
         }
 
         function updateControlButtons() {
-            document.getElementById('btnPause').disabled = !isRunning;
+            document.getElementById('btnPause').disabled = !isRunning || replayFinished;
             document.getElementById('btnPause').textContent = isPaused ? '继续' : '暂停';
-            document.getElementById('btnStop').disabled = !isRunning;
+            document.getElementById('btnStop').disabled = replayFinished;
         }
 
         function exportReport() {
