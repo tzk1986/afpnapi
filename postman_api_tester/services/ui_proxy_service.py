@@ -731,7 +731,16 @@ class UiProxyService:
         if session_id:
             response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
 
-        return resp.content, resp.status_code, response_headers
+        body = resp.content
+        if "javascript" in resp_ct:
+            try:
+                js_text = body.decode("utf-8", errors="replace")
+                rewritten = UiProxyService._rewrite_js_imports(js_text, url)
+                body = rewritten.encode("utf-8")
+            except Exception:
+                pass
+
+        return body, resp.status_code, response_headers
 
     @staticmethod
     def rewrite_html(html: str, base_url: str, replay_mode: bool = False, recording_mode: bool = False, replay_engine_js: str = "") -> str:
@@ -807,6 +816,35 @@ class UiProxyService:
             else:
                 result.append(transform(part))
         return "".join(result)
+
+    @staticmethod
+    def _rewrite_js_imports(js_content: str, js_url: str) -> str:
+        """改写 JS 模块中的动态 import() 和 new URL() 相对路径。
+
+        Vite 等打包工具生成的 JS 使用 import("./chunk.js") 加载子模块，
+        代理后相对路径解析错误，需改写为代理资源 URL。
+        """
+        base_dir = js_url.rsplit("/", 1)[0] + "/" if "/" in js_url else js_url
+
+        def _rewrite_relative(m: re.Match) -> str:
+            prefix = m.group(1)
+            rel_path = m.group(2)
+            suffix = m.group(3)
+            abs_url = urljoin(base_dir, rel_path)
+            proxy_url = UiProxyService.to_resource_proxy_url(abs_url)
+            return f"{prefix}{proxy_url}{suffix}"
+
+        result = re.sub(
+            r'(import\(\s*["\'])(\.[^"\']+)(["\'])',
+            _rewrite_relative,
+            js_content,
+        )
+        result = re.sub(
+            r'(new\s+URL\(\s*["\'])(\.[^"\']+)(["\']\s*,\s*import\.meta\.url)',
+            _rewrite_relative,
+            result,
+        )
+        return result
 
     @staticmethod
     def _rewrite_attr_urls(html: str, base_url: str, origin: str) -> str:
