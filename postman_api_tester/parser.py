@@ -148,7 +148,7 @@ class PostmanApiParser:
         item_path = list(item_path or [])
 
         # 如果是文件夹，递归处理
-        if 'item' in item and not 'request' in item:
+        if 'item' in item and 'request' not in item:
             folder_name = item.get('name', '')
             for sub_index, sub_item in enumerate(item['item']):
                 apis.extend(self._parse_item(sub_item, folder_name, item_path=item_path + [sub_index]))

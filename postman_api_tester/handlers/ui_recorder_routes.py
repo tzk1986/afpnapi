@@ -184,9 +184,8 @@ def api_ui_recorder_clear_recording() -> ResponseReturnValue:
     sessions = _store.list_sessions()
     removed = 0
     for s in sessions:
-        if s.get("status") == "recording":
-            if _store.delete_session(s["session_id"]):
-                removed += 1
+        if s.get("status") == "recording" and _store.delete_session(s["session_id"]):
+            removed += 1
     logger.info("Cleared %d stuck recording sessions", removed)
     return BaseHandler.json_response({"ok": True, "cleared": removed})
 

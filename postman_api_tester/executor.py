@@ -136,7 +136,7 @@ class PostmanTestExecutor:
         self.http_response: Optional[object] = None
         self.resp_status_code: Optional[int] = None
         self.response_data: Optional[object] = None
-        self.variable_context: Optional["VariableContext"] = variable_context
+        self.variable_context: Optional[VariableContext] = variable_context
         # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
         self._owns_session = session is None
         self.session: object = session if session is not None else _requests_mod.Session()

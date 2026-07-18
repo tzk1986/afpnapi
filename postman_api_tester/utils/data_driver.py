@@ -39,7 +39,7 @@ def _load_csv(file_path: str) -> List[Dict[str, str]]:
         if reader.fieldnames is None:
             raise DataFileError(f"CSV 文件为空或无表头: {file_path}")
         rows: List[Dict[str, str]] = []
-        for line_num, row in enumerate(reader, start=2):
+        for _line_num, row in enumerate(reader, start=2):
             cleaned: Dict[str, str] = {}
             for key, value in row.items():
                 if key is None:
