@@ -1,11 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.72
-发布日期：2026-07-18
+版本：v1.30.73
+发布日期：2026-07-19
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点（v1.30.72）：
-- **代码质量优化**：E713 成员检测优化（`not in` 替代 `not x in`）、B007 未使用循环变量（2 处）、UP037 去除多余引号注解（2 处）、SIM110 用 `any()` 替代手动循环（1 处）、SIM102 合并嵌套 if（1 处）
+本版新增重点（v1.30.73）：
+- **代码质量优化**：修复 F823 回归（恢复 `postman_api_tester.py` 引号注解）、SIM105 `contextlib.suppress` 改写（6 处：auth/executor/report_junit_service/report_job_execution_service/ui_headless_engine）
 
 本版新增重点（v1.30.70）：
 - **代理 JS 动态 import 改写**：`fetch_resource` 对 JS 内容改写 `import("./chunk.js")` 和 `new URL("./chunk.js", import.meta.url)` 为代理资源 URL，修复 Vite 构建应用 vendor chunk 404 导致页面无法渲染

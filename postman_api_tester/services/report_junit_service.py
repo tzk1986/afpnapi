@@ -4,6 +4,7 @@
 - 输出：可直接下载/集成 CI 的 testsuite/testcase/failure XML 文本。
 """
 
+import contextlib
 import io
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape as _xml_escape
@@ -54,10 +55,8 @@ def build_junit_xml(report: Dict[str, Any]) -> str:
             error_el.set("message", _xml_escape(str(item.get("message", ""))))
             error_el.text = _xml_escape(str(item.get("message", "")))
 
-    try:
+    with contextlib.suppress(AttributeError):
         ET.indent(suite, space="  ")
-    except AttributeError:
-        pass
 
     buf = io.StringIO()
     ET.ElementTree(suite).write(buf, encoding="unicode", xml_declaration=True)

@@ -5,6 +5,7 @@
 - 提供自动登录探测与 token 注入的公共能力。
 """
 
+import contextlib
 import logging
 from typing import Any, Dict, Optional, Sequence, TypedDict
 
@@ -111,9 +112,7 @@ def get_auth_token(
 
     finally:
         if owns_session:
-            try:
+            with contextlib.suppress(Exception):
                 local_session.close()
-            except Exception:
-                pass
 
     return None
