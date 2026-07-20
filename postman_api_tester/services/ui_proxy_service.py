@@ -819,10 +819,11 @@ class UiProxyService:
 
     @staticmethod
     def _rewrite_js_imports(js_content: str, js_url: str) -> str:
-        """改写 JS 模块中的动态 import() 和 new URL() 相对路径。
+        """改写 JS 模块中的 import/export 相对路径。
 
-        Vite 等打包工具生成的 JS 使用 import("./chunk.js") 加载子模块，
-        代理后相对路径解析错误，需改写为代理资源 URL。
+        Vite 等打包工具生成的 JS 使用静态 import/export 和动态 import()
+        加载子模块，代理后相对路径解析错误，需改写为代理资源 URL。
+        覆盖：import from, export from, import(), new URL()。
         """
         base_dir = js_url.rsplit("/", 1)[0] + "/" if "/" in js_url else js_url
 
@@ -834,11 +835,19 @@ class UiProxyService:
             proxy_url = UiProxyService.to_resource_proxy_url(abs_url)
             return f"{prefix}{proxy_url}{suffix}"
 
+        # 静态 import/export from: import{...}from"./chunk.js" 或 export * from './chunk.js'
         result = re.sub(
-            r'(import\(\s*["\'])(\.[^"\']+)(["\'])',
+            r'((?:import|export)\s*[^"\']*?from\s*["\'])(\.[^"\']+)(["\'])',
             _rewrite_relative,
             js_content,
         )
+        # 动态 import(): import("./chunk.js")
+        result = re.sub(
+            r'(import\(\s*["\'])(\.[^"\']+)(["\'])',
+            _rewrite_relative,
+            result,
+        )
+        # new URL(): new URL("./chunk.js", import.meta.url)
         result = re.sub(
             r'(new\s+URL\(\s*["\'])(\.[^"\']+)(["\']\s*,\s*import\.meta\.url)',
             _rewrite_relative,
