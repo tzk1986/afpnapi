@@ -8,6 +8,6 @@ Real cache invalidation logic is centralized in report_repository.
 - 真实实现：postman_api_tester.report_repository.invalidate_reports_cache。
 """
 
-from postman_api_tester.report_repository import invalidate_reports_cache  # noqa: F401
+from postman_api_tester.report_repository import invalidate_reports_cache
 
 __all__ = ["invalidate_reports_cache"]

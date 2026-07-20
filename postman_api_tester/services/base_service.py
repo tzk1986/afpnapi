@@ -39,7 +39,7 @@ class BaseService:
             raise
         except Exception as e:
             logger.error("Unexpected error in %s: %s: %s", func.__name__, type(e).__name__, e, extra={"event": "service.error", "func_name": func.__name__, "error_type": type(e).__name__})
-            raise ExecutionError(f"Service execution failed: {str(e)}") from e
+            raise ExecutionError(f"Service execution failed: {e!s}") from e
 
     @staticmethod
     def log_event(

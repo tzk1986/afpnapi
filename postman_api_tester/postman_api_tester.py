@@ -117,7 +117,7 @@ class PostmanTestReport:
 
 
 # Import execution helpers
-from postman_api_tester.core.execution_helpers import (  # noqa: E402
+from postman_api_tester.core.execution_helpers import (
     _prepare_runtime_settings,
     _prepare_execution_apis,
     _prepare_checkpoint_and_progress,

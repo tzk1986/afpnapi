@@ -276,7 +276,7 @@ class UiHeadlessEngine:
             fallback_css = selector.get("fallback_css", "")
             fallback_xpath = selector.get("fallback_xpath", "")
             if primary:
-                if primary.startswith("/") or primary.startswith("("):
+                if primary.startswith(("/", "(")):
                     return ("xpath", primary)
                 return ("css", primary)
             if fallback_css:
@@ -288,7 +288,7 @@ class UiHeadlessEngine:
         s = str(selector) if selector else ""
         if not s:
             return ("css", "")
-        if s.startswith("/") or s.startswith("("):
+        if s.startswith(("/", "(")):
             return ("xpath", s)
         if s.startswith("text="):
             return ("text", s[5:])

@@ -8,7 +8,7 @@ Real implementation is centralized in postman_api_tester.utils.request_builder.
 - 维护要求：新增请求构建能力应优先落到 request_builder，再由此处导出。
 """
 
-from postman_api_tester.utils.request_builder import (  # noqa: F401
+from postman_api_tester.utils.request_builder import (
     build_request_kwargs,
     infer_body_mode_from_stored_body,
     normalize_formdata_rows,

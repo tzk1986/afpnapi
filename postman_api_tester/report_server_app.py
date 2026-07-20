@@ -164,7 +164,7 @@ class ReportServerApp:
     def run_app(app: Flask) -> None:
         """运行应用。"""
         # 导入 report_server 模块以注册路由（必须在 run_app 中导入，避免循环导入）
-        from postman_api_tester import report_server  # noqa: F401
+        from postman_api_tester import report_server
         # 使用 report_server.app 而不是传入的 app
         app = report_server.app
 

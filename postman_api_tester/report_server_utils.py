@@ -27,7 +27,7 @@ def build_exclusion_key(folder: object, name: object, method: object, url: objec
     name_text = str(name or "").strip()
     method_text = str(method or "").strip().upper()
     url_text = str(url or "").strip()
-    return "|".join([folder_text, name_text, method_text, url_text])
+    return f"{folder_text}|{name_text}|{method_text}|{url_text}"
 
 
 def normalize_exclusion_key(value: object) -> str:

@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.77
+版本：v1.30.78
 发布日期：2026-07-20
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.30.78）：
+- **代码质量优化**：ruff 静态分析修复 — 清理 7 处 unused noqa、5 处 PIE810 合并 startswith/endswith、2 处 RUF010 显式 f-string 转换、1 处 FLY002 join→f-string、1 处 FURB167 正则别名、1 处 SIM115 noqa 标注
 
 本版新增重点（v1.30.77）：
 - **Vite 嵌入 link 标签改写**：`_rewrite_js_imports` 新增 JS 内嵌 `<link rel="modulepreload" href="...">` HTML 字符串的 href 改写，覆盖 Vite preload helper 运行时动态创建的 modulepreload 元素

@@ -289,7 +289,7 @@ def _build_preview_url(url_obj: Any) -> str:
         key = str(query.get("key") or "")
         if not key:
             continue
-        query_parts.append(f"{key}={str(query.get('value') or '')}")
+        query_parts.append(f"{key}={query.get('value') or ''!s}")
     query_text = ("?" + "&".join(query_parts)) if query_parts else ""
     return f"{path_text}{query_text}" if path_text else query_text
 
