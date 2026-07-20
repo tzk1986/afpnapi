@@ -1,11 +1,14 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.76
+版本：v1.30.77
 发布日期：2026-07-20
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
+本版新增重点（v1.30.77）：
+- **Vite 嵌入 link 标签改写**：`_rewrite_js_imports` 新增 JS 内嵌 `<link rel="modulepreload" href="...">` HTML 字符串的 href 改写，覆盖 Vite preload helper 运行时动态创建的 modulepreload 元素
+
 本版新增重点（v1.30.76）：
-- **Vite SPA 回放修复**：`_rewrite_js_imports` 新增静态 `import ... from` 和 `export ... from` 相对路径改写，修复 Vite 构建的 JS bundle 中 vendor chunk 在代理环境下 404 导致 SPA 页面灰屏
+- **Vite SPA 回放修复**：`_rewrite_js_imports` 扩展依赖数组路径匹配至 `js/` 和 `css/` 目录，新增 Vite base path 函数补丁，修复主应用 vendor chunk 404
 
 本版新增重点（v1.30.70）：
 - **代理 JS 动态 import 改写**：`fetch_resource` 对 JS 内容改写 `import("./chunk.js")` 和 `new URL("./chunk.js", import.meta.url)` 为代理资源 URL，修复 Vite 构建应用 vendor chunk 404 导致页面无法渲染

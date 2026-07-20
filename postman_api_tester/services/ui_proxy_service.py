@@ -871,6 +871,22 @@ class UiProxyService:
             _rewrite_asset_path,
             result,
         )
+        # Vite 嵌入的 <link rel="modulepreload"> HTML 字符串
+        # 这些是 Vite preload helper 运行时动态创建的 DOM 元素模板，
+        # 其 href 属性包含 /js/... 或 /assets/... 等绝对路径，
+        # 代理后需改写为 proxy-resource URL
+        def _rewrite_link_href(m: re.Match) -> str:
+            prefix = m.group(1)
+            href_val = m.group(2)
+            abs_url = urljoin(origin + "/", href_val.lstrip("/"))
+            proxy_url = UiProxyService.to_resource_proxy_url(abs_url)
+            return f'{prefix}{proxy_url}"'
+
+        result = re.sub(
+            r'(<link\s[^>]*?href\s*=\s*")([^"]*)(")',
+            _rewrite_link_href,
+            result,
+        )
         # Vite base path 函数: return"/"+e → 跳过已有 / 或 http 前缀的路径
         # 避免对已改写的 proxy-resource URL 添加多余的 / 前缀
         result = re.sub(
