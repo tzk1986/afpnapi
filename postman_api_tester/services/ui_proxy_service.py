@@ -823,7 +823,7 @@ class UiProxyService:
 
         Vite 等打包工具生成的 JS 使用静态 import/export 和动态 import()
         加载子模块，代理后相对路径解析错误，需改写为代理资源 URL。
-        覆盖：import from, export from, import(), new URL()。
+        覆盖：import from, export from, import(), new URL(), Vite 依赖数组。
         """
         base_dir = js_url.rsplit("/", 1)[0] + "/" if "/" in js_url else js_url
 
@@ -852,6 +852,32 @@ class UiProxyService:
             r'(new\s+URL\(\s*["\'])(\.[^"\']+)(["\']\s*,\s*import\.meta\.url)',
             _rewrite_relative,
             result,
+        )
+        # Vite 依赖数组: "assets/chunk.hash.js" / "assets/style.hash.css"
+        # 这些路径通过 Vite base path 函数（return"/"+e）变为 /assets/...
+        # 绝对路径，代理后解析到错误的 origin，需改写为 proxy-resource URL
+        # 注意：路径相对于 origin 根目录，非 JS 文件所在目录
+        origin = f"{urlparse(js_url).scheme}://{urlparse(js_url).netloc}"
+
+        def _rewrite_asset_path(m: re.Match) -> str:
+            q = m.group(1)
+            asset_path = m.group(2)
+            abs_url = urljoin(origin + "/", asset_path)
+            proxy_url = UiProxyService.to_resource_proxy_url(abs_url)
+            return f"{q}{proxy_url}{q}"
+
+        result = re.sub(
+            r'''(["'])(assets/[^"']+\.(?:js|css))\1''',
+            _rewrite_asset_path,
+            result,
+        )
+        # Vite base path 函数: return"/"+e → 跳过已有 / 或 http 前缀的路径
+        # 避免对已改写的 proxy-resource URL 添加多余的 / 前缀
+        result = re.sub(
+            r'return\s*"/"\s*\+\s*e(\s*[,}])',
+            r'return e[0]==="/"?e:"/"+e\1',
+            result,
+            count=1,
         )
         return result
 
