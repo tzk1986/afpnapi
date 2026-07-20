@@ -853,8 +853,8 @@ class UiProxyService:
             _rewrite_relative,
             result,
         )
-        # Vite 依赖数组: "assets/chunk.hash.js" / "assets/style.hash.css"
-        # 这些路径通过 Vite base path 函数（return"/"+e）变为 /assets/...
+        # Vite 依赖数组: "assets/chunk.hash.js" / "js/vendor-xxx.js" / "css/style.css"
+        # 这些路径通过 Vite base path 函数（return"/"+e）变为 /dir/...
         # 绝对路径，代理后解析到错误的 origin，需改写为 proxy-resource URL
         # 注意：路径相对于 origin 根目录，非 JS 文件所在目录
         origin = f"{urlparse(js_url).scheme}://{urlparse(js_url).netloc}"
@@ -867,7 +867,7 @@ class UiProxyService:
             return f"{q}{proxy_url}{q}"
 
         result = re.sub(
-            r'''(["'])(assets/[^"']+\.(?:js|css))\1''',
+            r'''(["'])((?:assets|js|css)/[^"']+\.(?:js|css))\1''',
             _rewrite_asset_path,
             result,
         )
