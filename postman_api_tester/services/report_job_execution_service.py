@@ -4,6 +4,7 @@
 - 关系：调用主执行器并负责运行态日志/状态字段拼装。
 """
 
+import contextlib
 import os
 import threading
 import logging
@@ -34,10 +35,8 @@ def _safe_run_job(
         fn(*args, **(kwargs or {}))
     except Exception as exc:
         logger.exception("job thread unhandled exception", extra={"job_id": job_id})
-        try:
+        with contextlib.suppress(Exception):
             set_run_job(job_id, status="error", message=f"任务异常退出: {exc}")
-        except Exception:
-            pass
 
 
 def _build_progress_message(total: int, completed: int, percent: int, current_name: str) -> str:

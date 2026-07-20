@@ -37,10 +37,7 @@ def _is_excluded(path: Path) -> bool:
         rel = path.relative_to(_REPORTS_DIR)
     except ValueError:
         return True
-    for part in rel.parts[:-1]:
-        if part in _EXCLUDE_DIRS:
-            return True
-    return False
+    return any(part in _EXCLUDE_DIRS for part in rel.parts[:-1])
 
 
 def is_total_report_file(path: Path) -> bool:

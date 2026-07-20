@@ -23,7 +23,7 @@ def _detect_csv_encoding(file_path: str) -> str:
         return "utf-8-sig"
     for encoding in ("utf-8", "gbk"):
         try:
-            with open(file_path, "r", encoding=encoding) as f:
+            with open(file_path, encoding=encoding) as f:
                 f.read(1024)
             return encoding
         except (UnicodeDecodeError, UnicodeError):
@@ -34,12 +34,12 @@ def _detect_csv_encoding(file_path: str) -> str:
 def _load_csv(file_path: str) -> List[Dict[str, str]]:
     """加载 CSV 文件，首行为变量名。"""
     encoding = _detect_csv_encoding(file_path)
-    with open(file_path, "r", encoding=encoding, newline="") as f:
+    with open(file_path, encoding=encoding, newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
             raise DataFileError(f"CSV 文件为空或无表头: {file_path}")
         rows: List[Dict[str, str]] = []
-        for line_num, row in enumerate(reader, start=2):
+        for _line_num, row in enumerate(reader, start=2):
             cleaned: Dict[str, str] = {}
             for key, value in row.items():
                 if key is None:
@@ -51,7 +51,7 @@ def _load_csv(file_path: str) -> List[Dict[str, str]]:
 
 def _load_json(file_path: str) -> List[Dict[str, str]]:
     """加载 JSON 文件，顶层必须为数组，每个元素为对象。"""
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise DataFileError(f"JSON 数据文件顶层必须为数组: {file_path}")

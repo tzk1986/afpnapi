@@ -119,7 +119,7 @@ def load_checkpoint(path: str) -> Optional[Dict[str, Any]]:
     if not path or not os.path.exists(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8") as file:
+        with open(path, encoding="utf-8") as file:
             data = json.load(file)
     except (json.JSONDecodeError, OSError):
         return None

@@ -254,7 +254,7 @@ def _coverage(report: Mapping[str, Any], results: Sequence[Dict[str, Any]], top_
             if key:
                 source_key_map[key] = item
         executed_keys = {str(item.get("key") or "").strip() for item in results if str(item.get("key") or "").strip()}
-        missing_keys = sorted([key for key in source_key_map.keys() if key not in executed_keys])
+        missing_keys = sorted([key for key in source_key_map if key not in executed_keys])
         for key in missing_keys[:top_n]:
             src = source_key_map[key]
             uncovered_top.append(

@@ -138,7 +138,7 @@ def api_ui_recorder_event() -> ResponseReturnValue:
         return _add_cors_headers(BaseHandler.json_response(None, 400, "Missing session_id or event_type"))
 
     if event_type == "session_start":
-        session = _store.create_session(session_id)
+        _store.create_session(session_id)
         logger.info("Recording session started: %s", session_id)
         return _add_cors_headers(BaseHandler.json_response({"session_id": session_id, "status": "created"}))
 
@@ -184,9 +184,8 @@ def api_ui_recorder_clear_recording() -> ResponseReturnValue:
     sessions = _store.list_sessions()
     removed = 0
     for s in sessions:
-        if s.get("status") == "recording":
-            if _store.delete_session(s["session_id"]):
-                removed += 1
+        if s.get("status") == "recording" and _store.delete_session(s["session_id"]):
+            removed += 1
     logger.info("Cleared %d stuck recording sessions", removed)
     return BaseHandler.json_response({"ok": True, "cleared": removed})
 

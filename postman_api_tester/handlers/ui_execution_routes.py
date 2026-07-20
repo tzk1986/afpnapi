@@ -411,7 +411,7 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
 
     raw_steps = result.get("steps", [])
     steps = []
-    for i, s in enumerate(raw_steps):
+    for _i, s in enumerate(raw_steps):
         selector = s.get("selector", "")
         if isinstance(selector, dict):
             selector_display = selector.get("primary", "") or selector.get("fallback_css", "") or selector.get("fallback_xpath", "")

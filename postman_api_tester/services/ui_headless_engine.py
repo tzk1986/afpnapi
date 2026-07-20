@@ -4,6 +4,7 @@
 需要安装 playwright: pip install playwright && playwright install chromium
 """
 
+import contextlib
 import json
 import logging
 import time
@@ -56,8 +57,6 @@ try:
         Browser,
         BrowserContext,
         Page,
-        Playwright,
-        TimeoutError as PwTimeout,
         sync_playwright,
     )
 
@@ -195,15 +194,11 @@ class UiHeadlessEngine:
             logger.error("headless_engine_fatal_error: %s", e, exc_info=True)
         finally:
             if context is not None:
-                try:
+                with contextlib.suppress(Exception):
                     context.close()
-                except Exception:
-                    pass
             if browser is not None:
-                try:
+                with contextlib.suppress(Exception):
                     browser.close()
-                except Exception:
-                    pass
             pw.stop()
 
         total_duration_ms = int((time.time() - start_time) * 1000)
@@ -280,8 +275,6 @@ class UiHeadlessEngine:
             primary = selector.get("primary", "")
             fallback_css = selector.get("fallback_css", "")
             fallback_xpath = selector.get("fallback_xpath", "")
-            strategy = selector.get("strategy", "")
-
             if primary:
                 if primary.startswith("/") or primary.startswith("("):
                     return ("xpath", primary)

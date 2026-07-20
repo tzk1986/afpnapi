@@ -262,7 +262,6 @@ def _assemble_items(groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     result: List[Dict[str, Any]] = []
 
     for group in groups:
-        group_name = group.get("group_name", "")
         requests = group.get("requests", [])
         subgroups = group.get("subgroups", [])
 
@@ -366,7 +365,7 @@ def analyze_dependency_map(groups: List[Dict[str, Any]]) -> Dict[str, Any]:
             for req in g.get("requests", []):
                 x_extract = req.get("x_extract", {})
                 if isinstance(x_extract, dict):
-                    for var_name in x_extract.keys():
+                    for var_name in x_extract:
                         produced[var_name] = {
                             "by_request": req["id"],
                             "by_name": req.get("name", ""),

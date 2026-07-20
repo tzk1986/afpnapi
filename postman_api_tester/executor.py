@@ -16,6 +16,7 @@ Postman API 测试执行模块 - 单接口执行与结果收集
   - 不提供原生 async/await 版本，保持简洁性
 """
 
+import contextlib
 import json
 import logging
 import time as _time_mod
@@ -136,7 +137,7 @@ class PostmanTestExecutor:
         self.http_response: Optional[object] = None
         self.resp_status_code: Optional[int] = None
         self.response_data: Optional[object] = None
-        self.variable_context: Optional["VariableContext"] = variable_context
+        self.variable_context: Optional[VariableContext] = variable_context
         # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
         self._owns_session = session is None
         self.session: object = session if session is not None else _requests_mod.Session()
@@ -373,10 +374,8 @@ class PostmanTestExecutor:
 
         # 变量替换后 body 可能变为合法 JSON 字符串，尝试解析
         if isinstance(body, str) and body.strip().startswith(('{', '[')):
-            try:
+            with contextlib.suppress(json.JSONDecodeError, ValueError):
                 body = json.loads(body)
-            except (json.JSONDecodeError, ValueError):
-                pass
 
         # 注入认证 token（始终覆盖，确保使用最新 token）
         if self._auth_token:
