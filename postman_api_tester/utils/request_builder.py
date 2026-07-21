@@ -1,6 +1,6 @@
-"""Request builder utilities for HTTP request assembly."""
+"""Request builder utilities for HTTP request assembly.
 
-"""开发导读：
+开发导读:
 - 职责：统一构建 URL/Headers/Body（含多 body_mode）并生成 requests 参数。
 - 入口：set_request_url()/set_request_headers()/set_request_body()/build_request_kwargs()。
 - 目标：让执行、重试、代理、导出链路共享同一请求语义。

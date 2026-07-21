@@ -5,8 +5,6 @@ import logging
 from pathlib import Path
 from typing import Iterator
 
-logger = logging.getLogger(__name__)
-
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
@@ -34,6 +32,8 @@ from postman_api_tester.services.report_results_service import (
     build_collection_preview_payload,
     build_export_collection_payload,
 )
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 UPLOADS_DIR = (PROJECT_ROOT / "uploaded_collections").resolve()

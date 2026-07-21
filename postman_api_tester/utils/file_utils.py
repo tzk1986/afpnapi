@@ -1,6 +1,6 @@
-"""File utility implementations for report artifacts."""
+"""File utility implementations for report artifacts.
 
-"""开发导读：
+开发导读:
 - 职责：导出文件名安全清洗，防止非法字符与路径穿透风险；JSON 原子写入。
 - 入口：sanitize_export_name()、atomic_write_json()。
 """

@@ -1,6 +1,6 @@
-"""Report handler real implementations for filtering/comparison/result payloads."""
+"""Report handler real implementations for filtering/comparison/result payloads.
 
-"""开发导读：
+开发导读:
 - 职责：报告结果筛选、分页、历史对比等"展示侧聚合逻辑"。
 - 入口：filter_report_results()、paginate_items()、compare_report_data()。
 - 输出：前端可直接消费的轻量结果项与对比摘要。
