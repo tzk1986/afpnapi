@@ -523,7 +523,13 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     if not target_url:
         return json_error("缺少 url 参数", 400, "UIT_RES_001")
 
-    target_url = unquote(target_url)
+    # 循环解码直到 URL 稳定（处理双重编码问题）
+    _prev = target_url
+    while True:
+        target_url = unquote(target_url)
+        if target_url == _prev:
+            break
+        _prev = target_url
 
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_RES_002")
