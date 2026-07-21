@@ -1469,7 +1469,7 @@ _REPLAYER_JS = r"""
         status: 'passed',
         duration_ms: 0,
         timestamp: new Date().toISOString(),
-        current_url: location.href,
+        current_url: self._getTargetUrl(),
         error: ''
       };
 
@@ -1573,9 +1573,10 @@ _REPLAYER_JS = r"""
 
       // assert_url / assert_title 不需要元素
       if (action === 'assert_url') {
-        var match = location.href === step.value || location.href.indexOf(step.value) >= 0;
+        var currentUrl = self._getTargetUrl();
+        var match = currentUrl === step.value || currentUrl.indexOf(step.value) >= 0;
         result.status = match ? 'passed' : 'failed';
-        if (!match) result.error = 'URL 不匹配: 期望包含 "' + step.value + '", 实际 "' + location.href + '"';
+        if (!match) result.error = 'URL 不匹配: 期望包含 "' + step.value + '", 实际 "' + currentUrl + '"';
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
         self._notifyParent('step_complete', result);
@@ -1644,7 +1645,7 @@ _REPLAYER_JS = r"""
         self._highlightElement(el);
 
         // 保存 action 执行前的 URL，用于延迟检测 SPA 导航
-        self._actionStartUrl = location.href;
+        self._actionStartUrl = self._getTargetUrl();
 
         try {
           var actionResult = self._executeAction(action, el, step.value);
@@ -1665,11 +1666,12 @@ _REPLAYER_JS = r"""
 
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
-          var urlBefore = self._actionStartUrl || location.href;
+          var urlBefore = self._actionStartUrl || self._getTargetUrl();
           setTimeout(function() {
             if (self.stopped) return;
-            if (location.href !== urlBefore) {
-              self._notifyParent('navigate', { url: location.href });
+            var currentUrl = self._getTargetUrl();
+            if (currentUrl !== urlBefore) {
+              self._notifyParent('navigate', { url: currentUrl });
             }
           }, 2000);
         }
@@ -1680,7 +1682,7 @@ _REPLAYER_JS = r"""
     _executeAction: function(action, el, value) {
       var self = this;
       console.log('[ReplayEngine] _executeAction ENTER: action=', action, 'el=', el ? el.tagName : 'null');
-      var urlBefore = location.href;
+      var urlBefore = self._getTargetUrl();
       var result = true;
       switch (action) {
         case 'click':
@@ -1774,7 +1776,7 @@ _REPLAYER_JS = r"""
           break;
       }
       // 检测 SPA 导航：如果 URL 发生变化，通知父页面更新 iframe
-      var urlAfter = location.href;
+      var urlAfter = self._getTargetUrl();
       if (urlAfter !== urlBefore) {
         this._notifyParent('navigate', { url: urlAfter });
       }
@@ -1907,6 +1909,13 @@ _REPLAYER_JS = r"""
         sessionStorage.removeItem('_ui_replay_state');
         console.log('[ReplayEngine] Saved state cleared');
       } catch(e) {}
+    },
+
+    _getTargetUrl: function() {
+      if (window.__proxyTargetLoc && window.__proxyTargetLoc.href) {
+        return window.__proxyTargetLoc.href;
+      }
+      return location.href;
     },
 
     _notifyParent: function(eventType, data) {

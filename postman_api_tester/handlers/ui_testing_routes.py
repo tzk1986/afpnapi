@@ -480,7 +480,10 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     if host_error is not None:
         return host_error
 
-    session_id = _get_proxy_session_id()
+    # 根据目标 URL 的 origin 匹配 session，确保跨系统资源使用正确的 session
+    from urllib.parse import urlparse as _urlparse
+    _resource_origin = _urlparse(target_url).scheme + "://" + _urlparse(target_url).netloc
+    session_id = _get_proxy_session_id(_resource_origin)
 
     started_at = time.perf_counter()
     try:

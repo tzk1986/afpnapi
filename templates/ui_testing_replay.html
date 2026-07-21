@@ -262,6 +262,13 @@
                             level: 'info'
                         })
                     }).catch(function() {});
+                    // window.open 在回放模式下需要导航到目标系统
+                    if (data.method === 'window.open' && data.target && initialTargetOrigin) {
+                        console.log('[ProxyNav] window.open detected, navigating to target system');
+                        var targetUrl = data.target;
+                        var replayUrl = '/ui-testing/proxy?url=' + encodeURIComponent(targetUrl) + '&replay=1';
+                        document.getElementById('replayFrame').src = replayUrl;
+                    }
                     break;
             }
         });
@@ -468,9 +475,21 @@
                         } else {
                             // 不同origin，真正的外部URL导航
                             shouldNavigate = true;
-                            console.log('[onNavigate] 跨origin导航（含_proxy_url）');
-                            var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                            proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
+                            // 如果 _proxy_url 指向代理服务器自身（pushState 残留），使用 initialTargetOrigin 修正
+                            if (targetOrigin === window.location.origin && initialTargetOrigin) {
+                                var correctedOrigin = initialTargetOrigin;
+                                var proxyPath = '';
+                                try { proxyPath = targetOriginObj.pathname + (targetOriginObj.search || '') + (targetOriginObj.hash || ''); } catch(e2) {}
+                                var correctedUrl = correctedOrigin + proxyPath;
+                                var correctedPath = proxyPath || urlObj.pathname;
+                                console.log('[onNavigate] _proxy_url指向代理服务器，修正为initialTargetOrigin:', correctedUrl.substring(0, 80));
+                                proxyUrl = correctedPath + (correctedPath.indexOf('?') >= 0 ? '&' : '?') +
+                                    '_proxy_url=' + encodeURIComponent(correctedUrl) + '&replay=1';
+                            } else {
+                                console.log('[onNavigate] 跨origin导航（含_proxy_url）');
+                                var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                                proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
+                            }
                         }
                     } catch(e) {
                         console.warn('[onNavigate] 解析_proxy_url失败:', e);
@@ -493,11 +512,12 @@
                     console.log('[onNavigate] 同origin SPA路由变化，不刷新 iframe');
                 } else {
                     shouldNavigate = true;
-                    console.log('[onNavigate] 跨origin导航，构造代理URL');
                     var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                    var navBaseUrl = urlObj.protocol + '//' + urlObj.host;
+                    // 如果 URL 来自代理服务器（pushState 残留），使用 initialTargetOrigin 构造正确的 _proxy_url
+                    var effectiveOrigin = (navOrigin === window.location.origin && initialTargetOrigin) ? initialTargetOrigin : navOrigin;
+                    console.log('[onNavigate] 跨origin导航，构造代理URL, effectiveOrigin=', effectiveOrigin.substring(0, 40));
                     proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                        '_proxy_url=' + encodeURIComponent(navBaseUrl) + '&replay=1';
+                        '_proxy_url=' + encodeURIComponent(effectiveOrigin) + '&replay=1';
                 }
             }
 
