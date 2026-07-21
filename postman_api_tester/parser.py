@@ -356,7 +356,7 @@ class PostmanApiParser:
         if not path:
             raw_url = str(url_dict.get('raw') or '').strip()
             if raw_url:
-                if raw_url.startswith('http://') or raw_url.startswith('https://'):
+                if raw_url.startswith(('http://', 'https://')):
                     return raw_url
                 if raw_url.startswith('{{') and '}}' in raw_url:
                     _, suffix = raw_url.split('}}', 1)

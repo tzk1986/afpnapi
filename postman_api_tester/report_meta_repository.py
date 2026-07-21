@@ -150,7 +150,7 @@ def legacy_postman_html_files() -> List[Path]:
 
 def load_legacy_postman_report(report_path: Path) -> ReportRecord:
     content = report_path.read_text(encoding="utf-8")
-    results_match = re.search(r"let\s+allResults\s*=\s*(\[.*?\]);", content, re.S)
+    results_match = re.search(r"let\s+allResults\s*=\s*(\[.*?\]);", content, re.DOTALL)
     total_match = re.search(r"<label>总计</label>\s*<span>(\d+)</span>", content)
     passed_match = re.search(r"<label>? 通过</label>\s*<span>(\d+)</span>", content)
     failed_match = re.search(r"<label>? 失败</label>\s*<span>(\d+)</span>", content)

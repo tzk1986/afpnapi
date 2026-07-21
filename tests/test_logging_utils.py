@@ -229,9 +229,12 @@ class TestConfigureLoggingFileHandler:
 			original_handlers = list(root_logger.handlers)
 			try:
 				configure_logging(log_file=log_file)
-				file_handlers = [h for h in root_logger.handlers if isinstance(h, RotatingFileHandler)]
-				assert len(file_handlers) >= 1
-				assert file_handlers[0].baseFilename == str(Path(log_file).expanduser().resolve())
+				expected_path = str(Path(log_file).expanduser().resolve())
+				matching = [
+					h for h in root_logger.handlers
+					if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "") == expected_path
+				]
+				assert len(matching) >= 1, f"未找到 log_file={expected_path} 的 RotatingFileHandler"
 			finally:
 				for h in list(root_logger.handlers):
 					if h not in original_handlers:

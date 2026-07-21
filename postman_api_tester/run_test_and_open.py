@@ -43,7 +43,7 @@ def main() -> None:
     print("="*80)
 
     # 获取Postman文件列表
-    postman_files = [f for f in os.listdir('.') if f.endswith('.postman.json') or f.endswith('.json')]
+    postman_files = [f for f in os.listdir('.') if f.endswith(('.postman.json', '.json'))]
 
     if not postman_files:
         print("\n✗ 未找到Postman JSON文件!")

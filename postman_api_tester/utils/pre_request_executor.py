@@ -78,7 +78,7 @@ def _contains_dangerous_keyword(expression: str) -> bool:
 def _execute_expression(expression: str, sandbox_globals: Dict[str, object]) -> str:
     """在沙箱中执行单个表达式，返回字符串结果。"""
     try:
-        value = eval(expression, sandbox_globals)  # noqa: S307
+        value = eval(expression, sandbox_globals)
         return str(value) if value is not None else ""
     except SyntaxError as e:
         logger.warning("pre-request syntax error: %s", e)

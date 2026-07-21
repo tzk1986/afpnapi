@@ -583,7 +583,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
 
     # 仅对 API 请求记录 cookie 详情（跳过静态资源）
-    if "/api/" in target_url or target_url.endswith("/login") or target_url.endswith("/kaptcha"):
+    if "/api/" in target_url or target_url.endswith(("/login", "/kaptcha")):
         logger.info(
             "proxy_resource_response_to_browser",
             extra={
