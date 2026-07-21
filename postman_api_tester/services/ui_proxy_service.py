@@ -841,6 +841,14 @@ class UiProxyService:
             _rewrite_relative,
             js_content,
         )
+        # 副作用 import: import"./chunk.js" 或 import './chunk.js'（无 from 关键字）
+        # 必须在 import from 之后、dependency array 之前执行，
+        # 避免匹配已被 import from 改写的内容
+        result = re.sub(
+            r'(import\s*["\'])(\.[^"\']+)(["\'])',
+            _rewrite_relative,
+            result,
+        )
         # 动态 import(): import("./chunk.js")
         result = re.sub(
             r'(import\(\s*["\'])(\.[^"\']+)(["\'])',
