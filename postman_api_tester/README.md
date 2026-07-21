@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.30.78
+版本：v1.30.79
 发布日期：2026-07-20
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.30.79）：
+- **修复 3 个预存 flaky 测试**：录制导出接口补充 `version`/`session_id` 字段；日志测试改为按文件名精确匹配 handler，消除测试间全局状态干扰
 
 本版新增重点（v1.30.78）：
 - **代码质量优化**：ruff 静态分析修复 — 清理 7 处 unused noqa、5 处 PIE810 合并 startswith/endswith、2 处 RUF010 显式 f-string 转换、1 处 FLY002 join→f-string、1 处 FURB167 正则别名、1 处 SIM115 noqa 标注

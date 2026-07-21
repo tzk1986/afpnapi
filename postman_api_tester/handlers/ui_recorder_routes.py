@@ -206,7 +206,9 @@ def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
         base_url = session["steps"][0].get("page_url", "")
 
     export_data = {
+        "version": "1.0",
         "id": session["session_id"],
+        "session_id": session["session_id"],
         "name": f"录制 - {session['session_id']}",
         "base_url": base_url,
         "steps": session["steps"],
