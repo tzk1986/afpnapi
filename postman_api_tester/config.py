@@ -10,6 +10,7 @@ token 优先级：命令行参数 > 环境变量 POSTMAN_TOKEN > 此文件中的
 - 新增配置项时建议补充默认值与环境变量映射，保持命令行与服务端行为一致。
 """
 
+import json as _json_cfg
 import os
 from typing import Any, Dict
 
@@ -184,7 +185,6 @@ ENABLE_RETRY_FAILURES = _env_bool("ENABLE_RETRY_FAILURES", "true")
 # ENVIRONMENTS_JSON: JSON 字符串，格式 {"env_name": {"base_url": "...", "token": ""}}
 # DEFAULT_ENV_NAME: 默认选中的环境名（为空则不预选）
 # ==============================================================
-import json as _json_cfg
 # _ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", "{}") # 无配置时
 
 _ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", '''

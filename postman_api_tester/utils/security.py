@@ -1,6 +1,6 @@
-"""Security utility implementations for sensitive-header handling."""
+"""Security utility implementations for sensitive-header handling.
 
-"""开发导读：
+开发导读：
 - 职责：敏感头识别、脱敏与导出鉴权字段裁剪。
 - 入口：merge_sensitive_headers()/strip_auth_headers() 等。
 - 目标：详情写入与导出链路使用同一敏感头规则。
