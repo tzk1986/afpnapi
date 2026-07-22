@@ -1387,6 +1387,19 @@ _REPLAYER_JS = r"""
       this.paused = false;
       this.stopped = false;
       this.startTime = Date.now();
+      // 恢复待保存的步骤结果（页面导航后可能丢失）
+      try {
+        var _pendingResults = JSON.parse(sessionStorage.getItem('_ui_replay_pending_results') || '[]');
+        if (_pendingResults.length > 0) {
+          console.log('[ReplayEngine] Restoring', _pendingResults.length, 'pending step results from sessionStorage');
+          for (var _pi = 0; _pi < _pendingResults.length; _pi++) {
+            this._notifyParent('step_complete', _pendingResults[_pi]);
+          }
+          sessionStorage.removeItem('_ui_replay_pending_results');
+        }
+      } catch(e) {
+        console.error('[ReplayEngine] Failed to restore pending results:', e);
+      }
       console.log('[ReplayEngine] Starting execution from step', this.currentIndex + 1);
       this._executeNext();
     },
@@ -1661,6 +1674,12 @@ _REPLAYER_JS = r"""
 
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
+        // 同步保存步骤结果到 sessionStorage，防止页面导航时丢失
+        try {
+          var _pendingResults = JSON.parse(sessionStorage.getItem('_ui_replay_pending_results') || '[]');
+          _pendingResults.push(result);
+          sessionStorage.setItem('_ui_replay_pending_results', JSON.stringify(_pendingResults));
+        } catch(e) {}
         self._notifyParent('step_complete', result);
         if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
 
