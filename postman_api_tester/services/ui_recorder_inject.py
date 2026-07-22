@@ -1388,12 +1388,22 @@ _REPLAYER_JS = r"""
       this.stopped = false;
       this.startTime = Date.now();
       // 恢复待保存的步骤结果（页面导航后可能丢失）
+      // 只恢复 index 等于 currentIndex - 1 的结果，避免重复保存
       try {
         var _pendingResults = JSON.parse(sessionStorage.getItem('_ui_replay_pending_results') || '[]');
         if (_pendingResults.length > 0) {
-          console.log('[ReplayEngine] Restoring', _pendingResults.length, 'pending step results from sessionStorage');
+          console.log('[ReplayEngine] Found', _pendingResults.length, 'pending step results in sessionStorage');
+          var _expectedIndex = this.currentIndex - 1;
+          var _restoredCount = 0;
           for (var _pi = 0; _pi < _pendingResults.length; _pi++) {
-            this._notifyParent('step_complete', _pendingResults[_pi]);
+            if (_pendingResults[_pi].index === _expectedIndex) {
+              console.log('[ReplayEngine] Restoring pending result for step', _expectedIndex);
+              this._notifyParent('step_complete', _pendingResults[_pi]);
+              _restoredCount++;
+            }
+          }
+          if (_restoredCount > 0) {
+            console.log('[ReplayEngine] Restored', _restoredCount, 'pending step result(s)');
           }
           sessionStorage.removeItem('_ui_replay_pending_results');
         }
