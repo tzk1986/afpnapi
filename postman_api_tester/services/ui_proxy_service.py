@@ -788,7 +788,7 @@ class UiProxyService:
             if not _platform_url:
                 # 尝试从其他 session 获取平台 URL
                 with _proxy_session_store._lock:
-                    for _sid, _sess in _proxy_session_store._sessions.items():
+                    for _sess in _proxy_session_store._sessions.values():
                         _pu = _sess.get("platform_url", "")
                         if _pu:
                             _platform_url = _pu
