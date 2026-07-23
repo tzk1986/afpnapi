@@ -624,10 +624,26 @@ class UiProxyService:
         if "Origin" in headers and ("/api/" in url or "/uapi/" in url):
             headers["Origin"] = target_origin
 
-        # 捕获 Token 并存储到 session（用于后续页面请求）
-        if session_id and req_headers:
+        # Token 处理：优先使用请求中的 Token，否则从 session 中取已存储的 Token 注入
+        token_value = ""
+        if req_headers:
             token_value = req_headers.get("Token", "")
-            if token_value and token_value != "null":
+        if (not token_value or token_value == "null") and session_id:
+            stored_token = _proxy_session_store.get_token(session_id)
+            if stored_token:
+                token_value = stored_token
+                logger.info(
+                    "proxy_resource_token_from_store",
+                    extra={
+                        "event": "ui.proxy.resource.token_from_store",
+                        "session_id": session_id[:8],
+                        "url": url,
+                        "token_preview": token_value[:30] + "..." if len(token_value) > 30 else token_value,
+                    },
+                )
+        if token_value and token_value != "null":
+            headers["Token"] = token_value
+            if session_id:
                 _proxy_session_store.set_token(session_id, token_value)
 
         # 记录 API 请求的完整请求头
