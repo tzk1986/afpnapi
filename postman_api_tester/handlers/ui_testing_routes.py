@@ -174,6 +174,21 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                 existing_sid = _proxy_session_store.find_session_by_base_url(_target_origin)
                 if existing_sid:
                     existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
+                    # 跨域 session 共享 Token：如果原 session 有 Token，复制到目标 session
+                    source_token = _proxy_session_store.get_token(sid)
+                    if source_token:
+                        target_token = _proxy_session_store.get_token(existing_sid)
+                        if not target_token:
+                            _proxy_session_store.set_token(existing_sid, source_token)
+                            logger.info(
+                                "proxy_session_shared_token_cross_origin",
+                                extra={
+                                    "event": "ui.proxy.session.shared_token",
+                                    "source_session_id": sid[:8],
+                                    "target_session_id": existing_sid[:8],
+                                    "target_origin": _target_origin,
+                                },
+                            )
                     logger.info(
                         "proxy_session_reuse_cross_origin",
                         extra={
@@ -186,6 +201,19 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                     return existing_sid
                 # 创建新 session
                 new_sid = _proxy_session_store.create_session(_target_origin)
+                # 跨域 session 共享 Token：从原 session 复制 Token 到新 session
+                source_token = _proxy_session_store.get_token(sid)
+                if source_token:
+                    _proxy_session_store.set_token(new_sid, source_token)
+                    logger.info(
+                        "proxy_session_shared_token_new_cross_origin",
+                        extra={
+                            "event": "ui.proxy.session.shared_token_new",
+                            "source_session_id": sid[:8],
+                            "new_session_id": new_sid[:8],
+                            "target_origin": _target_origin,
+                        },
+                    )
                 logger.info(
                     "proxy_session_created_cross_origin",
                     extra={
