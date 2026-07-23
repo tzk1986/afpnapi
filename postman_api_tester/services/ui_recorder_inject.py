@@ -1272,6 +1272,9 @@ _REPLAYER_JS = r"""
     var _origOpen = window.open;
     window.open = function(url, target, features) {
       console.log('[ReplayEngine] window.open blocked, url:', url);
+      if (typeof url === 'string' && url && typeof ReplayEngine !== 'undefined') {
+        ReplayEngine._lastWindowOpenUrl = url;
+      }
       return { closed: false, close: function(){}, focus: function(){}, postMessage: function(){} };
     };
 
@@ -1514,7 +1517,11 @@ _REPLAYER_JS = r"""
         self._saveStateToParent();
         // 获取导航 URL：优先 step.value，其次上一步 click 捕获的链接 href，
         // 再次下一步的 tab_url/page_url（录制数据中包含）
-        var navUrl = step.value || self._lastClickHref || '';
+        var navUrl = step.value || self._lastClickHref || self._lastWindowOpenUrl || '';
+        if (self._lastWindowOpenUrl) {
+          console.log('[ReplayEngine] new_tab: using window.open url:', navUrl.substring(0, 120));
+          self._lastWindowOpenUrl = '';
+        }
         if (!navUrl) {
           var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
           if (_nextStep) {
