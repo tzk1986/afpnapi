@@ -172,14 +172,18 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                 )
                 # 查找目标 origin 的已有 session
                 existing_sid = _proxy_session_store.find_session_by_base_url(_target_origin)
+                # 优先使用 loginOtherSystem 返回的子系统 Token，其次使用平台 Token
+                _subsystem_token = _proxy_session_store.get_subsystem_token(sid)
                 if existing_sid:
                     existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
-                    # 跨域 session 共享 Token：如果原 session 有 Token，复制到目标 session
-                    source_token = _proxy_session_store.get_token(sid)
-                    if source_token:
+                    # 跨域 session Token 传递：优先子系统 Token
+                    _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
+                    if _cross_token:
                         target_token = _proxy_session_store.get_token(existing_sid)
-                        if not target_token:
-                            _proxy_session_store.set_token(existing_sid, source_token)
+                        if not target_token or (_subsystem_token and target_token != _subsystem_token):
+                            _proxy_session_store.set_token(existing_sid, _cross_token)
+                            if _subsystem_token:
+                                _proxy_session_store.set_subsystem_token(existing_sid, _subsystem_token)
                             logger.info(
                                 "proxy_session_shared_token_cross_origin",
                                 extra={
@@ -187,6 +191,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                                     "source_session_id": sid[:8],
                                     "target_session_id": existing_sid[:8],
                                     "target_origin": _target_origin,
+                                    "token_source": "subsystem" if _subsystem_token else "platform",
                                 },
                             )
                     logger.info(
@@ -201,10 +206,12 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                     return existing_sid
                 # 创建新 session
                 new_sid = _proxy_session_store.create_session(_target_origin)
-                # 跨域 session 共享 Token：从原 session 复制 Token 到新 session
-                source_token = _proxy_session_store.get_token(sid)
-                if source_token:
-                    _proxy_session_store.set_token(new_sid, source_token)
+                # 跨域 session Token 传递：优先子系统 Token
+                _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
+                if _cross_token:
+                    _proxy_session_store.set_token(new_sid, _cross_token)
+                    if _subsystem_token:
+                        _proxy_session_store.set_subsystem_token(new_sid, _subsystem_token)
                     logger.info(
                         "proxy_session_shared_token_new_cross_origin",
                         extra={
@@ -212,6 +219,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                             "source_session_id": sid[:8],
                             "new_session_id": new_sid[:8],
                             "target_origin": _target_origin,
+                            "token_source": "subsystem" if _subsystem_token else "platform",
                         },
                     )
                 logger.info(
