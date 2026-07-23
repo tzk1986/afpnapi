@@ -64,8 +64,25 @@ class _ProxySessionStore:
                 "base_url": base_url,
                 "last_active": time.time(),
                 "token": "",  # 存储从 API 请求捕获的 Token
+                "platform_url": "",  # 存储 getEspSystemUrl 返回的平台 URL
             }
         return sid
+
+    def set_platform_url(self, session_id: str, platform_url: str) -> None:
+        """存储平台 URL（由 getEspSystemUrl 返回）。"""
+        if not platform_url:
+            return
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["platform_url"] = platform_url
+                s["last_active"] = time.time()
+
+    def get_platform_url(self, session_id: str) -> str:
+        """获取存储的平台 URL。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            return s.get("platform_url", "") if s else ""
 
     def get_cookie_jar(self, session_id: str) -> Optional[requests.cookies.RequestsCookieJar]:
         with self._lock:
@@ -693,6 +710,85 @@ class UiProxyService:
             method, url, headers=headers, data=req_body,
             timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
         )
+
+        # 捕获 getEspSystemUrl 返回的平台 URL 并存储到 session
+        if session_id and "getEspSystemUrl" in url and resp.status_code == 200:
+            try:
+                _esp_data = resp.json()
+                _platform_url = _esp_data.get("data", "")
+                if isinstance(_platform_url, str) and _platform_url.startswith("http"):
+                    _proxy_session_store.set_platform_url(session_id, _platform_url)
+                    logger.info(
+                        "proxy_platform_url_captured",
+                        extra={
+                            "event": "ui.proxy.platform_url_captured",
+                            "session_id": session_id[:8],
+                            "platform_url": _platform_url,
+                        },
+                    )
+            except Exception:
+                pass
+
+        # 405 重试：子系统不支持 /esp/ 路径时，转发到平台 origin
+        if resp.status_code == 405 and "/esp/" in url and session_id:
+            _platform_url = _proxy_session_store.get_platform_url(session_id)
+            if not _platform_url:
+                # 尝试从其他 session 获取平台 URL
+                with _proxy_session_store._lock:
+                    for _sid, _sess in _proxy_session_store._sessions.items():
+                        _pu = _sess.get("platform_url", "")
+                        if _pu:
+                            _platform_url = _pu
+                            break
+            if _platform_url:
+                from urllib.parse import urlparse as _urlparse_retry
+                _orig_parsed = _urlparse_retry(url)
+                _retry_url = _platform_url.rstrip("/") + _orig_parsed.path
+                if _orig_parsed.query:
+                    _retry_url += "?" + _orig_parsed.query
+                _retry_headers = dict(headers)
+                _retry_headers["Origin"] = _platform_url
+                _retry_headers["Referer"] = _platform_url + "/"
+                # 使用平台 session 的 Token
+                _platform_sid = _proxy_session_store.find_session_by_base_url(_platform_url)
+                if _platform_sid:
+                    _platform_token = _proxy_session_store.get_token(_platform_sid)
+                    if _platform_token:
+                        _retry_headers["Token"] = _platform_token
+                try:
+                    _retry_session = requests.Session()
+                    if _platform_sid:
+                        _pjar = _proxy_session_store.get_cookie_jar(_platform_sid)
+                        if _pjar:
+                            _retry_session.cookies = _pjar
+                    _retry_resp = _retry_session.request(
+                        method, _retry_url, headers=_retry_headers, data=req_body,
+                        timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+                    )
+                    if _retry_resp.status_code != 405:
+                        logger.info(
+                            "proxy_resource_405_retry_success",
+                            extra={
+                                "event": "ui.proxy.resource.405_retry",
+                                "session_id": session_id[:8],
+                                "original_url": url,
+                                "retry_url": _retry_url,
+                                "original_status": 405,
+                                "retry_status": _retry_resp.status_code,
+                            },
+                        )
+                        resp = _retry_resp
+                        url = _retry_url
+                except Exception as e:
+                    logger.warning(
+                        "proxy_resource_405_retry_failed",
+                        extra={
+                            "event": "ui.proxy.resource.405_retry_error",
+                            "session_id": session_id[:8],
+                            "retry_url": _retry_url,
+                            "error": str(e),
+                        },
+                    )
 
         # 记录目标服务器返回的 Set-Cookie
         resp_set_cookies = []
