@@ -539,9 +539,19 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         resp.headers["Access-Control-Allow-Headers"] = "*"
         return resp
 
-    # 检查是否为资源请求（有扩展名）或 API 请求（包含 /api/ 路径段）
+    # 检查是否为资源请求（有扩展名）
     is_resource = _ext in _resource_exts
-    is_api = "/api/" in resource_path or resource_path.startswith("api/")
+    # API 请求检测：优先按请求特征判断，路径模式作为兜底
+    _req_accept = request.headers.get("Accept", "")
+    _req_content_type = request.headers.get("Content-Type", "")
+    _req_xhr = request.headers.get("X-Requested-With", "")
+    _is_api_by_header = (
+        "application/json" in _req_accept
+        or "application/json" in _req_content_type
+        or _req_xhr.lower() == "xmlhttprequest"
+    )
+    _is_api_by_path = "/api/" in resource_path or resource_path.startswith("api/")
+    is_api = _is_api_by_header or _is_api_by_path
     # 页面请求：没有扩展名且不是 API（如 /home, /login, /dashboard）
     is_page = not is_resource and not is_api
 

@@ -370,7 +370,7 @@ class UiProxyService:
             "Referer": target_origin + "/",
         }
         if req_headers:
-            for key in ("Content-Type",):
+            for key in ("Content-Type", "Accept"):
                 if key in req_headers:
                     headers[key] = req_headers[key]
             # 转发 Token 请求头（用于目标服务器认证）
@@ -401,6 +401,8 @@ class UiProxyService:
             )
             if token_value and token_value != "null":
                 headers["Token"] = token_value
+                if session_id:
+                    _proxy_session_store.set_token(session_id, token_value)
 
         session = requests.Session()
         if session_id:
@@ -619,7 +621,7 @@ class UiProxyService:
                     headers[key] = value
 
         # 修正 Origin：设为目标服务器 origin（非代理 origin），模拟浏览器同源请求
-        if "Origin" in headers and "/api/" in url:
+        if "Origin" in headers and ("/api/" in url or "/uapi/" in url):
             headers["Origin"] = target_origin
 
         # 捕获 Token 并存储到 session（用于后续页面请求）
@@ -629,7 +631,7 @@ class UiProxyService:
                 _proxy_session_store.set_token(session_id, token_value)
 
         # 记录 API 请求的完整请求头
-        if "/api/" in url:
+        if "/api/" in url or "/uapi/" in url:
             logger.info(
                 "proxy_resource_request_headers",
                 extra={
