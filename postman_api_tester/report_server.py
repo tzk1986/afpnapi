@@ -569,7 +569,11 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         except Exception:
             pass
 
-    # 记录兜底请求
+    # 记录兜底请求（含完整请求头用于诊断 cookie 缺失问题）
+    _diag_headers = {k: v for k, v in request.headers if k.lower() in (
+        "referer", "origin", "cookie", "accept", "content-type", "user-agent",
+        "sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest",
+    )}
     logger.warning(
         "spa_fallback_request",
         extra={
@@ -578,6 +582,9 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
             "path": resource_path,
             "is_page": is_page,
             "referer": referer if referer else "(none)",
+            "diag_headers": _diag_headers,
+            "diag_cookies": dict(request.cookies),
+            "diag_query_string": request.query_string.decode("utf-8", errors="replace")[:200],
         },
     )
 

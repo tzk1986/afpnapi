@@ -281,7 +281,37 @@ def _get_proxy_session_id(base_url: str = "") -> str:
             pass
 
     # 创建新会话并保存 base_url
+    logger.warning(
+        "proxy_session_creating_new",
+        extra={
+            "event": "ui.proxy.session.creating_new",
+            "base_url": base_url,
+            "browser_cookies": dict(request.cookies),
+            "referer": request.headers.get("Referer", "")[:100],
+            "origin": request.headers.get("Origin", ""),
+            "request_path": request.path,
+        },
+    )
     new_sid = _proxy_session_store.create_session(base_url)
+
+    # Token 继承：如果同 origin 已有带 Token 的 session，自动继承（解决 cookie 丢失场景）
+    if base_url:
+        _existing_sid = _proxy_session_store.find_session_by_base_url(
+            f"{_up(base_url).scheme}://{_up(base_url).netloc}" if _up(base_url).netloc else base_url
+        )
+        if _existing_sid and _existing_sid != new_sid:
+            _inherited_token = _proxy_session_store.get_token(_existing_sid)
+            if _inherited_token:
+                _proxy_session_store.set_token(new_sid, _inherited_token)
+                logger.info(
+                    "proxy_session_token_inherited",
+                    extra={
+                        "event": "ui.proxy.session.token_inherited",
+                        "new_session_id": new_sid[:8],
+                        "source_session_id": _existing_sid[:8],
+                        "base_url": base_url,
+                    },
+                )
 
     # 加载浏览器原始 JSESSIONID 到代理 session jar，确保后续请求使用浏览器的已认证 session
     browser_jsessionid = request.cookies.get("JSESSIONID")

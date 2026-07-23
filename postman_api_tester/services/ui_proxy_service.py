@@ -697,7 +697,7 @@ class UiProxyService:
 
         # 记录 API 响应体（仅非二进制内容）
         resp_ct = resp.headers.get("Content-Type", "")
-        if "/api/" in url and ("json" in resp_ct or "text" in resp_ct):
+        if ("/api/" in url or "/uapi/" in url) and ("json" in resp_ct or "text" in resp_ct):
             resp_body_preview = resp.text[:500] if resp.text else ""
             logger.info(
                 "proxy_resource_response_body",
