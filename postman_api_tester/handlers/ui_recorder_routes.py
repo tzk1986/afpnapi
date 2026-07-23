@@ -88,15 +88,16 @@ class _RecordingSessionStore:
 
     def list_sessions(self) -> List[Dict[str, Any]]:
         with self._lock:
-            result = []
-            for s in self._sessions.values():
-                result.append({
+            result = [
+                {
                     "session_id": s["session_id"],
                     "status": s["status"],
                     "total_steps": s["total_steps"],
                     "started_at": s["started_at"],
                     "ended_at": s["ended_at"],
-                })
+                }
+                for s in self._sessions.values()
+            ]
             result.sort(key=lambda x: x["started_at"], reverse=True)
             return result
 
