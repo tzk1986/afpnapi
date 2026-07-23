@@ -65,6 +65,7 @@ class _ProxySessionStore:
                 "last_active": time.time(),
                 "token": "",  # 存储从 API 请求捕获的 Token
                 "platform_url": "",  # 存储 getEspSystemUrl 返回的平台 URL
+                "subsystem_token": "",  # 存储 loginOtherSystem 返回的子系统 Token
             }
         return sid
 
@@ -117,6 +118,33 @@ class _ProxySessionStore:
             if s:
                 s["last_active"] = time.time()
                 return s.get("token", "")
+            return None
+
+    def set_subsystem_token(self, session_id: str, token: str) -> None:
+        """存储 loginOtherSystem 返回的子系统 Token（用于跨系统认证）。"""
+        if not token or token == "null":
+            return
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["subsystem_token"] = token
+                s["last_active"] = time.time()
+                logger.info(
+                    "proxy_session_subsystem_token_stored",
+                    extra={
+                        "event": "ui.proxy.session.subsystem_token_stored",
+                        "session_id": session_id[:8],
+                        "token_preview": token[:30] + "..." if len(token) > 30 else token,
+                    },
+                )
+
+    def get_subsystem_token(self, session_id: str) -> Optional[str]:
+        """获取 loginOtherSystem 返回的子系统 Token。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                return s.get("subsystem_token", "")
             return None
 
     def get_base_url(self, session_id: str) -> Optional[str]:
@@ -574,7 +602,7 @@ class UiProxyService:
         response_headers.pop("Content-Security-Policy", None)
 
         if is_html:
-            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode, recording_mode=recording_mode, replay_engine_js=replay_engine_js)
+            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode, recording_mode=recording_mode, replay_engine_js=replay_engine_js, session_id=session_id or "")
             response_headers["Content-Type"] = "text/html; charset=utf-8"
         else:
             body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
@@ -729,6 +757,31 @@ class UiProxyService:
             except Exception:
                 pass
 
+        # 捕获 loginOtherSystem 返回的子系统 Token（用于跨系统认证）
+        if session_id and "loginOtherSystem" in url and resp.status_code == 200:
+            try:
+                _login_data = resp.json()
+                _sub_token = _login_data.get("data", {})
+                if isinstance(_sub_token, dict):
+                    _sub_token_value = _sub_token.get("token", "")
+                elif isinstance(_sub_token, str):
+                    _sub_token_value = _sub_token
+                else:
+                    _sub_token_value = ""
+                if _sub_token_value and _sub_token_value != "null":
+                    _proxy_session_store.set_subsystem_token(session_id, _sub_token_value)
+                    logger.info(
+                        "proxy_subsystem_token_captured",
+                        extra={
+                            "event": "ui.proxy.subsystem_token_captured",
+                            "session_id": session_id[:8],
+                            "url": url,
+                            "token_preview": _sub_token_value[:30] + "..." if len(_sub_token_value) > 30 else _sub_token_value,
+                        },
+                    )
+            except Exception:
+                pass
+
         # 405 重试：子系统不支持 /esp/ 路径时，转发到平台 origin
         if resp.status_code == 405 and "/esp/" in url and session_id:
             _platform_url = _proxy_session_store.get_platform_url(session_id)
@@ -857,7 +910,7 @@ class UiProxyService:
         return body, resp.status_code, response_headers
 
     @staticmethod
-    def rewrite_html(html: str, base_url: str, replay_mode: bool = False, recording_mode: bool = False, replay_engine_js: str = "") -> str:
+    def rewrite_html(html: str, base_url: str, replay_mode: bool = False, recording_mode: bool = False, replay_engine_js: str = "", session_id: str = "") -> str:
         """改写 HTML 中的所有 URL 引用。
 
         处理：
@@ -872,7 +925,7 @@ class UiProxyService:
 
         result = html
 
-        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode, recording_mode=recording_mode)
+        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode, recording_mode=recording_mode, session_id=session_id)
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
@@ -1141,7 +1194,7 @@ class UiProxyService:
         return html
 
     @staticmethod
-    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False, recording_mode: bool = False) -> str:
+    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False, recording_mode: bool = False, session_id: str = "") -> str:
         """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
 
         拦截机制（8 层防护）：
@@ -1239,8 +1292,9 @@ class UiProxyService:
             'if(_locHD&&_locHD.configurable){Object.defineProperty(window.location,"hash",{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;},configurable:true});}'
             'var _locWinDesc=Object.getOwnPropertyDescriptor(window,"location");'
             'var _locOverridden=false;var _locOverrideError="";var _winLocCfg=!!_locWinDesc&&!!_locWinDesc.configurable;'
-            'if(!(_locPD&&_locPD.configurable)){try{Object.defineProperty(window,"location",{get:function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){location.href=u;},replace:function(u){location.replace(u);},reload:function(){location.reload();}};},configurable:true});_locOverridden=true;}catch(e){_locOverrideError=String(e);}}'
-            'if(!_locOverridden){try{window.__defineGetter__("location",function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){location.href=u;},replace:function(u){location.replace(u);},reload:function(){location.reload();}};});_locOverridden=true;}catch(e){_locOverrideError=_locOverrideError||String(e);}}'
+            'var _origLocation=window.location;'
+            'if(!(_locPD&&_locPD.configurable)){try{Object.defineProperty(window,"location",{get:function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){_origLocation.href=_toPageProxy(u);},replace:function(u){_origLocation.replace(_toPageProxy(u));},reload:function(){location.reload();}};},configurable:true});_locOverridden=true;}catch(e){_locOverrideError=String(e);}}'
+            'if(!_locOverridden){try{window.__defineGetter__("location",function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){_origLocation.href=_toPageProxy(u);},replace:function(u){_origLocation.replace(_toPageProxy(u));},reload:function(){location.reload();}};});_locOverridden=true;}catch(e){_locOverrideError=_locOverrideError||String(e);}}'
             'if(typeof Location!=="undefined"&&Location.prototype){'
             'var _locHrefDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");'
             'if(_locHrefDesc&&_locHrefDesc.set){'
@@ -1248,6 +1302,12 @@ class UiProxyService:
             'try{Object.defineProperty(Location.prototype,"href",{get:_locHrefDesc.get,set:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};_origHrefSet.call(this,v);},configurable:false});}catch(e){Location.prototype.href=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};_origHrefSet.call(this,v);};}}'
             'console.log("[ProxyEarly] Location.prototype.href setter patched");'
             '}'
+            'var _locReplaceDesc=Object.getOwnPropertyDescriptor(Location.prototype,"replace");'
+            'if(_locReplaceDesc&&_locReplaceDesc.value){var _origReplace=_locReplaceDesc.value;'
+            'try{Object.defineProperty(Location.prototype,"replace",{value:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};return _origReplace.call(this,v);},writable:false,configurable:false});}catch(e){Location.prototype.replace=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};return _origReplace.call(this,v);};}}'
+            'var _locAssignDesc=Object.getOwnPropertyDescriptor(Location.prototype,"assign");'
+            'if(_locAssignDesc&&_locAssignDesc.value){var _origAssign=_locAssignDesc.value;'
+            'try{Object.defineProperty(Location.prototype,"assign",{value:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};return _origAssign.call(this,v);},writable:false,configurable:false});}catch(e){Location.prototype.assign=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};return _origAssign.call(this,v);};}}'
             '}'
             'window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_loaded",pathname:_targetLoc.pathname,href:_targetLoc.href,realPathname:window.location.pathname,pathnameConfigurable:!!_locPD&&!!_locPD.configurable,locOverridden:_locOverridden,locOverrideError:_locOverrideError,winLocConfigurable:_winLocCfg,gopdPatched:true}},"*");'
             '}catch(e){try{window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_error",error:String(e)}},"*");}catch(e2){}}'
@@ -1320,8 +1380,9 @@ class UiProxyService:
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
             'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'
+            'else if(_url.indexOf("http://")===0||_url.indexOf("https://")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
-            'console.log("[EarlyScript] fetch:", _url.substring(0,100));'
+            'console.log("[EarlyScript] fetch:", _origUrl.substring(0,60), "->", _url.substring(0,100));'
             'opts=opts||{};opts.credentials="include";arguments[1]=opts;'
             'return _origFetch.apply(this,[_url].concat(Array.prototype.slice.call(arguments,1))).then(function(resp){'
             'if(!resp.ok)console.warn("[EarlyScript] fetch failed:", _origUrl.substring(0,80), "->", resp.status, resp.statusText);'
@@ -1337,8 +1398,9 @@ class UiProxyService:
             'if(_url.indexOf(_T)===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else if(_url.indexOf("/")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url);'
             'else if(_url.indexOf(_F)===0&&!_isProxyUrl(_url))_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+_url.substring(_F.length));'
+            'else if(_url.indexOf("http://")===0||_url.indexOf("https://")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
-            'console.log("[EarlyScript] XHR:", m, _url.substring(0,100));'
+            'console.log("[EarlyScript] XHR:", m, _origUrl.substring(0,60), "->", _url.substring(0,100));'
             'arguments[1]=_url;'
             'var xhr=this;'
             'xhr.addEventListener("load",function(){'
@@ -1434,7 +1496,46 @@ class UiProxyService:
             if replay_mode else '')
             + '})();'
         )
-        early_script = f"<script>{early_js}</script>"
+        # 跨系统 Token 注入：将子系统 Token 注入到浏览器存储
+        subsystem_token_meta = ""
+        subsystem_token_js = ""
+        if session_id and replay_mode:
+            _sub_token = _proxy_session_store.get_subsystem_token(session_id)
+            if _sub_token:
+                subsystem_token_meta = f'<meta name="_proxy_subsystem_token" content="{_sub_token}">'
+                subsystem_token_js = (
+                    "try{"
+                    "var _stMeta=document.getElementsByName('_proxy_subsystem_token')[0];"
+                    "var _st=_stMeta?_stMeta.content:'';"
+                    "if(_st&&_st!=='null'){"
+                    "localStorage.setItem('token',_st);"
+                    "sessionStorage.setItem('token',_st);"
+                    "var _stores=['auth','user','account','userInfo','userStore','authStore'];"
+                    "_stores.forEach(function(k){"
+                    "try{var _s=localStorage.getItem(k);"
+                    "if(_s&&typeof _s==='string'&&_s.indexOf('{')===0){"
+                    "var _o=JSON.parse(_s);"
+                    "if(_o&&typeof _o==='object'){"
+                    "var _updated=false;"
+                    "['token','accessToken','access_token','authToken','Token'].forEach(function(tkn){"
+                    "if(tkn in _o){_o[tkn]=_st;_updated=true;}});"
+                    "if(_updated)localStorage.setItem(k,JSON.stringify(_o));}}"
+                    "}catch(e){}});"
+                    "console.log('[ProxyEarly] Subsystem token stored, len='+_st.length);}}"
+                    "catch(e){console.warn('[ProxyEarly] Subsystem token injection failed:',e);}"
+                )
+                logger.info(
+                    "proxy_subsystem_token_inject_into_html",
+                    extra={
+                        "event": "ui.proxy.subsystem_token.html_inject",
+                        "session_id": session_id[:8],
+                        "target_url": target_url,
+                        "token_len": len(_sub_token),
+                    },
+                )
+
+        early_js = subsystem_token_js + early_js
+        early_script = f"{subsystem_token_meta}<script>{early_js}</script>"
 
         # 诊断：确认早期脚本已注入
         logger.info(f"early_script_injected: len={len(early_js)}, target_url={target_url}, replay_mode={replay_mode}")

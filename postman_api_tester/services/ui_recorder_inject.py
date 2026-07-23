@@ -1454,14 +1454,15 @@ _REPLAYER_JS = r"""
       }
       if (this.paused) return;
 
+      // 保存当前状态，以防下一步导致页面导航
+      // 必须在 currentIndex++ 之前保存，否则恢复时会跳过当前步骤
+      self._saveState();
+
       this.currentIndex++;
       if (this.currentIndex >= this.steps.length) {
         this._finishAll();
         return;
       }
-
-      // 保存当前状态，以防下一步导致页面导航
-      self._saveState();
 
       var step = this.steps[this.currentIndex];
       var stepStart = Date.now();
@@ -1515,25 +1516,73 @@ _REPLAYER_JS = r"""
         self._notifyParent('step_complete', result);
         // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
-        // 获取导航 URL：优先 step.value，其次上一步 click 捕获的链接 href，
-        // 再次下一步的 tab_url/page_url（录制数据中包含）
-        var navUrl = step.value || self._lastClickHref || self._lastWindowOpenUrl || '';
-        if (self._lastWindowOpenUrl) {
-          console.log('[ReplayEngine] new_tab: using window.open url:', navUrl.substring(0, 120));
-          self._lastWindowOpenUrl = '';
+
+        // 获取导航 URL 的辅助函数
+        function _resolveNewTabUrl() {
+          // 优先级：step.value > _lastClickHref > _lastWindowOpenUrl > 下一步的 tab_url/page_url
+          var url = step.value || self._lastClickHref || self._lastWindowOpenUrl || '';
+          if (self._lastWindowOpenUrl) {
+            console.log('[ReplayEngine] new_tab: using window.open url:', url.substring(0, 120));
+            self._lastWindowOpenUrl = '';
+          }
+          if (!url) {
+            var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
+            if (_nextStep) {
+              url = _nextStep.tab_url || _nextStep.page_url || '';
+              console.log('[ReplayEngine] new_tab: using next step tab_url:', url ? url.substring(0, 80) : 'empty');
+            }
+          }
+          return url;
         }
-        if (!navUrl) {
-          var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
-          if (_nextStep) {
-            navUrl = _nextStep.tab_url || _nextStep.page_url || '';
-            console.log('[ReplayEngine] new_tab: using next step tab_url:', navUrl ? navUrl.substring(0, 80) : 'empty');
+
+        // 导航到新页面的辅助函数
+        function _doNavigate(navUrl) {
+          if (navUrl) {
+            self._notifyParent('navigate', { url: navUrl, new_tab: true });
+            console.log('[ReplayEngine] new_tab action: navigating to', navUrl.substring(0, 80));
+            if (typeof self._sendLog === 'function') {
+              try { self._sendLog('new_tab_navigate', '导航到新页面: ' + navUrl.substring(0, 80), { url: navUrl }); } catch(e) {}
+            }
+          } else {
+            console.log('[ReplayEngine] new_tab action: no url available, skipping navigation');
+            if (typeof self._sendLog === 'function') {
+              try { self._sendLog('new_tab_no_url', '无法获取导航 URL，跳过跳转', {}, 'warn'); } catch(e) {}
+            }
           }
         }
+
+        // 先尝试立即解析 URL
+        var navUrl = _resolveNewTabUrl();
         if (navUrl) {
-          self._notifyParent('navigate', { url: navUrl, new_tab: true });
-          console.log('[ReplayEngine] new_tab action: navigating to', navUrl.substring(0, 80));
+          console.log('[ReplayEngine] new_tab: URL resolved immediately');
+          _doNavigate(navUrl);
         } else {
-          console.log('[ReplayEngine] new_tab action: no url available, skipping navigation');
+          // URL 未立即获取到，启动轮询等待 _lastWindowOpenUrl（Vue 应用可能异步调用 window.open）
+          console.log('[ReplayEngine] new_tab: URL not available immediately, starting wait loop (max 3000ms)');
+          var waitStart = Date.now();
+          var maxWait = 3000;
+          var pollInterval = 200;
+
+          function _pollForUrl() {
+            var elapsed = Date.now() - waitStart;
+            if (self._lastWindowOpenUrl) {
+              console.log('[ReplayEngine] new_tab: window.open URL captured after', elapsed, 'ms');
+              var capturedUrl = self._lastWindowOpenUrl;
+              self._lastWindowOpenUrl = '';
+              _doNavigate(capturedUrl);
+              return;
+            }
+            if (elapsed >= maxWait) {
+              console.log('[ReplayEngine] new_tab: wait timeout after', elapsed, 'ms, using fallback');
+              var fallbackUrl = _resolveNewTabUrl();
+              _doNavigate(fallbackUrl);
+              return;
+            }
+            // 继续等待
+            setTimeout(_pollForUrl, pollInterval);
+          }
+
+          setTimeout(_pollForUrl, pollInterval);
         }
         return;
       }
