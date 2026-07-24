@@ -80,7 +80,7 @@
 
     <div class="main-content">
         <div class="iframe-panel">
-            <iframe id="replayFrame" sandbox="allow-same-origin allow-scripts allow-modals allow-forms allow-popups allow-top-navigation allow-downloads"></iframe>
+            <iframe id="replayFrame"></iframe>
             <div class="iframe-loading" id="iframeLoading">正在加载目标页面...</div>
         </div>
 
@@ -107,11 +107,15 @@
         var startTime = 0;
         var timerInterval = null;
         var pausedAt = 0;
+        var lastWindowOpenUrl = '';
+        var lastNewTabProxyUrl = '';
+        var lastNewTabTime = 0;
         var totalPausedMs = 0;
         var iframeReady = false;
         var replayStarted = false;
         var networkRequests = [];
         var initialTargetOrigin = ''; // 初始目标应用的 origin，用于判断 SPA 路由变化
+        var currentTargetOrigin = ''; // 当前目标应用的 origin，跨系统跳转时更新
         var savedReplayState = null; // 跨页面导航时保存的回放状态（由引擎通过 postMessage 传来）
 
         var clearLoginOption = true; // 默认清除登录信息
@@ -140,6 +144,7 @@
                         // 保存初始目标应用的 origin，用于后续判断 SPA 路由变化
                         var originObj = new URL(baseUrl);
                         initialTargetOrigin = originObj.protocol + '//' + originObj.host;
+                        currentTargetOrigin = initialTargetOrigin;
                         // 从 baseUrl 提取 pathname，让 iframe 的 window.location.pathname 直接等于目标路径
                         // 这样 Vue Router 等 SPA 框架可以正确匹配路由
                         var urlObj = new URL(baseUrl);
@@ -190,6 +195,17 @@
 
         // iframe 加载完成
         document.getElementById('replayFrame').addEventListener('load', function() {
+            console.log('[iframe onload] 触发 load 事件');
+            console.log('[iframe onload] src attribute:', this.src);
+
+            // 诊断：尝试读取 iframe 实际加载的 URL
+            try {
+                var actualUrl = this.contentWindow.location.href;
+                console.log('[iframe onload] 实际 URL:', actualUrl);
+            } catch(e) {
+                console.log('[iframe onload] 无法访问 iframe URL（跨域）:', e.message);
+            }
+
             document.getElementById('iframeLoading').style.display = 'none';
             iframeReady = true;
             injectReplayEngine();
@@ -262,12 +278,32 @@
                             level: 'info'
                         })
                     }).catch(function() {});
-                    // window.open 在回放模式下需要导航到目标系统
+                    // window.open 在回放模式下：存储 URL 并检查是否需要重新导航
                     if (data.method === 'window.open' && data.target && initialTargetOrigin) {
-                        console.log('[ProxyNav] window.open detected, navigating to target system');
-                        var targetUrl = data.target;
-                        var replayUrl = '/ui-testing/proxy?url=' + encodeURIComponent(targetUrl) + '&replay=1';
-                        document.getElementById('replayFrame').src = replayUrl;
+                        console.log('[ProxyNav] window.open detected, storing URL for new_tab:', data.target.substring(0, 80));
+                        lastWindowOpenUrl = data.target;
+                        // 如果刚做过 new_tab 导航（3秒内），重新导航并合并 esp_token 等参数
+                        if (lastNewTabProxyUrl && (Date.now() - lastNewTabTime) < 3000) {
+                            try {
+                                var woUrl = new URL(data.target);
+                                var mergedUrl = lastNewTabProxyUrl;
+                                var didMerge = false;
+                                woUrl.searchParams.forEach(function(v, k) {
+                                    if (k !== '_proxy_url' && k !== 'replay' && mergedUrl.indexOf(k + '=') < 0) {
+                                        mergedUrl += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+                                        didMerge = true;
+                                        console.log('[ProxyNav] re-navigate merge param:', k);
+                                    }
+                                });
+                                if (didMerge) {
+                                    console.log('[ProxyNav] re-navigating iframe with merged params');
+                                    document.getElementById('replayFrame').src = mergedUrl;
+                                }
+                            } catch(e) {
+                                console.warn('[ProxyNav] re-navigate merge failed:', e);
+                            }
+                            lastNewTabProxyUrl = '';
+                        }
                     }
                     break;
             }
@@ -441,6 +477,8 @@
             var isNewTab = (typeof navData === 'object' && navData.new_tab) || false;
             if (!url) return;
             console.log('[onNavigate] url=', url, 'new_tab=', isNewTab);
+            // 诊断日志：记录导航详情
+            console.log('[onNavigate] navData type:', typeof navData, 'navData:', JSON.stringify(navData));
 
             var urlObj = new URL(url, window.location.origin);
             var currentUrl = document.getElementById('currentUrl');
@@ -464,31 +502,41 @@
                     try {
                         var targetOriginObj = new URL(proxyUrlParam);
                         var targetOrigin = targetOriginObj.protocol + '//' + targetOriginObj.host;
-                        if (initialTargetOrigin && targetOrigin === initialTargetOrigin) {
+                        if (currentTargetOrigin && targetOrigin === currentTargetOrigin) {
                             // 同origin，只是 SPA 路由变化，不刷新 iframe
                             console.log('[onNavigate] 同origin SPA路由变化（含_proxy_url），不刷新 iframe');
                             shouldNavigate = false;
-                        } else if (!initialTargetOrigin) {
-                            // initialTargetOrigin 未设置，保守处理：不刷新
-                            console.log('[onNavigate] initialTargetOrigin 未设置，保守处理不刷新');
+                        } else if (!currentTargetOrigin) {
+                            // currentTargetOrigin 未设置，保守处理：不刷新
+                            console.log('[onNavigate] currentTargetOrigin 未设置，保守处理不刷新');
                             shouldNavigate = false;
                         } else {
                             // 不同origin，真正的外部URL导航
                             shouldNavigate = true;
-                            // 如果 _proxy_url 指向代理服务器自身（pushState 残留），使用 initialTargetOrigin 修正
-                            if (targetOrigin === window.location.origin && initialTargetOrigin) {
-                                var correctedOrigin = initialTargetOrigin;
+                            // 如果 _proxy_url 指向代理服务器自身（pushState 残留），使用 currentTargetOrigin 修正
+                            if (targetOrigin === window.location.origin && currentTargetOrigin) {
+                                var correctedOrigin = currentTargetOrigin;
                                 var proxyPath = '';
                                 try { proxyPath = targetOriginObj.pathname + (targetOriginObj.search || '') + (targetOriginObj.hash || ''); } catch(e2) {}
                                 var correctedUrl = correctedOrigin + proxyPath;
                                 var correctedPath = proxyPath || urlObj.pathname;
-                                console.log('[onNavigate] _proxy_url指向代理服务器，修正为initialTargetOrigin:', correctedUrl.substring(0, 80));
+                                console.log('[onNavigate] _proxy_url指向代理服务器，修正为currentTargetOrigin:', correctedUrl.substring(0, 80));
                                 proxyUrl = correctedPath + (correctedPath.indexOf('?') >= 0 ? '&' : '?') +
                                     '_proxy_url=' + encodeURIComponent(correctedUrl) + '&replay=1';
+                                // 更新 currentTargetOrigin
+                                if (correctedOrigin !== currentTargetOrigin) {
+                                    console.log('[onNavigate] updating currentTargetOrigin from', currentTargetOrigin, 'to', correctedOrigin);
+                                    currentTargetOrigin = correctedOrigin;
+                                }
                             } else {
                                 console.log('[onNavigate] 跨origin导航（含_proxy_url）');
                                 var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
                                 proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') + 'replay=1';
+                                // 更新 currentTargetOrigin
+                                if (targetOrigin !== currentTargetOrigin) {
+                                    console.log('[onNavigate] updating currentTargetOrigin from', currentTargetOrigin, 'to', targetOrigin);
+                                    currentTargetOrigin = targetOrigin;
+                                }
                             }
                         }
                     } catch(e) {
@@ -504,28 +552,57 @@
             else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
                 var navOrigin = urlObj.protocol + '//' + urlObj.host;
                 if (isNewTab) {
-                    // new_tab 直接走 /ui-testing/proxy 端点，确保使用正确的 session
+                    // new_tab 走 SPA fallback 格式，让 iframe 的 location.pathname 等于目标路径
+                    // 这样 Vue Router 等 SPA 框架可以正确匹配路由
                     shouldNavigate = true;
-                    proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&replay=1';
-                    console.log('[onNavigate] new_tab 走 proxy 端点，url=', url.substring(0, 80));
-                } else if (initialTargetOrigin && navOrigin === initialTargetOrigin) {
+                    var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                    proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
+                        '_proxy_url=' + encodeURIComponent(url) + '&replay=1';
+                    // 合并 window.open URL 中的查询参数（如 esp_token 等子系统认证令牌）
+                    if (lastWindowOpenUrl) {
+                        try {
+                            var woUrl = new URL(lastWindowOpenUrl);
+                            woUrl.searchParams.forEach(function(v, k) {
+                                if (k !== '_proxy_url' && k !== 'replay' && proxyUrl.indexOf(k + '=') < 0) {
+                                    proxyUrl += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(v);
+                                    console.log('[onNavigate] merged window.open param:', k);
+                                }
+                            });
+                        } catch(e) {}
+                        lastWindowOpenUrl = '';
+                    }
+                    // 跨系统跳转时更新 currentTargetOrigin
+                    if (navOrigin !== currentTargetOrigin) {
+                        console.log('[onNavigate] updating currentTargetOrigin from', currentTargetOrigin, 'to', navOrigin);
+                        currentTargetOrigin = navOrigin;
+                    }
+                    console.log('[onNavigate] new_tab 走 SPA fallback，url=', url.substring(0, 80));
+                } else if (currentTargetOrigin && navOrigin === currentTargetOrigin) {
                     console.log('[onNavigate] 同origin SPA路由变化，不刷新 iframe');
                 } else {
                     shouldNavigate = true;
                     var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
-                    // 如果 URL 来自代理服务器（pushState 残留），使用 initialTargetOrigin 构造正确的 _proxy_url
-                    var effectiveOrigin = (navOrigin === window.location.origin && initialTargetOrigin) ? initialTargetOrigin : navOrigin;
+                    // 如果 URL 来自代理服务器（pushState 残留），使用 currentTargetOrigin 构造正确的 _proxy_url
+                    var effectiveOrigin = (navOrigin === window.location.origin && currentTargetOrigin) ? currentTargetOrigin : navOrigin;
                     console.log('[onNavigate] 跨origin导航，构造代理URL, effectiveOrigin=', effectiveOrigin.substring(0, 40));
+                    // 跨系统跳转时更新 currentTargetOrigin
+                    if (effectiveOrigin !== currentTargetOrigin) {
+                        console.log('[onNavigate] updating currentTargetOrigin from', currentTargetOrigin, 'to', effectiveOrigin);
+                        currentTargetOrigin = effectiveOrigin;
+                    }
                     proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
                         '_proxy_url=' + encodeURIComponent(effectiveOrigin) + '&replay=1';
                 }
             }
 
-            // new_tab 兜底：如果以上条件都没匹配到，强制走 proxy 端点
+            // new_tab 兜底：如果以上条件都没匹配到，强制走 SPA fallback 格式
             if (isNewTab && !shouldNavigate && !proxyUrl) {
                 shouldNavigate = true;
-                proxyUrl = '/ui-testing/proxy?url=' + encodeURIComponent(url) + '&replay=1';
-                console.log('[onNavigate] new_tab 兜底走 proxy 端点, url=', url.substring(0, 80));
+                var fallbackPath = urlObj.pathname + urlObj.search + urlObj.hash;
+                var effectiveUrl = (url.indexOf('http') === 0) ? url : (initialTargetOrigin + url);
+                proxyUrl = fallbackPath + (fallbackPath.indexOf('?') >= 0 ? '&' : '?') +
+                    '_proxy_url=' + encodeURIComponent(effectiveUrl) + '&replay=1';
+                console.log('[onNavigate] new_tab 兜底走 SPA fallback, url=', url.substring(0, 80));
             }
 
             console.log('[onNavigate] shouldNavigate=', shouldNavigate, 'proxyUrl=', proxyUrl);
@@ -535,6 +612,10 @@
                 document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
                 document.getElementById('replayFrame').src = proxyUrl;
                 replayStarted = false;
+                if (isNewTab) {
+                    lastNewTabProxyUrl = proxyUrl;
+                    lastNewTabTime = Date.now();
+                }
             }
         }
 
@@ -606,12 +687,40 @@
                 .then(function(js) {
                     var frame = document.getElementById('replayFrame');
                     try {
+                        // 诊断：先尝试读取 iframe 的 URL
+                        var iframeUrl = '';
+                        try {
+                            iframeUrl = frame.contentWindow.location.href;
+                        } catch(urlErr) {
+                            iframeUrl = '[跨域无法访问]';
+                        }
+                        console.log('[injectReplayEngine] iframe URL:', iframeUrl);
+                        console.log('[injectReplayEngine] iframe src attribute:', frame.src);
+
                         var doc = frame.contentDocument || frame.contentWindow.document;
                         var script = doc.createElement('script');
                         script.textContent = js;
                         doc.head.appendChild(script);
+                        console.log('[injectReplayEngine] 成功注入回放引擎');
                     } catch(e) {
                         console.error('Failed to inject replay engine:', e);
+                        console.error('[injectReplayEngine] frame.src:', frame.src);
+                        // 跨域错误处理：iframe 加载了不同源的 URL，无法直接注入脚本
+                        // 这种情况下，回放引擎已经在代理 HTML 中被注入（通过 _inject_replay_engine_script）
+                        // 或者 iframe 已经导航到了跨域 URL，需要等待用户手动刷新或通过 postMessage 通信
+                        if (e.name === 'SecurityError' || e.message.indexOf('cross-origin') >= 0) {
+                            console.warn('[injectReplayEngine] 跨域错误，回放引擎可能已在代理 HTML 中注入，或通过 postMessage 通信');
+                            // 尝试通过 postMessage 通知 iframe 回放引擎已准备好
+                            try {
+                                frame.contentWindow.postMessage({
+                                    type: 'replay-engine-ready',
+                                    jobId: jobId
+                                }, '*');
+                                console.log('[injectReplayEngine] 已通过 postMessage 通知 iframe');
+                            } catch(postErr) {
+                                console.warn('[injectReplayEngine] postMessage 也失败:', postErr);
+                            }
+                        }
                     }
                 })
                 .catch(function(e) {

@@ -305,7 +305,7 @@ def _build_non_multipart_request(
         request_kwargs["data"] = urlencode(params_list, doseq=True)
         headers_to_send.setdefault("Content-Type", "application/x-www-form-urlencoded")
         normalized_data = {"urlencoded": rows}
-        stored_body = {key: value for key, value in params_list}
+        stored_body = dict(params_list)
     elif normalized_mode == "graphql":
         gql = normalize_graphql_data(body_data)
         gql_payload = {"query": gql["query"], "variables": gql["variables"]}

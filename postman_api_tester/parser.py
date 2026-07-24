@@ -187,16 +187,17 @@ class PostmanApiParser:
         elif mode == 'formdata':
             # 保留完整结构，包括 type 和 upload_key，供执行器处理文件上传
             items = body_data.get(mode, [])
-            formdata_items = []
-            for item_data in items:
-                if not item_data.get('disabled'):
-                    formdata_items.append({
-                        'key': item_data.get('key', ''),
-                        'value': item_data.get('value', ''),
-                        'type': item_data.get('type', 'text'),
-                        'file_name': item_data.get('file_name', ''),
-                        'upload_key': item_data.get('upload_key', ''),
-                    })
+            formdata_items = [
+                {
+                    'key': item_data.get('key', ''),
+                    'value': item_data.get('value', ''),
+                    'type': item_data.get('type', 'text'),
+                    'file_name': item_data.get('file_name', ''),
+                    'upload_key': item_data.get('upload_key', ''),
+                }
+                for item_data in items
+                if not item_data.get('disabled')
+            ]
             return {'__body_mode': 'formdata', 'formdata': formdata_items}
         elif mode == 'file':
             # binary 模式，保留文件名信息

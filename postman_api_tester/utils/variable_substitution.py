@@ -205,9 +205,7 @@ def api_references_variables(api: ApiConfig, variable_names: set[str]) -> bool:
     elif isinstance(body, dict):
         _collect_strings(body, check_targets)
     elif isinstance(body, list):
-        for item in body:
-            if isinstance(item, str):
-                check_targets.append(item)
+        check_targets.extend(item for item in body if isinstance(item, str))
 
     for target in check_targets:
         refs = extract_referenced_variables(target) - _BASE_URL_VARIABLES
