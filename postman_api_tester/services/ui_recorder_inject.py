@@ -970,6 +970,12 @@ _REPLAYER_JS = r"""
 (function() {
   'use strict';
 
+  if (window.__REPLAY_ENGINE_LOADED__) {
+    console.log('[ReplayEngine] Already loaded, skipping duplicate injection');
+    return;
+  }
+  window.__REPLAY_ENGINE_LOADED__ = true;
+
   // ====== 选择器引擎（回放模式，仅查找）======
   var SelectorEngine = {
     find: function(selectorStr, selectorObj, elementInfo) {
@@ -1272,8 +1278,16 @@ _REPLAYER_JS = r"""
     var _origOpen = window.open;
     window.open = function(url, target, features) {
       console.log('[ReplayEngine] window.open blocked, url:', url);
-      if (typeof url === 'string' && url && typeof ReplayEngine !== 'undefined') {
-        ReplayEngine._lastWindowOpenUrl = url;
+      if (typeof url === 'string' && url) {
+        if (typeof ReplayEngine !== 'undefined') {
+          ReplayEngine._lastWindowOpenUrl = url;
+          console.log('[ReplayEngine] window.open URL stored to ReplayEngine._lastWindowOpenUrl, len:', url.length);
+        } else {
+          console.warn('[ReplayEngine] window.open: ReplayEngine not defined, URL not stored!');
+        }
+        try {
+          window.parent.postMessage({type:"_proxy_nav",data:{method:"window.open",href:url,loc:location.href,target:url}},"*");
+        } catch(e) {}
       }
       return { closed: false, close: function(){}, focus: function(){}, postMessage: function(){} };
     };
@@ -1517,22 +1531,23 @@ _REPLAYER_JS = r"""
         // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
 
-        // 获取导航 URL 的辅助函数
-        function _resolveNewTabUrl() {
-          // 优先级：step.value > _lastClickHref > _lastWindowOpenUrl > 下一步的 tab_url/page_url
+        // 获取导航 URL 的辅助函数（仅高优先级来源，不含 tab_url 兜底）
+        function _resolveNewTabUrlHighPriority() {
           var url = step.value || self._lastClickHref || self._lastWindowOpenUrl || '';
           if (self._lastWindowOpenUrl) {
             console.log('[ReplayEngine] new_tab: using window.open url:', url.substring(0, 120));
             self._lastWindowOpenUrl = '';
           }
-          if (!url) {
-            var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
-            if (_nextStep) {
-              url = _nextStep.tab_url || _nextStep.page_url || '';
-              console.log('[ReplayEngine] new_tab: using next step tab_url:', url ? url.substring(0, 80) : 'empty');
-            }
-          }
           return url;
+        }
+
+        // 获取下一步的 tab_url 兜底
+        function _resolveNewTabUrlFallback() {
+          var _nextStep = (self.currentIndex + 1 < self.steps.length) ? self.steps[self.currentIndex + 1] : null;
+          if (_nextStep) {
+            return _nextStep.tab_url || _nextStep.page_url || '';
+          }
+          return '';
         }
 
         // 导航到新页面的辅助函数
@@ -1551,38 +1566,116 @@ _REPLAYER_JS = r"""
           }
         }
 
-        // 先尝试立即解析 URL
-        var navUrl = _resolveNewTabUrl();
+        // 先尝试高优先级来源（step.value, _lastClickHref, _lastWindowOpenUrl）
+        var navUrl = _resolveNewTabUrlHighPriority();
         if (navUrl) {
-          console.log('[ReplayEngine] new_tab: URL resolved immediately');
+          console.log('[ReplayEngine] new_tab: URL resolved immediately from high priority source');
           _doNavigate(navUrl);
         } else {
-          // URL 未立即获取到，启动轮询等待 _lastWindowOpenUrl（Vue 应用可能异步调用 window.open）
-          console.log('[ReplayEngine] new_tab: URL not available immediately, starting wait loop (max 3000ms)');
-          var waitStart = Date.now();
-          var maxWait = 3000;
-          var pollInterval = 200;
+          // 高优先级来源都没有，检查是否需要等待 window.open
+          var fallbackUrl = _resolveNewTabUrlFallback();
+          if (fallbackUrl) {
+            // 有 tab_url 兜底，但检查是否跨 origin（可能涉及 window.open 传递认证 token）
+            var currentOrigin = location.protocol + '//' + location.host;
+            var _fbOrigin = '';
+            try { _fbOrigin = new URL(fallbackUrl).origin; } catch(e) {}
+            var isCrossOrigin = _fbOrigin && _fbOrigin !== currentOrigin;
+            console.log('[ReplayEngine] new_tab: fallback tab_url origin:', _fbOrigin, 'current:', currentOrigin, 'cross:', isCrossOrigin);
+            if (isCrossOrigin) {
+              // 跨 origin 跳转：等待 window.open（可能携带 esp_token 等认证参数）
+              console.log('[ReplayEngine] new_tab: cross-origin jump, waiting for window.open (max 5000ms)');
+              var waitStart = Date.now();
+              var maxWait = 5000;
+              var pollInterval = 200;
 
-          function _pollForUrl() {
-            var elapsed = Date.now() - waitStart;
-            if (self._lastWindowOpenUrl) {
-              console.log('[ReplayEngine] new_tab: window.open URL captured after', elapsed, 'ms');
-              var capturedUrl = self._lastWindowOpenUrl;
-              self._lastWindowOpenUrl = '';
-              _doNavigate(capturedUrl);
-              return;
-            }
-            if (elapsed >= maxWait) {
-              console.log('[ReplayEngine] new_tab: wait timeout after', elapsed, 'ms, using fallback');
-              var fallbackUrl = _resolveNewTabUrl();
+              function _pollForWindowOpen() {
+                var elapsed = Date.now() - waitStart;
+                // 检查两个可能的存储位置（防止引用不一致）
+                var _winOpenUrl = self._lastWindowOpenUrl || (typeof ReplayEngine !== 'undefined' ? ReplayEngine._lastWindowOpenUrl : '');
+                if (_winOpenUrl) {
+                  console.log('[ReplayEngine] new_tab: window.open URL captured after', elapsed, 'ms, url:', _winOpenUrl.substring(0, 80));
+                  var capturedUrl = _winOpenUrl;
+                  self._lastWindowOpenUrl = '';
+                  if (typeof ReplayEngine !== 'undefined') ReplayEngine._lastWindowOpenUrl = '';
+                  // 合并 window.open 的查询参数（如 esp_token）与 tab_url 的路径
+                  if (fallbackUrl && capturedUrl) {
+                    try {
+                      var _woParsed = new URL(capturedUrl);
+                      var _fbParsed = new URL(fallbackUrl);
+                      if (_woParsed.origin === _fbParsed.origin && _fbParsed.pathname !== '/') {
+                        // 使用 tab_url 的路径 + window.open 的查询参数
+                        var mergedUrl = _fbParsed.origin + _fbParsed.pathname + _fbParsed.search;
+                        _woParsed.searchParams.forEach(function(v, k) {
+                          try {
+                            var _mUrl = new URL(mergedUrl);
+                            if (!_mUrl.searchParams.has(k)) {
+                              _mUrl.searchParams.set(k, v);
+                              mergedUrl = _mUrl.toString();
+                            }
+                          } catch(e2) {}
+                        });
+                        console.log('[ReplayEngine] new_tab: merged window.open params with tab_url path:', mergedUrl.substring(0, 120));
+                        _doNavigate(mergedUrl);
+                        return;
+                      }
+                    } catch(e) {
+                      console.warn('[ReplayEngine] new_tab: merge failed, using window.open URL directly:', e);
+                    }
+                  }
+                  _doNavigate(capturedUrl);
+                  return;
+                }
+                if (elapsed >= maxWait) {
+                  console.log('[ReplayEngine] new_tab: window.open wait timeout after', elapsed, 'ms, querying subsystem token API');
+                  console.log('[ReplayEngine] new_tab: debug self._lastWindowOpenUrl:', self._lastWindowOpenUrl, 'ReplayEngine._lastWindowOpenUrl:', typeof ReplayEngine !== 'undefined' ? ReplayEngine._lastWindowOpenUrl : 'N/A');
+                  // 查询代理 API 获取子系统 token（window.open 可能未被拦截）
+                  var _xhr = new XMLHttpRequest();
+                  _xhr.open('GET', '/api/ui-testing/subsystem-token', true);
+                  _xhr.onload = function() {
+                    try {
+                      var _resp = JSON.parse(_xhr.responseText);
+                      var _token = (_resp && _resp.data && _resp.data.token) || '';
+                      if (_token && fallbackUrl) {
+                        console.log('[ReplayEngine] new_tab: got subsystem token from API, len:', _token.length);
+                        try {
+                          var _fbParsed = new URL(fallbackUrl);
+                          if (!_fbParsed.searchParams.has('esp_token')) {
+                            _fbParsed.searchParams.set('esp_token', _token);
+                            var _tokenUrl = _fbParsed.toString();
+                            console.log('[ReplayEngine] new_tab: navigating with token from API:', _tokenUrl.substring(0, 100));
+                            _doNavigate(_tokenUrl);
+                            return;
+                          }
+                        } catch(e2) {
+                          console.warn('[ReplayEngine] new_tab: failed to append token to URL:', e2);
+                        }
+                      }
+                    } catch(e) {
+                      console.warn('[ReplayEngine] new_tab: failed to parse subsystem token response:', e);
+                    }
+                    console.log('[ReplayEngine] new_tab: no subsystem token available, using tab_url fallback:', fallbackUrl ? fallbackUrl.substring(0, 80) : 'empty');
+                    _doNavigate(fallbackUrl);
+                  };
+                  _xhr.onerror = function() {
+                    console.warn('[ReplayEngine] new_tab: subsystem token API request failed, using tab_url fallback');
+                    _doNavigate(fallbackUrl);
+                  };
+                  _xhr.send();
+                  return;
+                }
+                setTimeout(_pollForWindowOpen, pollInterval);
+              }
+              setTimeout(_pollForWindowOpen, pollInterval);
+            } else {
+              // 同 origin 跳转：直接使用 tab_url
+              console.log('[ReplayEngine] new_tab: same-origin jump, using tab_url immediately');
               _doNavigate(fallbackUrl);
-              return;
             }
-            // 继续等待
-            setTimeout(_pollForUrl, pollInterval);
+          } else {
+            // 完全没有 URL
+            console.log('[ReplayEngine] new_tab: no URL available from any source');
+            _doNavigate('');
           }
-
-          setTimeout(_pollForUrl, pollInterval);
         }
         return;
       }

@@ -495,6 +495,10 @@ def ui_testing_proxy() -> ResponseReturnValue:
         "method": request.method,
     })
     try:
+        _replay_engine_js = ""
+        if replay_mode:
+            from postman_api_tester.services.ui_recorder_inject import get_replayer_js
+            _replay_engine_js = get_replayer_js(base_url)
         body, status_code, headers = UiProxyService.fetch_and_rewrite(
             target_url,
             session_id,
@@ -503,7 +507,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             req_body=request.get_data() if request.method != "GET" else None,
             replay_mode=replay_mode,
             recording_mode=recording_mode,
-            replay_engine_js="",  # /ui-testing/proxy 路由不需要回放引擎
+            replay_engine_js=_replay_engine_js,
         )
         logger.info("proxy_fetch_completed", extra={
             "event": "ui.proxy.fetch_completed",

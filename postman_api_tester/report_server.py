@@ -499,6 +499,18 @@ def ui_proxy_sessions_debug() -> ResponseReturnValue:
     return _route_ui_proxy_sessions_debug()
 
 
+@app.route("/api/ui-testing/subsystem-token", methods=["GET"])
+def ui_subsystem_token() -> ResponseReturnValue:
+    """获取当前代理会话的子系统 token（供回放引擎在 new_tab 跳转前查询）。"""
+    from flask import request as _req
+    session_id = _req.cookies.get("_proxy_session", "")
+    if not session_id:
+        return {"code": 0, "data": {"token": ""}}
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+    token = _proxy_session_store.get_subsystem_token(session_id) or ""
+    return {"code": 0, "data": {"token": token}}
+
+
 @app.route("/static/<path:filename>")
 def ui_testing_static_fallback(filename: str) -> ResponseReturnValue:
     return _route_ui_testing_static_fallback(filename)
@@ -612,6 +624,17 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     parsed_target = _urlparse(target_url)
     # 对于页面请求，使用 resource_path 作为目标路径；对于资源/API，也使用 resource_path
     full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
+
+    # 转发非代理参数到目标服务器（如 esp_token 等认证参数）
+    _proxy_params = {"_proxy_url", "url", "replay", "recording"}
+    _forward_params = {k: v[0] for k, v in params.items() if k not in _proxy_params}
+    if _forward_params:
+        from urllib.parse import urlencode
+        full_url += "?" + urlencode(_forward_params)
+        logger.info("spa_fallback_forward_params", extra={
+            "event": "ui.proxy.fallback.forward_params",
+            "params": list(_forward_params.keys()),
+        })
 
     # 从 target_url 中提取 base_url，确保代理会话的 base_url 正确设置
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"

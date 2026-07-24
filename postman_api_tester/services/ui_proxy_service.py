@@ -195,6 +195,9 @@ class _ProxySessionStore:
                 if session_origin == target_origin and target_origin:
                     old_count = len(s["cookies"])
                     s["cookies"] = requests.cookies.RequestsCookieJar()
+                    s["token"] = ""
+                    s["subsystem_token"] = ""
+                    s["platform_url"] = ""
                     s["last_active"] = time.time()
                     logger.info(
                         "proxy_session_cookies_cleared",
@@ -554,6 +557,17 @@ class UiProxyService:
         # 处理重定向响应：改写 Location 为代理 URL，返回给浏览器处理
         if resp.status_code in (301, 302, 303, 307, 308):
             location = resp.headers.get("Location", "")
+            logger.info(
+                "proxy_page_redirect_handling",
+                extra={
+                    "event": "ui.proxy.page.redirect.handling",
+                    "session_id": session_id[:8] if session_id else None,
+                    "original_url": url,
+                    "status_code": resp.status_code,
+                    "location_header": location,
+                    "replay_mode": replay_mode,
+                },
+            )
             # 改写 Location 为代理 URL
             if location:
                 from urllib.parse import urlparse as _urlparse
@@ -578,6 +592,14 @@ class UiProxyService:
                 )
             else:
                 rewritten_location = "/"
+                logger.warning(
+                    "proxy_page_redirect_no_location",
+                    extra={
+                        "event": "ui.proxy.page.redirect.no_location",
+                        "session_id": session_id[:8] if session_id else None,
+                        "status_code": resp.status_code,
+                    },
+                )
 
             response_headers: Dict[str, Any] = {
                 "Location": rewritten_location,
@@ -1259,9 +1281,57 @@ class UiProxyService:
                 '}'
             )
 
+        # 跨系统 Token 注入：回放模式下，如果 session 中有子系统 Token 且目标不是主平台登录页，
+        # 将子系统 Token 注入 localStorage，覆盖可能残留的主平台 Token（解决 9301 等子系统"登录状态失效"）
+        subsystem_token_inject = ''
+        if replay_mode and session_id:
+            _sub_token = _proxy_session_store.get_subsystem_token(session_id)
+            if _sub_token:
+                _parsed_target = urlparse(target_url)
+                _target_path = _parsed_target.path or "/"
+                if "/login" not in _target_path:
+                    _escaped_token = _sub_token.replace("\\", "\\\\").replace('"', '\\"')
+                    subsystem_token_inject = (
+                        'try{'
+                        'var _subToken="' + _escaped_token + '";'
+                        'var _tokenKeys=["token","access_token","Token","AUTH_TOKEN","esp_token"];'
+                        '_tokenKeys.forEach(function(k){'
+                        'localStorage.setItem(k,_subToken);'
+                        'console.log("[ProxyEarly] subsystem token set:",k);'
+                        '});'
+                        'Object.keys(localStorage).forEach(function(k){'
+                        'try{var v=localStorage.getItem(k);'
+                        'if(v&&v.charAt(0)==="{"){var obj=JSON.parse(v);'
+                        'console.log("[ProxyEarly] JSON key:",k,"has token:",typeof obj.token==="string");'
+                        'if(typeof obj==="object"&&obj!==null&&typeof obj.token==="string"&&obj.token!==_subToken){'
+                        'obj.token=_subToken;localStorage.setItem(k,JSON.stringify(obj));'
+                        'console.log("[ProxyEarly] subsystem token updated in:",k);}}'
+                        '}catch(e){console.warn("[ProxyEarly] JSON parse failed:",k,e);}'
+                        '});'
+                        '}catch(e){console.warn("[ProxyEarly] subsystem token inject failed:",e);}'
+                    )
+                    logger.info(
+                        "proxy_early_subsystem_token_inject",
+                        extra={
+                            "event": "ui.proxy.early.subsystem_token_inject",
+                            "session_id": session_id[:8],
+                            "target_url": target_url[:100],
+                        },
+                    )
+
+        logger.info(
+            "proxy_early_script_origin",
+            extra={
+                "event": "ui.proxy.early.origin",
+                "origin": origin,
+                "target_url": target_url,
+                "session_id": session_id[:8] if session_id else None,
+                "replay_mode": replay_mode,
+            },
+        )
+
         early_js = (
             '(function(){'
-            + storage_clear +
             'var _T="' + origin + '";'
             'var _TURL="' + target_url + '";'
             'var _F=location.protocol+"//"+location.host;'
@@ -1269,6 +1339,8 @@ class UiProxyService:
             'if(!_T||_T===_F)return;'
             'var _targetLoc=document.createElement("a");_targetLoc.href=_TURL;'
             'window.__proxyTargetLoc=_targetLoc;'
+            + storage_clear +
+            subsystem_token_inject +
             'try{'
             'var _locProps={pathname:{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;}},search:{get:function(){return _targetLoc.search;},set:function(v){_targetLoc.search=v;}},hash:{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;}},host:{get:function(){return _targetLoc.host;}},hostname:{get:function(){return _targetLoc.hostname;}},protocol:{get:function(){return _targetLoc.protocol;}},port:{get:function(){return _targetLoc.port;}},origin:{get:function(){return _targetLoc.origin;}},href:{get:function(){return _targetLoc.href;}}};'
             '(function(){'
@@ -1301,7 +1373,6 @@ class UiProxyService:
             'var _origHrefSet=_locHrefDesc.set;'
             'try{Object.defineProperty(Location.prototype,"href",{get:_locHrefDesc.get,set:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};_origHrefSet.call(this,v);},configurable:false});}catch(e){Location.prototype.href=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};_origHrefSet.call(this,v);};}}'
             'console.log("[ProxyEarly] Location.prototype.href setter patched");'
-            '}'
             'var _locReplaceDesc=Object.getOwnPropertyDescriptor(Location.prototype,"replace");'
             'if(_locReplaceDesc&&_locReplaceDesc.value){var _origReplace=_locReplaceDesc.value;'
             'try{Object.defineProperty(Location.prototype,"replace",{value:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};return _origReplace.call(this,v);},writable:false,configurable:false});}catch(e){Location.prototype.replace=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};return _origReplace.call(this,v);};}}'
@@ -1419,6 +1490,7 @@ class UiProxyService:
             'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0)return v;'
             'if(v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0)return v;'
             'if(v.indexOf("proxy-resource")>=0)return v;'
+            'if(v.indexOf("_proxy_url=")>=0)return v;'
             'var _fullUrl=v.indexOf(_T)===0?v:(v.indexOf("/")===0?_T+v:(v.indexOf(_F)===0?_T+v.substring(_F.length):_T+"/"+v));'
             'var _pathUrl=v.indexOf("/")===0?v:(v.indexOf(_F)===0?v.substring(_F.length):"/"+v);'
             'var _sep=_pathUrl.indexOf("?")>=0?"&":"?";'
@@ -1429,13 +1501,13 @@ class UiProxyService:
             'var _nativeReplace=History.prototype.replaceState;'
             'function _proxyPushState(state,title,url){'
             'if(typeof url==="string"){try{window.parent.postMessage({type:"_proxy_nav",data:{method:"pushState",href:url,loc:location.href}},"*");}catch(e){}'
-            'if(url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativePush.call(this,state,title,url);}'
-            'try{var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r.href;var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";url=_path+_sep+"_proxy_url="+encodeURIComponent(_r.href);}catch(e){}}'
+            'if(url.indexOf("#")===0||url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativePush.call(this,state,title,url);}'
+            'try{if(url.indexOf("_proxy_url=")>=0){var _r2=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r2.href;}else{var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r.href;var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";url=_path+_sep+"_proxy_url="+encodeURIComponent(_r.href);}}catch(e){}}'
             'return _nativePush.call(this,state,title,url);}'
             'function _proxyReplaceState(state,title,url){'
             'if(typeof url==="string"){try{window.parent.postMessage({type:"_proxy_nav",data:{method:"replaceState",href:url,loc:location.href}},"*");}catch(e){}'
-            'if(url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativeReplace.call(this,state,title,url);}'
-            'try{var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r.href;var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";url=_path+_sep+"_proxy_url="+encodeURIComponent(_r.href);}catch(e){}}'
+            'if(url.indexOf("#")===0||url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativeReplace.call(this,state,title,url);}'
+            'try{if(url.indexOf("_proxy_url=")>=0){var _r2=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r2.href;}else{var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r.href;var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";url=_path+_sep+"_proxy_url="+encodeURIComponent(_r.href);}}catch(e){}}'
             'return _nativeReplace.call(this,state,title,url);}'
             'try{Object.defineProperty(History.prototype,"pushState",{value:_proxyPushState,writable:false,configurable:false});}catch(e){History.prototype.pushState=_proxyPushState;}'
             'try{Object.defineProperty(History.prototype,"replaceState",{value:_proxyReplaceState,writable:false,configurable:false});}catch(e){History.prototype.replaceState=_proxyReplaceState;}'
@@ -1457,7 +1529,7 @@ class UiProxyService:
                 'return _origOpen.call(this,url,name,features);};'
             ))
             + '}'
-            'try{if(typeof window.__PROXY_SETUP__==="undefined"){window.__PROXY_SETUP__=true;var _tPath=_targetLoc.pathname+(_targetLoc.search||"")+(_targetLoc.hash||"");window.history.replaceState(null,"",_tPath);try{window.dispatchEvent(new PopStateEvent("popstate",{}));}catch(e){var _pe=document.createEvent("HTMLEvents");_pe.initEvent("popstate",true,true);window.dispatchEvent(_pe);}}}catch(e){}'
+            'try{if(typeof window.__PROXY_SETUP__==="undefined"){window.__PROXY_SETUP__=true;var _tPath=_targetLoc.pathname+(_targetLoc.search||"")+(_targetLoc.hash||"");window.history.replaceState(null,"",_tPath);try{window.location.hash="#"+_targetLoc.pathname;}catch(e){}try{window.dispatchEvent(new PopStateEvent("popstate",{}));}catch(e){var _pe=document.createEvent("HTMLEvents");_pe.initEvent("popstate",true,true);window.dispatchEvent(_pe);}}}catch(e){}'
             + (
                 'function _convertBlank(){'
                 'var links=document.querySelectorAll("a[target=\\"_blank\\"]");'
