@@ -117,7 +117,7 @@ class PostmanTestReport:
 
 
 # Import execution helpers
-from postman_api_tester.core.execution_helpers import (
+from postman_api_tester.core.execution_helpers import (  # noqa: E402 必须在类定义后导入，避免循环依赖
     _prepare_runtime_settings,
     _prepare_execution_apis,
     _prepare_checkpoint_and_progress,

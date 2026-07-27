@@ -6,8 +6,8 @@
 - 使用方：执行层、代理请求与实际请求 URL 展示链路。
 """
 
-from typing import Any, Dict, Optional, Tuple
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin
+from typing import Any, Dict, Optional, Tuple  # noqa: E402 开发导读块后导入
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin  # noqa: E402
 
 
 def normalize_url_and_params(url: str, params: Any) -> Tuple[str, Dict[str, Any]]:
