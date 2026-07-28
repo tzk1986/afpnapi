@@ -5,9 +5,9 @@
 """
 
 import contextlib
+import logging
 import os
 import threading
-import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from postman_api_tester.services.report_retry_service import (
@@ -17,7 +17,6 @@ from postman_api_tester.services.report_retry_service import (
     collect_failed_item_paths,
 )
 from postman_api_tester.utils.logging_utils import get_log_sample_rate, log_sampled
-
 
 logger = logging.getLogger(__name__)
 PROGRESS_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)

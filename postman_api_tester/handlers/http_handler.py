@@ -19,7 +19,6 @@ import requests
 from postman_api_tester.runtime_utils import normalize_url_and_params
 from postman_api_tester.utils.request_builder import build_request_kwargs
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -92,6 +91,8 @@ def execute_http_request(
 
 		from postman_api_tester.report_server_config import (
 			REQUEST_CONNECT_TIMEOUT as _connect_timeout,
+		)
+		from postman_api_tester.report_server_config import (
 			REQUEST_READ_TIMEOUT as _read_timeout,
 		)
 		connect_timeout = _connect_timeout

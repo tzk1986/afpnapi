@@ -17,9 +17,12 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, Response, request
 
-from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
-from postman_api_tester.report_repository import configure_report_repository
 from postman_api_tester.report_job_store import configure_run_jobs
+from postman_api_tester.report_meta_repository import (
+    configure_reports_dir,
+    configure_scan_excludes,
+)
+from postman_api_tester.report_repository import configure_report_repository
 from postman_api_tester.utils.logging_utils import (
     configure_logging_from_config,
     get_log_sample_rate,
@@ -173,7 +176,7 @@ class ReportServerApp:
             reports_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            from postman_api_tester.config import REPORT_SERVER_PORT, REPORT_SERVER_HOST
+            from postman_api_tester.config import REPORT_SERVER_HOST, REPORT_SERVER_PORT
             port = REPORT_SERVER_PORT
             host = REPORT_SERVER_HOST
         except ImportError:

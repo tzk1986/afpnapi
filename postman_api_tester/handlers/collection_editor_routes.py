@@ -63,6 +63,8 @@ def api_collection_save() -> ResponseReturnValue:
 
         from postman_api_tester.services.collection_editor_service import (
             build_collection_json as _svc_build_collection_json,
+        )
+        from postman_api_tester.services.collection_editor_service import (
             validate_for_execution as _svc_validate_for_execution,
         )
 

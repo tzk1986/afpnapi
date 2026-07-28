@@ -7,7 +7,6 @@
 
 from typing import Any, Optional, Protocol, Tuple, cast
 
-
 RequestTimeout = Tuple[int, int]
 
 

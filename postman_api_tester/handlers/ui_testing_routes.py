@@ -735,7 +735,10 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
 
     通过 Referer 中的 proxy URL 或 Cookie session 提取目标地址。
     """
-    from postman_api_tester.services.ui_proxy_service import UiProxyService, _proxy_session_store
+    from postman_api_tester.services.ui_proxy_service import (
+        UiProxyService,
+        _proxy_session_store,
+    )
 
     # 从请求路径构造目标 URL（移除前导 /）
     resource_path = request.path.lstrip("/")

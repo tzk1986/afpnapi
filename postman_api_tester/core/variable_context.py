@@ -104,7 +104,9 @@ class VariableContext:
         合并优先级（高→低）：initial_variables > environments[env_name] > shared。
         文件不存在或解析失败时返回空上下文（仅含 initial_variables）。
         """
-        from postman_api_tester.services.global_variables_service import merge_variables_for_env
+        from postman_api_tester.services.global_variables_service import (
+            merge_variables_for_env,
+        )
 
         file_vars = merge_variables_for_env(path, env_name)
         merged: Dict[str, str] = {**file_vars, **(initial_variables or {})}

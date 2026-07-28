@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-
 _HEADER_PREFIX = "$header."
 _FIELD_PATTERN = re.compile(r"^\$(?:\.([A-Za-z_][A-Za-z0-9_]*))*(?:\[(-?\d+)\])?(?:\.([A-Za-z_][A-Za-z0-9_]*)(?:\[(-?\d+)\])?)*$")
 

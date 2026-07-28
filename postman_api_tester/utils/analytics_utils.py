@@ -8,7 +8,6 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 
-
 ERROR_CATEGORY_CONNECTION = "connection"
 ERROR_CATEGORY_AUTH = "auth"
 ERROR_CATEGORY_BUSINESS = "business"

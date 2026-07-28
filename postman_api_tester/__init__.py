@@ -5,14 +5,11 @@
 - 业务调用建议优先使用 run_postman_tests，避免直接依赖内部细节。
 """
 
-from .parser import PostmanApiParser
 from .executor import PostmanTestExecutor
-from .postman_api_tester import (
-    PostmanTestReport,
-    run_postman_tests
-)
+from .parser import PostmanApiParser
+from .postman_api_tester import PostmanTestReport, run_postman_tests
 
-__version__ = "1.30.106"
+__version__ = "1.30.107"
 __author__ = "API Testing Team"
 
 __all__ = [

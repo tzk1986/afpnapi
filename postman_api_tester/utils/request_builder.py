@@ -10,7 +10,9 @@ import json
 from typing import Any, Dict, List, Tuple
 from urllib.parse import urlencode
 
-from postman_api_tester.runtime_utils import merge_url_with_params as _merge_url_with_params
+from postman_api_tester.runtime_utils import (
+    merge_url_with_params as _merge_url_with_params,
+)
 
 
 def set_request_url(request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]) -> None:

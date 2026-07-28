@@ -5,9 +5,7 @@
 """
 
 import threading
-
 from typing import Dict
-
 
 REPORT_WRITE_LOCKS: Dict[str, threading.RLock] = {}
 _REPORT_WRITE_LOCKS_META = threading.Lock()
