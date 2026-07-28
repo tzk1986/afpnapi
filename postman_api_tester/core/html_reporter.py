@@ -15,7 +15,12 @@ from typing import Any, List, Tuple
 
 from jinja2 import Environment, FileSystemLoader
 
-from postman_api_tester.core.types import SummaryData, DetailsData, IndexResultsData, ReportMetadata
+from postman_api_tester.core.types import (
+    DetailsData,
+    IndexResultsData,
+    ReportMetadata,
+    SummaryData,
+)
 from postman_api_tester.executor import TestResultRecord
 from postman_api_tester.utils.security import sanitize_headers
 

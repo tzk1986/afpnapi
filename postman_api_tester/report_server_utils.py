@@ -9,7 +9,6 @@ from typing import Dict, List, Optional, SupportsInt, cast
 
 from postman_api_tester.utils.security import strip_sensitive_headers
 
-
 JsonDict = Dict[str, object]
 
 

@@ -8,6 +8,12 @@ from pathlib import Path
 from flask import make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.report_repository import (
+    find_report as _repo_find_report,
+)
+from postman_api_tester.report_repository import (
+    list_reports as _repo_list_reports,
+)
 from postman_api_tester.report_server_config import (
     ADHOC_DEFAULT_COLLECTION_NAME,
     ADHOC_MAX_ITEMS,
@@ -15,19 +21,19 @@ from postman_api_tester.report_server_config import (
     DEFAULT_ENV_NAME,
     ENABLE_ADHOC_RUN,
     ENABLE_ASSERTIONS,
+    ENABLE_DATA_DRIVEN,
     ENABLE_JUNIT_EXPORT,
     ENABLE_MANUAL_CASES,
     ENABLE_REPORT_ANALYTICS,
     ENABLE_REPORT_ANALYTICS_CHARTS,
-    ENABLE_DATA_DRIVEN,
     ENABLE_REPORT_LIST_FILTER,
     ENABLE_RESPONSE_TIME,
     ENABLE_RETRY_FAILURES,
     ENABLE_SELECTIVE_RUN,
     ENABLE_VARIABLE_EXTRACTION,
     ENABLE_VARIABLE_FUNCTIONS,
-    GLOBAL_VARIABLES_FILE,
     ENVIRONMENTS,
+    GLOBAL_VARIABLES_FILE,
     MANUAL_CASE_FOLDER_NAME,
     REPORT_ANALYTICS_ENABLE_SAMPLES,
     REPORT_ANALYTICS_TOP_N_DEFAULT,
@@ -42,10 +48,6 @@ from postman_api_tester.report_server_config import (
     RUN_RESULTS_PER_PAGE_MAX,
     RUN_RESULTS_PER_PAGE_MIN,
     RUN_STATUS_POLL_INTERVAL_MS,
-)
-from postman_api_tester.report_repository import (
-    find_report as _repo_find_report,
-    list_reports as _repo_list_reports,
 )
 from postman_api_tester.utils.server_utils import get_local_ip
 

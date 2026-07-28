@@ -15,35 +15,47 @@ import os
 import re
 from datetime import datetime
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+
 if TYPE_CHECKING:
     from postman_api_tester.postman_api_tester import PostmanTestReport
 from urllib.parse import urljoin
 
+from postman_api_tester.auth import get_auth_token
 from postman_api_tester.core.batch_scheduler import BatchScheduler
-from postman_api_tester.core.concurrent_executor import ConcurrentProgressTracker, execute_batch_concurrently
+from postman_api_tester.core.concurrent_executor import (
+    ConcurrentProgressTracker,
+    execute_batch_concurrently,
+)
 from postman_api_tester.core.html_reporter import HtmlReporter
 from postman_api_tester.core.types import ProgressCallback, ProgressPayload
 from postman_api_tester.exceptions import ValidationError
-from postman_api_tester.parser import ApiConfig, PostmanApiParser
-from postman_api_tester.auth import get_auth_token
 from postman_api_tester.executor import PostmanTestExecutor, TestResultRecord
+from postman_api_tester.parser import ApiConfig, PostmanApiParser
+from postman_api_tester.runtime_utils import (
+    checkpoint_file_path as _checkpoint_file_path,
+)
+from postman_api_tester.runtime_utils import (
+    checkpoint_key as _checkpoint_key,
+)
+from postman_api_tester.runtime_utils import (
+    compute_collection_fingerprint as _compute_collection_fingerprint,
+)
+from postman_api_tester.runtime_utils import (
+    load_checkpoint as _load_checkpoint,
+)
+from postman_api_tester.runtime_utils import (
+    save_checkpoint_atomic as _save_checkpoint_atomic,
+)
 from postman_api_tester.session import (
-    SessionLike,
     RequestTimeout,
-    create_shared_session,
+    SessionLike,
     close_session,
+    create_shared_session,
     normalize_timeout,
     resolve_request_timeout,
 )
-from postman_api_tester.runtime_utils import (
-    checkpoint_file_path as _checkpoint_file_path,
-    checkpoint_key as _checkpoint_key,
-    compute_collection_fingerprint as _compute_collection_fingerprint,
-    load_checkpoint as _load_checkpoint,
-    save_checkpoint_atomic as _save_checkpoint_atomic,
-)
-from postman_api_tester.utils.logging_utils import log_sampled, get_log_sample_rate
+from postman_api_tester.utils.logging_utils import get_log_sample_rate, log_sampled
 
 logger = logging.getLogger(__name__)
 PASSED_TEST_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)

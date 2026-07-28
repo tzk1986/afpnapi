@@ -8,7 +8,6 @@
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-
 DB_FEEDBACK_RULES: List[Tuple[str, List[str], str, str]] = [
     (
         "db_connection",

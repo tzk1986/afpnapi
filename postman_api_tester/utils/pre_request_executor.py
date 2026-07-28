@@ -19,7 +19,8 @@ import logging
 import re
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Dict
 
 logger = logging.getLogger(__name__)

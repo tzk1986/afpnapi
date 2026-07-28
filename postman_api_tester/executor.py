@@ -21,24 +21,34 @@ import json
 import logging
 import time as _time_mod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, TypedDict
+
 if TYPE_CHECKING:
     from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.session import RequestTimeout
 
 try:
-    from postman_api_tester.assertions import evaluate_assertions as _evaluate_assertions
+    from postman_api_tester.assertions import (
+        evaluate_assertions as _evaluate_assertions,
+    )
     _ASSERTIONS_AVAILABLE = True
 except ImportError:
     _ASSERTIONS_AVAILABLE = False
 
-from postman_api_tester.runtime_utils import normalize_url_and_params as _normalize_url_and_params
-from postman_api_tester.db_feedback import build_db_feedback
-from postman_api_tester.session import normalize_timeout
-from postman_api_tester.parser import ApiConfig
-from postman_api_tester.utils.response_parser import extract_msg_errcode as _extract_msg_errcode
-from postman_api_tester.utils.judgment_utils import evaluate_result_judgment, resolve_judgment_params
 from postman_api_tester import report_server_config as _rsc
+from postman_api_tester.db_feedback import build_db_feedback
+from postman_api_tester.parser import ApiConfig
+from postman_api_tester.runtime_utils import (
+    normalize_url_and_params as _normalize_url_and_params,
+)
+from postman_api_tester.session import normalize_timeout
+from postman_api_tester.utils.judgment_utils import (
+    evaluate_result_judgment,
+    resolve_judgment_params,
+)
+from postman_api_tester.utils.response_parser import (
+    extract_msg_errcode as _extract_msg_errcode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -338,14 +348,18 @@ class PostmanTestExecutor:
         if self.variable_context is None:
             return api
 
-        from postman_api_tester.utils.variable_substitution import substitute_in_api_config
+        from postman_api_tester.utils.variable_substitution import (
+            substitute_in_api_config,
+        )
 
         local_vars: Dict[str, str] = {}
         pre_request_expr = api.get("x_pre_request")
         if pre_request_expr:
             from postman_api_tester.config import ENABLE_PRE_REQUEST_SCRIPT
             if ENABLE_PRE_REQUEST_SCRIPT:
-                from postman_api_tester.utils.pre_request_executor import execute_pre_request
+                from postman_api_tester.utils.pre_request_executor import (
+                    execute_pre_request,
+                )
                 local_vars = execute_pre_request(pre_request_expr, self.variable_context.variables)
                 if local_vars:
                     logging.getLogger(__name__).debug("pre-request variables set: %s", list(local_vars.keys()))

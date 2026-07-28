@@ -7,14 +7,13 @@
 import json
 import logging
 import random
+import threading
 import time
-from collections import Counter
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from threading import Lock
-import threading
 from typing import Any, Deque, Dict, Mapping, Optional
 
 _STANDARD_RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__.keys())
@@ -183,11 +182,11 @@ def configure_logging(
 
 def configure_logging_from_config(service_name: str) -> None:
     from postman_api_tester.report_server_config import (
-        LOG_LEVEL,
-        LOG_FORMAT,
         LOG_FILE,
-        LOG_FILE_MAX_BYTES,
         LOG_FILE_BACKUP_COUNT,
+        LOG_FILE_MAX_BYTES,
+        LOG_FORMAT,
+        LOG_LEVEL,
     )
     configure_logging(
         level=LOG_LEVEL,
@@ -233,8 +232,8 @@ def get_log_metrics_snapshot() -> Dict[str, Any]:
 
 def _get_alert_config() -> Dict[str, float]:
     from postman_api_tester.report_server_config import (
-        LOG_ALERT_ERROR_WINDOW_SECONDS,
         LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN,
+        LOG_ALERT_ERROR_WINDOW_SECONDS,
     )
     return {
         "window_seconds": float(LOG_ALERT_ERROR_WINDOW_SECONDS),

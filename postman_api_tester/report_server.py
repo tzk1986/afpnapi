@@ -7,140 +7,309 @@
 """
 
 import logging
-from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.global_variables_routes import (
-    api_env_add as _route_api_env_add,
-    api_env_list_get as _route_api_env_list_get,
-    api_env_remove as _route_api_env_remove,
-    api_global_variables_all as _route_api_global_variables_all,
-    api_global_variables_clear as _route_api_global_variables_clear,
-    api_global_variables_delete as _route_api_global_variables_delete,
-    api_global_variables_get as _route_api_global_variables_get,
-    api_global_variables_set as _route_api_global_variables_set,
-    api_variable_functions as _route_api_variable_functions,
-)
 from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_dependency as _route_api_collection_dependency,
+)
+from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_parse as _route_api_collection_parse,
+)
+from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_save as _route_api_collection_save,
+)
+from postman_api_tester.handlers.collection_editor_routes import (
     api_collection_send as _route_api_collection_send,
 )
 from postman_api_tester.handlers.collection_routes import (
     api_collection_preview as _route_api_collection_preview,
+)
+from postman_api_tester.handlers.collection_routes import (
     api_export_collection as _route_api_export_collection,
+)
+from postman_api_tester.handlers.collection_routes import (
     api_export_collection_stream as _route_api_export_collection_stream,
 )
 from postman_api_tester.handlers.export_routes import (
     api_export_junit as _route_api_export_junit,
 )
+from postman_api_tester.handlers.global_variables_routes import (
+    api_env_add as _route_api_env_add,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_env_list_get as _route_api_env_list_get,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_env_remove as _route_api_env_remove,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_all as _route_api_global_variables_all,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_clear as _route_api_global_variables_clear,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_delete as _route_api_global_variables_delete,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_get as _route_api_global_variables_get,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_global_variables_set as _route_api_global_variables_set,
+)
+from postman_api_tester.handlers.global_variables_routes import (
+    api_variable_functions as _route_api_variable_functions,
+)
 from postman_api_tester.handlers.job_routes import (
     api_run_ad_hoc_tests as _route_api_run_ad_hoc_tests,
+)
+from postman_api_tester.handlers.job_routes import (
     api_run_postman as _route_api_run_postman,
+)
+from postman_api_tester.handlers.job_routes import (
     api_run_postman_status as _route_api_run_postman_status,
 )
 from postman_api_tester.handlers.page_routes import (
     adhoc_run_page as _route_adhoc_run_page,
+)
+from postman_api_tester.handlers.page_routes import (
     collection_editor_page as _route_collection_editor_page,
+)
+from postman_api_tester.handlers.page_routes import (
     index as _route_index,
+)
+from postman_api_tester.handlers.page_routes import (
     report_view as _route_report_view,
 )
 from postman_api_tester.handlers.report_meta_routes import (
     api_manual_case_add as _route_api_manual_case_add,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_manual_case_delete as _route_api_manual_case_delete,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_manual_case_update as _route_api_manual_case_update,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_manual_cases as _route_api_manual_cases,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_report_case_exclusion as _route_api_report_case_exclusion,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_report_detail as _route_api_report_detail,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_report_result_judgement as _route_api_report_result_judgement,
+)
+from postman_api_tester.handlers.report_meta_routes import (
     api_reports as _route_api_reports,
 )
 from postman_api_tester.handlers.report_result_routes import (
     api_compare as _route_api_compare,
+)
+from postman_api_tester.handlers.report_result_routes import (
     api_report_analytics as _route_api_report_analytics,
+)
+from postman_api_tester.handlers.report_result_routes import (
     api_report_analytics_compare as _route_api_report_analytics_compare,
+)
+from postman_api_tester.handlers.report_result_routes import (
     api_report_result_detail as _route_api_report_result_detail,
+)
+from postman_api_tester.handlers.report_result_routes import (
     api_report_results as _route_api_report_results,
 )
 from postman_api_tester.handlers.retry_routes import (
     api_retry_all as _route_api_retry_all,
+)
+from postman_api_tester.handlers.retry_routes import (
     api_retry_failures as _route_api_retry_failures,
 )
 from postman_api_tester.handlers.server_routes import (
     api_environments as _route_api_environments,
+)
+from postman_api_tester.handlers.server_routes import (
     api_report_delete as _route_api_report_delete,
+)
+from postman_api_tester.handlers.server_routes import (
     health as _route_health,
+)
+from postman_api_tester.handlers.server_routes import (
     latest_report as _route_latest_report,
+)
+from postman_api_tester.handlers.server_routes import (
     log_metrics as _route_log_metrics,
+)
+from postman_api_tester.handlers.server_routes import (
     serve_export as _route_serve_export,
+)
+from postman_api_tester.handlers.server_routes import (
     serve_report as _route_serve_report,
 )
 from postman_api_tester.handlers.test_proxy_routes import (
     api_proxy_request as _route_api_proxy_request,
+)
+from postman_api_tester.handlers.test_proxy_routes import (
     re_request_api as _route_re_request_api,
+)
+from postman_api_tester.handlers.test_proxy_routes import (
     test_token as _route_test_token,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_cleanup as _route_api_ui_testing_cleanup,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execute as _route_api_ui_testing_execute,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_cancel as _route_api_ui_testing_execution_cancel,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_finalize as _route_api_ui_testing_execution_finalize,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_init as _route_api_ui_testing_execution_init,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_report as _route_api_ui_testing_execution_report,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_screenshot as _route_api_ui_testing_execution_screenshot,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_screenshot_post as _route_api_ui_testing_execution_screenshot_post,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_status as _route_api_ui_testing_execution_status,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_playwright_status as _route_api_ui_testing_playwright_status,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_replay_engine_js as _route_api_ui_testing_replay_engine_js,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_replay_log as _route_api_ui_testing_replay_log,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_report_delete as _route_api_ui_testing_report_delete,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_reports_list as _route_api_ui_testing_reports_list,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_settings_get as _route_api_ui_testing_settings_get,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_settings_reset as _route_api_ui_testing_settings_reset,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    api_ui_testing_settings_update as _route_api_ui_testing_settings_update,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    ui_testing_replay_page as _route_ui_testing_replay_page,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    ui_testing_report_page as _route_ui_testing_report_page,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    ui_testing_reports_page as _route_ui_testing_reports_page,
+)
+from postman_api_tester.handlers.ui_execution_routes import (
+    ui_testing_settings_page as _route_ui_testing_settings_page,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
+    api_ui_recorder_clear_recording as _route_api_ui_recorder_clear_recording,
 )
 from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_event as _route_api_ui_recorder_event,
-    api_ui_recorder_sessions as _route_api_ui_recorder_sessions,
-    api_ui_recorder_session_detail as _route_api_ui_recorder_session_detail,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_session_delete as _route_api_ui_recorder_session_delete,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
+    api_ui_recorder_session_detail as _route_api_ui_recorder_session_detail,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
     api_ui_recorder_session_export as _route_api_ui_recorder_session_export,
-    api_ui_recorder_clear_recording as _route_api_ui_recorder_clear_recording,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
+    api_ui_recorder_sessions as _route_api_ui_recorder_sessions,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
     ui_recorder_demo_page as _route_ui_recorder_demo_page,
+)
+from postman_api_tester.handlers.ui_recorder_routes import (
     ui_recorder_page as _route_ui_recorder_page,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_case_delete as _route_api_ui_testing_case_delete,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_case_get as _route_api_ui_testing_case_get,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_case_update as _route_api_ui_testing_case_update,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_cases_create as _route_api_ui_testing_cases_create,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_cases_list as _route_api_ui_testing_cases_list,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_get as _route_api_ui_testing_recording_get,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_save_as_case as _route_api_ui_testing_recording_save_as_case,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_start as _route_api_ui_testing_recording_start,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_step as _route_api_ui_testing_recording_step,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_stop as _route_api_ui_testing_recording_stop,
-    ui_testing_editor_page as _route_ui_testing_editor_page,
-    ui_testing_index_page as _route_ui_testing_index_page,
-    ui_testing_proxy as _route_ui_testing_proxy,
-    ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     ui_proxy_sessions_debug as _route_ui_proxy_sessions_debug,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
+    ui_testing_editor_page as _route_ui_testing_editor_page,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
+    ui_testing_index_page as _route_ui_testing_index_page,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
+    ui_testing_proxy as _route_ui_testing_proxy,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
+    ui_testing_proxy_resource as _route_ui_testing_proxy_resource,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_recorder_page as _route_ui_testing_recorder_page,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_static_fallback as _route_ui_testing_static_fallback,
 )
-from postman_api_tester.handlers.ui_execution_routes import (
-    api_ui_testing_execute as _route_api_ui_testing_execute,
-    api_ui_testing_execution_cancel as _route_api_ui_testing_execution_cancel,
-    api_ui_testing_execution_finalize as _route_api_ui_testing_execution_finalize,
-    api_ui_testing_execution_init as _route_api_ui_testing_execution_init,
-    api_ui_testing_execution_report as _route_api_ui_testing_execution_report,
-    api_ui_testing_execution_screenshot as _route_api_ui_testing_execution_screenshot,
-    api_ui_testing_execution_screenshot_post as _route_api_ui_testing_execution_screenshot_post,
-    api_ui_testing_execution_status as _route_api_ui_testing_execution_status,
-    api_ui_testing_execution_step_report as _route_api_ui_testing_execution_step_report,
-    api_ui_testing_executions_list as _route_api_ui_testing_executions_list,
-    api_ui_testing_replay_engine_js as _route_api_ui_testing_replay_engine_js,
-    api_ui_testing_replay_log as _route_api_ui_testing_replay_log,
-    api_ui_testing_report_delete as _route_api_ui_testing_report_delete,
-    api_ui_testing_reports_list as _route_api_ui_testing_reports_list,
-    api_ui_testing_settings_get as _route_api_ui_testing_settings_get,
-    api_ui_testing_settings_update as _route_api_ui_testing_settings_update,
-    api_ui_testing_playwright_status as _route_api_ui_testing_playwright_status,
-    api_ui_testing_settings_reset as _route_api_ui_testing_settings_reset,
-    api_ui_testing_cleanup as _route_api_ui_testing_cleanup,
-    ui_testing_replay_page as _route_ui_testing_replay_page,
-    ui_testing_report_page as _route_ui_testing_report_page,
-    ui_testing_reports_page as _route_ui_testing_reports_page,
-    ui_testing_settings_page as _route_ui_testing_settings_page,
-)
 from postman_api_tester.report_job_store import configure_run_jobs
-from postman_api_tester.report_meta_repository import configure_reports_dir, configure_scan_excludes
+from postman_api_tester.report_meta_repository import (
+    configure_reports_dir,
+    configure_scan_excludes,
+)
 from postman_api_tester.report_repository import configure_report_repository
 from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import _cfg_int
+from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 from postman_api_tester.utils.logging_utils import configure_logging_from_config
 
 configure_logging_from_config(service_name="report_server")
@@ -150,7 +319,10 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
-from postman_api_tester.report_server_config import REPORT_SCAN_EXCLUDE_DIRS  # noqa: E402 必须在 app 创建后导入
+from postman_api_tester.report_server_config import (
+    REPORT_SCAN_EXCLUDE_DIRS,  # noqa: E402 必须在 app 创建后导入
+)
+
 configure_scan_excludes(REPORT_SCAN_EXCLUDE_DIRS)
 configure_report_repository(REPORTS_DIR, cache_ttl=30.0)
 configure_run_jobs(_cfg_int("RUN_JOBS_MAX", 200))
@@ -520,9 +692,11 @@ def ui_testing_static_fallback(filename: str) -> ResponseReturnValue:
 def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     """SPA 资源/API 兜底：拦截所有未被其他路由处理的请求，
     转发到目标服务器。覆盖早期脚本 fetch 拦截器未覆盖的情况。"""
-    from flask import make_response, request
+    from urllib.parse import parse_qs
     from urllib.parse import unquote as _uq
-    from urllib.parse import urlparse as _urlparse, parse_qs
+    from urllib.parse import urlparse as _urlparse
+
+    from flask import make_response, request
 
     _ext = resource_path.rsplit(".", 1)[-1].lower() if "." in resource_path else ""
     _resource_exts = {
@@ -604,7 +778,9 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     if not target_url:
         session_id = request.cookies.get("_proxy_session")
         if session_id:
-            from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+            from postman_api_tester.services.ui_proxy_service import (
+                _proxy_session_store,
+            )
             target_url = _proxy_session_store.get_base_url(session_id) or ""
 
     # 如果还是没有 target_url，使用最近一次会话的 base_url
@@ -664,6 +840,7 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
 
     try:
         from typing import Union
+
         from postman_api_tester.services.ui_proxy_service import UiProxyService
         body: Union[str, bytes]
         if is_page:

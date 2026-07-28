@@ -4,9 +4,10 @@
 """
 
 import logging
-from typing import Any, Callable
 from datetime import datetime
-from postman_api_tester.exceptions import PostmanTestException, ExecutionError
+from typing import Any, Callable
+
+from postman_api_tester.exceptions import ExecutionError, PostmanTestException
 
 logger = logging.getLogger(__name__)
 

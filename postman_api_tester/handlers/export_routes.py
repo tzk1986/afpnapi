@@ -9,10 +9,14 @@ from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import (
     get_report_or_error,
+)
+from postman_api_tester.handlers.base_handler import (
     json_error as _json_error,
 )
 from postman_api_tester.report_server_config import ENABLE_JUNIT_EXPORT
-from postman_api_tester.services.report_junit_service import build_junit_xml as _svc_build_junit_xml
+from postman_api_tester.services.report_junit_service import (
+    build_junit_xml as _svc_build_junit_xml,
+)
 
 logger = logging.getLogger(__name__)
 

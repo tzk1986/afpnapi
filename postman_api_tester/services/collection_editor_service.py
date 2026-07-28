@@ -10,7 +10,6 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-
 _VARIABLE_REF_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 _BASE_URL_VARS = frozenset({"baseUrl", "base_url"})
 

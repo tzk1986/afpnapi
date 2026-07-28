@@ -7,8 +7,8 @@
 import contextlib
 import io
 import xml.etree.ElementTree as ET
-from xml.sax.saxutils import escape as _xml_escape
 from typing import Any, Dict
+from xml.sax.saxutils import escape as _xml_escape
 
 
 def _parse_duration_to_seconds(duration_str: str) -> float:

@@ -10,6 +10,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from postman_api_tester.report_repository import load_report_details_map
+from postman_api_tester.report_server_utils import (
+    normalize_manual_case,
+    normalize_manual_exclusions,
+    strip_auth_headers,
+)
 from postman_api_tester.utils.collection_utils import (
     append_manual_cases_to_collection,
     collect_report_item_paths,
@@ -19,19 +25,12 @@ from postman_api_tester.utils.collection_utils import (
     prune_collection_to_paths,
     remove_excluded_items,
 )
-from postman_api_tester.report_repository import load_report_details_map
-from postman_api_tester.report_server_utils import (
-    normalize_manual_case,
-    normalize_manual_exclusions,
-    strip_auth_headers,
-)
 from postman_api_tester.utils.file_utils import sanitize_export_name
 from postman_api_tester.utils.request_builder import (
     set_request_body,
     set_request_headers,
     set_request_url,
 )
-
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,6 @@
 
 from typing import FrozenSet, Optional, Tuple
 
-
 _DEFAULT_SUCCESS_MESSAGES: FrozenSet[str] = frozenset({"success"})
 
 

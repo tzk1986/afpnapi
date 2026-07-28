@@ -5,8 +5,8 @@
 - 提供类型安全的配置访问辅助函数
 """
 
-from typing import Any, Dict, List, Optional
 from types import ModuleType
+from typing import Any, Dict, List, Optional
 
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 
@@ -144,7 +144,10 @@ DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")
 ENABLE_ERR_CODE_JUDGMENT: bool = _cfg_bool("ENABLE_ERR_CODE_JUDGMENT", False)
 ENABLE_MESSAGE_JUDGMENT: bool = _cfg_bool("ENABLE_MESSAGE_JUDGMENT", True)
 
-from postman_api_tester.utils.judgment_utils import parse_success_list as _parse_success_list  # noqa: E402 必须在配置加载后导入
+from postman_api_tester.utils.judgment_utils import (
+    parse_success_list as _parse_success_list,  # noqa: E402 必须在配置加载后导入
+)
+
 SUCCESS_ERR_CODES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_ERR_CODES", "0"))
 SUCCESS_MESSAGES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_MESSAGES", "success"))
 

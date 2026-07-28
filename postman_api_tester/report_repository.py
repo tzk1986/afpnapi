@@ -20,7 +20,6 @@ from postman_api_tester.report_meta_repository import (
 )
 from postman_api_tester.utils.file_utils import safe_report_artifact
 
-
 _REPORTS_DIR: Path = Path("reports").resolve()
 _REPORTS_CACHE_TTL = 30.0
 

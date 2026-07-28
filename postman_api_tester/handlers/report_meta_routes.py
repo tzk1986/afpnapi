@@ -7,38 +7,56 @@ from functools import partial
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.exceptions import ValidationError
 from postman_api_tester.handlers.base_handler import (
     BaseHandler,
     get_report_or_error,
+)
+from postman_api_tester.handlers.base_handler import (
     json_error as _json_error,
 )
-from postman_api_tester.exceptions import ValidationError
-from postman_api_tester.services.report_manual_case_service import (
-    add_manual_case as _svc_add_manual_case,
-    delete_manual_case as _svc_delete_manual_case,
-    set_case_exclusion as _svc_set_case_exclusion,
-    update_manual_case as _svc_update_manual_case,
+from postman_api_tester.report_repository import (
+    find_report as _repo_find_report,
 )
+from postman_api_tester.report_repository import (
+    invalidate_reports_cache as _repo_invalidate_reports_cache,
+)
+from postman_api_tester.report_repository import (
+    list_reports as _repo_list_reports,
+)
+from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import (
     ENABLE_MANUAL_CASES,
     MANUAL_CASE_FOLDER_NAME,
 )
 from postman_api_tester.report_server_utils import (
     manual_case_exclusion_key as _manual_case_exclusion_key,
-    normalize_exclusion_key as _normalize_exclusion_key,
-    normalize_manual_case as _normalize_manual_case,
-    normalize_manual_exclusions as _normalize_manual_exclusions,
 )
-from postman_api_tester.report_server_app import ReportServerApp
-from postman_api_tester.report_repository import (
-    find_report as _repo_find_report,
-    invalidate_reports_cache as _repo_invalidate_reports_cache,
-    list_reports as _repo_list_reports,
+from postman_api_tester.report_server_utils import (
+    normalize_exclusion_key as _normalize_exclusion_key,
+)
+from postman_api_tester.report_server_utils import (
+    normalize_manual_case as _normalize_manual_case,
+)
+from postman_api_tester.report_server_utils import (
+    normalize_manual_exclusions as _normalize_manual_exclusions,
 )
 from postman_api_tester.services.report_judgement_service import (
     set_report_result_judgement as _svc_set_report_result_judgement,
 )
 from postman_api_tester.services.report_lock_service import get_report_write_lock
+from postman_api_tester.services.report_manual_case_service import (
+    add_manual_case as _svc_add_manual_case,
+)
+from postman_api_tester.services.report_manual_case_service import (
+    delete_manual_case as _svc_delete_manual_case,
+)
+from postman_api_tester.services.report_manual_case_service import (
+    set_case_exclusion as _svc_set_case_exclusion,
+)
+from postman_api_tester.services.report_manual_case_service import (
+    update_manual_case as _svc_update_manual_case,
+)
 from postman_api_tester.services.report_meta_update_service import (
     update_report_meta as _svc_update_report_meta,
 )
@@ -50,7 +68,9 @@ from postman_api_tester.services.report_results_service import (
     build_report_meta_payload,
     build_result_judgement_payload,
 )
-from postman_api_tester.utils.report_utils import compute_summary as _utils_compute_summary
+from postman_api_tester.utils.report_utils import (
+    compute_summary as _utils_compute_summary,
+)
 
 logger = logging.getLogger(__name__)
 

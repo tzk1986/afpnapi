@@ -11,15 +11,15 @@ import logging
 import sys
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from postman_api_tester.core.variable_context import VariableContext
 
 from postman_api_tester.core.html_reporter import HtmlReporter
 from postman_api_tester.core.types import (
-    SummaryData,
     ProgressCallback,
+    SummaryData,
     copy_summary,
 )
 from postman_api_tester.executor import TestResultRecord
@@ -118,12 +118,12 @@ class PostmanTestReport:
 
 # Import execution helpers
 from postman_api_tester.core.execution_helpers import (  # noqa: E402 必须在类定义后导入，避免循环依赖
-    _prepare_runtime_settings,
-    _prepare_execution_apis,
-    _prepare_checkpoint_and_progress,
-    _prepare_execution_context,
-    _execute_and_finalize_suite,
     _complete_report_output,
+    _execute_and_finalize_suite,
+    _prepare_checkpoint_and_progress,
+    _prepare_execution_apis,
+    _prepare_execution_context,
+    _prepare_runtime_settings,
 )
 
 
@@ -177,7 +177,10 @@ def run_postman_tests(
     data_rows: Optional[List[Dict[str, str]]] = None
     data_columns: Optional[set] = None
     if data_file and getattr(_cfg, "ENABLE_DATA_DRIVEN", False):
-        from postman_api_tester.utils.data_driver import validate_data_file, get_data_columns
+        from postman_api_tester.utils.data_driver import (
+            get_data_columns,
+            validate_data_file,
+        )
         max_rows = int(getattr(_cfg, "DATA_FILE_MAX_ROWS", 10000))
         rows, _fmt = validate_data_file(data_file, max_rows)
         data_rows = rows

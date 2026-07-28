@@ -8,7 +8,6 @@
 
 from typing import Any, Dict, Iterable, Set
 
-
 DEFAULT_SENSITIVE_HEADERS = {
     "authorization",
     "token",

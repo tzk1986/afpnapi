@@ -1627,7 +1627,10 @@ class UiProxyService:
     @staticmethod
     def _inject_recorder_script(html: str, origin: str = "") -> str:
         """在 <head> 注入早期事件捕获脚本，在 </body> 前注入主录制器脚本。"""
-        from postman_api_tester.services.ui_recorder_inject import get_recorder_js, get_early_recorder_js
+        from postman_api_tester.services.ui_recorder_inject import (
+            get_early_recorder_js,
+            get_recorder_js,
+        )
 
         # 早期脚本：在 <head> 中注入，在 Vue.js 之前捕获事件
         early_js = get_early_recorder_js()

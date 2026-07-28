@@ -4,10 +4,10 @@
 - 目标：保证"仅失败重试"与"全量重试"路径选择一致且可验证。
 """
 
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
-import uuid
 
 
 def collect_failed_item_paths(report: Dict[str, Any]) -> List[List[int]]:

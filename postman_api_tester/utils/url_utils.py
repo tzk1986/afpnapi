@@ -7,7 +7,13 @@
 """
 
 from typing import Any, Dict, Optional, Tuple  # noqa: E402 开发导读块后导入
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit, urljoin  # noqa: E402
+from urllib.parse import (  # noqa: E402
+	parse_qsl,
+	urlencode,
+	urljoin,
+	urlsplit,
+	urlunsplit,
+)
 
 
 def normalize_url_and_params(url: str, params: Any) -> Tuple[str, Dict[str, Any]]:

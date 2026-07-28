@@ -14,6 +14,8 @@ from postman_api_tester.report_repository import (
 )
 from postman_api_tester.report_server_utils import (
     normalize_manual_exclusions as _normalize_manual_exclusions,
+)
+from postman_api_tester.report_server_utils import (
     result_exclusion_key as _result_exclusion_key,
 )
 

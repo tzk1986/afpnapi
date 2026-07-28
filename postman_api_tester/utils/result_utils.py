@@ -8,7 +8,9 @@ Real implementations are centralized in report_utils and response_parser.
 - 真实实现：compute_summary 在 report_utils，extract_msg_errcode 在 response_parser。
 """
 
-from postman_api_tester.utils.report_utils import compute_summary  # noqa: E402 开发导读块后导入
+from postman_api_tester.utils.report_utils import (
+    compute_summary,  # noqa: E402 开发导读块后导入
+)
 from postman_api_tester.utils.response_parser import extract_msg_errcode  # noqa: E402
 
 __all__ = ["extract_msg_errcode", "compute_summary"]

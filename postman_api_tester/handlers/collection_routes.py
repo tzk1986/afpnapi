@@ -10,10 +10,9 @@ from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import (
     get_report_or_error,
-    json_error as _json_error,
 )
-from postman_api_tester.utils.collection_utils import (
-    extract_collection_preview_items as _svc_extract_collection_preview_items,
+from postman_api_tester.handlers.base_handler import (
+    json_error as _json_error,
 )
 from postman_api_tester.report_server_config import (
     COLLECTION_PREVIEW_MAX_ITEMS,
@@ -31,6 +30,9 @@ from postman_api_tester.services.report_export_service import (
 from postman_api_tester.services.report_results_service import (
     build_collection_preview_payload,
     build_export_collection_payload,
+)
+from postman_api_tester.utils.collection_utils import (
+    extract_collection_preview_items as _svc_extract_collection_preview_items,
 )
 
 logger = logging.getLogger(__name__)

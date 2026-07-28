@@ -11,19 +11,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from flask import jsonify, redirect, send_from_directory, send_file, url_for
+from flask import jsonify, redirect, send_file, send_from_directory, url_for
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.report_server_config import (
-    DEFAULT_ENV_NAME,
-    ENVIRONMENTS,
-)
 from postman_api_tester.handlers.base_handler import BaseHandler
 from postman_api_tester.report_repository import (
     collect_report_artifacts,
+)
+from postman_api_tester.report_repository import (
     find_report as _repo_find_report,
+)
+from postman_api_tester.report_repository import (
     invalidate_reports_cache as _repo_invalidate_reports_cache,
+)
+from postman_api_tester.report_repository import (
     list_reports as _repo_list_reports,
+)
+from postman_api_tester.report_server_config import (
+    DEFAULT_ENV_NAME,
+    ENVIRONMENTS,
 )
 from postman_api_tester.services.report_results_service import (
     build_environments_payload,
@@ -92,7 +98,9 @@ def api_environments() -> ResponseReturnValue:
 
 def api_report_delete(report_name: str) -> ResponseReturnValue:
     """删除报告产物。"""
-    from postman_api_tester.services.report_delete_service import delete_report_artifacts as _svc_delete
+    from postman_api_tester.services.report_delete_service import (
+        delete_report_artifacts as _svc_delete,
+    )
     logger.info(
         "handler delete report",
         extra={"event": "handler.server.report_delete.forward", "report_name": report_name},
