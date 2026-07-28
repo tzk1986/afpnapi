@@ -79,42 +79,83 @@ def evaluate_assertions(response_body: Any, assertions: List[Dict[str, Any]]) ->
 
 
 def _compare(actual: Any, op: str, expected: Any) -> Tuple[bool, str]:
+    """比较操作符 dispatch 入口。"""
     try:
-        if op == "eq":
-            return (actual == expected, "")
-        if op == "ne":
-            return (actual != expected, "")
-        if op == "gt":
-            return (actual > expected, "")
-        if op == "lt":
-            return (actual < expected, "")
-        if op == "gte":
-            return (actual >= expected, "")
-        if op == "lte":
-            return (actual <= expected, "")
-        if op == "contains":
-            return (str(expected) in str(actual), "")
-        if op == "regex":
-            pattern = str(expected)
-            matched = _re.search(pattern, str(actual))
-            return (matched is not None, "" if matched else f"值 {actual!r} 不匹配正则 {pattern!r}")
-        if op == "length_eq":
-            expected_len = int(expected)
-            actual_len = len(actual) if actual is not None else 0
-            return (actual_len == expected_len, "" if actual_len == expected_len else f"实际长度 {actual_len} != 期望 {expected_len}")
-        if op == "type":
-            return _check_type(actual, str(expected))
-        if op == "schema":
-            if not _JSONSCHEMA_AVAILABLE:
-                return (False, "jsonschema 未安装，请运行: pip install jsonschema")
-            try:
-                _jsonschema.validate(instance=actual, schema=expected)
-                return (True, "")
-            except _jsonschema.ValidationError as exc:
-                return (False, f"Schema 验证失败: {exc.message}")
-        return (False, f"不支持的操作符: {op}，支持: {', '.join(sorted(SUPPORTED_OPS))}")
+        handler = _COMPARE_OPERATORS.get(op)
+        if handler is None:
+            return (False, f"不支持的操作符: {op}，支持: {', '.join(sorted(SUPPORTED_OPS))}")
+        return handler(actual, expected)
     except Exception as exc:
         return (False, f"比较异常: {exc}")
+
+
+def _op_eq(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual == expected, "")
+
+
+def _op_ne(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual != expected, "")
+
+
+def _op_gt(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual > expected, "")
+
+
+def _op_lt(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual < expected, "")
+
+
+def _op_gte(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual >= expected, "")
+
+
+def _op_lte(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (actual <= expected, "")
+
+
+def _op_contains(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return (str(expected) in str(actual), "")
+
+
+def _op_regex(actual: Any, expected: Any) -> Tuple[bool, str]:
+    pattern = str(expected)
+    matched = _re.search(pattern, str(actual))
+    return (matched is not None, "" if matched else f"值 {actual!r} 不匹配正则 {pattern!r}")
+
+
+def _op_length_eq(actual: Any, expected: Any) -> Tuple[bool, str]:
+    expected_len = int(expected)
+    actual_len = len(actual) if actual is not None else 0
+    return (actual_len == expected_len, "" if actual_len == expected_len else f"实际长度 {actual_len} != 期望 {expected_len}")
+
+
+def _op_type(actual: Any, expected: Any) -> Tuple[bool, str]:
+    return _check_type(actual, str(expected))
+
+
+def _op_schema(actual: Any, expected: Any) -> Tuple[bool, str]:
+    if not _JSONSCHEMA_AVAILABLE:
+        return (False, "jsonschema 未安装，请运行: pip install jsonschema")
+    try:
+        _jsonschema.validate(instance=actual, schema=expected)
+        return (True, "")
+    except _jsonschema.ValidationError as exc:
+        return (False, f"Schema 验证失败: {exc.message}")
+
+
+_COMPARE_OPERATORS: Dict[str, Any] = {
+    "eq": _op_eq,
+    "ne": _op_ne,
+    "gt": _op_gt,
+    "lt": _op_lt,
+    "gte": _op_gte,
+    "lte": _op_lte,
+    "contains": _op_contains,
+    "regex": _op_regex,
+    "length_eq": _op_length_eq,
+    "type": _op_type,
+    "schema": _op_schema,
+}
 
 
 _TYPE_MAP: Dict[str, Any] = {

@@ -173,10 +173,12 @@ class PostmanApiParser:
 
         mode = body_data.get('mode')
         if mode == 'raw':
+            raw = body_data.get('raw', '{}')
             try:
-                return json.loads(body_data.get('raw', '{}'))
+                return json.loads(raw)
             except (json.JSONDecodeError, ValueError, TypeError):
-                return body_data.get('raw', '')
+                logger.warning("raw body 不是合法 JSON，fallback 为字符串: %.200r", raw)
+                return raw
         elif mode == 'urlencoded':
             body = {}
             items = body_data.get(mode, [])
