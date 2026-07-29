@@ -212,7 +212,8 @@ class TestExecuteBatchConcurrently:
         )
         assert results[0] == 2
         assert results[1] == 4
-        assert results[2] is None
+        from postman_api_tester.core.concurrent_executor import _FailedResult
+        assert isinstance(results[2], _FailedResult)
         assert results[3] == 8
 
     def test_all_workers_fail_raises_exception(self):
@@ -240,7 +241,8 @@ class TestExecuteBatchConcurrently:
             max_workers=2,
         )
         assert results[0] == 1
-        assert results[1] is None
+        from postman_api_tester.core.concurrent_executor import _FailedResult
+        assert isinstance(results[1], _FailedResult)
         assert results[2] == 3
 
     def test_concurrent_execution(self):

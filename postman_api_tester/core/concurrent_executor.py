@@ -16,6 +16,20 @@ from postman_api_tester.core.types import ProgressCallback
 logger = logging.getLogger(__name__)
 
 
+class _FailedResult:
+    """标记并发执行中失败任务的哨兵对象。
+
+    当批次内部分任务失败时，用此对象替代 None，避免下游代码误判。
+    调用方可通过 ``isinstance(result, _FailedResult)`` 检测失败项。
+    """
+
+    def __init__(self, exception: BaseException) -> None:
+        self.exception = exception
+
+    def __repr__(self) -> str:
+        return f"_FailedResult({self.exception!r})"
+
+
 class ConcurrentProgressTracker:
     """并发模式下的线程安全进度追踪器。"""
 
@@ -81,7 +95,12 @@ def execute_batch_concurrently(
         on_item_done: 每个工作项完成后的回调 (item, result) -> None
 
     Returns:
-        与 work_items 顺序对应的结果列表
+        与 work_items 顺序对应的结果列表。成功任务返回实际结果，
+        失败任务返回 ``_FailedResult`` 对象（可通过 isinstance 检测）。
+        仅当所有任务都失败时才抛出首个异常。
+
+    Raises:
+        BaseException: 仅当所有任务都失败时抛出首个异常
     """
     n = len(work_items)
     if n == 0:
@@ -111,9 +130,9 @@ def execute_batch_concurrently(
                     on_item_done(work_items[idx], result)
             except BaseException as exc:
                 exceptions.append(exc)
-                results[idx] = None
+                results[idx] = _FailedResult(exc)
 
-    if exceptions and all(r is None for r in results):
+    if exceptions and all(isinstance(r, _FailedResult) for r in results):
         raise exceptions[0]
 
     return results
