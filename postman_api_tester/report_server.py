@@ -320,7 +320,7 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
 from postman_api_tester.report_server_config import (
-    REPORT_SCAN_EXCLUDE_DIRS,  # noqa: E402 必须在 app 创建后导入
+    REPORT_SCAN_EXCLUDE_DIRS,
 )
 
 configure_scan_excludes(REPORT_SCAN_EXCLUDE_DIRS)

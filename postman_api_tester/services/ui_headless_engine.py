@@ -324,9 +324,8 @@ class UiHeadlessEngine:
 
     def _action_navigate(self, page: "Page", url: str, base_url: str) -> Dict[str, Any]:
         target = url
-        if url and not url.startswith(("http://", "https://", "about:")):
-            if base_url:
-                target = base_url.rstrip("/") + "/" + url.lstrip("/")
+        if url and not url.startswith(("http://", "https://", "about:")) and base_url:
+            target = base_url.rstrip("/") + "/" + url.lstrip("/")
         page.goto(target, wait_until="domcontentloaded")
         return {"action": "navigate", "selector": {}, "value": target, "status": "passed", "error": ""}
 

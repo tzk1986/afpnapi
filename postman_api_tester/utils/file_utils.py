@@ -5,6 +5,7 @@
 - 入口：sanitize_export_name()、atomic_write_json()。
 """
 
+import contextlib
 import json
 import os
 import re
@@ -42,10 +43,8 @@ def atomic_write_json(path: Path, data: Any) -> None:
 			json.dump(data, f, indent=2, ensure_ascii=False)
 		os.replace(tmp_str, str(path))
 	except BaseException:
-		try:
+		with contextlib.suppress(OSError):
 			os.unlink(tmp_str)
-		except OSError:
-			pass
 		raise
 
 

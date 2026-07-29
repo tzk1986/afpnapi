@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -256,11 +257,9 @@ def _apply_base_url_override(
 def _emit_progress(progress_callback: Optional[ProgressCallback], payload: ProgressPayload) -> None:
     if not progress_callback:
         return
-    try:
+    # 外部回调异常不应中断执行流程，保持宽捕获。
+    with contextlib.suppress(Exception):
         progress_callback(payload)
-    except Exception:
-        # 外部回调异常不应中断执行流程，保持宽捕获。
-        pass
 
 
 def _emit_start_progress(
@@ -434,7 +433,7 @@ def _execute_api_suite_concurrent(
                 dup['repeat_group'] = base_name
                 dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
                 if item_path:
-                    dup['item_path'] = item_path + [ri]
+                    dup['item_path'] = [*item_path, ri]
                 expanded_apis.append(cast(ApiConfig, dup))
     apis = expanded_apis
 
@@ -652,7 +651,7 @@ def _execute_api_suite(
                 dup['repeat_group'] = base_name
                 dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
                 if item_path:
-                    dup['item_path'] = item_path + [ri]
+                    dup['item_path'] = [*item_path, ri]
                 expanded_apis.append(cast(ApiConfig, dup))
     apis = expanded_apis
 
