@@ -145,7 +145,7 @@ ENABLE_ERR_CODE_JUDGMENT: bool = _cfg_bool("ENABLE_ERR_CODE_JUDGMENT", False)
 ENABLE_MESSAGE_JUDGMENT: bool = _cfg_bool("ENABLE_MESSAGE_JUDGMENT", True)
 
 from postman_api_tester.utils.judgment_utils import (
-    parse_success_list as _parse_success_list,  # noqa: E402 必须在配置加载后导入
+    parse_success_list as _parse_success_list,
 )
 
 SUCCESS_ERR_CODES_SET: frozenset = _parse_success_list(_cfg_str("SUCCESS_ERR_CODES", "0"))

@@ -122,7 +122,7 @@ def prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: S
         for idx, item in enumerate(items):
             if not isinstance(item, dict):
                 continue
-            current_path = prefix + [idx]
+            current_path = [*prefix, idx]
             if "request" in item:
                 if tuple(current_path) in selected_paths:
                     kept.append(copy.deepcopy(item))
@@ -206,10 +206,14 @@ def append_manual_cases_to_collection(
     folder_name = str(default_folder).strip() or default_folder
     folder_item = None
     for item in root_items:
-        if isinstance(item, dict) and "request" not in item and str(item.get("name") or "") == folder_name:
-            if isinstance(item.get("item"), list):
-                folder_item = item
-                break
+        if (
+            isinstance(item, dict)
+            and "request" not in item
+            and str(item.get("name") or "") == folder_name
+            and isinstance(item.get("item"), list)
+        ):
+            folder_item = item
+            break
 
     if folder_item is None:
         folder_item = {"name": folder_name, "item": []}
@@ -308,7 +312,7 @@ def extract_collection_preview_items(
                 return
             if not isinstance(item, dict):
                 continue
-            current_path = path_prefix + [index]
+            current_path = [*path_prefix, index]
             name = str(item.get("name") or "")
             request_obj = item.get("request")
             if isinstance(request_obj, dict):
@@ -330,7 +334,7 @@ def extract_collection_preview_items(
 
             children = item.get("item")
             if isinstance(children, list):
-                walk(children, folder_chain + [name], current_path)
+                walk(children, [*folder_chain, name], current_path)
 
     walk(root_items, [], [])
     logger.info(
@@ -381,10 +385,10 @@ def _get_or_create_folder(
                 isinstance(item, dict)
                 and "request" not in item
                 and str(item.get("name") or "") == folder_name
+                and isinstance(item.get("item"), list)
             ):
-                if isinstance(item.get("item"), list):
-                    target = item
-                    break
+                target = item
+                break
         if target is None:
             target = {"name": folder_name, "item": []}
             current_items.append(target)

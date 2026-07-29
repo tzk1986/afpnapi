@@ -440,7 +440,8 @@ class PostmanTestExecutor:
                             file_path = self._uploaded_files.get(upload_key)
                             if file_path and Path(file_path).exists():
                                 file_name = Path(file_path).name
-                                file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))  # noqa: SIM115 — requests 读取后自动关闭
+                                # requests 库会在发送请求后自动关闭文件句柄
+                                file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))  # noqa: SIM115
                         else:
                             data_rows.append((key, str(item.get('value', ''))))
                     # 移除 Content-Type，让 requests 自动设置 multipart boundary

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -58,7 +59,7 @@ class ConcurrentProgressTracker:
             return
         total = self._total
         percent = int(completed * 100 / total) if total > 0 else 100
-        try:
+        with contextlib.suppress(Exception):
             self._callback({
                 'stage': 'running',
                 'total': total,
@@ -70,8 +71,6 @@ class ConcurrentProgressTracker:
                 'current_url': url,
                 'last_status': status,
             })
-        except Exception:
-            pass
 
     @property
     def completed(self) -> int:

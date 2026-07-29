@@ -20,7 +20,7 @@ def _build_retry_history_and_judgement(
     调用方需确保传入的是副本而非原始引用。
     """
     old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
-    retry_history = old_history + [old_result]
+    retry_history = [*old_history, old_result]
     old_judgement_value = old_result.get("manual_judgement")
     old_judgement: Dict[str, Any] = old_judgement_value if isinstance(old_judgement_value, dict) else {}
     manual_judgement = {
