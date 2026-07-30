@@ -10,7 +10,7 @@ import contextlib
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable
 
 from postman_api_tester.core.types import ProgressCallback
 

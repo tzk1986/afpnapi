@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Iterable, Sequence
 
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 

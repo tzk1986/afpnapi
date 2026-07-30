@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, Optional
+from typing import Any
 
 from postman_api_tester.utils.extract_utils import extract_from_response
 

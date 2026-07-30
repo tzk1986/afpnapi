@@ -18,7 +18,7 @@ import string
 import time
 import uuid
 from datetime import datetime
-from typing import Callable, Dict
+from typing import Callable
 from urllib.parse import quote
 
 VariableFunc = Callable[..., str]

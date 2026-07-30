@@ -16,7 +16,7 @@ import os
 import re
 from datetime import datetime
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from postman_api_tester.postman_api_tester import PostmanTestReport
