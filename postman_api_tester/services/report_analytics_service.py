@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from postman_api_tester.utils.analytics_utils import (
     ERROR_CATEGORY_ASSERTION,

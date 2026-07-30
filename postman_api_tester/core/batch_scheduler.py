@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from postman_api_tester.parser import ApiConfig
 from postman_api_tester.utils.variable_substitution import (
