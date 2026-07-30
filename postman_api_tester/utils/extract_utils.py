@@ -12,7 +12,7 @@ _HEADER_PREFIX = "$header."
 _FIELD_PATTERN = re.compile(r"^\$(?:\.([A-Za-z_][A-Za-z0-9_]*))*(?:\[(-?\d+)\])?(?:\.([A-Za-z_][A-Za-z0-9_]*)(?:\[(-?\d+)\])?)*$")
 
 
-def _parse_path(expression: str) -> Optional[List[tuple[str, Optional[int]]]]:
+def _parse_path(expression: str) -> list[tuple[str, int | None]] | None:
     """将简化 JSONPath 表达式解析为 (field_name, optional_index) 段列表。
 
     返回 None 表示表达式非法（含通配符/过滤器/递归下降等）。
@@ -26,7 +26,7 @@ def _parse_path(expression: str) -> Optional[List[tuple[str, Optional[int]]]]:
     if not body:
         return None
 
-    segments: list[tuple[str, Optional[int]]] = []
+    segments: list[tuple[str, int | None]] = []
     remaining = body
 
     while remaining:
@@ -38,7 +38,7 @@ def _parse_path(expression: str) -> Optional[List[tuple[str, Optional[int]]]]:
         field = match.group(1)
         remaining = remaining[match.end():]
 
-        index: Optional[int] = None
+        index: int | None = None
         if remaining.startswith("["):
             idx_match = re.match(r"\[(-?\d+)\]", remaining)
             if not idx_match:
@@ -51,7 +51,7 @@ def _parse_path(expression: str) -> Optional[List[tuple[str, Optional[int]]]]:
     return segments if segments else None
 
 
-def _navigate_segments(data: Any, segments: List[tuple[str, Optional[int]]]) -> Any:
+def _navigate_segments(data: Any, segments: list[tuple[str, int | None]]) -> Any:
     """沿段列表逐层导航，任一层失败返回 _MISSING。"""
     current = data
     for field, index in segments:
@@ -80,7 +80,7 @@ class _Missing:
 _MISSING = _Missing()
 
 
-def extract_by_jsonpath(data: Any, expression: str) -> Optional[str]:
+def extract_by_jsonpath(data: Any, expression: str) -> str | None:
     """从 JSON 数据中按简化 JSONPath 表达式提取值，返回字符串形式。
 
     支持：
@@ -109,7 +109,7 @@ def extract_by_jsonpath(data: Any, expression: str) -> Optional[str]:
     return str(result)
 
 
-def extract_from_header(headers: Dict[str, str], header_name: str) -> Optional[str]:
+def extract_from_header(headers: dict[str, str], header_name: str) -> str | None:
     """从响应头字典中提取指定名称的值（大小写不敏感）。"""
     lower_name = header_name.lower()
     for key, value in headers.items():
@@ -120,20 +120,20 @@ def extract_from_header(headers: Dict[str, str], header_name: str) -> Optional[s
 
 def extract_from_response(
     response_data: Any,
-    response_headers: Dict[str, str],
-    extract_config: Dict[str, str],
-) -> Dict[str, str]:
+    response_headers: dict[str, str],
+    extract_config: dict[str, str],
+) -> dict[str, str]:
     """根据 x_extract 配置批量提取变量。
 
     - 以 ``$header.`` 开头的表达式从响应头提取
     - 其余表达式从响应体 JSON 提取
     - 提取失败的字段不包含在结果字典中
     """
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     for var_name, expression in extract_config.items():
         if not isinstance(expression, str):
             continue
-        value: Optional[str] = None
+        value: str | None = None
         if expression.startswith(_HEADER_PREFIX):
             header_name = expression[len(_HEADER_PREFIX):]
             if header_name:

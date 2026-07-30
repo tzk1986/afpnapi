@@ -195,4 +195,7 @@ class ReportServerApp:
             logger.warning(
                 "waitress 未安装，降级使用 Flask 开发服务器（建议 pip install waitress）"
             )
+            # 抑制 Werkzeug 开发服务器警告
+            import os
+            os.environ["WERKZEUG_RUN_MAIN"] = "true"
             app.run(host=host, port=port, debug=False)

@@ -22,12 +22,12 @@ class VariableContext:
     线程安全：并发执行模式下多线程可同时读写变量。
     """
 
-    def __init__(self, initial_variables: Optional[Dict[str, str]] = None) -> None:
-        self._variables: Dict[str, str] = dict(initial_variables or {})
+    def __init__(self, initial_variables: dict[str, str] | None = None) -> None:
+        self._variables: dict[str, str] = dict(initial_variables or {})
         self._lock = threading.Lock()
 
     @property
-    def variables(self) -> Dict[str, str]:
+    def variables(self) -> dict[str, str]:
         """返回变量字典副本，防止外部直接修改内部状态。"""
         with self._lock:
             return dict(self._variables)
@@ -42,10 +42,10 @@ class VariableContext:
 
     def update_from_extract(
         self,
-        extract_config: Dict[str, str],
+        extract_config: dict[str, str],
         response_data: Any,
-        response_headers: Dict[str, str],
-    ) -> Dict[str, str]:
+        response_headers: dict[str, str],
+    ) -> dict[str, str]:
         """根据 x_extract 配置从响应中提取变量并更新上下文。
 
         返回本次成功提取的变量字典（用于报告记录）。
@@ -95,7 +95,7 @@ class VariableContext:
     def load_from_file(
         cls,
         path: str,
-        initial_variables: Optional[Dict[str, str]] = None,
+        initial_variables: dict[str, str] | None = None,
         max_count: int = 1000,
         env_name: str = "",
     ) -> VariableContext:
@@ -109,7 +109,7 @@ class VariableContext:
         )
 
         file_vars = merge_variables_for_env(path, env_name)
-        merged: Dict[str, str] = {**file_vars, **(initial_variables or {})}
+        merged: dict[str, str] = {**file_vars, **(initial_variables or {})}
         if len(merged) > max_count:
             logger.warning(
                 "合并后变量数量 %d 超过上限 %d，截断处理",

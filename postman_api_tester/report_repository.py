@@ -37,23 +37,60 @@ class _ReportsCache(TypedDict):
 
 _REPORTS_CACHE: _ReportsCache = {"data": None, "by_name": None, "ts": 0.0}
 _REPORTS_CACHE_LOCK = threading.Lock()
+_REPORTS_CACHE_LAST_MTIME: float = 0.0  # 缓存建立时报告目录的最新修改时间
 
 
-def configure_report_repository(reports_dir: Path, cache_ttl: float = 30.0) -> None:
+def configure_report_repository(reports_dir: Path, cache_ttl: float | None = None) -> None:
+    """配置报告仓储，优先使用 config.py 中的 REPORT_CACHE_TTL。"""
     global _REPORTS_DIR, _REPORTS_CACHE_TTL
     _REPORTS_DIR = Path(reports_dir).resolve()
+
+    # 优先从 config.py 读取 TTL
+    if cache_ttl is None:
+        try:
+            from postman_api_tester import config as _cfg
+            cache_ttl = float(getattr(_cfg, 'REPORT_CACHE_TTL', 10))
+        except (ImportError, AttributeError, TypeError, ValueError):
+            cache_ttl = 10.0
+
     try:
         _REPORTS_CACHE_TTL = float(cache_ttl)
     except (TypeError, ValueError):
-        _REPORTS_CACHE_TTL = 30.0
+        _REPORTS_CACHE_TTL = 10.0
 
 
 def invalidate_reports_cache() -> None:
     """主动清理报告列表缓存。"""
+    global _REPORTS_CACHE_LAST_MTIME
     with _REPORTS_CACHE_LOCK:
         _REPORTS_CACHE["data"] = None
         _REPORTS_CACHE["by_name"] = None
         _REPORTS_CACHE["ts"] = 0.0
+        _REPORTS_CACHE_LAST_MTIME = 0.0
+
+
+def _get_latest_report_mtime() -> float:
+    """获取报告目录中最新文件的修改时间。"""
+    if not _REPORTS_DIR.exists():
+        return 0.0
+
+    latest_mtime = 0.0
+    try:
+        # 扫描 meta 文件和 html 文件
+        for meta_path in _REPORTS_DIR.rglob("*_meta.json"):
+            mtime = meta_path.stat().st_mtime
+            if mtime > latest_mtime:
+                latest_mtime = mtime
+
+        for html_path in _REPORTS_DIR.rglob("*.html"):
+            if html_path.name.startswith("postman_report_") and "_page_" not in html_path.name:
+                mtime = html_path.stat().st_mtime
+                if mtime > latest_mtime:
+                    latest_mtime = mtime
+    except (OSError, PermissionError):
+        pass
+
+    return latest_mtime
 
 
 def load_report_details_map(report: ReportRecord) -> ReportDetailsMap:
@@ -82,10 +119,32 @@ def _is_total_report_name(report_name: str) -> bool:
 
 
 def list_reports() -> List[ReportRecord]:
+    global _REPORTS_CACHE_LAST_MTIME
     _now = _time.monotonic()
+
+    # 检查是否启用智能缓存失效
+    enable_smart_invalidation = True
+    try:
+        from postman_api_tester import config as _cfg
+        enable_smart_invalidation = bool(getattr(_cfg, 'REPORT_CACHE_SMART_INVALIDATION', True))
+    except (ImportError, AttributeError):
+        pass
+
     with _REPORTS_CACHE_LOCK:
-        if _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL:
-            return list(_REPORTS_CACHE["data"])
+        # 基础 TTL 检查
+        ttl_valid = _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL
+
+        if ttl_valid:
+            cached_data = _REPORTS_CACHE["data"]
+            # 智能失效：检查是否有新报告生成
+            if enable_smart_invalidation:
+                current_mtime = _get_latest_report_mtime()
+                if current_mtime <= _REPORTS_CACHE_LAST_MTIME and cached_data is not None:
+                    # 没有新文件，缓存有效
+                    return list(cached_data)
+                # 有新文件，需要重新加载
+            elif cached_data is not None:
+                return list(cached_data)
 
     reports: List[ReportRecord] = []
     seen_report_names = set()
@@ -129,6 +188,8 @@ def list_reports() -> List[ReportRecord]:
         _REPORTS_CACHE["data"] = reports
         _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
         _REPORTS_CACHE["ts"] = _time.monotonic()
+        # 记录缓存建立时的最新文件修改时间
+        _REPORTS_CACHE_LAST_MTIME = _get_latest_report_mtime()
     return list(reports)
 
 

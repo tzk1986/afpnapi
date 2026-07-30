@@ -69,6 +69,45 @@ REQUEST_CONNECT_TIMEOUT = _env_int("REQUEST_CONNECT_TIMEOUT", 10, lo=1, hi=300)
 REQUEST_READ_TIMEOUT = _env_int("REQUEST_READ_TIMEOUT", 30, lo=1, hi=300)
 
 # ==============================================================
+# 请求重试配置
+# ENABLE_REQUEST_RETRY: 是否启用自动重试（默认 false，保持原有行为）
+# REQUEST_RETRY_TOTAL: 最大重试次数（默认 3）
+# REQUEST_RETRY_BACKOFF_FACTOR: 重试退避因子（默认 1.0，即 1s, 2s, 4s...）
+# REQUEST_RETRY_STATUS_FORCELIST: 触发重试的 HTTP 状态码列表（逗号分隔）
+# 示例（启用重试）：
+# ENABLE_REQUEST_RETRY = True
+# REQUEST_RETRY_TOTAL = 3
+# REQUEST_RETRY_BACKOFF_FACTOR = 1.0
+# REQUEST_RETRY_STATUS_FORCELIST = 429,500,502,503,504
+# ==============================================================
+ENABLE_REQUEST_RETRY = _env_bool("ENABLE_REQUEST_RETRY", "false")
+REQUEST_RETRY_TOTAL = _env_int("REQUEST_RETRY_TOTAL", 3, lo=0, hi=10)
+try:
+    REQUEST_RETRY_BACKOFF_FACTOR = float(os.environ.get("REQUEST_RETRY_BACKOFF_FACTOR", "1.0"))
+except (TypeError, ValueError):
+    REQUEST_RETRY_BACKOFF_FACTOR = 1.0
+REQUEST_RETRY_BACKOFF_FACTOR = max(0.0, REQUEST_RETRY_BACKOFF_FACTOR)
+
+_retry_status_raw = os.environ.get("REQUEST_RETRY_STATUS_FORCELIST", "429,500,502,503,504")
+try:
+    REQUEST_RETRY_STATUS_FORCELIST = tuple(
+        int(s.strip()) for s in _retry_status_raw.split(",") if s.strip().isdigit()
+    )
+except (TypeError, ValueError):
+    REQUEST_RETRY_STATUS_FORCELIST = (429, 500, 502, 503, 504)
+
+# ==============================================================
+# 报告缓存策略配置
+# REPORT_CACHE_TTL: 报告列表缓存过期时间（秒，默认 10，原 30）
+# REPORT_CACHE_SMART_INVALIDATION: 是否启用智能缓存失效（基于文件修改时间，默认 true）
+# 示例（高并发场景缩短 TTL）：
+# REPORT_CACHE_TTL = 5
+# REPORT_CACHE_SMART_INVALIDATION = True
+# ==============================================================
+REPORT_CACHE_TTL = _env_int("REPORT_CACHE_TTL", 10, lo=1, hi=300)
+REPORT_CACHE_SMART_INVALIDATION = _env_bool("REPORT_CACHE_SMART_INVALIDATION", "true")
+
+# ==============================================================
 # 日志系统配置
 # LOG_LEVEL: 日志级别（DEBUG/INFO/WARNING/ERROR）
 # LOG_FORMAT: 日志格式（structured/json）

@@ -476,7 +476,7 @@ def api_ui_testing_replay_log() -> ResponseReturnValue:
 
     # 诊断：记录所有 replay-log 请求体
     event = payload.get("event", "")
-    if event.startswith("early_"):
+    if event.startswith("early_") or event.startswith("new_tab"):
         logger.info(f"replay-log DIAGNOSTIC: {payload}", extra={"event": f"ui.replay.{event}", "detail": payload})
 
     job_id = payload.get("job_id", "")

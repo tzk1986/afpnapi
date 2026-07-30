@@ -37,7 +37,7 @@ class ConcurrentProgressTracker:
     def __init__(
         self,
         total: int,
-        callback: Optional[ProgressCallback],
+        callback: ProgressCallback | None,
     ) -> None:
         self._lock = threading.Lock()
         self._completed = 0
@@ -79,12 +79,12 @@ class ConcurrentProgressTracker:
 
 
 def execute_batch_concurrently(
-    work_items: List[Any],
+    work_items: list[Any],
     worker_fn: Callable[[Any], Any],
     *,
     max_workers: int,
-    on_item_done: Optional[Callable[[Any, Any], None]] = None,
-) -> List[Any]:
+    on_item_done: Callable[[Any, Any], None] | None = None,
+) -> list[Any]:
     """在单批次内并行执行工作项，返回结果列表（保持输入顺序）。
 
     Args:
@@ -112,8 +112,8 @@ def execute_batch_concurrently(
         return [result]
 
     effective_workers = min(max_workers, n)
-    results: List[Any] = [None] * n
-    exceptions: List[BaseException] = []
+    results: list[Any] = [None] * n
+    exceptions: list[BaseException] = []
 
     with ThreadPoolExecutor(max_workers=effective_workers) as pool:
         future_to_idx = {

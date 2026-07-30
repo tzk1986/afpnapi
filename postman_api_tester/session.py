@@ -22,8 +22,40 @@ class SessionLike(Protocol):
 
 
 def create_shared_session() -> SessionLike:
+    """创建共享 Session，支持自动重试配置。"""
     import requests as _requests_mod
-    return cast(SessionLike, _requests_mod.Session())
+
+    session = _requests_mod.Session()
+
+    # 读取重试配置
+    try:
+        from postman_api_tester import config as _cfg
+        enable_retry = bool(getattr(_cfg, 'ENABLE_REQUEST_RETRY', False))
+
+        if enable_retry:
+            from requests.adapters import HTTPAdapter
+            from urllib3.util.retry import Retry
+
+            retry_total = int(getattr(_cfg, 'REQUEST_RETRY_TOTAL', 3))
+            backoff_factor = float(getattr(_cfg, 'REQUEST_RETRY_BACKOFF_FACTOR', 1.0))
+            status_forcelist = tuple(getattr(_cfg, 'REQUEST_RETRY_STATUS_FORCELIST', (429, 500, 502, 503, 504)))
+
+            retry_strategy = Retry(
+                total=retry_total,
+                backoff_factor=backoff_factor,
+                status_forcelist=status_forcelist,
+                allowed_methods=["HEAD", "GET", "POST", "PUT", "DELETE", "PATCH"],
+                raise_on_status=False,  # 不抛异常，让调用方处理响应
+            )
+
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            session.mount("http://", adapter)
+            session.mount("https://", adapter)
+    except (ImportError, AttributeError, TypeError, ValueError) as exc:
+        import logging
+        logging.getLogger(__name__).warning("配置请求重试失败，使用默认行为: %s", exc)
+
+    return cast(SessionLike, session)
 
 
 def close_session(session: Optional[SessionLike]) -> None:

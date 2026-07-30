@@ -23,7 +23,7 @@ from urllib.parse import quote
 
 VariableFunc = Callable[..., str]
 
-_BUILT_IN_FUNCTIONS: Dict[str, VariableFunc] = {}
+_BUILT_IN_FUNCTIONS: dict[str, VariableFunc] = {}
 
 
 def register(name: str) -> Callable[[VariableFunc], VariableFunc]:
@@ -164,7 +164,7 @@ def _url_encode(text: str = "") -> str:
 
 # ── 函数元数据（用于 UI 展示）──────────────────────────────────────────
 
-_FUNCTION_META: Dict[str, Dict[str, str]] = {
+_FUNCTION_META: dict[str, dict[str, str]] = {
     "timestamp": {
         "syntax": "{{timestamp()}}",
         "params": "无",

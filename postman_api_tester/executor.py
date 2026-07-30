@@ -377,6 +377,93 @@ class PostmanTestExecutor:
         # 变量替换与 pre-request 脚本
         api = self._execute_pre_request_and_substitute(api)
 
+        # 准备请求参数
+        method, url, headers, params, body = self._prepare_request(api)
+        raw_url = str(api.get('full_url') or '')
+
+        try:
+            # 验证 HTTP 方法
+            if method not in {'get', 'post', 'put', 'delete', 'patch'}:
+                return self._build_result_base(
+                    actual_request_url=raw_url,
+                    status='FAILED',
+                    message=f'不支持的HTTP方法: {method}',
+                    err_code='',
+                    status_code=None,
+                    response_time_ms=0,
+                    request_info={'headers': headers, 'params': params, 'body': body},
+                    response_info={'headers': {}, 'body': ''},
+                )
+
+            # 构建请求参数
+            request_kwargs = self._build_request_kwargs(method, headers, params, body)
+
+            # 发送请求
+            response, response_time_ms, actual_request_url = self._send_request(method, url, request_kwargs)
+            self.http_response = response
+            self.resp_status_code = response.status_code  # type: ignore[attr-defined]
+
+            # 处理响应
+            response_message, err_code, status_code, response_data, extracted_variables = self._process_response(api, response)
+            self.response_data = response_data
+
+            # 准备请求和响应详情
+            request_info: RequestInfo = {'headers': headers, 'params': params, 'body': body}
+            response_info: ResponseInfo = {'headers': dict(response.headers), 'body': response_data}  # type: ignore[attr-defined]
+
+            # 结果判定
+            judgment_passed, judgment_fail_reason = self._evaluate_judgment(api, status_code, err_code, response_message)
+
+            if judgment_passed:
+                # 运行断言
+                assertion_results, assertion_engine_error = self._run_assertions(api, response_data)
+                return self._build_passed_result(
+                    actual_request_url=actual_request_url,
+                    response_message=response_message,
+                    err_code=err_code,
+                    status_code=status_code,
+                    response_time_ms=response_time_ms,
+                    request_info=request_info,
+                    response_info=response_info,
+                    extracted_variables=extracted_variables,
+                    assertion_results=assertion_results,
+                    assertion_engine_error=assertion_engine_error,
+                )
+            else:
+                return self._build_judgment_failed_result(
+                    actual_request_url=actual_request_url,
+                    judgment_fail_reason=judgment_fail_reason,
+                    err_code=err_code,
+                    status_code=status_code,
+                    response_time_ms=response_time_ms,
+                    request_info=request_info,
+                    response_info=response_info,
+                    response_data=response_data,
+                    response_message=response_message,
+                    extracted_variables=extracted_variables,
+                )
+
+        except Exception as e:
+            return self._build_request_error_result(
+                raw_url=raw_url,
+                headers=headers,
+                params=params,
+                body=body,
+                error=e,
+            )
+        finally:
+            # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
+            if self._owns_session:
+                close_fn = getattr(self.session, 'close', None)
+                if callable(close_fn):
+                    close_fn()
+
+    def _extract_message_and_err_code(self, response_data: object) -> Tuple[str, str]:
+        """从响应体中提取 message 与 errCode 字段，委托到 response_parser.extract_msg_errcode。"""
+        return _extract_msg_errcode(response_data)
+
+    def _prepare_request(self, api: ApiConfig) -> Tuple[str, str, Dict[str, str], JsonObject, object]:
+        """准备请求参数：提取 method/URL/headers/params/body 并注入认证 token。"""
         method = str(api.get('method') or 'GET').lower()
         raw_url = str(api.get('full_url') or '')
         raw_headers = api.get('headers')
@@ -403,216 +490,184 @@ class PostmanTestExecutor:
                         del headers[k]
                 headers['token'] = self._auth_token
 
-        try:
-            response_time_ms: int = 0
-            if method not in {'get', 'post', 'put', 'delete', 'patch'}:
-                return self._build_result_base(
-                    actual_request_url=raw_url,
-                    status='FAILED',
-                    message=f'不支持的HTTP方法: {method}',
-                    err_code='',
-                    status_code=None,
-                    response_time_ms=0,
-                    request_info={'headers': headers, 'params': params, 'body': body},
-                    response_info={'headers': {}, 'body': ''},
-                )
+        return method, url, headers, params, body
 
-            request_kwargs: Dict[str, object] = {
-                'params': params,
-                'headers': headers,
-                'timeout': self.request_timeout,
-            }
-            if method in {'post', 'put', 'patch'}:
-                # 检查是否为 formdata 或 binary 模式
-                body_dict = body if isinstance(body, dict) else None
-                body_mode = body_dict.get('__body_mode') if body_dict else None
-                if body_mode == 'formdata' and body_dict:
-                    # 构建 multipart/form-data 请求
-                    formdata_items: List[Dict[str, Any]] = body_dict.get('formdata', []) or []  # type: ignore[assignment]
-                    data_rows: List[Tuple[str, str]] = []
-                    file_rows: List[Tuple[str, Tuple[str, Any, str]]] = []
-                    for item in formdata_items:
-                        if not isinstance(item, dict):
-                            continue
-                        key = str(item.get('key', ''))
-                        if item.get('type') == 'file':
-                            upload_key = str(item.get('upload_key', ''))
-                            file_path = self._uploaded_files.get(upload_key)
-                            if file_path and Path(file_path).exists():
-                                file_name = Path(file_path).name
-                                # requests 库会在发送请求后自动关闭文件句柄
-                                file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))  # noqa: SIM115
-                        else:
-                            data_rows.append((key, str(item.get('value', ''))))
-                    # 移除 Content-Type，让 requests 自动设置 multipart boundary
-                    headers.pop('Content-Type', None)
-                    headers.pop('content-type', None)
-                    request_kwargs['headers'] = headers
-                    request_kwargs['data'] = data_rows
-                    request_kwargs['files'] = file_rows
-                elif body_mode == 'binary' and body_dict:
-                    # 构建 binary 请求
-                    upload_key = str(body_dict.get('upload_key', ''))
-                    file_path = self._uploaded_files.get(upload_key)
-                    if file_path and Path(file_path).exists():
-                        with open(file_path, 'rb') as f:
-                            request_kwargs['data'] = f.read()
-                        # 根据文件扩展名设置 Content-Type
-                        ext = Path(file_path).suffix.lower()
-                        content_type_map = {
-                            '.json': 'application/json',
-                            '.xml': 'application/xml',
-                            '.txt': 'text/plain',
-                            '.csv': 'text/csv',
-                            '.pdf': 'application/pdf',
-                            '.zip': 'application/zip',
-                            '.png': 'image/png',
-                            '.jpg': 'image/jpeg',
-                            '.jpeg': 'image/jpeg',
-                            '.gif': 'image/gif',
-                        }
-                        headers.setdefault('Content-Type', content_type_map.get(ext, 'application/octet-stream'))
-                        request_kwargs['headers'] = headers
-                    else:
-                        request_kwargs['data'] = b''
-                else:
-                    request_kwargs['json'] = body
+    def _build_request_kwargs(
+        self, method: str, headers: Dict[str, str], params: JsonObject, body: object
+    ) -> Dict[str, object]:
+        """构建请求参数字典，处理不同 body 模式（formdata/binary/JSON）。"""
+        request_kwargs: Dict[str, object] = {
+            'params': params,
+            'headers': headers,
+            'timeout': self.request_timeout,
+        }
 
-            _t0 = _time_mod.monotonic()
-            response = getattr(self.session, method)(url, **request_kwargs)
-            response_time_ms = round((_time_mod.monotonic() - _t0) * 1000)
+        if method not in {'post', 'put', 'patch'}:
+            return request_kwargs
 
-            self.http_response = response
-            self.resp_status_code = response.status_code
-            actual_request_url = str(getattr(response.request, 'url', '') or url)
+        body_dict = body if isinstance(body, dict) else None
+        body_mode = body_dict.get('__body_mode') if body_dict else None
 
-            try:
-                self.response_data = response.json()
-            except (json.JSONDecodeError, ValueError):
-                self.response_data = response.text
+        if body_mode == 'formdata' and body_dict:
+            return self._build_formdata_request(request_kwargs, headers, body_dict)
+        elif body_mode == 'binary' and body_dict:
+            return self._build_binary_request(request_kwargs, headers, body_dict)
+        else:
+            request_kwargs['json'] = body
+            return request_kwargs
 
-            response_message, err_code = self._extract_message_and_err_code(self.response_data)
+    def _build_formdata_request(
+        self, request_kwargs: Dict[str, object], headers: Dict[str, str], body_dict: dict
+    ) -> Dict[str, object]:
+        """构建 multipart/form-data 请求。"""
+        formdata_items: List[Dict[str, Any]] = body_dict.get('formdata', []) or []
+        data_rows: List[Tuple[str, str]] = []
+        file_rows: List[Tuple[str, Tuple[str, Any, str]]] = []
 
-            # 验证响应
-            expected_status_value = api.get('expected_status')
-            expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
-
-            # 准备请求和响应详情
-            request_info: RequestInfo = {
-                'headers': headers,
-                'params': params,
-                'body': body
-            }
-
-            response_info: ResponseInfo = {
-                'headers': dict(response.headers),
-                'body': self.response_data
-            }
-
-            extracted_variables: Dict[str, str] = {}
-            if self.variable_context is not None:
-                raw_extract = api.get('x_extract')
-                if isinstance(raw_extract, dict) and raw_extract:
-                    extracted_variables = self.variable_context.update_from_extract(
-                        raw_extract,
-                        self.response_data,
-                        dict(response.headers),
-                    )
-
-            # 可配置结果判定：优先级 任务级 > 集合接口级 x_* > 全局 config > 内置默认
-            task_jcfg = self.judgment_config or {}
-
-            def _opt_bool(val: object) -> Optional[bool]:
-                return bool(val) if val is not None else None
-
-            def _opt_str(val: object) -> Optional[str]:
-                return str(val) if val is not None else None
-
-            judgment_params = resolve_judgment_params(
-                global_enable_err_code=_rsc.ENABLE_ERR_CODE_JUDGMENT,
-                global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
-                global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
-                global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
-                item_x_enable_err_code=_opt_bool(api.get('x_enable_err_code_judgment')),
-                item_x_success_err_codes=_opt_str(api.get('x_success_err_codes')),
-                item_x_enable_message=_opt_bool(api.get('x_enable_message_judgment')),
-                item_x_success_messages=_opt_str(api.get('x_success_messages')),
-                task_enable_err_code=_opt_bool(task_jcfg.get('enable_err_code_judgment')),
-                task_success_err_codes=_opt_str(task_jcfg.get('success_err_codes')),
-                task_enable_message=_opt_bool(task_jcfg.get('enable_message_judgment')),
-                task_success_messages=_opt_str(task_jcfg.get('success_messages')),
-            )
-
-            judgment_passed, judgment_fail_reason = evaluate_result_judgment(
-                status_code=self.resp_status_code,
-                expected_status=expected_status,
-                err_code=err_code,
-                response_message=response_message,
-                success_err_codes=judgment_params['success_err_codes'],
-                success_messages=judgment_params['success_messages'],
-                enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
-                enable_message_judgment=judgment_params['enable_message_judgment'],
-            )
-
-            if judgment_passed:
-                # 升级五：断言校验
-                assertion_results: List[AssertionResult] = []
-                assertion_engine_error = ""
-                raw_assertions = api.get('x_assertions')
-                assertions_rules = [item for item in raw_assertions if isinstance(item, dict)] if isinstance(raw_assertions, list) else []
-                if assertions_rules and _ASSERTIONS_AVAILABLE:
-                    try:
-                        assertion_results = _evaluate_assertions(self.response_data, assertions_rules)
-                    except Exception as assertion_exc:
-                        assertion_engine_error = str(assertion_exc)
-                        logger.exception("断言引擎执行异常: %s", assertion_exc)
-                        if self.assertion_strict_mode:
-                            assertion_results = [{
-                                'passed': False,
-                                'message': f'断言引擎异常: {assertion_engine_error}',
-                            }]
-                return self._build_passed_result(
-                    actual_request_url=actual_request_url,
-                    response_message=response_message,
-                    err_code=err_code,
-                    status_code=self.resp_status_code,
-                    response_time_ms=response_time_ms,
-                    request_info=request_info,
-                    response_info=response_info,
-                    extracted_variables=extracted_variables,
-                    assertion_results=assertion_results,
-                    assertion_engine_error=assertion_engine_error,
-                )
+        for item in formdata_items:
+            if not isinstance(item, dict):
+                continue
+            key = str(item.get('key', ''))
+            if item.get('type') == 'file':
+                upload_key = str(item.get('upload_key', ''))
+                file_path = self._uploaded_files.get(upload_key)
+                if file_path and Path(file_path).exists():
+                    file_name = Path(file_path).name
+                    file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))  # noqa: SIM115
             else:
-                return self._build_judgment_failed_result(
-                    actual_request_url=actual_request_url,
-                    judgment_fail_reason=judgment_fail_reason,
-                    err_code=err_code,
-                    status_code=self.resp_status_code,
-                    response_time_ms=response_time_ms,
-                    request_info=request_info,
-                    response_info=response_info,
-                    response_data=self.response_data,
-                    response_message=response_message,
-                    extracted_variables=extracted_variables,
+                data_rows.append((key, str(item.get('value', ''))))
+
+        # 移除 Content-Type，让 requests 自动设置 multipart boundary
+        headers.pop('Content-Type', None)
+        headers.pop('content-type', None)
+        request_kwargs['headers'] = headers
+        request_kwargs['data'] = data_rows
+        request_kwargs['files'] = file_rows
+        return request_kwargs
+
+    def _build_binary_request(
+        self, request_kwargs: Dict[str, object], headers: Dict[str, str], body_dict: dict
+    ) -> Dict[str, object]:
+        """构建 binary 请求。"""
+        upload_key = str(body_dict.get('upload_key', ''))
+        file_path = self._uploaded_files.get(upload_key)
+
+        if file_path and Path(file_path).exists():
+            with open(file_path, 'rb') as f:
+                request_kwargs['data'] = f.read()
+            # 根据文件扩展名设置 Content-Type
+            ext = Path(file_path).suffix.lower()
+            content_type_map = {
+                '.json': 'application/json',
+                '.xml': 'application/xml',
+                '.txt': 'text/plain',
+                '.csv': 'text/csv',
+                '.pdf': 'application/pdf',
+                '.zip': 'application/zip',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+            }
+            headers.setdefault('Content-Type', content_type_map.get(ext, 'application/octet-stream'))
+            request_kwargs['headers'] = headers
+        else:
+            request_kwargs['data'] = b''
+
+        return request_kwargs
+
+    def _send_request(self, method: str, url: str, request_kwargs: Dict[str, object]) -> Tuple[object, int, str]:
+        """发送 HTTP 请求并返回 (response, response_time_ms, actual_request_url)。"""
+        _t0 = _time_mod.monotonic()
+        response = getattr(self.session, method)(url, **request_kwargs)
+        response_time_ms = round((_time_mod.monotonic() - _t0) * 1000)
+        actual_request_url = str(getattr(response.request, 'url', '') or url)
+        return response, response_time_ms, actual_request_url
+
+    def _process_response(self, api: ApiConfig, response: object) -> Tuple[str, str, int, object, Dict[str, str]]:
+        """处理响应：解析数据、提取变量、结果判定。返回 (response_message, err_code, status_code, response_data, extracted_variables)。"""
+        # 解析响应数据
+        try:
+            response_data = response.json()  # type: ignore[attr-defined]
+        except (json.JSONDecodeError, ValueError):
+            response_data = response.text  # type: ignore[attr-defined]
+
+        response_message, err_code = self._extract_message_and_err_code(response_data)
+        status_code = response.status_code  # type: ignore[attr-defined]
+
+        # 提取变量
+        extracted_variables: Dict[str, str] = {}
+        if self.variable_context is not None:
+            raw_extract = api.get('x_extract')
+            if isinstance(raw_extract, dict) and raw_extract:
+                extracted_variables = self.variable_context.update_from_extract(
+                    raw_extract,
+                    response_data,
+                    dict(response.headers),  # type: ignore[attr-defined]
                 )
 
-        except Exception as e:
-            return self._build_request_error_result(
-                raw_url=raw_url,
-                headers=headers,
-                params=params,
-                body=body,
-                error=e,
-            )
-        finally:
-            # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
-            if self._owns_session:
-                close_fn = getattr(self.session, 'close', None)
-                if callable(close_fn):
-                    close_fn()
+        return response_message, err_code, status_code, response_data, extracted_variables
 
-    def _extract_message_and_err_code(self, response_data: object) -> Tuple[str, str]:
-        """从响应体中提取 message 与 errCode 字段，委托到 response_parser.extract_msg_errcode。"""
-        return _extract_msg_errcode(response_data)
+    def _evaluate_judgment(
+        self, api: ApiConfig, status_code: int, err_code: str, response_message: str
+    ) -> Tuple[bool, str]:
+        """评估结果判定，返回 (passed, fail_reason)。"""
+        expected_status_value = api.get('expected_status')
+        expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
+
+        task_jcfg = self.judgment_config or {}
+
+        def _opt_bool(val: object) -> Optional[bool]:
+            return bool(val) if val is not None else None
+
+        def _opt_str(val: object) -> Optional[str]:
+            return str(val) if val is not None else None
+
+        judgment_params = resolve_judgment_params(
+            global_enable_err_code=_rsc.ENABLE_ERR_CODE_JUDGMENT,
+            global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
+            global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
+            global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
+            item_x_enable_err_code=_opt_bool(api.get('x_enable_err_code_judgment')),
+            item_x_success_err_codes=_opt_str(api.get('x_success_err_codes')),
+            item_x_enable_message=_opt_bool(api.get('x_enable_message_judgment')),
+            item_x_success_messages=_opt_str(api.get('x_success_messages')),
+            task_enable_err_code=_opt_bool(task_jcfg.get('enable_err_code_judgment')),
+            task_success_err_codes=_opt_str(task_jcfg.get('success_err_codes')),
+            task_enable_message=_opt_bool(task_jcfg.get('enable_message_judgment')),
+            task_success_messages=_opt_str(task_jcfg.get('success_messages')),
+        )
+
+        return evaluate_result_judgment(
+            status_code=status_code,
+            expected_status=expected_status,
+            err_code=err_code,
+            response_message=response_message,
+            success_err_codes=judgment_params['success_err_codes'],
+            success_messages=judgment_params['success_messages'],
+            enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
+            enable_message_judgment=judgment_params['enable_message_judgment'],
+        )
+
+    def _run_assertions(self, api: ApiConfig, response_data: object) -> Tuple[List[AssertionResult], str]:
+        """运行断言引擎，返回 (assertion_results, assertion_engine_error)。"""
+        assertion_results: List[AssertionResult] = []
+        assertion_engine_error = ""
+
+        raw_assertions = api.get('x_assertions')
+        assertions_rules = [item for item in raw_assertions if isinstance(item, dict)] if isinstance(raw_assertions, list) else []
+
+        if assertions_rules and _ASSERTIONS_AVAILABLE:
+            try:
+                assertion_results = _evaluate_assertions(response_data, assertions_rules)
+            except Exception as assertion_exc:
+                assertion_engine_error = str(assertion_exc)
+                logger.exception("断言引擎执行异常: %s", assertion_exc)
+                if self.assertion_strict_mode:
+                    assertion_results = [{
+                        'passed': False,
+                        'message': f'断言引擎异常: {assertion_engine_error}',
+                    }]
+
+        return assertion_results, assertion_engine_error
 

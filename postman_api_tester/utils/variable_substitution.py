@@ -27,7 +27,7 @@ def _is_functions_enabled() -> bool:
         return True
 
 
-def substitute_variables(text: str, variables: Dict[str, str]) -> str:
+def substitute_variables(text: str, variables: dict[str, str]) -> str:
     """替换文本中的 ``{{variable}}`` 和 ``{{func(args)}}`` 为对应值。
 
     处理顺序：先替换函数调用（``{{timestamp()}}``），再替换普通变量（``{{token}}``）。
@@ -67,7 +67,7 @@ def substitute_variables(text: str, variables: Dict[str, str]) -> str:
     return _VARIABLE_PATTERN.sub(_var_replacer, text)
 
 
-def _substitute_body(body: Any, variables: Dict[str, str]) -> Any:
+def _substitute_body(body: Any, variables: dict[str, str]) -> Any:
     """递归替换 body 中的字符串值。"""
     if isinstance(body, str):
         return substitute_variables(body, variables)
@@ -78,11 +78,11 @@ def _substitute_body(body: Any, variables: Dict[str, str]) -> Any:
     return body
 
 
-def _substitute_params(params: Dict[str, object], variables: Dict[str, str]) -> Dict[str, object]:
+def _substitute_params(params: dict[str, object], variables: dict[str, str]) -> dict[str, object]:
     """替换请求参数中的键名和字符串值。"""
     if not variables and not _is_functions_enabled():
         return dict(params)
-    result: Dict[str, object] = {}
+    result: dict[str, object] = {}
     for key, value in params.items():
         new_key = substitute_variables(key, variables)
         if isinstance(value, str):
@@ -124,7 +124,7 @@ def _copy_api_config(
     return result
 
 
-def substitute_in_api_config(api: ApiConfig, variables: Dict[str, str]) -> ApiConfig:
+def substitute_in_api_config(api: ApiConfig, variables: dict[str, str]) -> ApiConfig:
     """对 ApiConfig 中的 URL/headers/body/params 执行变量替换。
 
     返回新的 ApiConfig 副本，不修改原始对象。
