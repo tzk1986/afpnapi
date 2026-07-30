@@ -25,14 +25,14 @@ from postman_api_tester.utils.analytics_utils import (
 )
 
 
-def _safe_results(report: Mapping[str, Any]) -> List[Dict[str, Any]]:
+def _safe_results(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     raw = report.get("results")
     if not isinstance(raw, list):
         return []
     return [item for item in raw if isinstance(item, dict)]
 
 
-def _safe_manual_cases(report: Mapping[str, Any]) -> List[Dict[str, Any]]:
+def _safe_manual_cases(report: Mapping[str, Any]) -> list[dict[str, Any]]:
     raw = report.get("manual_cases")
     if not isinstance(raw, list):
         return []
@@ -53,7 +53,7 @@ def _source_total(report: Mapping[str, Any], executed_total: int) -> int:
     return _summary_total(report, executed_total)
 
 
-def _status_distribution(results: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+def _status_distribution(results: Sequence[dict[str, Any]]) -> dict[str, int]:
     counter: Counter[str] = Counter()
     for item in results:
         status = str(item.get("status") or "UNKNOWN").upper()
@@ -66,7 +66,7 @@ def _status_distribution(results: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-def _method_distribution(results: Sequence[Dict[str, Any]]) -> Dict[str, int]:
+def _method_distribution(results: Sequence[dict[str, Any]]) -> dict[str, int]:
     counter: Counter[str] = Counter()
     for item in results:
         method = str(item.get("method") or "").upper()
@@ -84,7 +84,7 @@ def _method_distribution(results: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     }
 
 
-def _folder_top(results: Sequence[Dict[str, Any]], top_n: int) -> List[Dict[str, Any]]:
+def _folder_top(results: Sequence[dict[str, Any]], top_n: int) -> list[dict[str, Any]]:
     counter: Counter[str] = Counter()
     for item in results:
         folder = str(item.get("folder") or "(root)").strip() or "(root)"
@@ -92,7 +92,7 @@ def _folder_top(results: Sequence[Dict[str, Any]], top_n: int) -> List[Dict[str,
     return [{"folder": folder, "count": count} for folder, count in safe_top_items(dict(counter), top_n)]
 
 
-def _error_category_summary(error_items: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _error_category_summary(error_items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     total = len(error_items)
     categories = [
         ERROR_CATEGORY_CONNECTION,
@@ -116,7 +116,7 @@ def _error_category_summary(error_items: Sequence[Dict[str, Any]]) -> List[Dict[
     ]
 
 
-def _error_suggestions(category_summary: Sequence[Dict[str, Any]]) -> List[Dict[str, str]]:
+def _error_suggestions(category_summary: Sequence[dict[str, Any]]) -> list[dict[str, str]]:
     suggestion_map = {
         ERROR_CATEGORY_CONNECTION: "检查 base_url、网络连通性、DNS 与超时配置，必要时提升读超时。",
         ERROR_CATEGORY_AUTH: "检查 token 注入优先级与有效期，确认环境切换后认证头是否一致。",
@@ -125,7 +125,7 @@ def _error_suggestions(category_summary: Sequence[Dict[str, Any]]) -> List[Dict[
         ERROR_CATEGORY_DATABASE: "检查 SQL/数据库兼容反馈，确认连接配置与事务前置数据是否可用。",
         ERROR_CATEGORY_UNKNOWN: "补充错误码与 message 规范化规则，提升可观测性并细化分类。",
     }
-    suggestions: List[Dict[str, str]] = []
+    suggestions: list[dict[str, str]] = []
     for row in category_summary:
         category = str(row.get("category") or "")
         count = to_int(row.get("count"), default=0)
@@ -135,8 +135,8 @@ def _error_suggestions(category_summary: Sequence[Dict[str, Any]]) -> List[Dict[
     return suggestions
 
 
-def _frequent_errors(error_items: Sequence[Dict[str, Any]], top_n: int, include_samples: bool) -> List[Dict[str, Any]]:
-    grouped: Dict[str, Dict[str, Any]] = {}
+def _frequent_errors(error_items: Sequence[dict[str, Any]], top_n: int, include_samples: bool) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
     for item in error_items:
         normalized = normalize_error_message(item.get("message"))
         row = grouped.setdefault(
@@ -167,14 +167,14 @@ def _frequent_errors(error_items: Sequence[Dict[str, Any]], top_n: int, include_
                 )
 
     rows = sorted(grouped.values(), key=lambda value: (-to_int(value.get("count"), default=0), str(value.get("message") or "")))
-    output: List[Dict[str, Any]] = []
+    output: list[dict[str, Any]] = []
     for row in rows[:top_n]:
         categories_raw = row.get("categories")
         if isinstance(categories_raw, list):
             categories = distinct_list([str(item) for item in categories_raw if str(item)])
         else:
             categories = []
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "message": row.get("message", ""),
             "count": to_int(row.get("count"), default=0),
             "categories": categories,
@@ -187,14 +187,14 @@ def _frequent_errors(error_items: Sequence[Dict[str, Any]], top_n: int, include_
 
 def _quality_score(
     *,
-    results: Sequence[Dict[str, Any]],
+    results: Sequence[dict[str, Any]],
     p95: int,
     failed_penalty: int,
     error_penalty: int,
     slow_penalty: int,
     assertion_missing_penalty: int,
     assertions_enabled: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     failed_count = sum(1 for item in results if str(item.get("status") or "").upper() == "FAILED")
     error_count = sum(1 for item in results if str(item.get("status") or "").upper() == "ERROR")
     slow_count = sum(1 for item in results if to_int(item.get("response_time_ms"), default=-1) > p95 and p95 > 0)
@@ -235,7 +235,7 @@ def _quality_score(
     }
 
 
-def _coverage(report: Mapping[str, Any], results: Sequence[Dict[str, Any]], top_n: int) -> Dict[str, Any]:
+def _coverage(report: Mapping[str, Any], results: Sequence[dict[str, Any]], top_n: int) -> dict[str, Any]:
     executed_total = len(results)
     source_total = _source_total(report, executed_total)
     manual_cases_total = len(_safe_manual_cases(report))
@@ -243,10 +243,10 @@ def _coverage(report: Mapping[str, Any], results: Sequence[Dict[str, Any]], top_
     execution_coverage = ratio(executed_total, source_total)
     manual_coverage = ratio(manual_cases_total, source_total)
 
-    uncovered_top: List[Dict[str, Any]] = []
+    uncovered_top: list[dict[str, Any]] = []
     source_items = report.get("source_items")
     if isinstance(source_items, list):
-        source_key_map: Dict[str, Dict[str, Any]] = {}
+        source_key_map: dict[str, dict[str, Any]] = {}
         for item in source_items:
             if not isinstance(item, dict):
                 continue
@@ -280,12 +280,12 @@ def _coverage(report: Mapping[str, Any], results: Sequence[Dict[str, Any]], top_
 def _trend(
     *,
     report: Mapping[str, Any],
-    reports: Sequence[Dict[str, Any]],
+    reports: Sequence[dict[str, Any]],
     trend_limit: int,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     collection_name = str(report.get("collection_name") or "").strip()
     source_file = str(report.get("source_original_file") or report.get("source_file") or "").strip()
-    related: List[Dict[str, Any]] = []
+    related: list[dict[str, Any]] = []
     for item in reports:
         if not isinstance(item, dict):
             continue
@@ -299,12 +299,12 @@ def _trend(
 
     related = sorted(related, key=lambda row: str(row.get("generated_at") or ""), reverse=True)[:trend_limit]
     ordered = list(reversed(related))
-    success_rate: List[Dict[str, Any]] = []
-    avg_response_ms: List[Dict[str, Any]] = []
-    failed_count: List[Dict[str, Any]] = []
+    success_rate: list[dict[str, Any]] = []
+    avg_response_ms: list[dict[str, Any]] = []
+    failed_count: list[dict[str, Any]] = []
     for item in ordered:
         raw_summary = item.get("summary")
-        summary: Dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
+        summary: dict[str, Any] = raw_summary if isinstance(raw_summary, dict) else {}
         report_name = str(item.get("report_name") or "")
         generated_at = str(item.get("generated_at") or "")
         success_rate.append(
@@ -338,7 +338,7 @@ def _trend(
 def build_report_analytics_payload(
     *,
     report: Mapping[str, Any],
-    reports: Sequence[Dict[str, Any]],
+    reports: Sequence[dict[str, Any]],
     top_n: int,
     trend_limit: int,
     include_samples: bool,
@@ -348,7 +348,7 @@ def build_report_analytics_payload(
     slow_penalty: int,
     assertion_missing_penalty: int,
     assertions_enabled: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """聚合单份报告的分析数据，包含分布、性能、诊断和质量评分。"""
     results = _safe_results(report)
     response_times = extract_response_times(results)
@@ -405,7 +405,7 @@ def build_report_analytics_compare_payload(
     *,
     left_report: Mapping[str, Any],
     right_report: Mapping[str, Any],
-    reports: Sequence[Dict[str, Any]],
+    reports: Sequence[dict[str, Any]],
     top_n: int,
     trend_limit: int,
     include_samples: bool,
@@ -415,7 +415,7 @@ def build_report_analytics_compare_payload(
     slow_penalty: int,
     assertion_missing_penalty: int,
     assertions_enabled: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """对比两份报告的分析快照，计算各指标的变化量并输出对比结果。"""
     left_snapshot = build_report_analytics_payload(
         report=left_report,

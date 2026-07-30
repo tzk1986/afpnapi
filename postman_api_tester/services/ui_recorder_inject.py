@@ -1531,11 +1531,47 @@ _REPLAYER_JS = r"""
         // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
         self._saveStateToParent();
 
+        // 在页面上显示调试信息并发送到后端
+        var _debugDiv = document.createElement('div');
+        _debugDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(255,0,0,0.9);color:white;padding:10px;z-index:99999;font-size:12px;max-height:200px;overflow:auto;';
+        _debugDiv.id = '_new_tab_debug';
+        document.body.appendChild(_debugDiv);
+        var _debugMessages = [];
+        function _debug(msg) {
+          _debugDiv.innerHTML += '<div>' + msg + '</div>';
+          _debugMessages.push(msg);
+          console.log('[ReplayEngine] new_tab DEBUG:', msg);
+          // 直接发送到后端
+          try {
+            var _xhr = new XMLHttpRequest();
+            _xhr.open('POST', '/api/ui-testing/replay-log', true);
+            _xhr.setRequestHeader('Content-Type', 'application/json');
+            _xhr.send(JSON.stringify({
+              job_id: self.jobId || '',
+              step_index: self.currentIndex,
+              event: 'new_tab_debug',
+              message: msg,
+              detail: { all_messages: _debugMessages.slice(-5) },
+              level: 'info'
+            }));
+          } catch(e) {}
+        }
+        _debug('=== new_tab step started ===');
+        _debug('step.value: ' + (step.value || '(empty)'));
+        _debug('_lastClickHref: ' + (self._lastClickHref || '(empty)'));
+        _debug('_lastWindowOpenUrl: ' + (self._lastWindowOpenUrl || '(empty)'));
+        _debug('currentIndex: ' + self.currentIndex + ', steps.length: ' + self.steps.length);
+        if (self.currentIndex + 1 < self.steps.length) {
+          var _ns = self.steps[self.currentIndex + 1];
+          _debug('nextStep.tab_url: ' + (_ns.tab_url || '(empty)'));
+          _debug('nextStep.page_url: ' + (_ns.page_url || '(empty)'));
+        }
+
         // 获取导航 URL 的辅助函数（仅高优先级来源，不含 tab_url 兜底）
         function _resolveNewTabUrlHighPriority() {
           var url = step.value || self._lastClickHref || self._lastWindowOpenUrl || '';
           if (self._lastWindowOpenUrl) {
-            console.log('[ReplayEngine] new_tab: using window.open url:', url.substring(0, 120));
+            _debug('using window.open url: ' + url.substring(0, 120));
             self._lastWindowOpenUrl = '';
           }
           return url;
@@ -1552,28 +1588,70 @@ _REPLAYER_JS = r"""
 
         // 导航到新页面的辅助函数
         function _doNavigate(navUrl) {
+          _debug('_doNavigate called with navUrl: ' + (navUrl || '(empty)'));
           if (navUrl) {
             self._notifyParent('navigate', { url: navUrl, new_tab: true });
+            _debug('NOTIFYING PARENT TO NAVIGATE TO: ' + navUrl.substring(0, 120));
             console.log('[ReplayEngine] new_tab action: navigating to', navUrl.substring(0, 80));
             if (typeof self._sendLog === 'function') {
               try { self._sendLog('new_tab_navigate', '导航到新页面: ' + navUrl.substring(0, 80), { url: navUrl }); } catch(e) {}
             }
           } else {
+            _debug('ERROR: no url available, skipping navigation');
             console.log('[ReplayEngine] new_tab action: no url available, skipping navigation');
             if (typeof self._sendLog === 'function') {
-              try { self._sendLog('new_tab_no_url', '无法获取导航 URL，跳过跳转', {}, 'warn'); } catch(e) {}
+              try { self._sendLog('new_tab_no_url', '无法获取导航 URL，跳过跳转', {
+                step_value: (step.value || '').substring(0, 80),
+                lastClickHref: (self._lastClickHref || '').substring(0, 80),
+                lastWindowOpenUrl: (self._lastWindowOpenUrl || '').substring(0, 80),
+                fallbackUrl: (fallbackUrl || '').substring(0, 80)
+              }, 'warn'); } catch(e) {}
             }
           }
         }
 
         // 先尝试高优先级来源（step.value, _lastClickHref, _lastWindowOpenUrl）
         var navUrl = _resolveNewTabUrlHighPriority();
+        _debug('step.value: ' + ((step.value || '').substring(0, 80)));
+        _debug('_lastClickHref: ' + ((self._lastClickHref || '').substring(0, 80)));
+        _debug('_lastWindowOpenUrl: ' + ((self._lastWindowOpenUrl || '').substring(0, 80)));
+        _debug('high priority navUrl: ' + ((navUrl || '').substring(0, 80)));
+        console.log('[ReplayEngine] new_tab DEBUG: step.value=', (step.value || '').substring(0, 80));
+        console.log('[ReplayEngine] new_tab DEBUG: _lastClickHref=', (self._lastClickHref || '').substring(0, 80));
+        console.log('[ReplayEngine] new_tab DEBUG: _lastWindowOpenUrl=', (self._lastWindowOpenUrl || '').substring(0, 80));
+        console.log('[ReplayEngine] new_tab DEBUG: high priority navUrl=', (navUrl || '').substring(0, 80));
         if (navUrl) {
           console.log('[ReplayEngine] new_tab: URL resolved immediately from high priority source');
+          _debug('URL resolved immediately from high priority source');
           _doNavigate(navUrl);
         } else {
           // 高优先级来源都没有，检查是否需要等待 window.open
           var fallbackUrl = _resolveNewTabUrlFallback();
+          _debug('fallbackUrl from _resolveNewTabUrlFallback: ' + ((fallbackUrl || '').substring(0, 80)));
+          _debug('currentIndex: ' + self.currentIndex + ', steps.length: ' + self.steps.length);
+          console.log('[ReplayEngine] new_tab DEBUG: fallbackUrl=', (fallbackUrl || '').substring(0, 80));
+          console.log('[ReplayEngine] new_tab DEBUG: currentIndex=', self.currentIndex, 'steps.length=', self.steps.length);
+          if (self.currentIndex + 1 < self.steps.length) {
+            var _nextStep = self.steps[self.currentIndex + 1];
+            _debug('nextStep exists, tab_url: ' + ((_nextStep.tab_url || '').substring(0, 80)) + ', page_url: ' + ((_nextStep.page_url || '').substring(0, 80)));
+            console.log('[ReplayEngine] new_tab DEBUG: nextStep.tab_url=', (_nextStep.tab_url || '').substring(0, 80));
+            console.log('[ReplayEngine] new_tab DEBUG: nextStep.page_url=', (_nextStep.page_url || '').substring(0, 80));
+          }
+          // 如果 next step 有 tab_url 或 page_url，优先使用它（录制时 new_tab 可能没捕获到 URL）
+          _debug('Checking next step for URL...');
+          if (!fallbackUrl && self.currentIndex + 1 < self.steps.length) {
+            var _nextStep = self.steps[self.currentIndex + 1];
+            _debug('nextStep exists: ' + (!!_nextStep));
+            _debug('nextStep.tab_url: ' + (_nextStep ? (_nextStep.tab_url || '(empty)') : 'N/A'));
+            _debug('nextStep.page_url: ' + (_nextStep ? (_nextStep.page_url || '(empty)') : 'N/A'));
+            if (_nextStep) {
+              fallbackUrl = _nextStep.tab_url || _nextStep.page_url || '';
+              _debug('FALLBACK URL SET TO: ' + (fallbackUrl || '(still empty)'));
+              console.log('[ReplayEngine] new_tab: using next step URL as fallback:', fallbackUrl.substring(0, 80));
+            }
+          } else {
+            _debug('Skipping next step check: fallbackUrl=' + !!fallbackUrl + ', currentIndex=' + self.currentIndex + ', steps.length=' + self.steps.length);
+          }
           if (fallbackUrl) {
             // 有 tab_url 兜底，但检查是否跨 origin（可能涉及 window.open 传递认证 token）
             var currentOrigin = location.protocol + '//' + location.host;
@@ -1794,14 +1872,21 @@ _REPLAYER_JS = r"""
 
         if (!el) {
           result.status = 'failed';
-          result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '');
+          // 检查是否在近期发生过页面导航
+          var _navHint = '';
+          if (self._lastNavigationTime && (Date.now() - self._lastNavigationTime) < 10000) {
+            _navHint = ' （提示：页面已在 ' + Math.round((Date.now() - self._lastNavigationTime) / 1000) + ' 秒前从 ' +
+                (self._lastNavigationFromUrl || '').substring(0, 60) + ' 导航到 ' +
+                (self._lastNavigationToUrl || '').substring(0, 60) + '，该元素可能属于旧页面）';
+          }
+          result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '') + _navHint;
           result.duration_ms = Date.now() - stepStart;
           // 截图当前页面状态
           self._captureScreenshot(function(screenshotData) {
             result.screenshot = screenshotData || null;
             self.results.push(result);
             self._notifyParent('step_complete', result);
-            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout }, 'warn'); } catch(e) {}
+            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout, navigation_hint: _navHint }, 'warn'); } catch(e) {}
             // 元素未找到时记录错误并继续执行后续步骤
             self._executeNext();
           });
@@ -1845,13 +1930,22 @@ _REPLAYER_JS = r"""
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
           var urlBefore = self._actionStartUrl || self._getTargetUrl();
+          var _delayMs = 2000;
+          // 对于登录等操作，可能需要更长的等待时间
+          if (action === 'submit' || (el && el.type === 'submit')) {
+            _delayMs = 3000;
+          }
           setTimeout(function() {
             if (self.stopped) return;
             var currentUrl = self._getTargetUrl();
             if (currentUrl !== urlBefore) {
               self._notifyParent('navigate', { url: currentUrl });
+              // 记录导航事件，供后续步骤判断是否应该跳过
+              self._lastNavigationTime = Date.now();
+              self._lastNavigationFromUrl = urlBefore;
+              self._lastNavigationToUrl = currentUrl;
             }
-          }, 2000);
+          }, _delayMs);
         }
         self._executeNext();
       });
@@ -1910,14 +2004,23 @@ _REPLAYER_JS = r"""
           inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           // 在 el-select 容器内时不触发 Enter keyup（会关闭下拉框），
           // 让后续录制的 click 步骤自然完成选项选择
+          // 在 form 内且有 submit 按钮时也不触发 Enter keyup（会触发自动提交），
+          // 让后续录制的 click 步骤完成显式提交
           var _inElSelect = false;
+          var _inFormWithSubmit = false;
           var _p = inputEl.parentElement;
           while (_p && _p !== document.body) {
             var _cls = _p.className || '';
             if (typeof _cls === 'string' && _cls.indexOf('el-select') >= 0) { _inElSelect = true; break; }
+            if (_p.tagName === 'FORM') {
+              // 检查表单内是否有 submit 按钮
+              var _submitBtn = _p.querySelector('button[type="submit"], input[type="submit"], button.el-button--primary');
+              if (_submitBtn) { _inFormWithSubmit = true; }
+              break;
+            }
             _p = _p.parentElement;
           }
-          if (!_inElSelect) {
+          if (!_inElSelect && !_inFormWithSubmit) {
             inputEl.dispatchEvent(new KeyboardEvent('keyup', {
               bubbles: true, composed: true, key: 'Enter'
             }));

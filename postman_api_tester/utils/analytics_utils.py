@@ -24,8 +24,8 @@ def clamp_int(value: object, minimum: int, maximum: int, default: int) -> int:
     return max(minimum, min(maximum, parsed))
 
 
-def parse_histogram_buckets(text: str) -> List[int]:
-    numbers: List[int] = []
+def parse_histogram_buckets(text: str) -> list[int]:
+    numbers: list[int] = []
     for part in str(text or "").split(","):
         part = part.strip()
         if not part:
@@ -74,8 +74,8 @@ def normalize_error_message(message: object) -> str:
     return normalized
 
 
-def extract_response_times(results: Sequence[Dict[str, Any]]) -> List[int]:
-    times: List[int] = []
+def extract_response_times(results: Sequence[dict[str, Any]]) -> list[int]:
+    times: list[int] = []
     for item in results:
         value = to_int(item.get("response_time_ms"), default=-1)
         if value >= 0:
@@ -99,7 +99,7 @@ def percentile(values: Sequence[int], q: float) -> int:
     return int(round(interpolated))
 
 
-def build_quantiles(values: Sequence[int]) -> Dict[str, int]:
+def build_quantiles(values: Sequence[int]) -> dict[str, int]:
     if not values:
         return {"avg": 0, "p50": 0, "p95": 0, "p99": 0, "max": 0}
     avg = int(round(sum(values) / len(values)))
@@ -112,7 +112,7 @@ def build_quantiles(values: Sequence[int]) -> Dict[str, int]:
     }
 
 
-def build_histogram(values: Sequence[int], buckets: Sequence[int]) -> List[Dict[str, object]]:
+def build_histogram(values: Sequence[int], buckets: Sequence[int]) -> list[dict[str, object]]:
     limits = sorted(set(int(v) for v in buckets))
     if not limits:
         limits = [0, 50, 100, 200, 500, 1000, 3000, 5000]
@@ -125,7 +125,7 @@ def build_histogram(values: Sequence[int], buckets: Sequence[int]) -> List[Dict[
                 break
         counts[idx] += 1
 
-    rows: List[Dict[str, object]] = []
+    rows: list[dict[str, object]] = []
     for i, count in enumerate(counts):
         min_value = limits[i]
         if i < len(limits) - 1:
@@ -173,13 +173,13 @@ def ratio(count: int, total: int) -> float:
     return round((count / total) * 100.0, 2)
 
 
-def safe_top_items(counter: Dict[str, int], top_n: int) -> List[Tuple[str, int]]:
+def safe_top_items(counter: dict[str, int], top_n: int) -> list[tuple[str, int]]:
     return sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:top_n]
 
 
-def distinct_list(values: Iterable[str]) -> List[str]:
+def distinct_list(values: Iterable[str]) -> list[str]:
     seen = set()
-    result: List[str] = []
+    result: list[str] = []
     for value in values:
         if value in seen:
             continue
@@ -198,7 +198,7 @@ def normalize_analytics_query_params(
     trend_limit_default: int,
     trend_limit_max: int,
     include_samples_default: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     top_n = clamp_int(top_n_raw, minimum=1, maximum=top_n_max, default=top_n_default)
     trend_limit = clamp_int(trend_limit_raw, minimum=1, maximum=trend_limit_max, default=trend_limit_default)
     include_samples = _to_bool(include_samples_raw, default=include_samples_default)

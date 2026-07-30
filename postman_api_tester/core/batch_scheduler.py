@@ -20,7 +20,7 @@ from postman_api_tester.utils.variable_substitution import (
 logger = logging.getLogger(__name__)
 
 
-def extract_produced_variables(api: ApiConfig) -> Set[str]:
+def extract_produced_variables(api: ApiConfig) -> set[str]:
     """提取接口通过 x_extract 产出的变量名集合。"""
     raw_extract = api.get("x_extract")
     if not isinstance(raw_extract, dict):
@@ -28,7 +28,7 @@ def extract_produced_variables(api: ApiConfig) -> Set[str]:
     return {k for k in raw_extract if isinstance(k, str)}
 
 
-def _collect_strings(obj: Any, accumulator: List[str]) -> None:
+def _collect_strings(obj: Any, accumulator: list[str]) -> None:
     """递归收集对象中的所有字符串值。"""
     if isinstance(obj, str):
         accumulator.append(obj)
@@ -40,10 +40,10 @@ def _collect_strings(obj: Any, accumulator: List[str]) -> None:
             _collect_strings(item, accumulator)
 
 
-def extract_consumed_variables(api: ApiConfig) -> Set[str]:
+def extract_consumed_variables(api: ApiConfig) -> set[str]:
     """提取接口在 URL/headers/params/body 中引用的变量名集合。"""
-    refs: Set[str] = set()
-    targets: List[str] = []
+    refs: set[str] = set()
+    targets: list[str] = []
 
     if "url" in api:
         targets.append(str(api["url"]))
@@ -78,10 +78,10 @@ def extract_consumed_variables(api: ApiConfig) -> Set[str]:
 class BatchScheduler:
     """分析接口变量依赖，输出可并行执行的分批计划。"""
 
-    def __init__(self, apis: List[ApiConfig]) -> None:
+    def __init__(self, apis: list[ApiConfig]) -> None:
         self._apis = apis
 
-    def compute_batches(self) -> List[List[int]]:
+    def compute_batches(self) -> list[list[int]]:
         """返回批次列表，每批是接口索引列表，批次间必须串行。
 
         算法：
@@ -93,8 +93,8 @@ class BatchScheduler:
         if n == 0:
             return []
 
-        producer_map: Dict[str, List[int]] = {}
-        consumer_deps: Dict[int, Set[str]] = {}
+        producer_map: dict[str, list[int]] = {}
+        consumer_deps: dict[int, set[str]] = {}
 
         for idx, api in enumerate(self._apis):
             produced = extract_produced_variables(api)
@@ -105,8 +105,8 @@ class BatchScheduler:
             if consumed:
                 consumer_deps[idx] = consumed
 
-        edges: Dict[int, Set[int]] = {i: set() for i in range(n)}
-        in_degree: Dict[int, int] = {i: 0 for i in range(n)}
+        edges: dict[int, set[int]] = {i: set() for i in range(n)}
+        in_degree: dict[int, int] = {i: 0 for i in range(n)}
 
         for consumer_idx, deps in consumer_deps.items():
             for var_name in deps:
@@ -120,7 +120,7 @@ class BatchScheduler:
             if in_degree[i] == 0:
                 queue.append(i)
 
-        batches: List[List[int]] = []
+        batches: list[list[int]] = []
         while queue:
             batch = sorted(queue)
             batches.append(batch)

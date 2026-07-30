@@ -31,16 +31,16 @@ def _detect_csv_encoding(file_path: str) -> str:
     return "utf-8"
 
 
-def _load_csv(file_path: str) -> List[Dict[str, str]]:
+def _load_csv(file_path: str) -> list[dict[str, str]]:
     """加载 CSV 文件，首行为变量名。"""
     encoding = _detect_csv_encoding(file_path)
     with open(file_path, encoding=encoding, newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
             raise DataFileError(f"CSV 文件为空或无表头: {file_path}")
-        rows: List[Dict[str, str]] = []
+        rows: list[dict[str, str]] = []
         for _line_num, row in enumerate(reader, start=2):
-            cleaned: Dict[str, str] = {}
+            cleaned: dict[str, str] = {}
             for key, value in row.items():
                 if key is None:
                     continue
@@ -49,13 +49,13 @@ def _load_csv(file_path: str) -> List[Dict[str, str]]:
         return rows
 
 
-def _load_json(file_path: str) -> List[Dict[str, str]]:
+def _load_json(file_path: str) -> list[dict[str, str]]:
     """加载 JSON 文件，顶层必须为数组，每个元素为对象。"""
     with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise DataFileError(f"JSON 数据文件顶层必须为数组: {file_path}")
-    rows: List[Dict[str, str]] = []
+    rows: list[dict[str, str]] = []
     for idx, item in enumerate(data):
         if not isinstance(item, dict):
             raise DataFileError(f"JSON 数组第 {idx + 1} 项不是对象: {file_path}")
@@ -63,7 +63,7 @@ def _load_json(file_path: str) -> List[Dict[str, str]]:
     return rows
 
 
-def validate_data_file(file_path: str, max_rows: int) -> Tuple[List[Dict[str, str]], str]:
+def validate_data_file(file_path: str, max_rows: int) -> tuple[list[dict[str, str]], str]:
     """验证数据文件并返回 (数据行列表, 格式标识)。
 
     校验项：
@@ -95,7 +95,7 @@ def validate_data_file(file_path: str, max_rows: int) -> Tuple[List[Dict[str, st
     return rows, fmt
 
 
-def get_data_columns(rows: List[Dict[str, str]]) -> set[str]:
+def get_data_columns(rows: list[dict[str, str]]) -> set[str]:
     """从数据行中提取所有变量名列（并集）。"""
     columns: set[str] = set()
     for row in rows:

@@ -584,14 +584,15 @@
                     var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
                     // 如果 URL 来自代理服务器（pushState 残留），使用 currentTargetOrigin 构造正确的 _proxy_url
                     var effectiveOrigin = (navOrigin === window.location.origin && currentTargetOrigin) ? currentTargetOrigin : navOrigin;
-                    console.log('[onNavigate] 跨origin导航，构造代理URL, effectiveOrigin=', effectiveOrigin.substring(0, 40));
+                    var effectiveUrl = effectiveOrigin + urlObj.pathname + urlObj.search + urlObj.hash;
+                    console.log('[onNavigate] 跨origin导航，构造代理URL, effectiveOrigin=', effectiveOrigin.substring(0, 40), 'effectiveUrl=', effectiveUrl.substring(0, 80));
                     // 跨系统跳转时更新 currentTargetOrigin
                     if (effectiveOrigin !== currentTargetOrigin) {
                         console.log('[onNavigate] updating currentTargetOrigin from', currentTargetOrigin, 'to', effectiveOrigin);
                         currentTargetOrigin = effectiveOrigin;
                     }
                     proxyUrl = targetPath + (targetPath.indexOf('?') >= 0 ? '&' : '?') +
-                        '_proxy_url=' + encodeURIComponent(effectiveOrigin) + '&replay=1';
+                        '_proxy_url=' + encodeURIComponent(effectiveUrl) + '&replay=1';
                 }
             }
 

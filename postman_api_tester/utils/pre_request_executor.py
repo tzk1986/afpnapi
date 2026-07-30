@@ -25,7 +25,7 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-_SAFE_BUILTINS: Dict[str, object] = {
+_SAFE_BUILTINS: dict[str, object] = {
     "int": int,
     "str": str,
     "float": float,
@@ -52,7 +52,7 @@ _SAFE_BUILTINS: Dict[str, object] = {
     "None": None,
 }
 
-_SAFE_MODULES: Dict[str, object] = {
+_SAFE_MODULES: dict[str, object] = {
     "hashlib": hashlib,
     "hmac": hmac,
     "base64": base64,
@@ -76,7 +76,7 @@ def _contains_dangerous_keyword(expression: str) -> bool:
     return _DANGEROUS_KEYWORDS.search(expression) is not None
 
 
-def _execute_expression(expression: str, sandbox_globals: Dict[str, object]) -> str:
+def _execute_expression(expression: str, sandbox_globals: dict[str, object]) -> str:
     """在沙箱中执行单个表达式，返回字符串结果。"""
     try:
         value = eval(expression, sandbox_globals)
@@ -91,7 +91,7 @@ def _execute_expression(expression: str, sandbox_globals: Dict[str, object]) -> 
 
 def _execute_with_thread_timeout(
     expression: str,
-    sandbox_globals: Dict[str, object],
+    sandbox_globals: dict[str, object],
     timeout: float,
 ) -> str:
     """使用 ThreadPoolExecutor 实现跨平台超时。"""
@@ -106,7 +106,7 @@ def _execute_with_thread_timeout(
 
 def _execute_with_signal_timeout(
     expression: str,
-    sandbox_globals: Dict[str, object],
+    sandbox_globals: dict[str, object],
     timeout: float,
 ) -> str:
     """使用 signal.SIGALRM 实现 Unix 超时（更高效）。"""
@@ -130,7 +130,7 @@ def _execute_with_signal_timeout(
         signal.signal(signal.SIGALRM, old_handler)  # type: ignore[attr-defined]
 
 
-def _execute_with_timeout(expression: str, sandbox_globals: Dict[str, object]) -> str:
+def _execute_with_timeout(expression: str, sandbox_globals: dict[str, object]) -> str:
     """跨平台超时执行：Unix 用 signal，Windows 用线程池。"""
     if sys.platform == "win32":
         return _execute_with_thread_timeout(expression, sandbox_globals, _TIMEOUT_SECONDS)
@@ -138,9 +138,9 @@ def _execute_with_timeout(expression: str, sandbox_globals: Dict[str, object]) -
 
 
 def execute_pre_request(
-    expressions: Dict[str, str],
-    existing_variables: Dict[str, str],
-) -> Dict[str, str]:
+    expressions: dict[str, str],
+    existing_variables: dict[str, str],
+) -> dict[str, str]:
     """执行 pre-request 表达式，返回结果变量字典。
 
     - expressions: {变量名: Python 表达式}
@@ -149,8 +149,8 @@ def execute_pre_request(
     if not expressions:
         return {}
 
-    result: Dict[str, str] = {}
-    sandbox_globals: Dict[str, object] = {"__builtins__": _SAFE_BUILTINS}
+    result: dict[str, str] = {}
+    sandbox_globals: dict[str, object] = {"__builtins__": _SAFE_BUILTINS}
     sandbox_globals.update(_SAFE_MODULES)
     sandbox_globals.update({"variables": existing_variables, "result": result})
 
