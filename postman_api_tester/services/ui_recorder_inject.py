@@ -1653,13 +1653,16 @@ _REPLAYER_JS = r"""
             _debug('Skipping next step check: fallbackUrl=' + !!fallbackUrl + ', currentIndex=' + self.currentIndex + ', steps.length=' + self.steps.length);
           }
           if (fallbackUrl) {
+            _debug('fallbackUrl is truthy, checking cross-origin...');
             // 有 tab_url 兜底，但检查是否跨 origin（可能涉及 window.open 传递认证 token）
             var currentOrigin = location.protocol + '//' + location.host;
             var _fbOrigin = '';
-            try { _fbOrigin = new URL(fallbackUrl).origin; } catch(e) {}
+            try { _fbOrigin = new URL(fallbackUrl).origin; } catch(e) { _debug('ERROR parsing fallbackUrl: ' + e.message); }
             var isCrossOrigin = _fbOrigin && _fbOrigin !== currentOrigin;
+            _debug('currentOrigin: ' + currentOrigin + ', _fbOrigin: ' + _fbOrigin + ', isCrossOrigin: ' + isCrossOrigin);
             console.log('[ReplayEngine] new_tab: fallback tab_url origin:', _fbOrigin, 'current:', currentOrigin, 'cross:', isCrossOrigin);
             if (isCrossOrigin) {
+              _debug('CROSS-ORIGIN detected, waiting for window.open...');
               // 跨 origin 跳转：等待 window.open（可能携带 esp_token 等认证参数）
               console.log('[ReplayEngine] new_tab: cross-origin jump, waiting for window.open (max 5000ms)');
               var waitStart = Date.now();
@@ -1745,6 +1748,7 @@ _REPLAYER_JS = r"""
               }
               setTimeout(_pollForWindowOpen, pollInterval);
             } else {
+              _debug('SAME-ORIGIN detected, using tab_url immediately');
               // 同 origin 跳转：直接使用 tab_url
               console.log('[ReplayEngine] new_tab: same-origin jump, using tab_url immediately');
               _doNavigate(fallbackUrl);
