@@ -6,7 +6,6 @@
 """
 
 import json
-import os
 import threading
 import time as _time
 from pathlib import Path

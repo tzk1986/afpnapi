@@ -18,7 +18,6 @@ Postman Collection 解析模块 - 集合解析与 API 配置提取
 
 import json
 import logging
-import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict, Union

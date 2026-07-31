@@ -6,8 +6,8 @@
 - 使用方：执行层、代理请求与实际请求 URL 展示链路。
 """
 
-from typing import Any, Dict, Optional, Tuple
-from urllib.parse import (
+from typing import Any, Dict, Optional, Tuple  # noqa: E402
+from urllib.parse import (  # noqa: E402
 	parse_qsl,
 	urlencode,
 	urljoin,

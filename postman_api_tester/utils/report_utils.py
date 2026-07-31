@@ -5,7 +5,7 @@
 - 入口：compute_summary()。
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List  # noqa: E402
 
 
 def compute_summary(results: List[Dict[str, Any]]) -> Dict[str, Any]:

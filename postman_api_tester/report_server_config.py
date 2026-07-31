@@ -144,7 +144,7 @@ DEFAULT_ENV_NAME: str = _cfg_str("DEFAULT_ENV_NAME", "")
 ENABLE_ERR_CODE_JUDGMENT: bool = _cfg_bool("ENABLE_ERR_CODE_JUDGMENT", False)
 ENABLE_MESSAGE_JUDGMENT: bool = _cfg_bool("ENABLE_MESSAGE_JUDGMENT", True)
 
-from postman_api_tester.utils.judgment_utils import (
+from postman_api_tester.utils.judgment_utils import (  # noqa: E402
     parse_success_list as _parse_success_list,
 )
 

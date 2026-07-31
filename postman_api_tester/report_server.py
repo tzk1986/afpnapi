@@ -319,7 +319,7 @@ REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 app = ReportServerApp.create_app()
 configure_reports_dir(REPORTS_DIR)
-from postman_api_tester.report_server_config import (
+from postman_api_tester.report_server_config import (  # noqa: E402
     REPORT_SCAN_EXCLUDE_DIRS,
 )
 

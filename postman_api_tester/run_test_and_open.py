@@ -22,8 +22,8 @@ os.chdir(PROJECT_ROOT)
 # 添加包路径
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from postman_api_tester import config as cfg
-from postman_api_tester.postman_api_tester import (
+from postman_api_tester import config as cfg  # noqa: E402
+from postman_api_tester.postman_api_tester import (  # noqa: E402
     run_postman_tests,
 )
 
