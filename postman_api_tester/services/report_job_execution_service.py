@@ -6,7 +6,6 @@
 
 import contextlib
 import logging
-import os
 import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple

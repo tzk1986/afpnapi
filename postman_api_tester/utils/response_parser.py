@@ -5,7 +5,7 @@
 - 入口：extract_msg_errcode()。
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple  # noqa: E402
 
 
 def extract_msg_errcode(body: Any) -> Tuple[str, str]:
