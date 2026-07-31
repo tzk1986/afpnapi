@@ -8,6 +8,7 @@ import contextlib
 import logging
 import os
 import threading
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from postman_api_tester.services.report_retry_service import (
@@ -150,16 +151,16 @@ def run_postman_job(
             job_id,
             status="success",
             message="执行完成，正在刷新报告索引。",
-            report_name=os.path.basename(str(report.generated_report_file or "")),
-            report_meta_name=os.path.basename(str(report.generated_meta_file or "")),
+            report_name=Path(report.generated_report_file).name if report.generated_report_file else "",
+            report_meta_name=Path(report.generated_meta_file).name if report.generated_meta_file else "",
         )
         logger.info(
             "job completed",
             extra={
                 "event": "job.run.completed",
                 "job_id": job_id,
-                "report_name": os.path.basename(str(report.generated_report_file or "")),
-                "meta_name": os.path.basename(str(report.generated_meta_file or "")),
+                "report_name": report.generated_report_file or "",
+                "meta_name": report.generated_meta_file or "",
             },
         )
         invalidate_reports_cache()

@@ -15,6 +15,7 @@ import logging
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
@@ -108,7 +109,7 @@ def _resolve_runtime_config(
 def _resolve_output_dir(output_dir: str | None) -> str:
     if output_dir is not None:
         return output_dir
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
+    return str(Path(__file__).resolve().parent.parent / 'reports')
 
 
 def _validate_base_url(base_url: str | None) -> None:
@@ -331,11 +332,12 @@ def _resolve_report_file_path(output_dir: str, report_name: str | None) -> str:
     else:
         report_file_name = default_report_name
 
-    report_file = os.path.join(output_dir, report_file_name)
-    if os.path.exists(report_file):
-        name_no_ext, ext = os.path.splitext(report_file_name)
-        report_file = os.path.join(output_dir, f'{name_no_ext}_{timestamp}{ext or ".html"}')
-    return report_file
+    report_file = Path(output_dir) / report_file_name
+    if report_file.exists():
+        name_no_ext = report_file.stem
+        ext = report_file.suffix
+        report_file = Path(output_dir) / f'{name_no_ext}_{timestamp}{ext or ".html"}'
+    return str(report_file)
 
 
 def _flush_checkpoint_state(
@@ -951,7 +953,7 @@ def _build_report_context(
     report = PostmanTestReport()
     raw_info = parser.data.get('info') if isinstance(parser.data, dict) else None
     report.collection_name = str(raw_info.get('name', '') or '') if isinstance(raw_info, dict) else ''
-    report.source_file = os.path.abspath(postman_file)
+    report.source_file = str(Path(postman_file).resolve())
     report.source_original_file = str(source_original_file or '').strip()
     report.base_url = parser.base_url
     report.assertion_strict_mode = assertion_strict_mode

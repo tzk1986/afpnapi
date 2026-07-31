@@ -154,7 +154,7 @@ def list_reports() -> List[ReportRecord]:
             report = load_report_meta(meta_path, include_results=False)
             report["meta_file"] = str(meta_path.relative_to(_REPORTS_DIR))
             details_file = str(report.get("details_file") or "").strip()
-            if details_file and os.path.basename(details_file) == details_file:
+            if details_file and Path(details_file).name == details_file:
                 expected_details = meta_path.parent / details_file
                 if expected_details.exists():
                     report["details_file"] = str(expected_details.relative_to(_REPORTS_DIR))
@@ -196,7 +196,7 @@ def list_reports() -> List[ReportRecord]:
 def _fix_details_file_path(report: ReportRecord) -> None:
     """如果 details_file 只是文件名且 meta_file 在子目录中，修正为相对路径。"""
     details_file = str(report.get("details_file") or "").strip()
-    if not details_file or os.path.basename(details_file) != details_file:
+    if not details_file or Path(details_file).name != details_file:
         return
     meta_file = str(report.get("meta_file") or "").strip()
     if not meta_file:

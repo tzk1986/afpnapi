@@ -119,11 +119,11 @@ def main() -> None:
         )
 
         # 获取完整路径
-        report_path = os.path.abspath(report.generated_report_file)
+        report_path = str(Path(report.generated_report_file).resolve())
 
         print("\n✓ 测试完成！")
         print(f"✓ 报告已生成: {report_path}")
-        print(f"✓ 报告输出目录: {os.path.abspath(output_dir)}")
+        print(f"✓ 报告输出目录: {Path(output_dir).resolve()}")
 
         # 启动Flask服务器
         print("\n🚀 启动报告服务器...")
@@ -155,7 +155,7 @@ def main() -> None:
             print("  • 输入Token并点击'测试Token'验证有效性")
             print("  • 在详情中点击'重新请求'按钮使用新Token重新测试API")
             print("  • 同局域网开发可通过上面的局域网地址直接访问报告中心")
-            print(f"  • 当前报告目录: {os.path.abspath(output_dir)}")
+            print(f"  • 当前报告目录: {Path(output_dir).resolve()}")
             print("\n按 Ctrl+C 停止服务器...")
 
             # 等待用户中断

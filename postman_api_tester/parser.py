@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict, Union
 from urllib.parse import urljoin
 
@@ -75,11 +76,11 @@ class PostmanApiParser:
 
     def load_file(self) -> None:
         """加载并解析Postman文件"""
-        if not os.path.exists(self.file_path):
+        if not Path(self.file_path).exists():
             raise ParseError(f"文件不存在: {self.file_path}")
 
         try:
-            with open(self.file_path, encoding='utf-8') as f:
+            with Path(self.file_path).open(encoding='utf-8') as f:
                 self.data = json.load(f)
         except json.JSONDecodeError as e:
             raise ParseError(f"JSON文件格式错误: {e}") from e

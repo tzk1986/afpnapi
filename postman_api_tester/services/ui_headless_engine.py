@@ -47,7 +47,7 @@ def _log_request(job_id: str, step_index: int, request_data: Dict[str, Any]) -> 
         **request_data,
     }
     try:
-        with open(log_file, "a", encoding="utf-8") as f:
+        with Path(log_file).open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
         pass

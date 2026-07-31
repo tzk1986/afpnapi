@@ -392,7 +392,7 @@ class TestInputValidation:
         with pytest.raises(ValueError, match="action 仅支持 override 或 restore"):
             set_report_result_judgement(
                 report_name="r", result_index=0, action="DELETE",
-                reports_dir=Path("."),
+                reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
                 compute_summary=MagicMock(),
@@ -403,7 +403,7 @@ class TestInputValidation:
         with pytest.raises(ValueError, match="action 仅支持 override 或 restore"):
             set_report_result_judgement(
                 report_name="r", result_index=0, action=12345,
-                reports_dir=Path("."),
+                reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
                 compute_summary=MagicMock(),
@@ -446,7 +446,7 @@ class TestInputValidation:
         with pytest.raises(ValueError, match="target_status 仅支持 PASSED 或 FAILED"):
             set_report_result_judgement(
                 report_name="r", result_index=0, action="override",
-                reports_dir=Path("."),
+                reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
                 compute_summary=MagicMock(),

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import csv
 import json
-import os
+from pathlib import Path
 
 
 class DataFileError(Exception):
@@ -16,13 +16,13 @@ class DataFileError(Exception):
 
 def _detect_csv_encoding(file_path: str) -> str:
     """探测 CSV 文件编码，依次尝试 UTF-8-sig / UTF-8 / GBK。"""
-    with open(file_path, "rb") as f:
+    with Path(file_path).open("rb") as f:
         raw = f.read(4)
     if raw.startswith(b"\xef\xbb\xbf"):
         return "utf-8-sig"
     for encoding in ("utf-8", "gbk"):
         try:
-            with open(file_path, encoding=encoding) as f:
+            with Path(file_path).open(encoding=encoding) as f:
                 f.read(1024)
             return encoding
         except (UnicodeDecodeError, UnicodeError):
@@ -33,7 +33,7 @@ def _detect_csv_encoding(file_path: str) -> str:
 def _load_csv(file_path: str) -> list[dict[str, str]]:
     """加载 CSV 文件，首行为变量名。"""
     encoding = _detect_csv_encoding(file_path)
-    with open(file_path, encoding=encoding, newline="") as f:
+    with Path(file_path).open(encoding=encoding, newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames is None:
             raise DataFileError(f"CSV 文件为空或无表头: {file_path}")
@@ -50,7 +50,7 @@ def _load_csv(file_path: str) -> list[dict[str, str]]:
 
 def _load_json(file_path: str) -> list[dict[str, str]]:
     """加载 JSON 文件，顶层必须为数组，每个元素为对象。"""
-    with open(file_path, encoding="utf-8") as f:
+    with Path(file_path).open(encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise DataFileError(f"JSON 数据文件顶层必须为数组: {file_path}")
@@ -71,10 +71,10 @@ def validate_data_file(file_path: str, max_rows: int) -> tuple[list[dict[str, st
     - 行数不超过 max_rows
     - CSV 各行变量名一致（DictReader 天然保证）
     """
-    if not os.path.isfile(file_path):
+    if not Path(file_path).is_file():
         raise DataFileError(f"数据文件不存在: {file_path}")
 
-    ext = os.path.splitext(file_path)[1].lower()
+    ext = Path(file_path).suffix.lower()
     if ext == ".csv":
         rows = _load_csv(file_path)
         fmt = "csv"

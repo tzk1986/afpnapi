@@ -74,4 +74,4 @@ class TestCheckpointManager:
                 mgr = CheckpointManager(checkpoint_dir=file_path)
                 mgr.save("fp", [])
         finally:
-            os.unlink(file_path)
+            Path(file_path).unlink()

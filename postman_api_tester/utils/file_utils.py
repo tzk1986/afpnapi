@@ -33,18 +33,19 @@ def safe_report_artifact(reports_dir: Path, name: str) -> Optional[Path]:
 	return candidate
 
 def atomic_write_json(path: Path, data: Any) -> None:
-	"""原子写入 JSON 文件：先写临时文件再 os.replace，避免写入中断损坏原文件。"""
+	"""原子写入 JSON 文件：先写临时文件再 Path.replace，避免写入中断损坏原文件。"""
 	path.parent.mkdir(parents=True, exist_ok=True)
 	tmp_fd, tmp_str = tempfile.mkstemp(
 		dir=str(path.parent), suffix=".tmp", prefix=path.name + "."
 	)
+	tmp_path = Path(tmp_str)
 	try:
 		with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
 			json.dump(data, f, indent=2, ensure_ascii=False)
-		os.replace(tmp_str, str(path))
+		tmp_path.replace(path)
 	except BaseException:
 		with contextlib.suppress(OSError):
-			os.unlink(tmp_str)
+			tmp_path.unlink(missing_ok=True)
 		raise
 
 

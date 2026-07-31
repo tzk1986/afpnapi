@@ -324,7 +324,7 @@ class TestGenerateHtmlReport:
                 HtmlReporter.generate_html_report(report, output_path, results_per_page=30)
 
         details_file = tmp_path / "report_details.json"
-        with open(details_file, "r", encoding="utf-8") as f:
+        with details_file.open("r", encoding="utf-8") as f:
             details = json.load(f)
 
         assert details["0"]["request_info"]["headers"]["Authorization"] == "***"

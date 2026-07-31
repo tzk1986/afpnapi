@@ -533,7 +533,7 @@ class PostmanTestExecutor:
                 file_path = self._uploaded_files.get(upload_key)
                 if file_path and Path(file_path).exists():
                     file_name = Path(file_path).name
-                    file_rows.append((key, (file_name, open(file_path, 'rb'), 'application/octet-stream')))  # noqa: SIM115
+                    file_rows.append((key, (file_name, Path(file_path).open('rb'), 'application/octet-stream')))  # noqa: SIM115
             else:
                 data_rows.append((key, str(item.get('value', ''))))
 
@@ -553,7 +553,7 @@ class PostmanTestExecutor:
         file_path = self._uploaded_files.get(upload_key)
 
         if file_path and Path(file_path).exists():
-            with open(file_path, 'rb') as f:
+            with Path(file_path).open('rb') as f:
                 request_kwargs['data'] = f.read()
             # 根据文件扩展名设置 Content-Type
             ext = Path(file_path).suffix.lower()

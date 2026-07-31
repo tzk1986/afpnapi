@@ -31,7 +31,7 @@ class TestResolveOutputDir:
 
     def test_default_path_is_absolute(self) -> None:
         result = _resolve_output_dir(None)
-        assert os.path.isabs(result)
+        assert Path(result).is_absolute()
 
 
 class TestValidateBaseUrl:
@@ -125,11 +125,11 @@ class TestResolveReportFilePath:
 
     def test_path_traversal_sanitized(self, tmp_path: Path) -> None:
         result = _resolve_report_file_path(str(tmp_path), "../../../etc/passwd")
-        assert ".." not in os.path.basename(result)
+        assert ".." not in Path(result).name
 
     def test_special_chars_sanitized(self, tmp_path: Path) -> None:
         result = _resolve_report_file_path(str(tmp_path), "report<>:\"|?*.html")
-        basename = os.path.basename(result)
+        basename = Path(result).name
         assert "<" not in basename
         assert ">" not in basename
 

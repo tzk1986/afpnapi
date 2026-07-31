@@ -7,6 +7,7 @@ _parse_item、_parse_request、_normalize_api_name、_build_url_from_dict。
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
@@ -16,8 +17,8 @@ from postman_api_tester.parser import PostmanApiParser
 
 
 def _write_collection(tmpdir: str, data: Dict[str, Any]) -> str:
-	path = os.path.join(tmpdir, "test_collection.json")
-	with open(path, "w", encoding="utf-8") as f:
+	path = str(Path(tmpdir) / "test_collection.json")
+	with Path(path).open("w", encoding="utf-8") as f:
 		json.dump(data, f)
 	return path
 
@@ -31,8 +32,8 @@ class TestLoadFile:
 
 	def test_invalid_json(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			path = os.path.join(tmpdir, "bad.json")
-			with open(path, "w") as f:
+			path = str(Path(tmpdir) / "bad.json")
+			with Path(path).open("w") as f:
 				f.write("not json {{{")
 			with pytest.raises(ParseError, match="JSON文件格式错误"):
 				PostmanApiParser(path)

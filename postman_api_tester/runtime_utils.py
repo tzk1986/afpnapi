@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -87,7 +88,7 @@ def compute_collection_fingerprint(
     data_file: str = "",
 ) -> str:
     hasher = hashlib.sha256()
-    with open(postman_file, "rb") as file:
+    with Path(postman_file).open("rb") as file:
         while True:
             chunk = file.read(1024 * 1024)
             if not chunk:
@@ -95,8 +96,8 @@ def compute_collection_fingerprint(
             hasher.update(chunk)
     hasher.update((base_url or "").encode("utf-8"))
     hasher.update(json.dumps(selected_item_paths or [], ensure_ascii=False, sort_keys=True).encode("utf-8"))
-    if data_file and os.path.isfile(data_file):
-        with open(data_file, "rb") as df:
+    if data_file and Path(data_file).is_file():
+        with Path(data_file).open("rb") as df:
             while True:
                 chunk = df.read(1024 * 1024)
                 if not chunk:
@@ -109,17 +110,17 @@ def checkpoint_file_path(output_dir: str, postman_file: str, fingerprint: str, c
     if checkpoint_dir:
         base_dir = checkpoint_dir
     else:
-        base_dir = os.path.join(output_dir, "checkpoints")
-    os.makedirs(base_dir, exist_ok=True)
-    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(postman_file))[0]).strip("._") or "collection"
-    return os.path.join(base_dir, f"{stem}_{fingerprint[:16]}.checkpoint.json")
+        base_dir = str(Path(output_dir) / "checkpoints")
+    Path(base_dir).mkdir(parents=True, exist_ok=True)
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(postman_file).stem).strip("._") or "collection"
+    return str(Path(base_dir) / f"{stem}_{fingerprint[:16]}.checkpoint.json")
 
 
 def load_checkpoint(path: str) -> Optional[Dict[str, Any]]:
-    if not path or not os.path.exists(path):
+    if not path or not Path(path).exists():
         return None
     try:
-        with open(path, encoding="utf-8") as file:
+        with Path(path).open(encoding="utf-8") as file:
             data = json.load(file)
     except (json.JSONDecodeError, OSError):
         return None
@@ -134,7 +135,7 @@ def load_checkpoint(path: str) -> Optional[Dict[str, Any]]:
 
 
 def save_checkpoint_atomic(path: str, data: Dict[str, Any]) -> None:
-    tmp_path = f"{path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as file:
+    tmp_path = Path(f"{path}.tmp")
+    with tmp_path.open("w", encoding="utf-8") as file:
         json.dump(data, file, indent=2, ensure_ascii=False)
-    os.replace(tmp_path, path)
+    tmp_path.replace(path)

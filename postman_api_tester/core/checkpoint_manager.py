@@ -8,6 +8,7 @@
 
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -97,7 +98,7 @@ class CheckpointManager:
             return None
 
         try:
-            with open(checkpoint_path, encoding="utf-8") as f:
+            with Path(checkpoint_path).open(encoding="utf-8") as f:
                 data: Dict[str, Any] = json.load(f)
             logger.info(
                 "checkpoint_loaded",

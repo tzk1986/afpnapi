@@ -8,6 +8,7 @@ compute_collection_fingerprint。
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
@@ -147,20 +148,20 @@ class TestCheckpointFilePath:
 
 	def test_custom_checkpoint_dir(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
-			custom = os.path.join(tmpdir, "my_checkpoints")
+			custom = str(Path(tmpdir) / "my_checkpoints")
 			result = checkpoint_file_path(tmpdir, "test.json", "abcdef1234567890", checkpoint_dir=custom)
 			assert "my_checkpoints" in result
 
 	def test_fingerprint_truncated(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
 			result = checkpoint_file_path(tmpdir, "test.json", "abcdef1234567890abcdef")
-			basename = os.path.basename(result)
+			basename = Path(result).name
 			assert "abcdef1234567890" in basename
 
 	def test_special_chars_in_filename(self) -> None:
 		with tempfile.TemporaryDirectory() as tmpdir:
 			result = checkpoint_file_path(tmpdir, "my file (1).json", "abcdef1234567890")
-			basename = os.path.basename(result)
+			basename = Path(result).name
 			assert " " not in basename
 			assert "(" not in basename
 
@@ -179,7 +180,7 @@ class TestLoadCheckpoint:
 			json.dump({"executed_item_paths": ["0.1", "0.2"]}, f)
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is not None
 		assert result["executed_item_paths"] == ["0.1", "0.2"]
 
@@ -188,7 +189,7 @@ class TestLoadCheckpoint:
 			f.write("not json")
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is None
 
 	def test_non_dict_json(self) -> None:
@@ -196,7 +197,7 @@ class TestLoadCheckpoint:
 			json.dump([1, 2, 3], f)
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is None
 
 	def test_missing_executed_key(self) -> None:
@@ -204,7 +205,7 @@ class TestLoadCheckpoint:
 			json.dump({"other": "data"}, f)
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is None
 
 	def test_non_list_executed(self) -> None:
@@ -212,7 +213,7 @@ class TestLoadCheckpoint:
 			json.dump({"executed_item_paths": "not a list"}, f)
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is None
 
 	def test_non_string_items_in_list(self) -> None:
@@ -220,7 +221,7 @@ class TestLoadCheckpoint:
 			json.dump({"executed_item_paths": [1, 2]}, f)
 			f.flush()
 			result = load_checkpoint(f.name)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert result is None
 
 
@@ -233,7 +234,7 @@ class TestSaveCheckpointAtomic:
 		data = {"executed_item_paths": ["0.1"], "status": "running"}
 		save_checkpoint_atomic(path, data)
 		loaded = load_checkpoint(path)
-		os.unlink(path)
+		Path(path).unlink()
 		assert loaded is not None
 		assert loaded["executed_item_paths"] == ["0.1"]
 
@@ -241,8 +242,8 @@ class TestSaveCheckpointAtomic:
 		with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
 			path = f.name
 		save_checkpoint_atomic(path, {"executed_item_paths": []})
-		assert not os.path.exists(f"{path}.tmp")
-		os.unlink(path)
+		assert not Path(f"{path}.tmp").exists()
+		Path(path).unlink()
 
 	def test_overwrite_existing(self) -> None:
 		with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
@@ -250,7 +251,7 @@ class TestSaveCheckpointAtomic:
 		save_checkpoint_atomic(path, {"executed_item_paths": ["0.1"]})
 		save_checkpoint_atomic(path, {"executed_item_paths": ["0.1", "0.2"]})
 		loaded = load_checkpoint(path)
-		os.unlink(path)
+		Path(path).unlink()
 		assert loaded is not None
 		assert len(loaded["executed_item_paths"]) == 2
 
@@ -264,7 +265,7 @@ class TestComputeCollectionFingerprint:
 			f.flush()
 			h1 = compute_collection_fingerprint(f.name, "https://api.example.com", None)
 			h2 = compute_collection_fingerprint(f.name, "https://api.example.com", None)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert h1 == h2
 
 	def test_different_url_different_hash(self) -> None:
@@ -273,7 +274,7 @@ class TestComputeCollectionFingerprint:
 			f.flush()
 			h1 = compute_collection_fingerprint(f.name, "https://a.com", None)
 			h2 = compute_collection_fingerprint(f.name, "https://b.com", None)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert h1 != h2
 
 	def test_different_content_different_hash(self) -> None:
@@ -285,8 +286,8 @@ class TestComputeCollectionFingerprint:
 			json.dump({"v": 2}, f2)
 			f2.flush()
 			h2 = compute_collection_fingerprint(f2.name, "", None)
-		os.unlink(f1.name)
-		os.unlink(f2.name)
+		Path(f1.name).unlink()
+		Path(f2.name).unlink()
 		assert h1 != h2
 
 	def test_selected_items_affect_hash(self) -> None:
@@ -295,7 +296,7 @@ class TestComputeCollectionFingerprint:
 			f.flush()
 			h1 = compute_collection_fingerprint(f.name, "", None)
 			h2 = compute_collection_fingerprint(f.name, "", [[0, 1]])
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert h1 != h2
 
 	def test_with_data_file(self) -> None:
@@ -307,8 +308,8 @@ class TestComputeCollectionFingerprint:
 				df.flush()
 				h1 = compute_collection_fingerprint(pf.name, "", None, data_file="")
 				h2 = compute_collection_fingerprint(pf.name, "", None, data_file=df.name)
-			os.unlink(df.name)
-		os.unlink(pf.name)
+			Path(df.name).unlink()
+		Path(pf.name).unlink()
 		assert h1 != h2
 
 	def test_returns_hex_string(self) -> None:
@@ -316,6 +317,6 @@ class TestComputeCollectionFingerprint:
 			json.dump({}, f)
 			f.flush()
 			result = compute_collection_fingerprint(f.name, "", None)
-		os.unlink(f.name)
+		Path(f.name).unlink()
 		assert len(result) == 64
 		assert all(c in "0123456789abcdef" for c in result)

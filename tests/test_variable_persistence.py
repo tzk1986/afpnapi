@@ -19,7 +19,7 @@ class TestSaveToFile:
         path = str(tmp_path / "vars.json")
         ctx.save_to_file(path)
 
-        assert os.path.exists(path)
+        assert Path(path).exists()
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         assert data["version"] == 2
         assert data["shared"] == {"a": "1", "b": "2"}
@@ -29,7 +29,7 @@ class TestSaveToFile:
         ctx = VariableContext({"x": "1"})
         path = str(tmp_path / "deep" / "nested" / "vars.json")
         ctx.save_to_file(path)
-        assert os.path.exists(path)
+        assert Path(path).exists()
 
     def test_save_truncates_excess(self, tmp_path: Path) -> None:
         vars_dict = {f"v{i}": str(i) for i in range(100)}

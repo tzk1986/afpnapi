@@ -6,6 +6,7 @@
 import json
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, Dict
 from unittest.mock import MagicMock, patch
 
@@ -16,8 +17,8 @@ from postman_api_tester.parser import PostmanApiParser
 
 
 def _write_collection(tmpdir: str, data: Dict[str, Any]) -> str:
-    path = os.path.join(tmpdir, "test_collection.json")
-    with open(path, "w", encoding="utf-8") as f:
+    path = str(Path(tmpdir) / "test_collection.json")
+    with Path(path).open("w", encoding="utf-8") as f:
         json.dump(data, f)
     return path
 

@@ -53,13 +53,13 @@ class HtmlReporter:
 
     @staticmethod
     def _write_json_file(report: Any, file_path: str, payload: object) -> None:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with Path(file_path).open('w', encoding='utf-8') as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
 
 
     @staticmethod
     def _write_text_file(report: Any, file_path: str, content: str) -> None:
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with Path(file_path).open('w', encoding='utf-8') as f:
             f.write(content)
 
 
@@ -162,8 +162,8 @@ class HtmlReporter:
     def generate_html_report(report: Any, output_path: str, results_per_page: int = 30) -> None:
         """生成 HTML 报告。"""
         summary = report.generate_summary()
-        output_dir = os.path.dirname(output_path) if os.path.dirname(output_path) else '.'
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path(output_path).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # 计算分页
         total_results = len(report.results)
@@ -171,7 +171,7 @@ class HtmlReporter:
         details_data = HtmlReporter._build_details_data(report)
 
         # 保存详情 JSON 文件
-        base_name = os.path.splitext(output_path)[0]
+        base_name = str(Path(output_path).with_suffix(''))
         details_file = f"{base_name}_details.json"
         HtmlReporter._write_json_file(report, details_file, details_data)
 
@@ -188,7 +188,7 @@ class HtmlReporter:
             total_pages=total_pages,
             results_per_page=results_per_page,
             summary=summary,
-            details_file_name=os.path.basename(details_file),
+            details_file_name=Path(details_file).name,
         )
 
         report.generated_report_file = output_path
@@ -200,7 +200,7 @@ class HtmlReporter:
     def _build_report_metadata(report: Any, summary: SummaryData, output_path: str, details_file: str) -> ReportMetadata:
         """构建历史报告和差异比对所需的结构化元数据。"""
         return {
-            'report_name': os.path.basename(output_path),
+            'report_name': Path(output_path).name,
             'generated_at': summary['end_time'],
             'host_name': socket.gethostname(),
             'collection_name': report.collection_name,
@@ -212,7 +212,7 @@ class HtmlReporter:
             'interrupt_reason': report.interrupt_reason,
             'assertion_strict_mode': bool(report.assertion_strict_mode),
             'summary': summary,
-            'details_file': os.path.basename(details_file),
+            'details_file': Path(details_file).name,
             'results': [
                 {
                     'key': ' | '.join([
