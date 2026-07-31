@@ -409,6 +409,11 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
+        # SSRF 防护：禁止访问内网地址
+        from postman_api_tester.utils.security import is_safe_url
+        if not is_safe_url(url):
+            raise ValueError(f"禁止访问内网地址: {url}")
+
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

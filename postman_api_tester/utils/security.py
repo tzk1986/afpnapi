@@ -6,7 +6,9 @@
 - 目标：详情写入与导出链路使用同一敏感头规则。
 """
 
+import ipaddress
 from typing import Any, Dict, Iterable, Set
+from urllib.parse import urlparse
 
 DEFAULT_SENSITIVE_HEADERS = {
     "authorization",
@@ -79,8 +81,45 @@ def strip_sensitive_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
 def strip_auth_headers(headers: Dict[str, Any]) -> Dict[str, Any]:
     return strip_sensitive_headers(headers)
 
+
+def is_safe_url(url: str) -> bool:
+    """检查 URL 是否安全（非内网地址）。
+
+    防止 SSRF 攻击，禁止访问私有网络地址段。
+
+    Args:
+        url: 待检查的 URL
+
+    Returns:
+        True 表示安全（公网地址），False 表示不安全（内网地址或无效）
+    """
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+
+        if not hostname:
+            return False
+
+        # 禁止访问常见内网地址
+        if hostname in ('127.0.0.1', 'localhost', '0.0.0.0', '[::1]'):
+            return False
+
+        # 禁止私有 IP 段
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return False
+        except ValueError:
+            pass  # 非 IP 地址（域名），允许
+
+        return True
+    except Exception:
+        return False
+
+
 __all__ = [
     "sanitize_headers",
     "strip_sensitive_headers",
     "strip_auth_headers",
+    "is_safe_url",
 ]
