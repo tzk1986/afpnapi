@@ -60,7 +60,9 @@ def api_collection_preview() -> ResponseReturnValue:
     except Exception as exc:
         return _json_error(f"JSON 解析失败：{exc}", 400, "COL_PREVIEW_004")
 
-    preview_items = _svc_extract_collection_preview_items(collection_data, COLLECTION_PREVIEW_MAX_ITEMS)
+    preview_items = _svc_extract_collection_preview_items(
+        collection_data, COLLECTION_PREVIEW_MAX_ITEMS
+    )
     total = len(preview_items)
     truncated = False
     if total >= COLLECTION_PREVIEW_MAX_ITEMS:
@@ -81,8 +83,13 @@ def api_export_collection() -> ResponseReturnValue:
     """Collection 导出 API。错误码：COL_EXPORT_001-003"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
-    include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
-    export_scope = str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower() or REPORT_EXPORT_DEFAULT_SCOPE
+    include_auth = _to_bool(
+        payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT
+    )
+    export_scope = (
+        str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower()
+        or REPORT_EXPORT_DEFAULT_SCOPE
+    )
     if export_scope not in {"full", "report_only"}:
         export_scope = REPORT_EXPORT_DEFAULT_SCOPE
     if export_scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
@@ -124,8 +131,13 @@ def api_export_collection_stream() -> ResponseReturnValue:
     """Collection 流式导出 API。错误码：COL_EXPORT_001-004"""
     payload = request.get_json(silent=True) or {}
     report_name = str(payload.get("report_name", "")).strip()
-    include_auth = _to_bool(payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT)
-    export_scope = str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower() or REPORT_EXPORT_DEFAULT_SCOPE
+    include_auth = _to_bool(
+        payload.get("include_auth"), default=REPORT_EXPORT_INCLUDE_AUTH_DEFAULT
+    )
+    export_scope = (
+        str(payload.get("export_scope", REPORT_EXPORT_DEFAULT_SCOPE)).strip().lower()
+        or REPORT_EXPORT_DEFAULT_SCOPE
+    )
     if export_scope not in {"full", "report_only"}:
         export_scope = REPORT_EXPORT_DEFAULT_SCOPE
     if export_scope == "report_only" and not REPORT_EXPORT_ALLOW_REPORT_ONLY:
@@ -166,7 +178,11 @@ def api_export_collection_stream() -> ResponseReturnValue:
                     break
                 yield chunk
 
-    response = Response(stream_with_context(generate_chunks()), mimetype="application/json")
-    response.headers["Content-Disposition"] = f"attachment; filename={exported['file_name']}"
+    response = Response(
+        stream_with_context(generate_chunks()), mimetype="application/json"
+    )
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename={exported['file_name']}"
+    )
     response.headers["X-Export-Scope"] = str(exported.get("export_scope") or "full")
     return response

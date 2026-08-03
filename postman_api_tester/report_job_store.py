@@ -28,8 +28,7 @@ def _evict_old_jobs_locked() -> None:
         return
     terminal_statuses = {"success", "failed"}
     finished = [
-        jid for jid, job in RUN_JOBS.items()
-        if job.get("status") in terminal_statuses
+        jid for jid, job in RUN_JOBS.items() if job.get("status") in terminal_statuses
     ]
     # 按写入顺序保留最新一半已完成任务
     to_evict = finished[: max(0, len(finished) - _RUN_JOBS_MAX // 2)]

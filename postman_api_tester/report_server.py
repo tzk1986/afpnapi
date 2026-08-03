@@ -496,7 +496,9 @@ def api_report_analytics_compare() -> ResponseReturnValue:
 
 
 @app.route("/api/report-result-detail/<path:report_name>/<int:result_index>")
-def api_report_result_detail(report_name: str, result_index: int) -> ResponseReturnValue:
+def api_report_result_detail(
+    report_name: str, result_index: int
+) -> ResponseReturnValue:
     return _route_api_report_result_detail(report_name, result_index)
 
 
@@ -660,7 +662,10 @@ def ui_testing_proxy() -> ResponseReturnValue:
     return _route_ui_testing_proxy()
 
 
-@app.route("/ui-testing/proxy-resource", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+@app.route(
+    "/ui-testing/proxy-resource",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+)
 def ui_testing_proxy_resource() -> ResponseReturnValue:
     return _route_ui_testing_proxy_resource()
 
@@ -675,10 +680,12 @@ def ui_proxy_sessions_debug() -> ResponseReturnValue:
 def ui_subsystem_token() -> ResponseReturnValue:
     """获取当前代理会话的子系统 token（供回放引擎在 new_tab 跳转前查询）。"""
     from flask import request as _req
+
     session_id = _req.cookies.get("_proxy_session", "")
     if not session_id:
         return {"code": 0, "data": {"token": ""}}
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
     token = _proxy_session_store.get_subsystem_token(session_id) or ""
     return {"code": 0, "data": {"token": token}}
 
@@ -688,7 +695,10 @@ def ui_testing_static_fallback(filename: str) -> ResponseReturnValue:
     return _route_ui_testing_static_fallback(filename)
 
 
-@app.route("/<path:resource_path>", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+@app.route(
+    "/<path:resource_path>",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+)
 def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     """SPA 资源/API 兜底：拦截所有未被其他路由处理的请求，
     转发到目标服务器。覆盖早期脚本 fetch 拦截器未覆盖的情况。"""
@@ -700,28 +710,49 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
 
     _ext = resource_path.rsplit(".", 1)[-1].lower() if "." in resource_path else ""
     _resource_exts = {
-        "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp",
-        "woff", "woff2", "ttf", "eot", "otf",
-        "css", "js",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "svg",
+        "ico",
+        "webp",
+        "bmp",
+        "woff",
+        "woff2",
+        "ttf",
+        "eot",
+        "otf",
+        "css",
+        "js",
     }
     # 跳过代理自身的路径（不转发），但允许目标服务器的 /api/ 路径走兜底转发
     _skip_prefixes = {"ui-testing/", "ui-recorder/", "favicon.ico"}
     for prefix in _skip_prefixes:
         if resource_path.startswith(prefix):
             from flask import abort
+
             abort(404)
     # 代理自身的 API 路径也跳过（不走兜底转发）
-    _proxy_api_prefixes = {"api/ui-testing/", "api/ui-recorder/", "api/postman/", "api/report/"}
+    _proxy_api_prefixes = {
+        "api/ui-testing/",
+        "api/ui-recorder/",
+        "api/postman/",
+        "api/report/",
+    }
     for prefix in _proxy_api_prefixes:
         if resource_path.startswith(prefix):
             from flask import abort
+
             abort(404)
 
     # OPTIONS 预检请求直接返回
     if request.method == "OPTIONS":
         resp = make_response("", 204)
         resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        resp.headers["Access-Control-Allow-Methods"] = (
+            "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        )
         resp.headers["Access-Control-Allow-Headers"] = "*"
         return resp
 
@@ -751,15 +782,29 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         try:
             parsed_ref = _urlparse(referer)
             ref_params = parse_qs(parsed_ref.query)
-            target_url = ref_params.get("_proxy_url", [""])[0] or ref_params.get("url", [""])[0]
+            target_url = (
+                ref_params.get("_proxy_url", [""])[0] or ref_params.get("url", [""])[0]
+            )
         except Exception:
             pass
 
     # 记录兜底请求（含完整请求头用于诊断 cookie 缺失问题）
-    _diag_headers = {k: v for k, v in request.headers if k.lower() in (
-        "referer", "origin", "cookie", "accept", "content-type", "user-agent",
-        "sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest",
-    )}
+    _diag_headers = {
+        k: v
+        for k, v in request.headers
+        if k.lower()
+        in (
+            "referer",
+            "origin",
+            "cookie",
+            "accept",
+            "content-type",
+            "user-agent",
+            "sec-fetch-site",
+            "sec-fetch-mode",
+            "sec-fetch-dest",
+        )
+    }
     logger.warning(
         "spa_fallback_request",
         extra={
@@ -770,7 +815,9 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
             "referer": referer if referer else "(none)",
             "diag_headers": _diag_headers,
             "diag_cookies": dict(request.cookies),
-            "diag_query_string": request.query_string.decode("utf-8", errors="replace")[:200],
+            "diag_query_string": request.query_string.decode("utf-8", errors="replace")[
+                :200
+            ],
         },
     )
 
@@ -781,19 +828,24 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
             from postman_api_tester.services.ui_proxy_service import (
                 _proxy_session_store,
             )
+
             target_url = _proxy_session_store.get_base_url(session_id) or ""
 
     # 如果还是没有 target_url，使用最近一次会话的 base_url
     if not target_url:
         from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
         with _proxy_session_store._lock:
             all_sessions = list(_proxy_session_store._sessions.items())
         if all_sessions:
-            latest_sid = max(all_sessions, key=lambda item: item[1].get("last_active", 0))[0]
+            latest_sid = max(
+                all_sessions, key=lambda item: item[1].get("last_active", 0)
+            )[0]
             target_url = _proxy_session_store.get_base_url(latest_sid) or ""
 
     if not target_url:
         from flask import abort
+
         abort(404)
 
     target_url = _uq(target_url)
@@ -806,11 +858,15 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     _forward_params = {k: v[0] for k, v in params.items() if k not in _proxy_params}
     if _forward_params:
         from urllib.parse import urlencode
+
         full_url += "?" + urlencode(_forward_params)
-        logger.info("spa_fallback_forward_params", extra={
-            "event": "ui.proxy.fallback.forward_params",
-            "params": list(_forward_params.keys()),
-        })
+        logger.info(
+            "spa_fallback_forward_params",
+            extra={
+                "event": "ui.proxy.fallback.forward_params",
+                "params": list(_forward_params.keys()),
+            },
+        )
 
     # 从 target_url 中提取 base_url，确保代理会话的 base_url 正确设置
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
@@ -820,28 +876,37 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
     if recording_mode:
         from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
         old_sid = request.cookies.get("_proxy_session")
         if old_sid:
             _proxy_session_store.delete_session(old_sid)
-            logger.info("spa_fallback_recording_clear_session", extra={
-                "event": "ui.proxy.fallback.recording_clear",
-                "old_session_id": old_sid[:8],
-            })
+            logger.info(
+                "spa_fallback_recording_clear_session",
+                extra={
+                    "event": "ui.proxy.fallback.recording_clear",
+                    "old_session_id": old_sid[:8],
+                },
+            )
         session_id = _proxy_session_store.create_session(base_url)
-        logger.info("spa_fallback_recording_new_session", extra={
-            "event": "ui.proxy.fallback.recording_new",
-            "session_id": session_id[:8],
-            "base_url": base_url,
-        })
+        logger.info(
+            "spa_fallback_recording_new_session",
+            extra={
+                "event": "ui.proxy.fallback.recording_new",
+                "session_id": session_id[:8],
+                "base_url": base_url,
+            },
+        )
     else:
         # 调用 _get_proxy_session_id 获取 session_id，确保 base_url 被正确设置
         from postman_api_tester.handlers.ui_testing_routes import _get_proxy_session_id
+
         session_id = _get_proxy_session_id(base_url)
 
     try:
         from typing import Union
 
         from postman_api_tester.services.ui_proxy_service import UiProxyService
+
         body: Union[str, bytes]
         if is_page:
             # 回放模式：获取回放引擎 JS 代码并注入到每个页面
@@ -867,7 +932,9 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
                 full_url,
                 method=request.method,
                 req_headers=dict(request.headers),
-                req_body=request.get_data() if request.method not in ("GET", "HEAD") else None,
+                req_body=request.get_data()
+                if request.method not in ("GET", "HEAD")
+                else None,
                 session_id=session_id if session_id else None,
             )
     except Exception:
@@ -876,7 +943,21 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     # 内容类型校验（仅对资源请求）
     if is_resource:
         content_type = headers.get("Content-Type", "")
-        _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
+        _binary_exts = {
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "svg",
+            "ico",
+            "webp",
+            "bmp",
+            "woff",
+            "woff2",
+            "ttf",
+            "eot",
+            "otf",
+        }
         if _ext in _binary_exts and content_type.startswith("text/"):
             return make_response(b"", 404)
 
@@ -885,20 +966,26 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     if is_page and "Location" in headers and "_proxy_url" not in headers["Location"]:
         loc = headers["Location"]
         from urllib.parse import quote as _quote2
+
         base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
         if loc.startswith(("http://", "https://")):
             # 绝对 URL：提取 pathname
             loc_parsed = _urlparse(loc)
-            loc_path = loc_parsed.pathname + ('?' + loc_parsed.query if loc_parsed.query else '') + \
-                ('#' + loc_parsed.fragment if loc_parsed.fragment else '')
-            sep = '&' if '?' in loc_path else '?'
-            headers["Location"] = loc_path + sep + '_proxy_url=' + _quote2(loc, safe='')
+            loc_path = (
+                loc_parsed.pathname
+                + ("?" + loc_parsed.query if loc_parsed.query else "")
+                + ("#" + loc_parsed.fragment if loc_parsed.fragment else "")
+            )
+            sep = "&" if "?" in loc_path else "?"
+            headers["Location"] = loc_path + sep + "_proxy_url=" + _quote2(loc, safe="")
         elif loc.startswith("/"):
             # 相对路径：构造完整 URL
             full_loc = base_url + loc
             loc_path = loc
-            sep = '&' if '?' in loc_path else '?'
-            headers["Location"] = loc_path + sep + '_proxy_url=' + _quote2(full_loc, safe='')
+            sep = "&" if "?" in loc_path else "?"
+            headers["Location"] = (
+                loc_path + sep + "_proxy_url=" + _quote2(full_loc, safe="")
+            )
 
     resp = make_response(body, status_code)
     for key, value in headers.items():
@@ -908,10 +995,15 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         else:
             resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    resp.headers["Access-Control-Allow-Methods"] = (
+        "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    )
     resp.headers["Access-Control-Allow-Headers"] = "*"
     if session_id:
-        resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+        resp.headers.add(
+            "Set-Cookie",
+            f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+        )
     return resp
 
 
@@ -1009,7 +1101,9 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
 
 
 @app.route("/api/ui-testing/execution/<path:job_id>/screenshot/<int:step_index>")
-def api_ui_testing_execution_screenshot(job_id: str, step_index: int) -> ResponseReturnValue:
+def api_ui_testing_execution_screenshot(
+    job_id: str, step_index: int
+) -> ResponseReturnValue:
     return _route_api_ui_testing_execution_screenshot(job_id, step_index)
 
 
@@ -1086,6 +1180,7 @@ def api_ui_testing_report_delete(job_id: str) -> ResponseReturnValue:
 @app.route("/favicon.ico")
 def favicon() -> ResponseReturnValue:
     from flask import make_response
+
     return make_response("", 204)
 
 
@@ -1094,6 +1189,5 @@ def favicon() -> ResponseReturnValue:
 
 if __name__ == "__main__":
     from postman_api_tester.report_server_app import ReportServerApp
+
     ReportServerApp.run_app(app)
-
-

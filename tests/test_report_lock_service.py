@@ -22,7 +22,11 @@ def _clear_locks() -> None:
 
 def _is_rlock(obj: object) -> bool:
     """判断对象是否为 threading 风格的 RLock（可重入锁）."""
-    return type(obj).__name__ == "RLock" and hasattr(obj, "acquire") and hasattr(obj, "release")
+    return (
+        type(obj).__name__ == "RLock"
+        and hasattr(obj, "acquire")
+        and hasattr(obj, "release")
+    )
 
 
 def test_returns_rlock() -> None:

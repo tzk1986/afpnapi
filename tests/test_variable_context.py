@@ -1,6 +1,5 @@
 """VariableContext 单元测试."""
 
-import pytest
 from postman_api_tester.core.variable_context import VariableContext
 
 

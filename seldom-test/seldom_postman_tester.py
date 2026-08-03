@@ -33,7 +33,7 @@ class PostmanApiParser:
             raise FileNotFoundError(f"文件不存在: {self.file_path}")
 
         try:
-            with open(self.file_path, 'r', encoding='utf-8') as f:
+            with open(self.file_path, "r", encoding="utf-8") as f:
                 self.data = json.load(f)
         except json.JSONDecodeError as e:
             raise ValueError(f"JSON文件格式错误: {e}")
@@ -43,21 +43,21 @@ class PostmanApiParser:
         从Postman文件中提取基础URL
         :return: 基础URL
         """
-        if self.data.get('variable'):
-            for var in self.data['variable']:
-                if var.get('key') == 'baseUrl' or var.get('key') == 'base_url':
-                    self.base_url = var.get('value', '')
+        if self.data.get("variable"):
+            for var in self.data["variable"]:
+                if var.get("key") == "baseUrl" or var.get("key") == "base_url":
+                    self.base_url = var.get("value", "")
 
         # 如果没有找到baseUrl变量，尝试从第一个请求中提取
         if not self.base_url:
-            items = self.data.get('item', [])
-            if items and items[0].get('request'):
-                url = items[0]['request'].get('url')
+            items = self.data.get("item", [])
+            if items and items[0].get("request"):
+                url = items[0]["request"].get("url")
                 if isinstance(url, dict):
                     self.base_url = f"{url.get('protocol', 'https')}://{url.get('host', 'localhost')}"
                 elif isinstance(url, str):
                     # 提取协议和主机
-                    match = re.match(r'(https?://[^/]+)', url)
+                    match = re.match(r"(https?://[^/]+)", url)
                     if match:
                         self.base_url = match.group(1)
 
@@ -69,7 +69,7 @@ class PostmanApiParser:
         :return: API列表
         """
         apis = []
-        items = self.data.get('item', [])
+        items = self.data.get("item", [])
 
         self.extract_base_url()
 
@@ -89,16 +89,16 @@ class PostmanApiParser:
         :return: API信息或None
         """
         # 如果是文件夹，递归处理
-        if 'item' in item and not 'request' in item:
-            folder_name = item.get('name', '')
-            for sub_item in item['item']:
+        if "item" in item and "request" not in item:
+            folder_name = item.get("name", "")
+            for sub_item in item["item"]:
                 api_info = self._parse_item(sub_item, folder_name)
                 if api_info:
                     self.collections.append(api_info)
             return None
 
         # 解析请求
-        if 'request' in item:
+        if "request" in item:
             return self._parse_request(item, parent_name)
 
         return None
@@ -110,70 +110,76 @@ class PostmanApiParser:
         :param parent_name: 父级名称（文件夹）
         :return: API信息
         """
-        request = item.get('request', {})
-        name = item.get('name', 'Unknown')
+        request = item.get("request", {})
+        name = item.get("name", "Unknown")
 
         # 解析URL
-        url = request.get('url', '')
+        url = request.get("url", "")
         if isinstance(url, dict):
             url = self._build_url_from_dict(url)
 
         # 解析方法
-        method = request.get('method', 'GET').upper()
+        method = request.get("method", "GET").upper()
 
         # 解析请求头
         headers = {}
-        for header in request.get('header', []):
-            if header.get('disabled'):
+        for header in request.get("header", []):
+            if header.get("disabled"):
                 continue
-            headers[header.get('key', '')] = header.get('value', '')
+            headers[header.get("key", "")] = header.get("value", "")
 
         # 解析请求体
         body = None
-        body_data = request.get('body', {})
+        body_data = request.get("body", {})
         if body_data:
-            if body_data.get('mode') == 'raw':
+            if body_data.get("mode") == "raw":
                 try:
-                    body = json.loads(body_data.get('raw', '{}'))
+                    body = json.loads(body_data.get("raw", "{}"))
                 except:
-                    body = body_data.get('raw', '')
-            elif body_data.get('mode') == 'formdata':
+                    body = body_data.get("raw", "")
+            elif body_data.get("mode") == "formdata":
                 body = {}
-                for item_data in body_data.get('formdata', []):
-                    if not item_data.get('disabled'):
-                        body[item_data.get('key')] = item_data.get('value')
-            elif body_data.get('mode') == 'urlencoded':
+                for item_data in body_data.get("formdata", []):
+                    if not item_data.get("disabled"):
+                        body[item_data.get("key")] = item_data.get("value")
+            elif body_data.get("mode") == "urlencoded":
                 body = {}
-                for item_data in body_data.get('urlencoded', []):
-                    if not item_data.get('disabled'):
-                        body[item_data.get('key')] = item_data.get('value')
+                for item_data in body_data.get("urlencoded", []):
+                    if not item_data.get("disabled"):
+                        body[item_data.get("key")] = item_data.get("value")
 
         # 解析参数
         params = {}
-        for query in request.get('url', {}).get('query', []) if isinstance(request.get('url'), dict) else []:
-            if not query.get('disabled'):
-                params[query.get('key')] = query.get('value')
+        for query in (
+            request.get("url", {}).get("query", [])
+            if isinstance(request.get("url"), dict)
+            else []
+        ):
+            if not query.get("disabled"):
+                params[query.get("key")] = query.get("value")
 
         # 解析预期响应
         expected_status = 200
-        tests = item.get('event', [])
+        tests = item.get("event", [])
         for event in tests:
-            if event.get('listen') == 'test':
-                script = event.get('script', {}).get('exec', '')
-                if '200' in str(script):
+            if event.get("listen") == "test":
+                script = event.get("script", {}).get("exec", "")
+                if "200" in str(script):
                     expected_status = 200
 
         return {
-            'name': name,
-            'folder': parent_name,
-            'method': method,
-            'url': url,
-            'full_url': urljoin(self.base_url, url) if not url.startswith('http') else url,
-            'headers': headers,
-            'body': body,
-            'params': params,
-            'expected_status': expected_status,
-            'description': item.get('description', '')
+            "name": name,
+            "folder": parent_name,
+            "method": method,
+            "url": url,
+            "full_url": urljoin(self.base_url, url)
+            if not url.startswith("http")
+            else url,
+            "headers": headers,
+            "body": body,
+            "params": params,
+            "expected_status": expected_status,
+            "description": item.get("description", ""),
         }
 
     def _build_url_from_dict(self, url_dict: Dict) -> str:
@@ -182,14 +188,16 @@ class PostmanApiParser:
         :param url_dict: URL字典
         :return: URL字符串
         """
-        path = '/'.join(url_dict.get('path', []))
-        if path and not path.startswith('/'):
-            path = '/' + path
+        path = "/".join(url_dict.get("path", []))
+        if path and not path.startswith("/"):
+            path = "/" + path
 
-        query = ''
-        if url_dict.get('query'):
-            query_parts = [f"{q.get('key')}={q.get('value')}" for q in url_dict['query']]
-            query = '?' + '&'.join(query_parts)
+        query = ""
+        if url_dict.get("query"):
+            query_parts = [
+                f"{q.get('key')}={q.get('value')}" for q in url_dict["query"]
+            ]
+            query = "?" + "&".join(query_parts)
 
         return path + query
 
@@ -216,29 +224,36 @@ class SeldomPostmanTest(seldom.TestCase):
     def execute_api_test(self):
         """执行单个API测试"""
         api = self.api_config
-        method = api['method'].lower()
-        url = api['url']
-        headers = api.get('headers', {})
-        params = api.get('params', {})
-        body = api.get('body')
+        method = api["method"].lower()
+        url = api["url"]
+        headers = api.get("headers", {})
+        params = api.get("params", {})
+        body = api.get("body")
 
         try:
             # 使用 seldom 的请求方法而不是直接用 requests
-            if method == 'get':
+            if method == "get":
                 self.api_response = self.get(url, params=params, headers=headers)
-            elif method == 'post':
-                self.api_response = self.post(url, json=body, params=params, headers=headers)
-            elif method == 'put':
-                self.api_response = self.put(url, json=body, params=params, headers=headers)
-            elif method == 'delete':
+            elif method == "post":
+                self.api_response = self.post(
+                    url, json=body, params=params, headers=headers
+                )
+            elif method == "put":
+                self.api_response = self.put(
+                    url, json=body, params=params, headers=headers
+                )
+            elif method == "delete":
                 self.api_response = self.delete(url, params=params, headers=headers)
-            elif method == 'patch':
+            elif method == "patch":
                 # seldom 可能没有 patch 方法，使用 requests
                 import requests
+
                 session = requests.Session()
-                self.api_response = session.patch(url, json=body, params=params, headers=headers)
+                self.api_response = session.patch(
+                    url, json=body, params=params, headers=headers
+                )
             else:
-                self.fail(f'不支持的HTTP方法: {method}')
+                self.fail(f"不支持的HTTP方法: {method}")
                 return
 
             # 获取 seldom 的响应数据（避免直接访问 response 属性）
@@ -250,23 +265,26 @@ class SeldomPostmanTest(seldom.TestCase):
                 self.api_response_data = self.api_response.text
 
             # 验证响应状态码
-            expected_status = api.get('expected_status', 200)
-            self.assertEqual(self.api_status_code, expected_status,
-                           f'期望状态码: {expected_status}, 实际: {self.api_status_code}')
+            expected_status = api.get("expected_status", 200)
+            self.assertEqual(
+                self.api_status_code,
+                expected_status,
+                f"期望状态码: {expected_status}, 实际: {self.api_status_code}",
+            )
 
         except Exception as e:
-            self.fail(f'API测试失败: {str(e)}')
+            self.fail(f"API测试失败: {str(e)}")
 
     def get_test_result(self) -> Dict:
         """获取测试结果"""
         return {
-            'name': self.api_config['name'],
-            'method': self.api_config['method'],
-            'url': self.api_config['full_url'],
-            'status': 'PASSED',  # 如果执行到这里说明通过了
-            'message': f'响应状态码: {self.api_status_code}',
-            'status_code': self.api_status_code,
-            'folder': self.api_config.get('folder', '')
+            "name": self.api_config["name"],
+            "method": self.api_config["method"],
+            "url": self.api_config["full_url"],
+            "status": "PASSED",  # 如果执行到这里说明通过了
+            "message": f"响应状态码: {self.api_status_code}",
+            "status_code": self.api_status_code,
+            "folder": self.api_config.get("folder", ""),
         }
 
 
@@ -291,21 +309,21 @@ class PostmanTestReport:
         self.end_time = datetime.now()
 
         total = len(self.results)
-        passed = len([r for r in self.results if r['status'] == 'PASSED'])
-        failed = len([r for r in self.results if r['status'] == 'FAILED'])
-        error = len([r for r in self.results if r['status'] == 'ERROR'])
+        passed = len([r for r in self.results if r["status"] == "PASSED"])
+        failed = len([r for r in self.results if r["status"] == "FAILED"])
+        error = len([r for r in self.results if r["status"] == "ERROR"])
 
         duration = (self.end_time - self.start_time).total_seconds()
 
         return {
-            'total': total,
-            'passed': passed,
-            'failed': failed,
-            'error': error,
-            'success_rate': f"{(passed/total*100):.2f}%" if total > 0 else "0%",
-            'duration': f"{duration:.2f}s",
-            'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S')
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "error": error,
+            "success_rate": f"{(passed/total*100):.2f}%" if total > 0 else "0%",
+            "duration": f"{duration:.2f}s",
+            "start_time": self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": self.end_time.strftime("%Y-%m-%d %H:%M:%S"),
         }
 
     def generate_html_report(self, output_path: str):
@@ -411,36 +429,51 @@ class PostmanTestReport:
 """
 
         # 确保输出目录存在
-        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
+        os.makedirs(
+            os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
+            exist_ok=True,
+        )
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
     def print_console_report(self):
         """在控制台输出测试报告"""
         summary = self.generate_summary()
 
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("Seldom Postman API 测试报告".center(80))
-        print("="*80)
-        print(f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}")
+        print("=" * 80)
+        print(
+            f"\n总计: {summary['total']} | 通过: {summary['passed']} | 失败: {summary['failed']} | 错误: {summary['error']}"
+        )
         print(f"成功率: {summary['success_rate']} | 耗时: {summary['duration']}")
         print(f"开始时间: {summary['start_time']} | 结束时间: {summary['end_time']}")
 
-        print("\n" + "-"*80)
+        print("\n" + "-" * 80)
         print("详细结果:".ljust(80))
-        print("-"*80)
+        print("-" * 80)
 
         for result in self.results:
-            status_symbol = "✓" if result['status'] == 'PASSED' else "✗" if result['status'] == 'FAILED' else "!"
-            print(f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}")
+            status_symbol = (
+                "✓"
+                if result["status"] == "PASSED"
+                else "✗"
+                if result["status"] == "FAILED"
+                else "!"
+            )
+            print(
+                f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}"
+            )
             print(f"    URL: {result['url']}")
             print(f"    {result['message']}")
 
-        print("="*80 + "\n")
+        print("=" * 80 + "\n")
 
 
-def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir: str = None) -> PostmanTestReport:
+def run_seldom_postman_tests(
+    postman_file: str, base_url: str = None, output_dir: str = None
+) -> PostmanTestReport:
     """
     使用 Seldom 框架运行 Postman 接口测试
 
@@ -452,7 +485,9 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
 
     if output_dir is None:
         # 报告输出到上级目录的reports文件夹
-        output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reports')
+        output_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports"
+        )
 
     print(f"\n开始加载Postman文件: {postman_file}")
 
@@ -463,7 +498,11 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
     if base_url:
         parser.base_url = base_url
         for api in apis:
-            api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
+            api["full_url"] = (
+                urljoin(base_url, api["url"])
+                if not api["url"].startswith("http")
+                else api["url"]
+            )
 
     print(f"✓ 成功加载 {len(apis)} 个API接口")
     print(f"  基础URL: {parser.base_url}")
@@ -478,7 +517,9 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
     test_classes = []
 
     for idx, api in enumerate(apis, 1):
-        print(f"  [{idx}/{len(apis)}] 准备测试: {api['name']} ({api['method']} {api['url']})")
+        print(
+            f"  [{idx}/{len(apis)}] 准备测试: {api['name']} ({api['method']} {api['url']})"
+        )
 
         # 动态创建测试类
         class_name = f"TestAPI_{idx}"
@@ -486,13 +527,20 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
         def create_test_method(api_config):
             def test_method(self):
                 self.execute_api_test()
+
             return test_method
 
         # 创建测试类
-        TestClass = type(class_name, (SeldomPostmanTest,), {
-            '__init__': lambda self, *args, **kwargs: SeldomPostmanTest.__init__(self, api, *args, **kwargs),
-            'test_api': create_test_method(api)
-        })
+        TestClass = type(
+            class_name,
+            (SeldomPostmanTest,),
+            {
+                "__init__": lambda self, *args, **kwargs: SeldomPostmanTest.__init__(
+                    self, api, *args, **kwargs
+                ),
+                "test_api": create_test_method(api),
+            },
+        )
 
         test_classes.append(TestClass)
 
@@ -504,20 +552,20 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
         case=test_classes,
         report="postman_seldom_report.html",
         rerun=0,
-        save_last_run=False
+        save_last_run=False,
     )
 
     # 由于 seldom 的测试结果获取比较复杂，这里我们模拟一些结果
     # 实际使用中可能需要修改 seldom 的输出捕获
     for api in apis:
         result = {
-            'name': api['name'],
-            'method': api['method'],
-            'url': api['full_url'],
-            'status': 'PASSED',  # 假设测试通过
-            'message': f'使用 Seldom 执行完成',
-            'status_code': 200,
-            'folder': api.get('folder', '')
+            "name": api["name"],
+            "method": api["method"],
+            "url": api["full_url"],
+            "status": "PASSED",  # 假设测试通过
+            "message": "使用 Seldom 执行完成",
+            "status_code": 200,
+            "folder": api.get("folder", ""),
         }
         report.add_result(result)
 
@@ -526,8 +574,8 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
     summary = report.generate_summary()
 
     # 保存HTML报告
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    report_file = os.path.join(output_dir, f'seldom_postman_report_{timestamp}.html')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_file = os.path.join(output_dir, f"seldom_postman_report_{timestamp}.html")
     report.generate_html_report(report_file)
     print(f"✓ HTML报告已保存: {report_file}")
 
@@ -537,7 +585,7 @@ def run_seldom_postman_tests(postman_file: str, base_url: str = None, output_dir
     return report
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     使用示例:
     1. 将Postman导出的JSON文件放在项目目录
@@ -552,7 +600,9 @@ if __name__ == '__main__':
         run_seldom_postman_tests(postman_file, base_url, output_dir)
     else:
         print("使用方法:")
-        print("  python seldom_postman_tester.py <postman_file_path> [base_url] [output_dir]")
+        print(
+            "  python seldom_postman_tester.py <postman_file_path> [base_url] [output_dir]"
+        )
         print("\n参数说明:")
         print("  postman_file_path: Postman导出的JSON文件路径（必需）")
         print("  base_url: 基础URL（可选，将覆盖Postman文件中的配置）")

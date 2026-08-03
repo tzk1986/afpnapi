@@ -5,6 +5,7 @@
 - 输出统一断言结果结构，供执行器汇总到报告层。
 - 支持 13 种操作符: eq/ne/gt/lt/gte/lte/exists/not_exists/contains/regex/length_eq/type/schema。
 """
+
 import logging as _logging
 import re as _re
 from typing import Any, Dict, List, Tuple
@@ -13,33 +14,57 @@ logger = _logging.getLogger(__name__)
 
 try:
     from jsonpath_ng import parse as _jsonpath_parse
+
     _JSONPATH_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _JSONPATH_AVAILABLE = False
-    logger.warning("jsonpath_ng 未安装，断言功能不可用。请运行: pip install 'jsonpath-ng>=1.5.3'")
+    logger.warning(
+        "jsonpath_ng 未安装，断言功能不可用。请运行: pip install 'jsonpath-ng>=1.5.3'"
+    )
 
 try:
     import jsonschema as _jsonschema
+
     _JSONSCHEMA_AVAILABLE = True
 except ImportError:
     _JSONSCHEMA_AVAILABLE = False
 
 SUPPORTED_OPS = {
-    "eq", "ne", "gt", "lt", "gte", "lte",
-    "exists", "not_exists", "contains",
-    "regex", "length_eq", "type", "schema",
+    "eq",
+    "ne",
+    "gt",
+    "lt",
+    "gte",
+    "lte",
+    "exists",
+    "not_exists",
+    "contains",
+    "regex",
+    "length_eq",
+    "type",
+    "schema",
 }
 
 
-def evaluate_assertions(response_body: Any, assertions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def evaluate_assertions(
+    response_body: Any, assertions: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """评估断言列表，返回每条断言的结果列表。
 
     每项结果包含: path, op, expected, actual, passed, message
     """
     results: List[Dict[str, Any]] = []
     if not _JSONPATH_AVAILABLE:
-        return [{"path": "*", "op": "*", "expected": None, "actual": None,
-                 "passed": False, "message": "jsonpath_ng 未安装，请运行: pip install 'jsonpath-ng>=1.5.3'"}]
+        return [
+            {
+                "path": "*",
+                "op": "*",
+                "expected": None,
+                "actual": None,
+                "passed": False,
+                "message": "jsonpath_ng 未安装，请运行: pip install 'jsonpath-ng>=1.5.3'",
+            }
+        ]
 
     for rule in assertions:
         path = str(rule.get("path", ""))
@@ -67,14 +92,16 @@ def evaluate_assertions(response_body: Any, assertions: List[Dict[str, Any]]) ->
         except Exception as exc:
             passed = False
             message = f"断言异常: {exc}"
-        results.append({
-            "path": path,
-            "op": op,
-            "expected": expected,
-            "actual": actual,
-            "passed": passed,
-            "message": message,
-        })
+        results.append(
+            {
+                "path": path,
+                "op": op,
+                "expected": expected,
+                "actual": actual,
+                "passed": passed,
+                "message": message,
+            }
+        )
     return results
 
 
@@ -83,7 +110,10 @@ def _compare(actual: Any, op: str, expected: Any) -> Tuple[bool, str]:
     try:
         handler = _COMPARE_OPERATORS.get(op)
         if handler is None:
-            return (False, f"不支持的操作符: {op}，支持: {', '.join(sorted(SUPPORTED_OPS))}")
+            return (
+                False,
+                f"不支持的操作符: {op}，支持: {', '.join(sorted(SUPPORTED_OPS))}",
+            )
         return handler(actual, expected)
     except Exception as exc:
         return (False, f"比较异常: {exc}")
@@ -120,13 +150,21 @@ def _op_contains(actual: Any, expected: Any) -> Tuple[bool, str]:
 def _op_regex(actual: Any, expected: Any) -> Tuple[bool, str]:
     pattern = str(expected)
     matched = _re.search(pattern, str(actual))
-    return (matched is not None, "" if matched else f"值 {actual!r} 不匹配正则 {pattern!r}")
+    return (
+        matched is not None,
+        "" if matched else f"值 {actual!r} 不匹配正则 {pattern!r}",
+    )
 
 
 def _op_length_eq(actual: Any, expected: Any) -> Tuple[bool, str]:
     expected_len = int(expected)
     actual_len = len(actual) if actual is not None else 0
-    return (actual_len == expected_len, "" if actual_len == expected_len else f"实际长度 {actual_len} != 期望 {expected_len}")
+    return (
+        actual_len == expected_len,
+        ""
+        if actual_len == expected_len
+        else f"实际长度 {actual_len} != 期望 {expected_len}",
+    )
 
 
 def _op_type(actual: Any, expected: Any) -> Tuple[bool, str]:
@@ -182,7 +220,10 @@ def _check_type(actual: Any, expected_type: str) -> Tuple[bool, str]:
         return (passed, "" if passed else f"期望 number，实际 {type(actual).__name__}")
     py_type = _TYPE_MAP.get(expected_lower)
     if py_type is None:
-        return (False, f"未知类型: {expected_type}，支持: {', '.join(sorted(_TYPE_MAP.keys()))}, null")
+        return (
+            False,
+            f"未知类型: {expected_type}，支持: {', '.join(sorted(_TYPE_MAP.keys()))}, null",
+        )
     passed = isinstance(actual, py_type)
     if not passed:
         return (False, f"期望 {expected_type}，实际 {type(actual).__name__}")

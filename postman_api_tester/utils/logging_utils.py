@@ -23,7 +23,7 @@ def _safe_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, (list, tuple, set)):
-        return [ _safe_value(item) for item in value ]
+        return [_safe_value(item) for item in value]
     if isinstance(value, dict):
         return {str(k): _safe_value(v) for k, v in value.items()}
     return str(value)
@@ -44,7 +44,10 @@ class StructuredFormatter(logging.Formatter):
         extras = _extra_fields(record)
         if not extras:
             return base
-        kv_pairs = " ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in sorted(extras.items()))
+        kv_pairs = " ".join(
+            f"{k}={json.dumps(v, ensure_ascii=False)}"
+            for k, v in sorted(extras.items())
+        )
         return f"{base} | {kv_pairs}"
 
 
@@ -136,9 +139,16 @@ def configure_logging(
     if str(log_format).strip().lower() == "json":
         formatter = JsonFormatter()
     else:
-        formatter = StructuredFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+        formatter = StructuredFormatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s"
+        )
 
-    stream_handlers = [h for h in root_logger.handlers if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)]
+    stream_handlers = [
+        h
+        for h in root_logger.handlers
+        if isinstance(h, logging.StreamHandler)
+        and not isinstance(h, logging.FileHandler)
+    ]
     if stream_handlers:
         for handler in stream_handlers:
             handler.setFormatter(formatter)
@@ -151,7 +161,8 @@ def configure_logging(
         log_path = Path(log_file).expanduser().resolve()
         log_path.parent.mkdir(parents=True, exist_ok=True)
         has_file_handler = any(
-            isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "") == str(log_path)
+            isinstance(h, RotatingFileHandler)
+            and getattr(h, "baseFilename", "") == str(log_path)
             for h in root_logger.handlers
         )
         if not has_file_handler:
@@ -188,6 +199,7 @@ def configure_logging_from_config(service_name: str) -> None:
         LOG_FORMAT,
         LOG_LEVEL,
     )
+
     configure_logging(
         level=LOG_LEVEL,
         log_format=LOG_FORMAT,
@@ -204,6 +216,7 @@ def configure_logging_from_config(service_name: str) -> None:
 
 def get_log_sample_rate(default: float = 0.1) -> float:
     from postman_api_tester.report_server_config import LOG_SAMPLE_RATE
+
     return _parse_sample_rate(LOG_SAMPLE_RATE, default=default)
 
 
@@ -235,6 +248,7 @@ def _get_alert_config() -> Dict[str, float]:
         LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN,
         LOG_ALERT_ERROR_WINDOW_SECONDS,
     )
+
     return {
         "window_seconds": float(LOG_ALERT_ERROR_WINDOW_SECONDS),
         "threshold_per_min": float(LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN),
@@ -307,6 +321,7 @@ def cleanup_old_logs(log_dir: str, retention_days: int = _LOG_RETENTION_DAYS) ->
 
 def _start_log_cleanup(log_dir: str) -> None:
     """启动后台日志清理线程。"""
+
     def _cleanup_loop() -> None:
         while True:
             time.sleep(_LOG_CLEANUP_INTERVAL)

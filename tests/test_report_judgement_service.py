@@ -12,7 +12,9 @@ from postman_api_tester.services.report_judgement_service import (
 )
 
 
-def _make_meta(results: List[Dict[str, Any]], summary: Dict[str, Any]) -> Dict[str, Any]:
+def _make_meta(
+    results: List[Dict[str, Any]], summary: Dict[str, Any]
+) -> Dict[str, Any]:
     return {"results": results, "summary": summary}
 
 
@@ -23,8 +25,10 @@ def _write_meta(meta_path: Path, meta: Dict[str, Any]) -> None:
 
 class MockLock:
     """Simple mock context manager for lock."""
+
     def __enter__(self):
         return None
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
 
@@ -37,22 +41,48 @@ class TestOverride:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "API Check", "folder": "", "method": "POST",
-            "url": "https://api.example.com/users", "status": "FAILED",
-            "message": "Expected 201 got 500", "expected_status": 201,
-            "item_path": [], "manual_judgement": {},
-            "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "API Check",
+                "folder": "",
+                "method": "POST",
+                "url": "https://api.example.com/users",
+                "status": "FAILED",
+                "message": "Expected 201 got 500",
+                "expected_status": 201,
+                "item_path": [],
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
         deps.invalidate_reports_cache.reset_mock()
 
         result = set_report_result_judgement(
-            report_name="my_report", result_index=0, action="override",
-            target_status="PASSED", reason="False positive",
+            report_name="my_report",
+            result_index=0,
+            action="override",
+            target_status="PASSED",
+            reason="False positive",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -81,21 +111,47 @@ class TestOverride:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "Health", "folder": "", "method": "GET",
-            "url": "https://example.com/health", "status": "PASSED",
-            "message": "OK", "expected_status": 200,
-            "item_path": [], "manual_judgement": {},
-            "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        results = [
+            {
+                "name": "Health",
+                "folder": "",
+                "method": "GET",
+                "url": "https://example.com/health",
+                "status": "PASSED",
+                "message": "OK",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="FAILED", reason="Service degraded",
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="FAILED",
+            reason="Service degraded",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -112,21 +168,49 @@ class TestOverride:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "Nest API", "folder": "v2", "method": "PUT",
-            "url": "https://api.example.com/v2/item/42", "status": "FAILED",
-            "message": "Timeout", "expected_status": 200,
-            "item_path": ["Users", "Details"], "manual_judgement": {},
-            "judgement_history": [], "custom_field": "kept",
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "Nest API",
+                "folder": "v2",
+                "method": "PUT",
+                "url": "https://api.example.com/v2/item/42",
+                "status": "FAILED",
+                "message": "Timeout",
+                "expected_status": 200,
+                "item_path": ["Users", "Details"],
+                "manual_judgement": {},
+                "judgement_history": [],
+                "custom_field": "kept",
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="PASSED", reason="", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="PASSED",
+            reason="",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -148,22 +232,71 @@ class TestOverride:
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
         results = [
-            {"name": "A", "status": "PASSED", "message": "ok", "method": "GET", "url": "http://a",
-             "expected_status": 200, "item_path": [], "folder": "", "manual_judgement": {}, "judgement_history": []},
-            {"name": "B", "status": "FAILED", "message": "err", "method": "POST", "url": "http://b",
-             "expected_status": 200, "item_path": [], "folder": "", "manual_judgement": {}, "judgement_history": []},
-            {"name": "C", "status": "PASSED", "message": "ok", "method": "GET", "url": "http://c",
-             "expected_status": 200, "item_path": [], "folder": "", "manual_judgement": {}, "judgement_history": []},
+            {
+                "name": "A",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            },
+            {
+                "name": "B",
+                "status": "FAILED",
+                "message": "err",
+                "method": "POST",
+                "url": "http://b",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            },
+            {
+                "name": "C",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://c",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            },
         ]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 3, "passed": 2, "failed": 1, "error": 0, "success_rate": 2/3,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 3, "passed": 3, "failed": 0, "error": 0, "success_rate": 1.0}
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 3,
+                    "passed": 2,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 2 / 3,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
         deps.invalidate_reports_cache.reset_mock()
 
         set_report_result_judgement(
-            report_name="r", result_index=1, action="override",
-            target_status="PASSED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=1,
+            action="override",
+            target_status="PASSED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -178,19 +311,46 @@ class TestOverride:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "X", "status": "PASSED", "message": "ok", "method": "GET",
-            "url": "http://x", "expected_status": 200,
-            "item_path": [], "manual_judgement": {}, "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        results = [
+            {
+                "name": "X",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://x",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action=" OVERRIDE ",
-            target_status="FAILED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action=" OVERRIDE ",
+            target_status="FAILED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -201,8 +361,11 @@ class TestOverride:
     def test_override_empty_target_status(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="target_status 仅支持 PASSED 或 FAILED"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="override",
-                target_status="", reason="",
+                report_name="r",
+                result_index=0,
+                action="override",
+                target_status="",
+                reason="",
                 reports_dir=tmp_path,
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
@@ -215,19 +378,47 @@ class TestOverride:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "X", "status": "FAILED", "message": "err", "method": "GET",
-            "url": "http://x", "expected_status": 200,
-            "item_path": [], "manual_judgement": {}, "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "X",
+                "status": "FAILED",
+                "message": "err",
+                "method": "GET",
+                "url": "http://x",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="passed", reason="", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="passed",
+            reason="",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -245,26 +436,64 @@ class TestRestore:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        overridden = [{
-            "name": "A", "folder": "", "method": "GET", "url": "http://a",
-            "status": "PASSED", "message": "Overridden", "expected_status": 200,
-            "item_path": [], "manual_judgement": {
-                "active": True, "source": "manual", "action": "override",
-                "at": "2026-06-11 10:00:00",
-                "from_status": "FAILED", "from_message": "Was failing",
-                "target_status": "PASSED", "reason": "It was flaky",
-            },
-            "judgement_history": [{"action": "override", "at": "2026-06-11 10:00:00",
-                                   "from_status": "FAILED", "to_status": "PASSED", "reason": "It was flaky"}],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(overridden, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        overridden = [
+            {
+                "name": "A",
+                "folder": "",
+                "method": "GET",
+                "url": "http://a",
+                "status": "PASSED",
+                "message": "Overridden",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {
+                    "active": True,
+                    "source": "manual",
+                    "action": "override",
+                    "at": "2026-06-11 10:00:00",
+                    "from_status": "FAILED",
+                    "from_message": "Was failing",
+                    "target_status": "PASSED",
+                    "reason": "It was flaky",
+                },
+                "judgement_history": [
+                    {
+                        "action": "override",
+                        "at": "2026-06-11 10:00:00",
+                        "from_status": "FAILED",
+                        "to_status": "PASSED",
+                        "reason": "It was flaky",
+                    }
+                ],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                overridden,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
         deps.invalidate_reports_cache.reset_mock()
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="restore", reason="Auto detected again",
+            report_name="r",
+            result_index=0,
+            action="restore",
+            reason="Auto detected again",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -287,24 +516,54 @@ class TestRestore:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        overridden = [{
-            "name": "A", "folder": "", "method": "GET", "url": "http://a",
-            "status": "PASSED", "message": "Overridden msg", "expected_status": 200,
-            "item_path": [], "manual_judgement": {
-                "active": True, "source": "manual", "action": "override",
-                "at": "2026-06-11 10:00:00",
-                "from_status": "FAILED", "from_message": "Original failure detail",
-                "target_status": "PASSED", "reason": "",
-            },
-            "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(overridden, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        overridden = [
+            {
+                "name": "A",
+                "folder": "",
+                "method": "GET",
+                "url": "http://a",
+                "status": "PASSED",
+                "message": "Overridden msg",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {
+                    "active": True,
+                    "source": "manual",
+                    "action": "override",
+                    "at": "2026-06-11 10:00:00",
+                    "from_status": "FAILED",
+                    "from_message": "Original failure detail",
+                    "target_status": "PASSED",
+                    "reason": "",
+                },
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                overridden,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="restore",
+            report_name="r",
+            result_index=0,
+            action="restore",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -319,28 +578,62 @@ class TestRestore:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        base_results = [{
-            "name": "A", "status": "PASSED", "message": "ok", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(base_results, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
+        base_results = [
+            {
+                "name": "A",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                base_results,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
 
         def step_compute(rs):
             cur = rs[0]
             mj = cur.get("manual_judgement", {})
             if isinstance(mj, dict) and mj.get("active"):
-                return {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
-            return {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+                return {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                }
+            return {
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "error": 0,
+                "success_rate": 1.0,
+            }
 
         deps.compute_summary.side_effect = step_compute
         deps.invalidate_reports_cache.reset_mock()
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="FAILED", reason="first",
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="FAILED",
+            reason="first",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -350,7 +643,9 @@ class TestRestore:
         deps.invalidate_reports_cache.reset_mock()
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action="restore",
+            report_name="r",
+            result_index=0,
+            action="restore",
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -365,18 +660,39 @@ class TestRestore:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        no_judgement = [{
-            "name": "A", "status": "PASSED", "message": "ok", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(no_judgement, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
+        no_judgement = [
+            {
+                "name": "A",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                no_judgement,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
 
         with pytest.raises(ValueError, match="当前结果无可恢复的人工判定"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="restore",
+                report_name="r",
+                result_index=0,
+                action="restore",
                 reports_dir=tmp_path,
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
@@ -391,7 +707,9 @@ class TestInputValidation:
     def test_invalid_action_string(self) -> None:
         with pytest.raises(ValueError, match="action 仅支持 override 或 restore"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="DELETE",
+                report_name="r",
+                result_index=0,
+                action="DELETE",
                 reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
@@ -402,7 +720,9 @@ class TestInputValidation:
     def test_invalid_action_non_string(self) -> None:
         with pytest.raises(ValueError, match="action 仅支持 override 或 restore"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action=12345,
+                report_name="r",
+                result_index=0,
+                action=12345,
                 reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
@@ -416,24 +736,56 @@ class TestInputValidation:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        overridden = [{
-            "name": "A", "folder": "", "method": "GET", "url": "http://a",
-            "status": "PASSED", "message": "msg", "expected_status": 200,
-            "item_path": [], "manual_judgement": {
-                "active": True, "source": "manual", "action": "override",
-                "at": "now", "from_status": "FAILED", "from_message": "was down",
-                "target_status": "PASSED", "reason": "",
-            },
-            "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(overridden, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        overridden = [
+            {
+                "name": "A",
+                "folder": "",
+                "method": "GET",
+                "url": "http://a",
+                "status": "PASSED",
+                "message": "msg",
+                "expected_status": 200,
+                "item_path": [],
+                "manual_judgement": {
+                    "active": True,
+                    "source": "manual",
+                    "action": "override",
+                    "at": "now",
+                    "from_status": "FAILED",
+                    "from_message": "was down",
+                    "target_status": "PASSED",
+                    "reason": "",
+                },
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                overridden,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action="restore",
-            target_status="GARBAGE_VALUE", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="restore",
+            target_status="GARBAGE_VALUE",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -445,7 +797,9 @@ class TestInputValidation:
     def test_override_no_target_status(self) -> None:
         with pytest.raises(ValueError, match="target_status 仅支持 PASSED 或 FAILED"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="override",
+                report_name="r",
+                result_index=0,
+                action="override",
                 reports_dir=Path(),
                 get_report_write_lock=MagicMock(),
                 find_report=MagicMock(),
@@ -464,8 +818,11 @@ class TestFileErrors:
 
         with pytest.raises(FileNotFoundError, match="元数据文件不存在"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="override",
-                target_status="PASSED", reports_dir=tmp_path,
+                report_name="r",
+                result_index=0,
+                action="override",
+                target_status="PASSED",
+                reports_dir=tmp_path,
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
                 compute_summary=MagicMock(),
@@ -479,8 +836,11 @@ class TestFileErrors:
 
         with pytest.raises(ValueError, match="报告缺少 meta_file"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="override",
-                target_status="PASSED", reports_dir=Path("/tmp"),
+                report_name="r",
+                result_index=0,
+                action="override",
+                target_status="PASSED",
+                reports_dir=Path("/tmp"),
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
                 compute_summary=MagicMock(),
@@ -489,15 +849,21 @@ class TestFileErrors:
 
     def test_invalid_result_index_negative(self, tmp_path: Path) -> None:
         meta_file = tmp_path / "_meta.json"
-        meta_file.write_text(json.dumps({"results": [{"name": "A", "status": "PASSED"}]}), encoding="utf-8")
+        meta_file.write_text(
+            json.dumps({"results": [{"name": "A", "status": "PASSED"}]}),
+            encoding="utf-8",
+        )
         deps = MagicMock()
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
         with pytest.raises(IndexError):
             set_report_result_judgement(
-                report_name="r", result_index=-1, action="override",
-                target_status="PASSED", reports_dir=tmp_path,
+                report_name="r",
+                result_index=-1,
+                action="override",
+                target_status="PASSED",
+                reports_dir=tmp_path,
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
                 compute_summary=MagicMock(),
@@ -506,15 +872,21 @@ class TestFileErrors:
 
     def test_result_index_out_of_range(self, tmp_path: Path) -> None:
         meta_file = tmp_path / "_meta.json"
-        meta_file.write_text(json.dumps({"results": [{"name": "A", "status": "PASSED"}]}), encoding="utf-8")
+        meta_file.write_text(
+            json.dumps({"results": [{"name": "A", "status": "PASSED"}]}),
+            encoding="utf-8",
+        )
         deps = MagicMock()
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
         with pytest.raises(IndexError):
             set_report_result_judgement(
-                report_name="r", result_index=999, action="override",
-                target_status="PASSED", reports_dir=tmp_path,
+                report_name="r",
+                result_index=999,
+                action="override",
+                target_status="PASSED",
+                reports_dir=tmp_path,
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
                 compute_summary=MagicMock(),
@@ -530,19 +902,47 @@ class TestEdgeCases:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "A", "status": "FAILED", "message": "bad", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": None,
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "A",
+                "status": "FAILED",
+                "message": "bad",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": None,
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="PASSED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="PASSED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -561,19 +961,47 @@ class TestEdgeCases:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "A", "status": "FAILED", "message": "bad", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": "old-string",
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "A",
+                "status": "FAILED",
+                "message": "bad",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": "old-string",
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
 
         set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="PASSED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="PASSED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -587,19 +1015,39 @@ class TestEdgeCases:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        incomplete = [{
-            "name": "A", "status": "PASSED", "message": "ok", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {"source": "manual"},
-            "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(incomplete, {
-            "total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0,
-        }))
+        incomplete = [
+            {
+                "name": "A",
+                "status": "PASSED",
+                "message": "ok",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {"source": "manual"},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                incomplete,
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            ),
+        )
 
         with pytest.raises(ValueError, match="当前结果无可恢复的人工判定"):
             set_report_result_judgement(
-                report_name="r", result_index=0, action="restore",
+                report_name="r",
+                result_index=0,
+                action="restore",
                 reports_dir=tmp_path,
                 get_report_write_lock=deps.get_report_write_lock,
                 find_report=deps.find_report,
@@ -612,19 +1060,47 @@ class TestEdgeCases:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "A", "status": "FAILED", "message": "err", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": [],
-        }]
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
+        results = [
+            {
+                "name": "A",
+                "status": "FAILED",
+                "message": "err",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action=None,
-            target_status="PASSED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action=None,
+            target_status="PASSED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,
@@ -639,20 +1115,48 @@ class TestEdgeCases:
         deps.get_report_write_lock.return_value = MockLock()
         deps.find_report.return_value = {"meta_file": "_meta.json"}
 
-        results = [{
-            "name": "A", "status": "FAILED", "message": "err", "method": "GET", "url": "http://a",
-            "expected_status": 200, "item_path": [], "folder": "",
-            "manual_judgement": {}, "judgement_history": [],
-        }]
-        expected_stats = {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}
-        _write_meta(tmp_path / "_meta.json", _make_meta(results, {
-            "total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0,
-        }))
+        results = [
+            {
+                "name": "A",
+                "status": "FAILED",
+                "message": "err",
+                "method": "GET",
+                "url": "http://a",
+                "expected_status": 200,
+                "item_path": [],
+                "folder": "",
+                "manual_judgement": {},
+                "judgement_history": [],
+            }
+        ]
+        expected_stats = {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "error": 0,
+            "success_rate": 1.0,
+        }
+        _write_meta(
+            tmp_path / "_meta.json",
+            _make_meta(
+                results,
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "failed": 1,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            ),
+        )
         deps.compute_summary.side_effect = lambda rs: expected_stats
 
         result = set_report_result_judgement(
-            report_name="r", result_index=0, action="override",
-            target_status="PASSED", reports_dir=tmp_path,
+            report_name="r",
+            result_index=0,
+            action="override",
+            target_status="PASSED",
+            reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
             compute_summary=deps.compute_summary,

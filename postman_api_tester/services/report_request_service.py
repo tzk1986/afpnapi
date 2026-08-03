@@ -77,7 +77,9 @@ def inject_token_header(headers: Dict[str, Any], token: str) -> Dict[str, Any]:
     return out_headers
 
 
-def extract_http_request_fields(source: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+def extract_http_request_fields(
+    source: Dict[str, Any], payload: Dict[str, Any]
+) -> Dict[str, Any]:
     """从源数据与载荷中提取 HTTP 请求相关字段并统一格式。"""
     return {
         "url": str(source.get("url", "")).strip(),

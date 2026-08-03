@@ -22,6 +22,7 @@ def _is_functions_enabled() -> bool:
     """延迟读取配置，避免循环导入。"""
     try:
         from postman_api_tester import config as _cfg
+
         return bool(getattr(_cfg, "ENABLE_VARIABLE_FUNCTIONS", True))
     except (ImportError, AttributeError):
         return True
@@ -42,6 +43,7 @@ def substitute_variables(text: str, variables: dict[str, str]) -> str:
 
     # 第一轮：函数调用替换（仅当 ENABLE_VARIABLE_FUNCTIONS=true 时执行）
     if _is_functions_enabled():
+
         def _func_replacer(match: re.Match[str]) -> str:
             func_name = match.group(1)
             args_str = match.group(2)
@@ -78,7 +80,9 @@ def _substitute_body(body: Any, variables: dict[str, str]) -> Any:
     return body
 
 
-def _substitute_params(params: dict[str, object], variables: dict[str, str]) -> dict[str, object]:
+def _substitute_params(
+    params: dict[str, object], variables: dict[str, str]
+) -> dict[str, object]:
     """替换请求参数中的键名和字符串值。"""
     if not variables and not _is_functions_enabled():
         return dict(params)
@@ -103,10 +107,19 @@ def _copy_api_config(
 ) -> ApiConfig:
     """构造 ApiConfig 副本，仅覆盖显式传入的字段。"""
     result: ApiConfig = {}
-    for field in ("name", "folder", "method", "description", "expected_status",
-                  "x_assertions", "x_expected_status", "x_success_err_codes",
-                  "x_success_messages", "x_enable_err_code_judgment",
-                  "x_enable_message_judgment"):
+    for field in (
+        "name",
+        "folder",
+        "method",
+        "description",
+        "expected_status",
+        "x_assertions",
+        "x_expected_status",
+        "x_success_err_codes",
+        "x_success_messages",
+        "x_enable_err_code_judgment",
+        "x_enable_message_judgment",
+    ):
         if field in api:
             result[field] = api[field]
     if "url" in api:
@@ -133,15 +146,25 @@ def substitute_in_api_config(api: ApiConfig, variables: dict[str, str]) -> ApiCo
         return _copy_api_config(api)
 
     raw_url = api.get("url")
-    new_url: Any = substitute_variables(str(raw_url), variables) if raw_url is not None else _SENTINEL
+    new_url: Any = (
+        substitute_variables(str(raw_url), variables)
+        if raw_url is not None
+        else _SENTINEL
+    )
     raw_full_url = api.get("full_url")
-    new_full_url: Any = substitute_variables(str(raw_full_url), variables) if raw_full_url is not None else _SENTINEL
+    new_full_url: Any = (
+        substitute_variables(str(raw_full_url), variables)
+        if raw_full_url is not None
+        else _SENTINEL
+    )
 
     raw_headers = api.get("headers")
     new_headers: Any = _SENTINEL
     if isinstance(raw_headers, dict) and raw_headers:
         new_headers = {
-            substitute_variables(str(k), variables): substitute_variables(str(v), variables)
+            substitute_variables(str(k), variables): substitute_variables(
+                str(v), variables
+            )
             for k, v in raw_headers.items()
         }
 
@@ -155,13 +178,17 @@ def substitute_in_api_config(api: ApiConfig, variables: dict[str, str]) -> ApiCo
 
     return _copy_api_config(
         api,
-        **{k: v for k, v in [
-            ("url", new_url),
-            ("full_url", new_full_url),
-            ("headers", new_headers),
-            ("params", new_params),
-            ("body", new_body),
-        ] if v is not _SENTINEL},
+        **{
+            k: v
+            for k, v in [
+                ("url", new_url),
+                ("full_url", new_full_url),
+                ("headers", new_headers),
+                ("params", new_params),
+                ("body", new_body),
+            ]
+            if v is not _SENTINEL
+        },
     )
 
 

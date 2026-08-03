@@ -31,6 +31,7 @@ try:
     from postman_api_tester.assertions import (
         evaluate_assertions as _evaluate_assertions,
     )
+
     _ASSERTIONS_AVAILABLE = True
 except ImportError:
     _ASSERTIONS_AVAILABLE = False
@@ -74,6 +75,7 @@ def _safe_int(value: object) -> int:
 # === 类型定义 ===
 class TestResultRecord(TypedDict, total=False):
     """单个API测试结果记录（TypedDict 便于外部消费）"""
+
     name: str
     method: str
     url: str
@@ -100,6 +102,7 @@ class TestResultRecord(TypedDict, total=False):
 
 class RequestInfo(TypedDict, total=False):
     """请求信息记录"""
+
     headers: Dict[str, str]
     params: JsonObject
     body: object
@@ -107,6 +110,7 @@ class RequestInfo(TypedDict, total=False):
 
 class ResponseInfo(TypedDict, total=False):
     """响应信息记录"""
+
     headers: Dict[str, str]
     body: object
 
@@ -143,6 +147,7 @@ class PostmanTestExecutor:
         :param uploaded_files: 上传文件路径映射（upload_key -> file_path），用于 formdata/binary 模式
         """
         import requests as _requests_mod
+
         self.api_config = dict(api_config)
         self.http_response: Optional[object] = None
         self.resp_status_code: Optional[int] = None
@@ -150,16 +155,24 @@ class PostmanTestExecutor:
         self.variable_context: Optional[VariableContext] = variable_context
         # 若调用方传入共享 Session 则复用；否则创建私有 Session（单独执行场景）
         self._owns_session = session is None
-        self.session: object = session if session is not None else _requests_mod.Session()
+        self.session: object = (
+            session if session is not None else _requests_mod.Session()
+        )
         # 实例级别 token，不再使用类变量，避免多任务并发时互相覆盖
         self._auth_token: Optional[str] = auth_token or None
-        self.request_timeout: Tuple[int, int] = normalize_timeout(request_timeout, default=(10, 30))
+        self.request_timeout: Tuple[int, int] = normalize_timeout(
+            request_timeout, default=(10, 30)
+        )
         self.assertion_strict_mode = bool(assertion_strict_mode)
-        self.judgment_config: Optional[Dict[str, object]] = judgment_config if isinstance(judgment_config, dict) else None
+        self.judgment_config: Optional[Dict[str, object]] = (
+            judgment_config if isinstance(judgment_config, dict) else None
+        )
         self._repeat_index = repeat_index
         self._repeat_total = repeat_total
-        self._repeat_group = repeat_group or str(api_config.get('name') or '')
-        self._uploaded_files: Dict[str, str] = uploaded_files if isinstance(uploaded_files, dict) else {}
+        self._repeat_group = repeat_group or str(api_config.get("name") or "")
+        self._uploaded_files: Dict[str, str] = (
+            uploaded_files if isinstance(uploaded_files, dict) else {}
+        )
 
     def start(self) -> None:
         """测试前准备"""
@@ -187,34 +200,36 @@ class PostmanTestExecutor:
     ) -> TestResultRecord:
         """构建统一结果边界，避免不同分支字段漂移。"""
         api = self.api_config
-        item_path_value = api.get('item_path')
+        item_path_value = api.get("item_path")
         item_path = item_path_value if isinstance(item_path_value, list) else []
-        expected_status_value = api.get('expected_status')
-        expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
-        default_request_info: RequestInfo = {'headers': {}, 'params': {}, 'body': None}
-        default_response_info: ResponseInfo = {'headers': {}, 'body': ''}
+        expected_status_value = api.get("expected_status")
+        expected_status = (
+            expected_status_value if isinstance(expected_status_value, int) else 200
+        )
+        default_request_info: RequestInfo = {"headers": {}, "params": {}, "body": None}
+        default_response_info: ResponseInfo = {"headers": {}, "body": ""}
         return {
-            'name': str(api.get('name') or ''),
-            'method': str(api.get('method') or ''),
-            'url': str(api.get('full_url') or ''),
-            'actual_request_url': actual_request_url,
-            'item_path': item_path,
-            'expected_status': expected_status,
-            'status': status,
-            'message': message,
-            'err_code': err_code,
-            'status_code': status_code,
-            'folder': str(api.get('folder') or ''),
-            'response_time_ms': response_time_ms,
-            'request_info': request_info or default_request_info,
-            'response_info': response_info or default_response_info,
-            'assertion_results': [],
-            'assertion_engine_error': '',
-            'data_index': _safe_int(api.get('data_index')),
-            'extracted_variables': {},
-            'repeat_index': self._repeat_index,
-            'repeat_total': self._repeat_total,
-            'repeat_group': self._repeat_group,
+            "name": str(api.get("name") or ""),
+            "method": str(api.get("method") or ""),
+            "url": str(api.get("full_url") or ""),
+            "actual_request_url": actual_request_url,
+            "item_path": item_path,
+            "expected_status": expected_status,
+            "status": status,
+            "message": message,
+            "err_code": err_code,
+            "status_code": status_code,
+            "folder": str(api.get("folder") or ""),
+            "response_time_ms": response_time_ms,
+            "request_info": request_info or default_request_info,
+            "response_info": response_info or default_response_info,
+            "assertion_results": [],
+            "assertion_engine_error": "",
+            "data_index": _safe_int(api.get("data_index")),
+            "extracted_variables": {},
+            "repeat_index": self._repeat_index,
+            "repeat_total": self._repeat_total,
+            "repeat_group": self._repeat_group,
         }
 
     def _build_passed_result(
@@ -232,14 +247,18 @@ class PostmanTestExecutor:
         assertion_engine_error: str,
     ) -> TestResultRecord:
         """构建判定通过路径的结果（含断言校验结果）。"""
-        assertion_failed = any(not a.get('passed') for a in assertion_results)
+        assertion_failed = any(not a.get("passed") for a in assertion_results)
         if assertion_failed:
-            fail_detail = '; '.join(str(a.get('message', '')) for a in assertion_results if not a.get('passed'))
-            message = f'断言失败: {fail_detail}'
-            status = 'FAILED'
+            fail_detail = "; ".join(
+                str(a.get("message", ""))
+                for a in assertion_results
+                if not a.get("passed")
+            )
+            message = f"断言失败: {fail_detail}"
+            status = "FAILED"
         else:
             message = response_message
-            status = 'PASSED'
+            status = "PASSED"
         result = self._build_result_base(
             actual_request_url=actual_request_url,
             status=status,
@@ -250,9 +269,9 @@ class PostmanTestExecutor:
             request_info=request_info,
             response_info=response_info,
         )
-        result['assertion_results'] = assertion_results
-        result['assertion_engine_error'] = assertion_engine_error
-        result['extracted_variables'] = extracted_variables
+        result["assertion_results"] = assertion_results
+        result["assertion_engine_error"] = assertion_engine_error
+        result["extracted_variables"] = extracted_variables
         return result
 
     def _build_judgment_failed_result(
@@ -271,18 +290,20 @@ class PostmanTestExecutor:
     ) -> TestResultRecord:
         """构建判定失败路径的结果（含数据库反馈）。"""
         db_feedback = build_db_feedback(
-            status='FAILED',
+            status="FAILED",
             status_code=status_code,
             response_message=response_message,
             err_code=err_code,
             response_body=response_data,
         )
         fail_message = judgment_fail_reason
-        if db_feedback.get('is_db_related'):
-            fail_message = f"{judgment_fail_reason} | 数据库反馈: {db_feedback.get('title')}"
+        if db_feedback.get("is_db_related"):
+            fail_message = (
+                f"{judgment_fail_reason} | 数据库反馈: {db_feedback.get('title')}"
+            )
         result = self._build_result_base(
             actual_request_url=actual_request_url,
-            status='FAILED',
+            status="FAILED",
             message=fail_message,
             err_code=err_code,
             status_code=status_code,
@@ -290,8 +311,8 @@ class PostmanTestExecutor:
             request_info=request_info,
             response_info=response_info,
         )
-        result['db_feedback'] = db_feedback
-        result['extracted_variables'] = extracted_variables
+        result["db_feedback"] = db_feedback
+        result["extracted_variables"] = extracted_variables
         return result
 
     def _build_request_error_result(
@@ -305,42 +326,47 @@ class PostmanTestExecutor:
     ) -> TestResultRecord:
         """构建请求异常路径的结果（含数据库反馈）。"""
         import requests as _requests
+
         if isinstance(error, _requests.exceptions.Timeout):
-            err_type = '请求超时'
+            err_type = "请求超时"
         elif isinstance(error, _requests.exceptions.ConnectionError):
-            err_type = '连接失败'
+            err_type = "连接失败"
         elif isinstance(error, _requests.exceptions.TooManyRedirects):
-            err_type = '重定向过多'
+            err_type = "重定向过多"
         elif isinstance(error, _requests.exceptions.InvalidURL):
-            err_type = 'URL无效'
+            err_type = "URL无效"
         elif isinstance(error, _requests.exceptions.MissingSchema):
-            err_type = 'URL缺少协议'
+            err_type = "URL缺少协议"
         elif isinstance(error, (ValueError, KeyError, TypeError)):
-            err_type = '数据处理异常'
+            err_type = "数据处理异常"
         else:
-            err_type = '请求异常'
+            err_type = "请求异常"
         db_feedback = build_db_feedback(
-            status='ERROR',
+            status="ERROR",
             status_code=None,
             response_message=str(error),
-            err_code='',
+            err_code="",
             response_body=str(error),
         )
-        error_message = f'[{err_type}] {error}'
-        if db_feedback.get('is_db_related'):
+        error_message = f"[{err_type}] {error}"
+        if db_feedback.get("is_db_related"):
             error_message = f"{error_message} | 数据库反馈: {db_feedback.get('title')}"
-        error_request_info: RequestInfo = {'headers': headers, 'params': params, 'body': body}
+        error_request_info: RequestInfo = {
+            "headers": headers,
+            "params": params,
+            "body": body,
+        }
         result = self._build_result_base(
             actual_request_url=raw_url,
-            status='ERROR',
+            status="ERROR",
             message=error_message,
-            err_code='',
+            err_code="",
             status_code=None,
             response_time_ms=0,
             request_info=error_request_info,
-            response_info={'headers': {}, 'body': str(error)},
+            response_info={"headers": {}, "body": str(error)},
         )
-        result['db_feedback'] = db_feedback
+        result["db_feedback"] = db_feedback
         return result
 
     def _execute_pre_request_and_substitute(self, api: ApiConfig) -> ApiConfig:
@@ -356,13 +382,19 @@ class PostmanTestExecutor:
         pre_request_expr = api.get("x_pre_request")
         if pre_request_expr:
             from postman_api_tester.config import ENABLE_PRE_REQUEST_SCRIPT
+
             if ENABLE_PRE_REQUEST_SCRIPT:
                 from postman_api_tester.utils.pre_request_executor import (
                     execute_pre_request,
                 )
-                local_vars = execute_pre_request(pre_request_expr, self.variable_context.variables)
+
+                local_vars = execute_pre_request(
+                    pre_request_expr, self.variable_context.variables
+                )
                 if local_vars:
-                    logging.getLogger(__name__).debug("pre-request variables set: %s", list(local_vars.keys()))
+                    logging.getLogger(__name__).debug(
+                        "pre-request variables set: %s", list(local_vars.keys())
+                    )
 
         merged_vars = {**self.variable_context.variables, **local_vars}
         api = substitute_in_api_config(api, merged_vars)
@@ -372,6 +404,7 @@ class PostmanTestExecutor:
     def execute_test(self) -> TestResultRecord:
         """执行单个API测试，返回标准化结果记录"""
         from typing import cast
+
         api: ApiConfig = cast(ApiConfig, self.api_config)
 
         # 变量替换与 pre-request 脚本
@@ -379,44 +412,63 @@ class PostmanTestExecutor:
 
         # 准备请求参数
         method, url, headers, params, body = self._prepare_request(api)
-        raw_url = str(api.get('full_url') or '')
+        raw_url = str(api.get("full_url") or "")
 
         try:
             # 验证 HTTP 方法
-            if method not in {'get', 'post', 'put', 'delete', 'patch'}:
+            if method not in {"get", "post", "put", "delete", "patch"}:
                 return self._build_result_base(
                     actual_request_url=raw_url,
-                    status='FAILED',
-                    message=f'不支持的HTTP方法: {method}',
-                    err_code='',
+                    status="FAILED",
+                    message=f"不支持的HTTP方法: {method}",
+                    err_code="",
                     status_code=None,
                     response_time_ms=0,
-                    request_info={'headers': headers, 'params': params, 'body': body},
-                    response_info={'headers': {}, 'body': ''},
+                    request_info={"headers": headers, "params": params, "body": body},
+                    response_info={"headers": {}, "body": ""},
                 )
 
             # 构建请求参数
             request_kwargs = self._build_request_kwargs(method, headers, params, body)
 
             # 发送请求
-            response, response_time_ms, actual_request_url = self._send_request(method, url, request_kwargs)
+            response, response_time_ms, actual_request_url = self._send_request(
+                method, url, request_kwargs
+            )
             self.http_response = response
             self.resp_status_code = response.status_code  # type: ignore[attr-defined]
 
             # 处理响应
-            response_message, err_code, status_code, response_data, extracted_variables = self._process_response(api, response)
+            (
+                response_message,
+                err_code,
+                status_code,
+                response_data,
+                extracted_variables,
+            ) = self._process_response(api, response)
             self.response_data = response_data
 
             # 准备请求和响应详情
-            request_info: RequestInfo = {'headers': headers, 'params': params, 'body': body}
-            response_info: ResponseInfo = {'headers': dict(response.headers), 'body': response_data}  # type: ignore[attr-defined]
+            request_info: RequestInfo = {
+                "headers": headers,
+                "params": params,
+                "body": body,
+            }
+            response_info: ResponseInfo = {
+                "headers": dict(response.headers),
+                "body": response_data,
+            }  # type: ignore[attr-defined]
 
             # 结果判定
-            judgment_passed, judgment_fail_reason = self._evaluate_judgment(api, status_code, err_code, response_message)
+            judgment_passed, judgment_fail_reason = self._evaluate_judgment(
+                api, status_code, err_code, response_message
+            )
 
             if judgment_passed:
                 # 运行断言
-                assertion_results, assertion_engine_error = self._run_assertions(api, response_data)
+                assertion_results, assertion_engine_error = self._run_assertions(
+                    api, response_data
+                )
                 return self._build_passed_result(
                     actual_request_url=actual_request_url,
                     response_message=response_message,
@@ -454,7 +506,7 @@ class PostmanTestExecutor:
         finally:
             # 仅当本实例拥有 Session（未传入外部 Session）时才关闭，避免提前终止共享连接池
             if self._owns_session:
-                close_fn = getattr(self.session, 'close', None)
+                close_fn = getattr(self.session, "close", None)
                 if callable(close_fn):
                     close_fn()
 
@@ -462,33 +514,35 @@ class PostmanTestExecutor:
         """从响应体中提取 message 与 errCode 字段，委托到 response_parser.extract_msg_errcode。"""
         return _extract_msg_errcode(response_data)
 
-    def _prepare_request(self, api: ApiConfig) -> Tuple[str, str, Dict[str, str], JsonObject, object]:
+    def _prepare_request(
+        self, api: ApiConfig
+    ) -> Tuple[str, str, Dict[str, str], JsonObject, object]:
         """准备请求参数：提取 method/URL/headers/params/body 并注入认证 token。"""
-        method = str(api.get('method') or 'GET').lower()
-        raw_url = str(api.get('full_url') or '')
-        raw_headers = api.get('headers')
+        method = str(api.get("method") or "GET").lower()
+        raw_url = str(api.get("full_url") or "")
+        raw_headers = api.get("headers")
         headers = dict(raw_headers) if isinstance(raw_headers, dict) else {}
-        raw_params = api.get('params')
+        raw_params = api.get("params")
         params = raw_params if isinstance(raw_params, dict) else {}
         url, params = _normalize_url_and_params(raw_url, params)
-        body = api.get('body')
+        body = api.get("body")
 
         # 变量替换后 body 可能变为合法 JSON 字符串，尝试解析
-        if isinstance(body, str) and body.strip().startswith(('{', '[')):
+        if isinstance(body, str) and body.strip().startswith(("{", "[")):
             with contextlib.suppress(json.JSONDecodeError, ValueError):
                 body = json.loads(body)
 
         # 注入认证 token（始终覆盖，确保使用最新 token）
         if self._auth_token:
             headers_lower = {k.lower(): k for k in headers}
-            if 'authorization' in headers_lower:
-                orig_key = headers_lower['authorization']
-                headers[orig_key] = f'Bearer {self._auth_token}'
+            if "authorization" in headers_lower:
+                orig_key = headers_lower["authorization"]
+                headers[orig_key] = f"Bearer {self._auth_token}"
             else:
                 for k in list(headers.keys()):
-                    if k.lower() == 'token':
+                    if k.lower() == "token":
                         del headers[k]
-                headers['token'] = self._auth_token
+                headers["token"] = self._auth_token
 
         return method, url, headers, params, body
 
@@ -497,94 +551,115 @@ class PostmanTestExecutor:
     ) -> Dict[str, object]:
         """构建请求参数字典，处理不同 body 模式（formdata/binary/JSON）。"""
         request_kwargs: Dict[str, object] = {
-            'params': params,
-            'headers': headers,
-            'timeout': self.request_timeout,
+            "params": params,
+            "headers": headers,
+            "timeout": self.request_timeout,
         }
 
-        if method not in {'post', 'put', 'patch'}:
+        if method not in {"post", "put", "patch"}:
             return request_kwargs
 
         body_dict = body if isinstance(body, dict) else None
-        body_mode = body_dict.get('__body_mode') if body_dict else None
+        body_mode = body_dict.get("__body_mode") if body_dict else None
 
-        if body_mode == 'formdata' and body_dict:
+        if body_mode == "formdata" and body_dict:
             return self._build_formdata_request(request_kwargs, headers, body_dict)
-        elif body_mode == 'binary' and body_dict:
+        elif body_mode == "binary" and body_dict:
             return self._build_binary_request(request_kwargs, headers, body_dict)
         else:
-            request_kwargs['json'] = body
+            request_kwargs["json"] = body
             return request_kwargs
 
     def _build_formdata_request(
-        self, request_kwargs: Dict[str, object], headers: Dict[str, str], body_dict: dict
+        self,
+        request_kwargs: Dict[str, object],
+        headers: Dict[str, str],
+        body_dict: dict,
     ) -> Dict[str, object]:
         """构建 multipart/form-data 请求。"""
-        formdata_items: List[Dict[str, Any]] = body_dict.get('formdata', []) or []
+        formdata_items: List[Dict[str, Any]] = body_dict.get("formdata", []) or []
         data_rows: List[Tuple[str, str]] = []
         file_rows: List[Tuple[str, Tuple[str, Any, str]]] = []
 
         for item in formdata_items:
             if not isinstance(item, dict):
                 continue
-            key = str(item.get('key', ''))
-            if item.get('type') == 'file':
-                upload_key = str(item.get('upload_key', ''))
+            key = str(item.get("key", ""))
+            if item.get("type") == "file":
+                upload_key = str(item.get("upload_key", ""))
                 file_path = self._uploaded_files.get(upload_key)
                 if file_path and Path(file_path).exists():
                     file_name = Path(file_path).name
-                    file_rows.append((key, (file_name, Path(file_path).open('rb'), 'application/octet-stream')))  # noqa: SIM115
+                    file_rows.append(
+                        (
+                            key,
+                            (
+                                file_name,
+                                Path(file_path).open("rb"),
+                                "application/octet-stream",
+                            ),
+                        )
+                    )  # noqa: SIM115
             else:
-                data_rows.append((key, str(item.get('value', ''))))
+                data_rows.append((key, str(item.get("value", ""))))
 
         # 移除 Content-Type，让 requests 自动设置 multipart boundary
-        headers.pop('Content-Type', None)
-        headers.pop('content-type', None)
-        request_kwargs['headers'] = headers
-        request_kwargs['data'] = data_rows
-        request_kwargs['files'] = file_rows
+        headers.pop("Content-Type", None)
+        headers.pop("content-type", None)
+        request_kwargs["headers"] = headers
+        request_kwargs["data"] = data_rows
+        request_kwargs["files"] = file_rows
         return request_kwargs
 
     def _build_binary_request(
-        self, request_kwargs: Dict[str, object], headers: Dict[str, str], body_dict: dict
+        self,
+        request_kwargs: Dict[str, object],
+        headers: Dict[str, str],
+        body_dict: dict,
     ) -> Dict[str, object]:
         """构建 binary 请求。"""
-        upload_key = str(body_dict.get('upload_key', ''))
+        upload_key = str(body_dict.get("upload_key", ""))
         file_path = self._uploaded_files.get(upload_key)
 
         if file_path and Path(file_path).exists():
-            with Path(file_path).open('rb') as f:
-                request_kwargs['data'] = f.read()
+            with Path(file_path).open("rb") as f:
+                request_kwargs["data"] = f.read()
             # 根据文件扩展名设置 Content-Type
             ext = Path(file_path).suffix.lower()
             content_type_map = {
-                '.json': 'application/json',
-                '.xml': 'application/xml',
-                '.txt': 'text/plain',
-                '.csv': 'text/csv',
-                '.pdf': 'application/pdf',
-                '.zip': 'application/zip',
-                '.png': 'image/png',
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.gif': 'image/gif',
+                ".json": "application/json",
+                ".xml": "application/xml",
+                ".txt": "text/plain",
+                ".csv": "text/csv",
+                ".pdf": "application/pdf",
+                ".zip": "application/zip",
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
             }
-            headers.setdefault('Content-Type', content_type_map.get(ext, 'application/octet-stream'))
-            request_kwargs['headers'] = headers
+            headers.setdefault(
+                "Content-Type", content_type_map.get(ext, "application/octet-stream")
+            )
+            request_kwargs["headers"] = headers
         else:
-            request_kwargs['data'] = b''
+            request_kwargs["data"] = b""
 
         return request_kwargs
 
-    def _send_request(self, method: str, url: str, request_kwargs: Dict[str, object]) -> Tuple[object, int, str]:
+    def _send_request(
+        self, method: str, url: str, request_kwargs: Dict[str, object]
+    ) -> Tuple[object, int, str]:
         """发送 HTTP 请求并返回 (response, response_time_ms, actual_request_url)。"""
         _t0 = _time_mod.monotonic()
         response = getattr(self.session, method)(url, **request_kwargs)
         response_time_ms = round((_time_mod.monotonic() - _t0) * 1000)
-        actual_request_url = str(getattr(response.request, 'url', '') or url)
+        actual_request_url = str(getattr(response.request, "url", "") or url)
         return response, response_time_ms, actual_request_url
 
-    def _process_response(self, api: ApiConfig, response: object) -> Tuple[str, str, int, object, Dict[str, str]]:
+    def _process_response(
+        self, api: ApiConfig, response: object
+    ) -> Tuple[str, str, int, object, Dict[str, str]]:
         """处理响应：解析数据、提取变量、结果判定。返回 (response_message, err_code, status_code, response_data, extracted_variables)。"""
         # 解析响应数据
         try:
@@ -598,7 +673,7 @@ class PostmanTestExecutor:
         # 提取变量
         extracted_variables: Dict[str, str] = {}
         if self.variable_context is not None:
-            raw_extract = api.get('x_extract')
+            raw_extract = api.get("x_extract")
             if isinstance(raw_extract, dict) and raw_extract:
                 extracted_variables = self.variable_context.update_from_extract(
                     raw_extract,
@@ -606,14 +681,22 @@ class PostmanTestExecutor:
                     dict(response.headers),  # type: ignore[attr-defined]
                 )
 
-        return response_message, err_code, status_code, response_data, extracted_variables
+        return (
+            response_message,
+            err_code,
+            status_code,
+            response_data,
+            extracted_variables,
+        )
 
     def _evaluate_judgment(
         self, api: ApiConfig, status_code: int, err_code: str, response_message: str
     ) -> Tuple[bool, str]:
         """评估结果判定，返回 (passed, fail_reason)。"""
-        expected_status_value = api.get('expected_status')
-        expected_status = expected_status_value if isinstance(expected_status_value, int) else 200
+        expected_status_value = api.get("expected_status")
+        expected_status = (
+            expected_status_value if isinstance(expected_status_value, int) else 200
+        )
 
         task_jcfg = self.judgment_config or {}
 
@@ -628,14 +711,14 @@ class PostmanTestExecutor:
             global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
             global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
             global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
-            item_x_enable_err_code=_opt_bool(api.get('x_enable_err_code_judgment')),
-            item_x_success_err_codes=_opt_str(api.get('x_success_err_codes')),
-            item_x_enable_message=_opt_bool(api.get('x_enable_message_judgment')),
-            item_x_success_messages=_opt_str(api.get('x_success_messages')),
-            task_enable_err_code=_opt_bool(task_jcfg.get('enable_err_code_judgment')),
-            task_success_err_codes=_opt_str(task_jcfg.get('success_err_codes')),
-            task_enable_message=_opt_bool(task_jcfg.get('enable_message_judgment')),
-            task_success_messages=_opt_str(task_jcfg.get('success_messages')),
+            item_x_enable_err_code=_opt_bool(api.get("x_enable_err_code_judgment")),
+            item_x_success_err_codes=_opt_str(api.get("x_success_err_codes")),
+            item_x_enable_message=_opt_bool(api.get("x_enable_message_judgment")),
+            item_x_success_messages=_opt_str(api.get("x_success_messages")),
+            task_enable_err_code=_opt_bool(task_jcfg.get("enable_err_code_judgment")),
+            task_success_err_codes=_opt_str(task_jcfg.get("success_err_codes")),
+            task_enable_message=_opt_bool(task_jcfg.get("enable_message_judgment")),
+            task_success_messages=_opt_str(task_jcfg.get("success_messages")),
         )
 
         return evaluate_result_judgment(
@@ -643,31 +726,40 @@ class PostmanTestExecutor:
             expected_status=expected_status,
             err_code=err_code,
             response_message=response_message,
-            success_err_codes=judgment_params['success_err_codes'],
-            success_messages=judgment_params['success_messages'],
-            enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
-            enable_message_judgment=judgment_params['enable_message_judgment'],
+            success_err_codes=judgment_params["success_err_codes"],
+            success_messages=judgment_params["success_messages"],
+            enable_err_code_judgment=judgment_params["enable_err_code_judgment"],
+            enable_message_judgment=judgment_params["enable_message_judgment"],
         )
 
-    def _run_assertions(self, api: ApiConfig, response_data: object) -> Tuple[List[AssertionResult], str]:
+    def _run_assertions(
+        self, api: ApiConfig, response_data: object
+    ) -> Tuple[List[AssertionResult], str]:
         """运行断言引擎，返回 (assertion_results, assertion_engine_error)。"""
         assertion_results: List[AssertionResult] = []
         assertion_engine_error = ""
 
-        raw_assertions = api.get('x_assertions')
-        assertions_rules = [item for item in raw_assertions if isinstance(item, dict)] if isinstance(raw_assertions, list) else []
+        raw_assertions = api.get("x_assertions")
+        assertions_rules = (
+            [item for item in raw_assertions if isinstance(item, dict)]
+            if isinstance(raw_assertions, list)
+            else []
+        )
 
         if assertions_rules and _ASSERTIONS_AVAILABLE:
             try:
-                assertion_results = _evaluate_assertions(response_data, assertions_rules)
+                assertion_results = _evaluate_assertions(
+                    response_data, assertions_rules
+                )
             except Exception as assertion_exc:
                 assertion_engine_error = str(assertion_exc)
                 logger.exception("断言引擎执行异常: %s", assertion_exc)
                 if self.assertion_strict_mode:
-                    assertion_results = [{
-                        'passed': False,
-                        'message': f'断言引擎异常: {assertion_engine_error}',
-                    }]
+                    assertion_results = [
+                        {
+                            "passed": False,
+                            "message": f"断言引擎异常: {assertion_engine_error}",
+                        }
+                    ]
 
         return assertion_results, assertion_engine_error
-

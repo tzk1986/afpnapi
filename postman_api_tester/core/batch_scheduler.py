@@ -111,7 +111,10 @@ class BatchScheduler:
         for consumer_idx, deps in consumer_deps.items():
             for var_name in deps:
                 for producer_idx in producer_map.get(var_name, []):
-                    if producer_idx < consumer_idx and consumer_idx not in edges[producer_idx]:
+                    if (
+                        producer_idx < consumer_idx
+                        and consumer_idx not in edges[producer_idx]
+                    ):
                         edges[producer_idx].add(consumer_idx)
                         in_degree[consumer_idx] += 1
 

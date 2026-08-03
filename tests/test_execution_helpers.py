@@ -1,10 +1,8 @@
 """Tests for execution_helpers module in core/execution_helpers.py."""
 
-import os
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from typing import Any, Dict, List
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -128,7 +126,7 @@ class TestResolveReportFilePath:
         assert ".." not in Path(result).name
 
     def test_special_chars_sanitized(self, tmp_path: Path) -> None:
-        result = _resolve_report_file_path(str(tmp_path), "report<>:\"|?*.html")
+        result = _resolve_report_file_path(str(tmp_path), 'report<>:"|?*.html')
         basename = Path(result).name
         assert "<" not in basename
         assert ">" not in basename
@@ -167,9 +165,9 @@ class TestResolveRuntimeConfig:
         from postman_api_tester.core.execution_helpers import _resolve_runtime_config
         from postman_api_tester import config
 
-        original_token = getattr(config, 'TOKEN', '')
-        original_base_url = getattr(config, 'BASE_URL', '')
-        original_output_dir = getattr(config, 'REPORT_OUTPUT_DIR', '')
+        original_token = getattr(config, "TOKEN", "")
+        original_base_url = getattr(config, "BASE_URL", "")
+        original_output_dir = getattr(config, "REPORT_OUTPUT_DIR", "")
 
         try:
             config.TOKEN = "config_token"
@@ -194,13 +192,13 @@ class TestResolveRuntimeConfig:
         from postman_api_tester.core.execution_helpers import _resolve_runtime_config
         from postman_api_tester import config
 
-        original_token = getattr(config, 'TOKEN', '')
-        original_base_url = getattr(config, 'BASE_URL', '')
-        original_output_dir = getattr(config, 'REPORT_OUTPUT_DIR', '')
-        original_ckpt = getattr(config, 'ENABLE_CHECKPOINT_RECOVERY', False)
-        original_flush = getattr(config, 'CHECKPOINT_FLUSH_EVERY_N', 1)
-        original_ckpt_dir = getattr(config, 'CHECKPOINT_DIR', '')
-        original_strict = getattr(config, 'ENABLE_ASSERTION_STRICT_MODE', False)
+        original_token = getattr(config, "TOKEN", "")
+        original_base_url = getattr(config, "BASE_URL", "")
+        original_output_dir = getattr(config, "REPORT_OUTPUT_DIR", "")
+        original_ckpt = getattr(config, "ENABLE_CHECKPOINT_RECOVERY", False)
+        original_flush = getattr(config, "CHECKPOINT_FLUSH_EVERY_N", 1)
+        original_ckpt_dir = getattr(config, "CHECKPOINT_DIR", "")
+        original_strict = getattr(config, "ENABLE_ASSERTION_STRICT_MODE", False)
 
         try:
             config.TOKEN = "config_token"
@@ -211,8 +209,8 @@ class TestResolveRuntimeConfig:
             config.CHECKPOINT_DIR = "/tmp/checkpoints"
             config.ENABLE_ASSERTION_STRICT_MODE = True
 
-            token, base_url, output_dir, ckpt_enabled, ckpt_flush, ckpt_dir, strict = _resolve_runtime_config(
-                None, None, None
+            token, base_url, output_dir, ckpt_enabled, ckpt_flush, ckpt_dir, strict = (
+                _resolve_runtime_config(None, None, None)
             )
 
             assert token == "config_token"

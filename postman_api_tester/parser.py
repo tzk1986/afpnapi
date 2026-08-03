@@ -35,6 +35,7 @@ AssertionConfig = Dict[str, object]
 # === 类型定义 ===
 class ApiConfig(TypedDict, total=False):
     """单个 API 配置信息（TypedDict 便于外部消费）"""
+
     name: str
     folder: str
     method: str
@@ -79,7 +80,7 @@ class PostmanApiParser:
             raise ParseError(f"文件不存在: {self.file_path}")
 
         try:
-            with Path(self.file_path).open(encoding='utf-8') as f:
+            with Path(self.file_path).open(encoding="utf-8") as f:
                 self.data = json.load(f)
         except json.JSONDecodeError as e:
             raise ParseError(f"JSON文件格式错误: {e}") from e
@@ -89,31 +90,36 @@ class PostmanApiParser:
         从Postman文件中提取基础URL
         :return: 基础URL
         """
-        raw_variables = self.data.get('variable')
+        raw_variables = self.data.get("variable")
         if isinstance(raw_variables, list):
             for var in raw_variables:
                 if not isinstance(var, dict):
                     continue
-                if var.get('key') == 'baseUrl' or var.get('key') == 'base_url':
-                    self.base_url = var.get('value', '')
+                if var.get("key") == "baseUrl" or var.get("key") == "base_url":
+                    self.base_url = var.get("value", "")
 
         # 如果没有找到baseUrl变量，尝试从第一个请求中提取
         if not self.base_url:
-            raw_items = self.data.get('item')
+            raw_items = self.data.get("item")
             items = raw_items if isinstance(raw_items, list) else []
             first_item = items[0] if items and isinstance(items[0], dict) else None
-            first_request = first_item.get('request') if isinstance(first_item, dict) else None
+            first_request = (
+                first_item.get("request") if isinstance(first_item, dict) else None
+            )
             if isinstance(first_request, dict):
-                url = first_request.get('url')
+                url = first_request.get("url")
                 if isinstance(url, dict):
-                    protocol = url.get('protocol', 'https')
-                    if str(protocol).lower() not in ('http', 'https'):
-                        logger.warning("ignoring non-http protocol in collection base_url: %s", protocol)
+                    protocol = url.get("protocol", "https")
+                    if str(protocol).lower() not in ("http", "https"):
+                        logger.warning(
+                            "ignoring non-http protocol in collection base_url: %s",
+                            protocol,
+                        )
                     else:
                         self.base_url = f"{protocol}://{url.get('host', 'localhost')}"
                 elif isinstance(url, str):
                     # 提取协议和主机
-                    match = re.match(r'(https?://[^/]+)', url)
+                    match = re.match(r"(https?://[^/]+)", url)
                     if match:
                         self.base_url = match.group(1)
 
@@ -125,7 +131,7 @@ class PostmanApiParser:
         :return: API列表
         """
         apis = []
-        raw_items = self.data.get('item')
+        raw_items = self.data.get("item")
         items = raw_items if isinstance(raw_items, list) else []
 
         self.extract_base_url()
@@ -136,7 +142,12 @@ class PostmanApiParser:
         self.collections = apis
         return apis
 
-    def _parse_item(self, item: Dict[str, Any], parent_name: str = "", item_path: Optional[List[int]] = None) -> List[ApiConfig]:
+    def _parse_item(
+        self,
+        item: Dict[str, Any],
+        parent_name: str = "",
+        item_path: Optional[List[int]] = None,
+    ) -> List[ApiConfig]:
         """
         递归解析item（可能是文件夹或请求）
         :param item: item对象
@@ -148,19 +159,25 @@ class PostmanApiParser:
         item_path = list(item_path or [])
 
         # 如果是文件夹，递归处理
-        if 'item' in item and 'request' not in item:
-            folder_name = item.get('name', '')
-            for sub_index, sub_item in enumerate(item['item']):
-                apis.extend(self._parse_item(sub_item, folder_name, item_path=[*item_path, sub_index]))
+        if "item" in item and "request" not in item:
+            folder_name = item.get("name", "")
+            for sub_index, sub_item in enumerate(item["item"]):
+                apis.extend(
+                    self._parse_item(
+                        sub_item, folder_name, item_path=[*item_path, sub_index]
+                    )
+                )
 
         # 解析请求
-        elif 'request' in item:
+        elif "request" in item:
             api_info = self._parse_request(item, parent_name, item_path=item_path)
             if api_info:
                 # 校验必填字段：name/method/url 任一缺失则跳过，避免执行层崩溃
-                _missing = [k for k in ('name', 'method', 'url') if not api_info.get(k)]
+                _missing = [k for k in ("name", "method", "url") if not api_info.get(k)]
                 if _missing:
-                    logger.warning("跳过无效 API（字段缺失: %s）: %s", _missing, api_info)
+                    logger.warning(
+                        "跳过无效 API（字段缺失: %s）: %s", _missing, api_info
+                    )
                 else:
                     apis.append(api_info)
 
@@ -171,42 +188,42 @@ class PostmanApiParser:
         if not body_data:
             return None
 
-        mode = body_data.get('mode')
-        if mode == 'raw':
-            raw = body_data.get('raw', '{}')
+        mode = body_data.get("mode")
+        if mode == "raw":
+            raw = body_data.get("raw", "{}")
             try:
                 return json.loads(raw)
             except (json.JSONDecodeError, ValueError, TypeError):
                 logger.warning("raw body 不是合法 JSON，fallback 为字符串: %.200r", raw)
                 return raw
-        elif mode == 'urlencoded':
+        elif mode == "urlencoded":
             body = {}
             items = body_data.get(mode, [])
             for item_data in items:
-                if not item_data.get('disabled'):
-                    body[item_data.get('key')] = item_data.get('value')
+                if not item_data.get("disabled"):
+                    body[item_data.get("key")] = item_data.get("value")
             return body
-        elif mode == 'formdata':
+        elif mode == "formdata":
             # 保留完整结构，包括 type 和 upload_key，供执行器处理文件上传
             items = body_data.get(mode, [])
             formdata_items = [
                 {
-                    'key': item_data.get('key', ''),
-                    'value': item_data.get('value', ''),
-                    'type': item_data.get('type', 'text'),
-                    'file_name': item_data.get('file_name', ''),
-                    'upload_key': item_data.get('upload_key', ''),
+                    "key": item_data.get("key", ""),
+                    "value": item_data.get("value", ""),
+                    "type": item_data.get("type", "text"),
+                    "file_name": item_data.get("file_name", ""),
+                    "upload_key": item_data.get("upload_key", ""),
                 }
                 for item_data in items
-                if not item_data.get('disabled')
+                if not item_data.get("disabled")
             ]
-            return {'__body_mode': 'formdata', 'formdata': formdata_items}
-        elif mode == 'file':
+            return {"__body_mode": "formdata", "formdata": formdata_items}
+        elif mode == "file":
             # binary 模式，保留文件名信息
             return {
-                '__body_mode': 'binary',
-                'file_name': body_data.get('src', ''),
-                'upload_key': body_data.get('upload_key', ''),
+                "__body_mode": "binary",
+                "file_name": body_data.get("src", ""),
+                "upload_key": body_data.get("upload_key", ""),
             }
         return None
 
@@ -215,7 +232,7 @@ class PostmanApiParser:
         extensions: Dict[str, Any] = {}
 
         # 字符串类型扩展
-        for field in ('x_success_err_codes', 'x_success_messages'):
+        for field in ("x_success_err_codes", "x_success_messages"):
             str_value = request.get(field)
             if str_value is not None:
                 str_value = str(str_value).strip() or None
@@ -223,96 +240,115 @@ class PostmanApiParser:
                     extensions[field] = str_value
 
         # 布尔类型扩展
-        bool_fields = ('x_enable_err_code_judgment', 'x_enable_message_judgment')
+        bool_fields = ("x_enable_err_code_judgment", "x_enable_message_judgment")
         for field in bool_fields:
             bool_value: Any = request.get(field)
             if bool_value is not None:
                 if not isinstance(bool_value, bool):
-                    bool_value = str(bool_value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+                    bool_value = str(bool_value).strip().lower() in {
+                        "1",
+                        "true",
+                        "yes",
+                        "y",
+                        "on",
+                    }
                 extensions[field] = bool_value
 
         # 字典类型扩展
-        dict_fields = ('x_extract', 'x_pre_request')
+        dict_fields = ("x_extract", "x_pre_request")
         for field in dict_fields:
             value_raw = request.get(field)
             if isinstance(value_raw, dict) and value_raw:
-                dict_value = {str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)}
+                dict_value = {
+                    str(k): str(v) for k, v in value_raw.items() if isinstance(v, str)
+                }
                 if dict_value:
                     extensions[field] = dict_value
 
         # 整数类型扩展
-        repeat_raw = request.get('x_repeat')
+        repeat_raw = request.get("x_repeat")
         if repeat_raw is not None:
             try:
                 repeat_val = max(1, min(int(repeat_raw), 10))
-                extensions['x_repeat'] = repeat_val
+                extensions["x_repeat"] = repeat_val
             except (TypeError, ValueError):
                 pass
 
         return extensions
 
-    def _parse_request(self, item: Dict[str, Any], parent_name: str = "", item_path: Optional[List[int]] = None) -> ApiConfig:
+    def _parse_request(
+        self,
+        item: Dict[str, Any],
+        parent_name: str = "",
+        item_path: Optional[List[int]] = None,
+    ) -> ApiConfig:
         """
         解析单个请求
         :param item: item对象
         :param parent_name: 父级名称（文件夹）
         :return: API信息
         """
-        request = item.get('request', {})
+        request = item.get("request", {})
 
         # 解析URL
-        url = request.get('url', '')
+        url = request.get("url", "")
         if isinstance(url, dict):
             url = self._build_url_from_dict(url)
 
         # 解析方法
-        method = request.get('method', 'GET').upper()
-        name = self._normalize_api_name(item.get('name', ''), method, url)
+        method = request.get("method", "GET").upper()
+        name = self._normalize_api_name(item.get("name", ""), method, url)
 
         # 解析请求头
         headers = {}
-        for header in request.get('header', []):
-            if header.get('disabled'):
+        for header in request.get("header", []):
+            if header.get("disabled"):
                 continue
-            headers[header.get('key', '')] = header.get('value', '')
+            headers[header.get("key", "")] = header.get("value", "")
 
         # 解析请求体
-        body = self._parse_body(request.get('body', {}))
+        body = self._parse_body(request.get("body", {}))
 
         # 解析参数
         params = {}
-        for query in request.get('url', {}).get('query', []) if isinstance(request.get('url'), dict) else []:
-            if not query.get('disabled'):
-                params[query.get('key')] = query.get('value')
+        for query in (
+            request.get("url", {}).get("query", [])
+            if isinstance(request.get("url"), dict)
+            else []
+        ):
+            if not query.get("disabled"):
+                params[query.get("key")] = query.get("value")
 
         # 解析预期响应
         # 兼容报告中心 ad-hoc 请求写入的扩展字段 x_expected_status。
         try:
-            expected_status = int(request.get('x_expected_status', 200))
+            expected_status = int(request.get("x_expected_status", 200))
         except (TypeError, ValueError):
             expected_status = 200
-        tests = item.get('event', [])
+        tests = item.get("event", [])
         for event in tests:
-            if event.get('listen') == 'test':
-                script = event.get('script', {}).get('exec', '')
-                if '200' in str(script):
+            if event.get("listen") == "test":
+                script = event.get("script", {}).get("exec", "")
+                if "200" in str(script):
                     expected_status = 200
 
         # 解析 x_* 扩展字段
         extensions = self._parse_x_extensions(request)
 
         result: ApiConfig = {
-            'name': name,
-            'folder': parent_name,
-            'method': method,
-            'url': url,
-            'full_url': urljoin(self.base_url, url) if not url.startswith('http') else url,
-            'headers': headers,
-            'body': body,
-            'params': params,
-            'expected_status': expected_status,
-            'description': item.get('description', ''),
-            'item_path': list(item_path or []),
+            "name": name,
+            "folder": parent_name,
+            "method": method,
+            "url": url,
+            "full_url": urljoin(self.base_url, url)
+            if not url.startswith("http")
+            else url,
+            "headers": headers,
+            "body": body,
+            "params": params,
+            "expected_status": expected_status,
+            "description": item.get("description", ""),
+            "item_path": list(item_path or []),
         }
 
         # 合并扩展字段
@@ -322,25 +358,25 @@ class PostmanApiParser:
         return result
 
     def _normalize_api_name(self, name: object, method: str, url: str) -> str:
-        text = str(name or '').strip()
-        if text and not re.fullmatch(r'[?？\s_]+', text):
+        text = str(name or "").strip()
+        if text and not re.fullmatch(r"[?？\s_]+", text):
             return text
 
-        url_text = str(url or '').strip()
+        url_text = str(url or "").strip()
         if not url_text:
             return f"{method} 接口"
 
-        if url_text.startswith('{{baseUrl}}'):
-            url_text = url_text[len('{{baseUrl}}'):] or '/'
-        elif url_text.startswith('{{base_url}}'):
-            url_text = url_text[len('{{base_url}}'):] or '/'
+        if url_text.startswith("{{baseUrl}}"):
+            url_text = url_text[len("{{baseUrl}}") :] or "/"
+        elif url_text.startswith("{{base_url}}"):
+            url_text = url_text[len("{{base_url}}") :] or "/"
 
-        match = re.match(r'https?://[^/]+(.*)$', url_text)
+        match = re.match(r"https?://[^/]+(.*)$", url_text)
         if match:
-            url_text = match.group(1) or '/'
+            url_text = match.group(1) or "/"
 
-        if not url_text.startswith('/'):
-            url_text = '/' + url_text
+        if not url_text.startswith("/"):
+            url_text = "/" + url_text
 
         return f"{method} {url_text}"
 
@@ -350,29 +386,33 @@ class PostmanApiParser:
         :param url_dict: URL字典
         :return: URL字符串
         """
-        path_parts = url_dict.get('path', [])
-        path = '/'.join(path_parts) if isinstance(path_parts, list) else ''
-        if path and not path.startswith('/'):
-            path = '/' + path
+        path_parts = url_dict.get("path", [])
+        path = "/".join(path_parts) if isinstance(path_parts, list) else ""
+        if path and not path.startswith("/"):
+            path = "/" + path
 
         # 兼容仅提供 raw 的 URL（常见于导出后再次导入场景）
         if not path:
-            raw_url = str(url_dict.get('raw') or '').strip()
+            raw_url = str(url_dict.get("raw") or "").strip()
             if raw_url:
-                if raw_url.startswith(('http://', 'https://')):
+                if raw_url.startswith(("http://", "https://")):
                     return raw_url
-                if raw_url.startswith('{{') and '}}' in raw_url:
-                    _, suffix = raw_url.split('}}', 1)
+                if raw_url.startswith("{{") and "}}" in raw_url:
+                    _, suffix = raw_url.split("}}", 1)
                     suffix = suffix.strip()
-                    if suffix and not suffix.startswith('/'):
-                        suffix = '/' + suffix
+                    if suffix and not suffix.startswith("/"):
+                        suffix = "/" + suffix
                     return suffix
                 return raw_url
 
-        query = ''
-        raw_query = url_dict.get('query')
+        query = ""
+        raw_query = url_dict.get("query")
         if isinstance(raw_query, list):
-            query_parts = [f"{q.get('key')}={q.get('value')}" for q in raw_query if isinstance(q, dict)]
-            query = '?' + '&'.join(query_parts)
+            query_parts = [
+                f"{q.get('key')}={q.get('value')}"
+                for q in raw_query
+                if isinstance(q, dict)
+            ]
+            query = "?" + "&".join(query_parts)
 
         return path + query

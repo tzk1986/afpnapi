@@ -21,7 +21,9 @@ def _env_bool(key: str, default: str = "false") -> bool:
     return str(os.environ.get(key, default)).strip().lower() in _TRUTHY
 
 
-def _env_int(key: str, default: int, *, lo: int | None = None, hi: int | None = None) -> int:
+def _env_int(
+    key: str, default: int, *, lo: int | None = None, hi: int | None = None
+) -> int:
     """安全读取整数环境变量，非法值回退到 default。"""
     raw = os.environ.get(key)
     if raw is None:
@@ -83,12 +85,16 @@ REQUEST_READ_TIMEOUT = _env_int("REQUEST_READ_TIMEOUT", 30, lo=1, hi=300)
 ENABLE_REQUEST_RETRY = _env_bool("ENABLE_REQUEST_RETRY", "false")
 REQUEST_RETRY_TOTAL = _env_int("REQUEST_RETRY_TOTAL", 3, lo=0, hi=10)
 try:
-    REQUEST_RETRY_BACKOFF_FACTOR = float(os.environ.get("REQUEST_RETRY_BACKOFF_FACTOR", "1.0"))
+    REQUEST_RETRY_BACKOFF_FACTOR = float(
+        os.environ.get("REQUEST_RETRY_BACKOFF_FACTOR", "1.0")
+    )
 except (TypeError, ValueError):
     REQUEST_RETRY_BACKOFF_FACTOR = 1.0
 REQUEST_RETRY_BACKOFF_FACTOR = max(0.0, REQUEST_RETRY_BACKOFF_FACTOR)
 
-_retry_status_raw = os.environ.get("REQUEST_RETRY_STATUS_FORCELIST", "429,500,502,503,504")
+_retry_status_raw = os.environ.get(
+    "REQUEST_RETRY_STATUS_FORCELIST", "429,500,502,503,504"
+)
 try:
     REQUEST_RETRY_STATUS_FORCELIST = tuple(
         int(s.strip()) for s in _retry_status_raw.split(",") if s.strip().isdigit()
@@ -116,7 +122,9 @@ REPORT_CACHE_SMART_INVALIDATION = _env_bool("REPORT_CACHE_SMART_INVALIDATION", "
 # LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN: ERROR 告警阈值（每分钟）
 # ==============================================================
 LOG_LEVEL = str(os.environ.get("LOG_LEVEL", "INFO")).strip().upper() or "INFO"
-LOG_FORMAT = str(os.environ.get("LOG_FORMAT", "structured")).strip().lower() or "structured"
+LOG_FORMAT = (
+    str(os.environ.get("LOG_FORMAT", "structured")).strip().lower() or "structured"
+)
 if LOG_FORMAT not in {"structured", "json"}:
     LOG_FORMAT = "structured"
 try:
@@ -124,12 +132,18 @@ try:
 except (TypeError, ValueError):
     LOG_SAMPLE_RATE = 0.1
 LOG_SAMPLE_RATE = min(max(LOG_SAMPLE_RATE, 0.0), 1.0)
-LOG_ALERT_ERROR_WINDOW_SECONDS = max(60, int(os.environ.get("LOG_ALERT_ERROR_WINDOW_SECONDS", "300")))
+LOG_ALERT_ERROR_WINDOW_SECONDS = max(
+    60, int(os.environ.get("LOG_ALERT_ERROR_WINDOW_SECONDS", "300"))
+)
 try:
-    LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = float(os.environ.get("LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", "10"))
+    LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = float(
+        os.environ.get("LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN", "10")
+    )
 except (TypeError, ValueError):
     LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = 10.0
-LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(0.0, LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN)
+LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN = max(
+    0.0, LOG_ALERT_ERROR_RATE_THRESHOLD_PER_MIN
+)
 
 # ==============================================================
 # 任务历史记录上限
@@ -140,11 +154,15 @@ RUN_JOBS_MAX = _env_int("RUN_JOBS_MAX", 200, lo=1, hi=100000)
 # ==============================================================
 # 运行页与结果页分页配置（集中管理）
 # ==============================================================
-RUN_RESULTS_PER_PAGE_DEFAULT = _env_int("RUN_RESULTS_PER_PAGE_DEFAULT", 30, lo=1, hi=1000)
+RUN_RESULTS_PER_PAGE_DEFAULT = _env_int(
+    "RUN_RESULTS_PER_PAGE_DEFAULT", 30, lo=1, hi=1000
+)
 RUN_RESULTS_PER_PAGE_MIN = _env_int("RUN_RESULTS_PER_PAGE_MIN", 1, lo=1, hi=100)
 RUN_RESULTS_PER_PAGE_MAX = _env_int("RUN_RESULTS_PER_PAGE_MAX", 100, lo=1, hi=1000)
 
-REPORT_VIEW_PAGE_SIZE_DEFAULT = _env_int("REPORT_VIEW_PAGE_SIZE_DEFAULT", 20, lo=1, hi=1000)
+REPORT_VIEW_PAGE_SIZE_DEFAULT = _env_int(
+    "REPORT_VIEW_PAGE_SIZE_DEFAULT", 20, lo=1, hi=1000
+)
 REPORT_VIEW_PAGE_SIZE_MIN = _env_int("REPORT_VIEW_PAGE_SIZE_MIN", 1, lo=1, hi=100)
 REPORT_VIEW_PAGE_SIZE_MAX = _env_int("REPORT_VIEW_PAGE_SIZE_MAX", 100, lo=1, hi=1000)
 
@@ -159,7 +177,9 @@ RUN_STATUS_POLL_INTERVAL_MS = _env_int("RUN_STATUS_POLL_INTERVAL_MS", 3000, lo=1
 # COLLECTION_PREVIEW_MAX_ITEMS: 单次预览最多返回的接口数量（防止超大集合拖慢页面）
 # ==============================================================
 ENABLE_SELECTIVE_RUN = _env_bool("ENABLE_SELECTIVE_RUN", "true")
-COLLECTION_PREVIEW_MAX_ITEMS = _env_int("COLLECTION_PREVIEW_MAX_ITEMS", 3000, lo=1, hi=100000)
+COLLECTION_PREVIEW_MAX_ITEMS = _env_int(
+    "COLLECTION_PREVIEW_MAX_ITEMS", 3000, lo=1, hi=100000
+)
 
 # ==============================================================
 # 报告导出范围配置
@@ -181,10 +201,16 @@ COLLECTION_PREVIEW_MAX_ITEMS = _env_int("COLLECTION_PREVIEW_MAX_ITEMS", 3000, lo
 # REPORT_EXPORT_CHANNEL_MODE = "stream"
 # REPORT_EXPORT_STREAM_THRESHOLD = 300
 # ==============================================================
-REPORT_EXPORT_DEFAULT_SCOPE = str(os.environ.get("REPORT_EXPORT_DEFAULT_SCOPE", "full")).strip().lower() or "full"
+REPORT_EXPORT_DEFAULT_SCOPE = (
+    str(os.environ.get("REPORT_EXPORT_DEFAULT_SCOPE", "full")).strip().lower() or "full"
+)
 REPORT_EXPORT_ALLOW_REPORT_ONLY = _env_bool("REPORT_EXPORT_ALLOW_REPORT_ONLY", "true")
-REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _env_bool("REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", "false")
-REPORT_EXPORT_CHANNEL_MODE = str(os.environ.get("REPORT_EXPORT_CHANNEL_MODE", "auto")).strip().lower() or "auto"
+REPORT_EXPORT_INCLUDE_AUTH_DEFAULT = _env_bool(
+    "REPORT_EXPORT_INCLUDE_AUTH_DEFAULT", "false"
+)
+REPORT_EXPORT_CHANNEL_MODE = (
+    str(os.environ.get("REPORT_EXPORT_CHANNEL_MODE", "auto")).strip().lower() or "auto"
+)
 if REPORT_EXPORT_CHANNEL_MODE not in {"auto", "legacy", "stream"}:
     REPORT_EXPORT_CHANNEL_MODE = "auto"
 REPORT_EXPORT_STREAM_THRESHOLD = _env_int("REPORT_EXPORT_STREAM_THRESHOLD", 800, lo=1)
@@ -195,7 +221,9 @@ REPORT_EXPORT_STREAM_THRESHOLD = _env_int("REPORT_EXPORT_STREAM_THRESHOLD", 800,
 # MANUAL_CASE_FOLDER_NAME: 人工用例默认目录名称（可在页面手动修改）
 # ==============================================================
 ENABLE_MANUAL_CASES = _env_bool("ENABLE_MANUAL_CASES", "true")
-MANUAL_CASE_FOLDER_NAME = str(os.environ.get("MANUAL_CASE_FOLDER_NAME", "人工补录")).strip() or "人工补录"
+MANUAL_CASE_FOLDER_NAME = (
+    str(os.environ.get("MANUAL_CASE_FOLDER_NAME", "人工补录")).strip() or "人工补录"
+)
 
 # ==============================================================
 # 报告中心直接新增接口测试（ad-hoc）配置
@@ -205,7 +233,10 @@ MANUAL_CASE_FOLDER_NAME = str(os.environ.get("MANUAL_CASE_FOLDER_NAME", "人工�
 # ==============================================================
 ENABLE_ADHOC_RUN = _env_bool("ENABLE_ADHOC_RUN", "true")
 ADHOC_MAX_ITEMS = _env_int("ADHOC_MAX_ITEMS", 200, lo=1, hi=10000)
-ADHOC_DEFAULT_COLLECTION_NAME = str(os.environ.get("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试")).strip() or "报告中心临时测试"
+ADHOC_DEFAULT_COLLECTION_NAME = (
+    str(os.environ.get("ADHOC_DEFAULT_COLLECTION_NAME", "报告中心临时测试")).strip()
+    or "报告中心临时测试"
+)
 
 # ==============================================================
 # 升级三：响应时间记录与展示
@@ -226,13 +257,16 @@ ENABLE_RETRY_FAILURES = _env_bool("ENABLE_RETRY_FAILURES", "true")
 # ==============================================================
 # _ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", "{}") # 无配置时
 
-_ENVIRONMENTS_JSON = os.environ.get("ENVIRONMENTS_JSON", '''
+_ENVIRONMENTS_JSON = os.environ.get(
+    "ENVIRONMENTS_JSON",
+    """
 {
   "生产环境": {"base_url": "http://10.50.11.130:11000", "token": ""},
   "测试环境": {"base_url": "http://10.50.11.120:8090", "token": ""},
   "本地开发": {"base_url": "http://127.0.0.1:8080", "token": ""}
 }
-''')
+""",
+)
 try:
     ENVIRONMENTS: Dict[str, Any] = _json_cfg.loads(_ENVIRONMENTS_JSON)
     if not isinstance(ENVIRONMENTS, dict):
@@ -247,7 +281,9 @@ DEFAULT_ENV_NAME: str = os.environ.get("DEFAULT_ENV_NAME", "")
 # ASSERTIONS_ENGINE: 断言引擎，目前仅支持 'jsonpath'
 # ==============================================================
 ENABLE_ASSERTIONS = _env_bool("ENABLE_ASSERTIONS", "false")
-ASSERTIONS_ENGINE = str(os.environ.get("ASSERTIONS_ENGINE", "jsonpath")).strip() or "jsonpath"
+ASSERTIONS_ENGINE = (
+    str(os.environ.get("ASSERTIONS_ENGINE", "jsonpath")).strip() or "jsonpath"
+)
 
 # ==============================================================
 # 1.1 错误恢复与容错
@@ -293,20 +329,32 @@ ENABLE_REPORT_LIST_FILTER = _env_bool("ENABLE_REPORT_LIST_FILTER", "true")
 # QUALITY_SCORE_*: 质量评分扣分项阈值
 # ==============================================================
 ENABLE_REPORT_ANALYTICS = _env_bool("ENABLE_REPORT_ANALYTICS", "true")
-REPORT_ANALYTICS_TOP_N_DEFAULT = _env_int("REPORT_ANALYTICS_TOP_N_DEFAULT", 10, lo=1, hi=1000)
+REPORT_ANALYTICS_TOP_N_DEFAULT = _env_int(
+    "REPORT_ANALYTICS_TOP_N_DEFAULT", 10, lo=1, hi=1000
+)
 REPORT_ANALYTICS_TOP_N_MAX = _env_int("REPORT_ANALYTICS_TOP_N_MAX", 100, lo=1, hi=10000)
-REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = _env_int("REPORT_ANALYTICS_TREND_LIMIT_DEFAULT", 20, lo=1, hi=1000)
-REPORT_ANALYTICS_TREND_LIMIT_MAX = _env_int("REPORT_ANALYTICS_TREND_LIMIT_MAX", 100, lo=1, hi=10000)
+REPORT_ANALYTICS_TREND_LIMIT_DEFAULT = _env_int(
+    "REPORT_ANALYTICS_TREND_LIMIT_DEFAULT", 20, lo=1, hi=1000
+)
+REPORT_ANALYTICS_TREND_LIMIT_MAX = _env_int(
+    "REPORT_ANALYTICS_TREND_LIMIT_MAX", 100, lo=1, hi=10000
+)
 REPORT_ANALYTICS_ENABLE_SAMPLES = _env_bool("REPORT_ANALYTICS_ENABLE_SAMPLES", "false")
 ENABLE_REPORT_ANALYTICS_CHARTS = _env_bool("ENABLE_REPORT_ANALYTICS_CHARTS", "true")
 REPORT_ANALYTICS_HISTOGRAM_BUCKETS = str(
-    os.environ.get("REPORT_ANALYTICS_HISTOGRAM_BUCKETS", "0,50,100,200,500,1000,3000,5000")
+    os.environ.get(
+        "REPORT_ANALYTICS_HISTOGRAM_BUCKETS", "0,50,100,200,500,1000,3000,5000"
+    )
 ).strip()
 
-QUALITY_SCORE_FAILED_PENALTY = _env_int("QUALITY_SCORE_FAILED_PENALTY", 10, lo=0, hi=100)
+QUALITY_SCORE_FAILED_PENALTY = _env_int(
+    "QUALITY_SCORE_FAILED_PENALTY", 10, lo=0, hi=100
+)
 QUALITY_SCORE_ERROR_PENALTY = _env_int("QUALITY_SCORE_ERROR_PENALTY", 15, lo=0, hi=100)
 QUALITY_SCORE_SLOW_PENALTY = _env_int("QUALITY_SCORE_SLOW_PENALTY", 5, lo=0, hi=100)
-QUALITY_SCORE_ASSERTION_MISSING_PENALTY = _env_int("QUALITY_SCORE_ASSERTION_MISSING_PENALTY", 2, lo=0, hi=100)
+QUALITY_SCORE_ASSERTION_MISSING_PENALTY = _env_int(
+    "QUALITY_SCORE_ASSERTION_MISSING_PENALTY", 2, lo=0, hi=100
+)
 
 # ==============================================================
 # 报告服务端口与主机配置
@@ -314,7 +362,9 @@ QUALITY_SCORE_ASSERTION_MISSING_PENALTY = _env_int("QUALITY_SCORE_ASSERTION_MISS
 # REPORT_SERVER_HOST: Flask 服务监听地址
 # ==============================================================
 REPORT_SERVER_PORT = _env_int("REPORT_SERVER_PORT", 5000, lo=1, hi=65535)
-REPORT_SERVER_HOST = str(os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")).strip() or "0.0.0.0"
+REPORT_SERVER_HOST = (
+    str(os.environ.get("REPORT_SERVER_HOST", "0.0.0.0")).strip() or "0.0.0.0"
+)
 
 # ==============================================================
 # 安全脱敏配置（请求头）
@@ -355,11 +405,15 @@ else:
 # 示例：PROXY_ALLOWED_HOSTS = "api.example.com,10.50.11.130"
 # ==============================================================
 _PROXY_ALLOWED_HOSTS_TEXT = str(os.environ.get("PROXY_ALLOWED_HOSTS", "")).strip()
-PROXY_ALLOWED_HOSTS: tuple = tuple(
-    item.strip().lower()
-    for item in _PROXY_ALLOWED_HOSTS_TEXT.split(",")
-    if item.strip()
-) if _PROXY_ALLOWED_HOSTS_TEXT else ()
+PROXY_ALLOWED_HOSTS: tuple = (
+    tuple(
+        item.strip().lower()
+        for item in _PROXY_ALLOWED_HOSTS_TEXT.split(",")
+        if item.strip()
+    )
+    if _PROXY_ALLOWED_HOSTS_TEXT
+    else ()
+)
 
 # ==============================================================
 # 可配置结果自动判定条件（errCode & message）
@@ -394,7 +448,9 @@ ENABLE_VARIABLE_EXTRACTION = _env_bool("ENABLE_VARIABLE_EXTRACTION", "true")
 DATA_FILE_MAX_ROWS = _env_int("DATA_FILE_MAX_ROWS", 10000, lo=1, hi=1000000)
 
 # DATA_FILE_MAX_SIZE: 数据文件最大字节数（默认 10MB）
-DATA_FILE_MAX_SIZE = _env_int("DATA_FILE_MAX_SIZE", 10 * 1024 * 1024, lo=1024, hi=100 * 1024 * 1024)
+DATA_FILE_MAX_SIZE = _env_int(
+    "DATA_FILE_MAX_SIZE", 10 * 1024 * 1024, lo=1024, hi=100 * 1024 * 1024
+)
 
 # ==============================================================
 # P0 功能开关：并发执行引擎
@@ -414,7 +470,9 @@ CONCURRENT_WORKERS = _env_int("CONCURRENT_WORKERS", 10, lo=1, hi=100)
 # ==============================================================
 ENABLE_VARIABLE_FUNCTIONS = _env_bool("ENABLE_VARIABLE_FUNCTIONS", "true")
 GLOBAL_VARIABLES_FILE = os.environ.get("GLOBAL_VARIABLES_FILE", "variables.json")
-GLOBAL_VARIABLES_MAX_COUNT = _env_int("GLOBAL_VARIABLES_MAX_COUNT", 1000, lo=1, hi=100000)
+GLOBAL_VARIABLES_MAX_COUNT = _env_int(
+    "GLOBAL_VARIABLES_MAX_COUNT", 1000, lo=1, hi=100000
+)
 ENABLE_PRE_REQUEST_SCRIPT = _env_bool("ENABLE_PRE_REQUEST_SCRIPT", "false")
 
 # ==============================================================
@@ -425,10 +483,14 @@ ENABLE_PRE_REQUEST_SCRIPT = _env_bool("ENABLE_PRE_REQUEST_SCRIPT", "false")
 UI_EXECUTION_RESULTS_DIR = str(os.environ.get("UI_EXECUTION_RESULTS_DIR", "")).strip()
 
 # UI_EXECUTION_DEFAULT_DELAY_MS: 步骤间默认间隔（毫秒）
-UI_EXECUTION_DEFAULT_DELAY_MS = _env_int("UI_EXECUTION_DEFAULT_DELAY_MS", 500, lo=100, hi=10000)
+UI_EXECUTION_DEFAULT_DELAY_MS = _env_int(
+    "UI_EXECUTION_DEFAULT_DELAY_MS", 500, lo=100, hi=10000
+)
 
 # UI_EXECUTION_DEFAULT_TIMEOUT_MS: 单步默认超时（毫秒）
-UI_EXECUTION_DEFAULT_TIMEOUT_MS = _env_int("UI_EXECUTION_DEFAULT_TIMEOUT_MS", 5000, lo=1000, hi=300000)
+UI_EXECUTION_DEFAULT_TIMEOUT_MS = _env_int(
+    "UI_EXECUTION_DEFAULT_TIMEOUT_MS", 5000, lo=1000, hi=300000
+)
 
 # UI_EXECUTION_MAX_CONCURRENT: 同时执行的最大任务数（防止资源耗尽）
 UI_EXECUTION_MAX_CONCURRENT = _env_int("UI_EXECUTION_MAX_CONCURRENT", 5, lo=1, hi=50)
@@ -440,7 +502,9 @@ UI_EXECUTION_RETENTION_DAYS = _env_int("UI_EXECUTION_RETENTION_DAYS", 30, lo=1, 
 UI_HEADLESS_ENABLED = _env_bool("UI_HEADLESS_ENABLED", "false")
 
 # UI_HEADLESS_BROWSER: 无头浏览器类型（chromium / firefox / webkit）
-UI_HEADLESS_BROWSER = str(os.environ.get("UI_HEADLESS_BROWSER", "chromium")).strip().lower()
+UI_HEADLESS_BROWSER = (
+    str(os.environ.get("UI_HEADLESS_BROWSER", "chromium")).strip().lower()
+)
 
 # UI_HEADLESS_TIMEOUT_S: 无头执行全局超时（秒）
 UI_HEADLESS_TIMEOUT_S = _env_int("UI_HEADLESS_TIMEOUT_S", 300, lo=30, hi=3600)

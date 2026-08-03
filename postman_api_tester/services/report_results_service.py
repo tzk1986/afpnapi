@@ -40,23 +40,29 @@ def build_report_results_payload(
         include_excluded=include_excluded,
     )
     paged = paginate_items(filtered_items, page, page_size)
-    paged.update({
-        "report_name": report.get("report_name", ""),
-        "query": keyword,
-        "message_query": message_keyword,
-        "err_code_query": err_code_keyword,
-        "status": status_filter or "all",
-        "include_excluded": include_excluded,
-    })
+    paged.update(
+        {
+            "report_name": report.get("report_name", ""),
+            "query": keyword,
+            "message_query": message_keyword,
+            "err_code_query": err_code_keyword,
+            "status": status_filter or "all",
+            "include_excluded": include_excluded,
+        }
+    )
     return paged
 
 
-def build_compare_payload(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str, Any]:
+def build_compare_payload(
+    left: Dict[str, Any], right: Dict[str, Any]
+) -> Dict[str, Any]:
     """比对两份报告数据并生成对比结果字典。"""
     return compare_report_data(left, right)
 
 
-def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Dict[str, Any]:
+def build_result_detail_payload(
+    report: Dict[str, Any], result_index: int
+) -> Dict[str, Any]:
     """根据索引获取单条结果的完整详情，包括请求/响应信息。"""
     # 详情载荷遵循"结果摘要 + details_map 按需补充"的轻量策略。
     results = report.get("results", [])
@@ -65,7 +71,9 @@ def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Di
 
     result = dict(results[result_index])
     exclusion_key = result_exclusion_key(result)
-    exclusion_set = set(normalize_manual_exclusions(report.get("manual_exclusions") or []))
+    exclusion_set = set(
+        normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    )
     details_map = load_report_details_map(report)
     detail = details_map.get(str(result_index))
     response = {
@@ -84,7 +92,10 @@ def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Di
         "retried": result.get("retried", False),
         "retry_history": result.get("retry_history", []),
         "manual_judgement": result.get("manual_judgement", {}),
-        "judgement_source": "manual" if isinstance(result.get("manual_judgement"), dict) and result.get("manual_judgement", {}).get("active") else "auto",
+        "judgement_source": "manual"
+        if isinstance(result.get("manual_judgement"), dict)
+        and result.get("manual_judgement", {}).get("active")
+        else "auto",
         "excluded": exclusion_key in exclusion_set,
         "exclusion_key": exclusion_key,
         "detail_available": bool(detail),
@@ -98,9 +109,19 @@ def build_result_detail_payload(report: Dict[str, Any], result_index: int) -> Di
     }
     if detail:
         request_info = detail.get("request_info") if isinstance(detail, dict) else None
-        response_info = detail.get("response_info") if isinstance(detail, dict) else None
-        response["request_info"] = request_info if isinstance(request_info, dict) else {"headers": {}, "params": {}, "body": None}
-        response["response_info"] = response_info if isinstance(response_info, dict) else {"headers": {}, "body": None}
+        response_info = (
+            detail.get("response_info") if isinstance(detail, dict) else None
+        )
+        response["request_info"] = (
+            request_info
+            if isinstance(request_info, dict)
+            else {"headers": {}, "params": {}, "body": None}
+        )
+        response["response_info"] = (
+            response_info
+            if isinstance(response_info, dict)
+            else {"headers": {}, "body": None}
+        )
     return response
 
 
@@ -117,16 +138,20 @@ def build_manual_cases_payload(
         for case in (report.get("manual_cases") or [])
         if isinstance(case, dict)
     ]
-    manual_exclusions = normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    manual_exclusions = normalize_manual_exclusions(
+        report.get("manual_exclusions") or []
+    )
     exclusion_set = set(manual_exclusions)
     response_cases: List[Dict[str, Any]] = []
     for case in manual_cases:
         key = manual_case_exclusion_key(case)
-        response_cases.append({
-            **case,
-            "exclusion_key": key,
-            "excluded": key in exclusion_set,
-        })
+        response_cases.append(
+            {
+                **case,
+                "exclusion_key": key,
+                "excluded": key in exclusion_set,
+            }
+        )
     return {
         "report_name": report_name,
         "enabled": enabled,
@@ -136,7 +161,9 @@ def build_manual_cases_payload(
     }
 
 
-def build_manual_case_upsert_payload(report_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+def build_manual_case_upsert_payload(
+    report_name: str, result: Dict[str, Any]
+) -> Dict[str, Any]:
     """拼装人工用例新增/更新后的返回载荷。"""
     return {
         "report_name": report_name,
@@ -145,7 +172,9 @@ def build_manual_case_upsert_payload(report_name: str, result: Dict[str, Any]) -
     }
 
 
-def build_manual_case_delete_payload(report_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+def build_manual_case_delete_payload(
+    report_name: str, result: Dict[str, Any]
+) -> Dict[str, Any]:
     """拼装人工用例删除后的返回载荷。"""
     return {
         "report_name": report_name,
@@ -153,7 +182,9 @@ def build_manual_case_delete_payload(report_name: str, result: Dict[str, Any]) -
     }
 
 
-def build_case_exclusion_payload(report_name: str, excluded: bool, result: Dict[str, Any]) -> Dict[str, Any]:
+def build_case_exclusion_payload(
+    report_name: str, excluded: bool, result: Dict[str, Any]
+) -> Dict[str, Any]:
     """拼装人工用例排除状态变更后的返回载荷。"""
     return {
         "report_name": report_name,
@@ -194,7 +225,9 @@ def build_export_collection_payload(
         "manual_case_exported_count": exported.get("manual_case_exported_count", 0),
         "excluded_count": exported.get("excluded_count", 0),
         "source_total_count": exported.get("source_total_count", 0),
-        "scope_effective_same_as_full": exported.get("scope_effective_same_as_full", False),
+        "scope_effective_same_as_full": exported.get(
+            "scope_effective_same_as_full", False
+        ),
         "include_auth": include_auth,
         "export_scope": exported["export_scope"],
         "report_only_count": exported["report_only_count"],
@@ -207,7 +240,9 @@ def build_report_meta_payload(report: Dict[str, Any]) -> Dict[str, Any]:
     return dict(report)
 
 
-def build_report_delete_payload(report_name: str, deleted_files: List[str]) -> Dict[str, Any]:
+def build_report_delete_payload(
+    report_name: str, deleted_files: List[str]
+) -> Dict[str, Any]:
     """拼装报告删除成功后的返回载荷。"""
     return {
         "success": True,
@@ -216,7 +251,9 @@ def build_report_delete_payload(report_name: str, deleted_files: List[str]) -> D
     }
 
 
-def build_retry_queued_payload(job_id: str, retry_count: int, message: str) -> Dict[str, Any]:
+def build_retry_queued_payload(
+    job_id: str, retry_count: int, message: str
+) -> Dict[str, Any]:
     """拼装重试任务入队后的返回载荷。"""
     return {
         "job_id": job_id,
@@ -226,7 +263,9 @@ def build_retry_queued_payload(job_id: str, retry_count: int, message: str) -> D
     }
 
 
-def build_health_payload(timestamp: str, log_alert: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def build_health_payload(
+    timestamp: str, log_alert: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """拼装健康检查接口的返回载荷。"""
     payload: Dict[str, Any] = {
         "status": "ok",
@@ -245,7 +284,9 @@ def build_test_token_payload(success: bool, message: str) -> Dict[str, Any]:
     }
 
 
-def build_environments_payload(env_list: List[Dict[str, Any]], default_env_name: str) -> Dict[str, Any]:
+def build_environments_payload(
+    env_list: List[Dict[str, Any]], default_env_name: str
+) -> Dict[str, Any]:
     """拼装可用环境列表与默认环境的返回载荷。"""
     return {
         "environments": env_list,

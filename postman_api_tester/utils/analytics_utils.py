@@ -95,7 +95,9 @@ def percentile(values: Sequence[int], q: float) -> int:
     if low == high:
         return int(sorted_values[low])
     weight = rank - low
-    interpolated = sorted_values[low] + (sorted_values[high] - sorted_values[low]) * weight
+    interpolated = (
+        sorted_values[low] + (sorted_values[high] - sorted_values[low]) * weight
+    )
     return int(round(interpolated))
 
 
@@ -112,7 +114,9 @@ def build_quantiles(values: Sequence[int]) -> dict[str, int]:
     }
 
 
-def build_histogram(values: Sequence[int], buckets: Sequence[int]) -> list[dict[str, object]]:
+def build_histogram(
+    values: Sequence[int], buckets: Sequence[int]
+) -> list[dict[str, object]]:
     limits = sorted(set(int(v) for v in buckets))
     if not limits:
         limits = [0, 50, 100, 200, 500, 1000, 3000, 5000]
@@ -154,15 +158,65 @@ def build_histogram(values: Sequence[int], buckets: Sequence[int]) -> list[dict[
 
 def classify_error_category(message: object, err_code: object) -> str:
     text = f"{normalize_text(err_code)} {normalize_text(message)}"
-    if any(keyword in text for keyword in ("timeout", "timed out", "connection", "refused", "dns", "network", "ssl", "tls")):
+    if any(
+        keyword in text
+        for keyword in (
+            "timeout",
+            "timed out",
+            "connection",
+            "refused",
+            "dns",
+            "network",
+            "ssl",
+            "tls",
+        )
+    ):
         return ERROR_CATEGORY_CONNECTION
-    if any(keyword in text for keyword in ("unauthorized", "forbidden", "token", "expired", "login", "鉴权", "认证", "权限")):
+    if any(
+        keyword in text
+        for keyword in (
+            "unauthorized",
+            "forbidden",
+            "token",
+            "expired",
+            "login",
+            "鉴权",
+            "认证",
+            "权限",
+        )
+    ):
         return ERROR_CATEGORY_AUTH
-    if any(keyword in text for keyword in ("assert", "jsonpath", "expected", "断言", "校验")):
+    if any(
+        keyword in text
+        for keyword in ("assert", "jsonpath", "expected", "断言", "校验")
+    ):
         return ERROR_CATEGORY_ASSERTION
-    if any(keyword in text for keyword in ("sql", "mysql", "postgres", "database", "db", "constraint", "数据库")):
+    if any(
+        keyword in text
+        for keyword in (
+            "sql",
+            "mysql",
+            "postgres",
+            "database",
+            "db",
+            "constraint",
+            "数据库",
+        )
+    ):
         return ERROR_CATEGORY_DATABASE
-    if any(keyword in text for keyword in ("business", "biz", "invalid", "参数", "业务", "不合法", "重复", "不存在")):
+    if any(
+        keyword in text
+        for keyword in (
+            "business",
+            "biz",
+            "invalid",
+            "参数",
+            "业务",
+            "不合法",
+            "重复",
+            "不存在",
+        )
+    ):
         return ERROR_CATEGORY_BUSINESS
     return ERROR_CATEGORY_UNKNOWN
 
@@ -200,7 +254,9 @@ def normalize_analytics_query_params(
     include_samples_default: bool,
 ) -> dict[str, Any]:
     top_n = clamp_int(top_n_raw, minimum=1, maximum=top_n_max, default=top_n_default)
-    trend_limit = clamp_int(trend_limit_raw, minimum=1, maximum=trend_limit_max, default=trend_limit_default)
+    trend_limit = clamp_int(
+        trend_limit_raw, minimum=1, maximum=trend_limit_max, default=trend_limit_default
+    )
     include_samples = _to_bool(include_samples_raw, default=include_samples_default)
     return {
         "top_n": top_n,

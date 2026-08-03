@@ -8,7 +8,6 @@ from postman_api_tester.utils.response_parser import extract_msg_errcode
 
 
 class TestExtractMsgErrcode(unittest.TestCase):
-
     def test_non_dict_body_returns_empty(self) -> None:
         assert extract_msg_errcode("bad") == ("", "")
         assert extract_msg_errcode(None) == ("", "")
@@ -25,7 +24,10 @@ class TestExtractMsgErrcode(unittest.TestCase):
         assert extract_msg_errcode({"msg": "success"}) == ("success", "")
 
     def test_error_message_key(self) -> None:
-        assert extract_msg_errcode({"error_message": "bad request"}) == ("bad request", "")
+        assert extract_msg_errcode({"error_message": "bad request"}) == (
+            "bad request",
+            "",
+        )
 
     def test_error_message_camel_case(self) -> None:
         assert extract_msg_errcode({"errorMessage": "not found"}) == ("not found", "")

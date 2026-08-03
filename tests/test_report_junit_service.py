@@ -88,7 +88,14 @@ class TestBuildJunitXml:
         """失败用例包含 failure 子元素。"""
         report = {
             "summary": {"total": 1, "failed": 1},
-            "results": [{"name": "test_fail", "status": "FAILED", "message": "assertion error", "response_time_ms": 50}],
+            "results": [
+                {
+                    "name": "test_fail",
+                    "status": "FAILED",
+                    "message": "assertion error",
+                    "response_time_ms": 50,
+                }
+            ],
             "report_name": "test",
         }
         xml_str = build_junit_xml(report)
@@ -103,7 +110,14 @@ class TestBuildJunitXml:
         """错误用例包含 error 子元素。"""
         report = {
             "summary": {"total": 1, "error": 1},
-            "results": [{"name": "test_err", "status": "ERROR", "message": "connection timeout", "response_time_ms": 0}],
+            "results": [
+                {
+                    "name": "test_err",
+                    "status": "ERROR",
+                    "message": "connection timeout",
+                    "response_time_ms": 0,
+                }
+            ],
             "report_name": "test",
         }
         xml_str = build_junit_xml(report)
@@ -118,7 +132,14 @@ class TestBuildJunitXml:
         """有 folder 时 classname 为 folder.name。"""
         report = {
             "summary": {"total": 1},
-            "results": [{"name": "test1", "folder": "group1", "status": "PASSED", "response_time_ms": 10}],
+            "results": [
+                {
+                    "name": "test1",
+                    "folder": "group1",
+                    "status": "PASSED",
+                    "response_time_ms": 10,
+                }
+            ],
             "report_name": "test",
         }
         xml_str = build_junit_xml(report)
@@ -150,7 +171,14 @@ class TestBuildJunitXml:
         """特殊字符被 XML 转义。"""
         report = {
             "summary": {"total": 1},
-            "results": [{"name": "test <>&", "status": "FAILED", "message": "err <msg>", "response_time_ms": 10}],
+            "results": [
+                {
+                    "name": "test <>&",
+                    "status": "FAILED",
+                    "message": "err <msg>",
+                    "response_time_ms": 10,
+                }
+            ],
             "report_name": "test & report",
         }
         xml_str = build_junit_xml(report)

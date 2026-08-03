@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from postman_api_tester.services.report_patch_service import (
     patch_report_result,
@@ -22,15 +21,22 @@ def _write_json(path: Path, data) -> None:
 class MockLock:
     def __enter__(self):
         return None
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
 
 
 BASE_RESULT = {
-    "name": "Test API", "folder": "", "method": "GET",
-    "url": "https://example.com/api", "status": "PASSED",
-    "message": "ok", "expected_status": 200,
-    "item_path": [], "manual_judgement": {}, "judgement_history": [],
+    "name": "Test API",
+    "folder": "",
+    "method": "GET",
+    "url": "https://example.com/api",
+    "status": "PASSED",
+    "message": "ok",
+    "expected_status": 200,
+    "item_path": [],
+    "manual_judgement": {},
+    "judgement_history": [],
 }
 
 
@@ -41,12 +47,20 @@ def make_deps(
 ) -> tuple[MagicMock, dict]:
     deps = MagicMock()
     deps.get_report_write_lock.return_value = MockLock()
-    deps.find_report.return_value = {"meta_file": meta_file, "details_file": details_file or ""}
+    deps.find_report.return_value = {
+        "meta_file": meta_file,
+        "details_file": details_file or "",
+    }
     if compute_func is None:
-        compute_func = lambda rs: {"total": len(rs), "passed": sum(1 for r in rs if r["status"] == "PASSED"),
-                                   "failed": sum(1 for r in rs if r["status"] == "FAILED"),
-                                   "error": sum(1 for r in rs if r["status"] == "ERROR"),
-                                   "success_rate": round(sum(1 for r in rs if r["status"] == "PASSED") / max(len(rs), 1), 2)}
+        compute_func = lambda rs: {
+            "total": len(rs),
+            "passed": sum(1 for r in rs if r["status"] == "PASSED"),
+            "failed": sum(1 for r in rs if r["status"] == "FAILED"),
+            "error": sum(1 for r in rs if r["status"] == "ERROR"),
+            "success_rate": round(
+                sum(1 for r in rs if r["status"] == "PASSED") / max(len(rs), 1), 2
+            ),
+        }
     deps.compute_summary.side_effect = compute_func
     deps.invalidate_reports_cache.reset_mock()
     return deps, compute_func
@@ -54,15 +68,35 @@ def make_deps(
 
 # --- normal patch flow -------------------------------------------------------
 
+
 class TestNormalPatch:
     def test_patch_updates_meta_summary(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         result = patch_report_result(
-            report_name="my_report", result_index=0,
+            report_name="my_report",
+            result_index=0,
             new_result_fields={"status": "FAILED", "message": "Connection reset"},
             new_request_info={"body": "{}"},
             new_response_info={"status_code": 500, "headers": {}},
@@ -87,12 +121,35 @@ class TestNormalPatch:
     def test_patch_merges_new_fields_over_old(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "name": "Create Item", "folder": "Items"}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={"status": "FAILED", "message": "Validation error", "url": "https://api.example.com/items/updated"},
+            report_name="r",
+            result_index=0,
+            new_result_fields={
+                "status": "FAILED",
+                "message": "Validation error",
+                "url": "https://api.example.com/items/updated",
+            },
             new_request_info={},
             new_response_info={},
             reports_dir=tmp_path,
@@ -116,11 +173,30 @@ class TestNormalPatch:
     def test_patch_generates_key_field(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [dict(BASE_RESULT, name="Test", folder="F1")]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -139,11 +215,30 @@ class TestNormalPatch:
     def test_patch_handles_empty_values(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "name": "", "folder": "", "method": "", "url": ""}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -162,10 +257,23 @@ class TestNormalPatch:
         deps, cf = make_deps()
         deps.invalidate_reports_cache.reset_mock()
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
 
         patch_report_result(
-            report_name="my_report", result_index=0,
+            report_name="my_report",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -183,18 +291,38 @@ class TestNormalPatch:
 
 # --- details file ------------------------------------------------------------
 
+
 class TestDetailsFile:
     def test_creates_details_when_missing(self, tmp_path: Path) -> None:
         deps, cf = make_deps(details_file="_details.json")
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         details_path = tmp_path / "_details.json"
         assert not details_path.exists()
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={"body": '{"user": "test"}'},
             new_response_info={"status_code": 500, "body": "Error"},
@@ -215,14 +343,33 @@ class TestDetailsFile:
     def test_appends_to_existing_details(self, tmp_path: Path) -> None:
         deps, cf = make_deps(details_file="_details.json")
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         details_path = tmp_path / "_details.json"
         _write_json(details_path, {"0": {"request_info": {"old": "data"}}})
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={"new": "data"},
             new_response_info={"new_resp": True},
@@ -241,15 +388,34 @@ class TestDetailsFile:
     def test_handles_corrupt_details_file(self, tmp_path: Path) -> None:
         deps, cf = make_deps(details_file="_details.json")
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         details_path = tmp_path / "_details.json"
         details_path.write_text("NOT VALID JSON {{{")
 
         # Should not raise
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={"clean": True},
             new_response_info={},
@@ -267,11 +433,30 @@ class TestDetailsFile:
     def test_skips_details_when_no_details_file(self, tmp_path: Path) -> None:
         deps, cf = make_deps(details_file="")
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={"data": 1},
             new_response_info={"code": 500},
@@ -288,16 +473,41 @@ class TestDetailsFile:
 
 # --- retry_history -----------------------------------------------------------
 
+
 class TestRetryHistory:
     def test_retry_history_accumulates(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
-        orig = {**BASE_RESULT, "custom_key": "preserved_in_history", "status": "PASSED", "message": "first pass"}
+        orig = {
+            **BASE_RESULT,
+            "custom_key": "preserved_in_history",
+            "status": "PASSED",
+            "message": "first pass",
+        }
         results = [orig.copy()]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -317,15 +527,43 @@ class TestRetryHistory:
 
     def test_manual_judgement_reset_on_patch(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
-        results = [{
-            **BASE_RESULT, "name": "B", "status": "PASSED",
-            "manual_judgement": {"active": True, "source": "manual", "action": "override", "target_status": "PASSED"},
-        }]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        results = [
+            {
+                **BASE_RESULT,
+                "name": "B",
+                "status": "PASSED",
+                "manual_judgement": {
+                    "active": True,
+                    "source": "manual",
+                    "action": "override",
+                    "target_status": "PASSED",
+                },
+            }
+        ]
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -344,17 +582,45 @@ class TestRetryHistory:
 
     def test_judgement_history_preserved_across_patch(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
-        results = [{
-            **BASE_RESULT, "name": "C",
-            "manual_judgement": {},
-            "judgement_history": [{"action": "override", "at": "2026-06-10 10:00:00",
-                                   "from_status": "FAILED", "to_status": "PASSED"}],
-        }]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        results = [
+            {
+                **BASE_RESULT,
+                "name": "C",
+                "manual_judgement": {},
+                "judgement_history": [
+                    {
+                        "action": "override",
+                        "at": "2026-06-10 10:00:00",
+                        "from_status": "FAILED",
+                        "to_status": "PASSED",
+                    }
+                ],
+            }
+        ]
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -372,14 +638,18 @@ class TestRetryHistory:
 
 # --- early returns -----------------------------------------------------------
 
+
 class TestEarlyReturns:
     def test_find_report_raises_file_not_found(self) -> None:
         deps, cf = make_deps()
         deps.find_report.side_effect = FileNotFoundError("Report not found")
 
         result = patch_report_result(
-            report_name="missing", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="missing",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=Path("/tmp"),
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -391,8 +661,11 @@ class TestEarlyReturns:
     def test_meta_file_empty_string_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps(meta_file="")
         result = patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -404,8 +677,11 @@ class TestEarlyReturns:
     def test_meta_file_whitespace_only_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps(meta_file="   ")
         result = patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -414,12 +690,17 @@ class TestEarlyReturns:
         )
         assert result == {}
 
-    def test_meta_file_absent_from_report_dict_returns_empty(self, tmp_path: Path) -> None:
+    def test_meta_file_absent_from_report_dict_returns_empty(
+        self, tmp_path: Path
+    ) -> None:
         deps, cf = make_deps()
         deps.find_report.return_value = {}
         result = patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -431,8 +712,11 @@ class TestEarlyReturns:
     def test_meta_path_does_not_exist_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps(meta_file="gone.json")
         result = patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -444,11 +728,26 @@ class TestEarlyReturns:
     def test_result_index_out_of_range_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
 
         result = patch_report_result(
-            report_name="r", result_index=99,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=99,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -460,11 +759,26 @@ class TestEarlyReturns:
     def test_negative_result_index_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
 
         result = patch_report_result(
-            report_name="r", result_index=-1,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=-1,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -475,11 +789,26 @@ class TestEarlyReturns:
 
     def test_empty_results_list_returns_empty(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
-        _write_json(tmp_path / "_meta.json", {"results": [], "summary": {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": 0.0}})
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": [],
+                "summary": {
+                    "total": 0,
+                    "passed": 0,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 0.0,
+                },
+            },
+        )
 
         result = patch_report_result(
-            report_name="r", result_index=0,
-            new_result_fields={}, new_request_info={}, new_response_info={},
+            report_name="r",
+            result_index=0,
+            new_result_fields={},
+            new_request_info={},
+            new_response_info={},
             reports_dir=tmp_path,
             get_report_write_lock=deps.get_report_write_lock,
             find_report=deps.find_report,
@@ -491,15 +820,35 @@ class TestEarlyReturns:
 
 # --- field merging edge cases ------------------------------------------------
 
+
 class TestFieldMerging:
     def test_preserves_original_expected_status(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "expected_status": 201}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -517,11 +866,30 @@ class TestFieldMerging:
     def test_new_expected_status_overrides(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [dict(BASE_RESULT)]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED", "expected_status": 204},
             new_request_info={},
             new_response_info={},
@@ -539,11 +907,30 @@ class TestFieldMerging:
     def test_item_path_overrides(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "item_path": ["Root", "Sub"]}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED", "item_path": ["NewPath"]},
             new_request_info={},
             new_response_info={},
@@ -561,11 +948,30 @@ class TestFieldMerging:
     def test_method_falls_back_to_old(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "method": "PATCH"}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -583,15 +989,35 @@ class TestFieldMerging:
 
 # --- non-dict manual_judgement -----------------------------------------------
 
+
 class TestNonDictManualJudgement:
     def test_manual_judgement_is_none(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "name": "I", "manual_judgement": None}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -610,11 +1036,30 @@ class TestNonDictManualJudgement:
     def test_manual_judgement_is_string(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "name": "J", "manual_judgement": "invalid"}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -632,11 +1077,30 @@ class TestNonDictManualJudgement:
     def test_manual_judgement_is_list(self, tmp_path: Path) -> None:
         deps, cf = make_deps()
         results = [{**BASE_RESULT, "name": "K", "manual_judgement": ["bad"]}]
-        _write_json(tmp_path / "_meta.json", {"results": results, "summary": {"total": 1, "passed": 1, "failed": 0, "error": 0, "success_rate": 1.0}})
-        deps.compute_summary.side_effect = lambda rs: {"total": 1, "passed": 0, "failed": 1, "error": 0, "success_rate": 0.0}
+        _write_json(
+            tmp_path / "_meta.json",
+            {
+                "results": results,
+                "summary": {
+                    "total": 1,
+                    "passed": 1,
+                    "failed": 0,
+                    "error": 0,
+                    "success_rate": 1.0,
+                },
+            },
+        )
+        deps.compute_summary.side_effect = lambda rs: {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "error": 0,
+            "success_rate": 0.0,
+        }
 
         patch_report_result(
-            report_name="r", result_index=0,
+            report_name="r",
+            result_index=0,
             new_result_fields={"status": "FAILED"},
             new_request_info={},
             new_response_info={},
@@ -653,6 +1117,7 @@ class TestNonDictManualJudgement:
 
 
 # --- helper function tests ---------------------------------------------------
+
 
 class TestBuildRetryHistoryAndJudgement:
     """_build_retry_history_and_judgement 辅助函数测试。"""
@@ -734,7 +1199,9 @@ class TestBuildMergedResult:
         retry_history = [{"name": "test", "status": "FAILED"}]
         manual_judgement = {"active": False, "source": "auto"}
 
-        merged = _build_merged_result(old_result, new_fields, retry_history, manual_judgement)
+        merged = _build_merged_result(
+            old_result, new_fields, retry_history, manual_judgement
+        )
 
         assert merged["name"] == "test"
         assert merged["folder"] == "api"

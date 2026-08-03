@@ -6,7 +6,6 @@ from postman_api_tester.utils.variable_functions import get_function_metadata
 
 
 class TestGetFunctionMetadata:
-
     def test_returns_list(self) -> None:
         result = get_function_metadata()
         assert isinstance(result, list)

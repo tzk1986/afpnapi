@@ -9,11 +9,13 @@
 
 # ===== 基类 =====
 
+
 class PostmanTestException(Exception):
     """Base exception for postman_api_tester runtime and validation errors."""
 
 
 # ===== 解析异常（Tier 1：Collection 加载时） =====
+
 
 class ParseError(PostmanTestException, ValueError):
     """Raised when collection input cannot be parsed."""
@@ -32,6 +34,7 @@ class CollectionStructureError(ParseError):
 
 
 # ===== 校验异常（Tier 2：参数验证时） =====
+
 
 class ValidationError(PostmanTestException, ValueError):
     """Raised when caller input fails runtime validation."""
@@ -55,6 +58,7 @@ class InvalidAssertion(ValidationError):
 
 # ===== 执行异常（Tier 3：运行时） =====
 
+
 class ExecutionError(PostmanTestException, RuntimeError):
     """Raised when request execution fails unexpectedly."""
 
@@ -76,6 +80,7 @@ class NetworkError(ExecutionError):
 
 
 # ===== 资源异常（Tier 4：资源管理） =====
+
 
 class FileOperationError(PostmanTestException):
     """文件操作异常."""

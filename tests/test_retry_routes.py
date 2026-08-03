@@ -62,9 +62,7 @@ class TestApiRetryFailures:
         """缺少 report_name 返回 400。"""
         with patch(
             "postman_api_tester.handlers.retry_routes.ENABLE_RETRY_FAILURES", True
-        ), patch(
-            "postman_api_tester.handlers.retry_routes.request"
-        ) as mock_request:
+        ), patch("postman_api_tester.handlers.retry_routes.request") as mock_request:
             mock_request.get_json = MagicMock(return_value={"report_name": "  "})
             result = api_retry_failures()
             assert isinstance(result, tuple)
@@ -87,9 +85,7 @@ class TestApiRetryAll:
         """缺少 report_name 返回 400。"""
         with patch(
             "postman_api_tester.handlers.retry_routes.ENABLE_RETRY_FAILURES", True
-        ), patch(
-            "postman_api_tester.handlers.retry_routes.request"
-        ) as mock_request:
+        ), patch("postman_api_tester.handlers.retry_routes.request") as mock_request:
             mock_request.get_json = MagicMock(return_value={"report_name": "  "})
             result = api_retry_all()
             assert isinstance(result, tuple)

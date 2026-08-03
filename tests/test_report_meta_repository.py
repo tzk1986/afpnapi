@@ -1,9 +1,7 @@
 """Tests for postman_api_tester.report_meta_repository module."""
 
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 from postman_api_tester.report_meta_repository import (
     configure_reports_dir,
@@ -29,7 +27,10 @@ class TestConfigureReportsDir:
         original_dir = _REPORTS_DIR
         try:
             configure_reports_dir(tmp_path)
-            from postman_api_tester.report_meta_repository import _REPORTS_DIR as new_dir
+            from postman_api_tester.report_meta_repository import (
+                _REPORTS_DIR as new_dir,
+            )
+
             assert new_dir == tmp_path.resolve()
         finally:
             configure_reports_dir(original_dir)
@@ -43,7 +44,10 @@ class TestConfigureScanExcludes:
         original_excludes = _EXCLUDE_DIRS.copy()
         try:
             configure_scan_excludes(["node_modules", ".git", ""])
-            from postman_api_tester.report_meta_repository import _EXCLUDE_DIRS as new_excludes
+            from postman_api_tester.report_meta_repository import (
+                _EXCLUDE_DIRS as new_excludes,
+            )
+
             assert "node_modules" in new_excludes
             assert ".git" in new_excludes
             assert "" not in new_excludes

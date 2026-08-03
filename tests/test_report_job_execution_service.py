@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import threading
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from postman_api_tester.services.report_job_execution_service import (
     _safe_run_job,
@@ -55,15 +53,17 @@ class TestCreateProgressCallback:
         set_run_job = MagicMock()
         callback = _create_progress_callback("job-1", set_run_job)
 
-        callback({
-            "total": 10,
-            "completed": 5,
-            "percent": 50,
-            "current_name": "API1",
-            "current_method": "GET",
-            "current_url": "http://test.com",
-            "last_status": "passed",
-        })
+        callback(
+            {
+                "total": 10,
+                "completed": 5,
+                "percent": 50,
+                "current_name": "API1",
+                "current_method": "GET",
+                "current_url": "http://test.com",
+                "last_status": "passed",
+            }
+        )
 
         set_run_job.assert_called_once()
         call_kwargs = set_run_job.call_args[1]
@@ -214,7 +214,9 @@ class TestRunPostmanJob:
         def capture_callback(**kwargs):
             callback = kwargs.get("progress_callback")
             if callback:
-                callback({"total": 10, "completed": 5, "percent": 50, "current_name": "API1"})
+                callback(
+                    {"total": 10, "completed": 5, "percent": 50, "current_name": "API1"}
+                )
             return mock_report
 
         mock_run_tests.side_effect = capture_callback
@@ -249,7 +251,9 @@ class TestRunPostmanJob:
 class TestEnqueueRetryJob:
     """Tests for enqueue_retry_job."""
 
-    @patch("postman_api_tester.services.report_job_execution_service.build_retry_job_plan")
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.build_retry_job_plan"
+    )
     @patch("postman_api_tester.services.report_job_execution_service.threading.Thread")
     def test_retry_job_queued(self, mock_thread_class, mock_build_plan):
         """Test retry job is queued and thread started."""
@@ -276,7 +280,9 @@ class TestEnqueueRetryJob:
 
         assert job_id == "retry-job-1"
         mock_build_plan.assert_called_once()
-        set_run_job.assert_called_once_with("retry-job-1", status="queued", message="Retry queued")
+        set_run_job.assert_called_once_with(
+            "retry-job-1", status="queued", message="Retry queued"
+        )
         mock_thread_class.assert_called_once()
         mock_thread.start.assert_called_once()
 
@@ -284,8 +290,12 @@ class TestEnqueueRetryJob:
 class TestPrepareRetryJobContext:
     """Tests for prepare_retry_job_context."""
 
-    @patch("postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context")
-    @patch("postman_api_tester.services.report_job_execution_service.collect_failed_item_paths")
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context"
+    )
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.collect_failed_item_paths"
+    )
     def test_failures_mode(self, mock_collect_failed, mock_build_context):
         """Test failures retry mode."""
         mock_collect_failed.return_value = [[0], [1]]
@@ -305,8 +315,12 @@ class TestPrepareRetryJobContext:
         assert error is None
         mock_collect_failed.assert_called_once()
 
-    @patch("postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context")
-    @patch("postman_api_tester.services.report_job_execution_service.collect_all_item_paths")
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context"
+    )
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.collect_all_item_paths"
+    )
     def test_all_mode(self, mock_collect_all, mock_build_context):
         """Test all retry mode."""
         mock_collect_all.return_value = [[0], [1], [2]]
@@ -341,8 +355,12 @@ class TestPrepareRetryJobContext:
         assert ctx is None
         assert "未知重试模式" in error
 
-    @patch("postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context")
-    @patch("postman_api_tester.services.report_job_execution_service.collect_failed_item_paths")
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.build_retry_source_runtime_context"
+    )
+    @patch(
+        "postman_api_tester.services.report_job_execution_service.collect_failed_item_paths"
+    )
     def test_context_build_failure(self, mock_collect_failed, mock_build_context):
         """Test context build failure is propagated."""
         mock_collect_failed.return_value = [[0]]

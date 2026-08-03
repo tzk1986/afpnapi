@@ -54,5 +54,5 @@ class FileDataTest(seldom.TestCase):
         self.assertStatusCode(200)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     seldom.main(debug=True, base_url="https://httpbin.org")

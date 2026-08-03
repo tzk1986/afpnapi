@@ -21,7 +21,9 @@ def _coerce_int(value: object) -> Optional[int]:
         return None
 
 
-def build_exclusion_key(folder: object, name: object, method: object, url: object) -> str:
+def build_exclusion_key(
+    folder: object, name: object, method: object, url: object
+) -> str:
     folder_text = str(folder or "").strip()
     name_text = str(name or "").strip()
     method_text = str(method or "").strip().upper()
@@ -101,14 +103,20 @@ def normalize_manual_case(case: JsonDict, default_folder: str) -> JsonDict:
     elapsed_ms = _coerce_int(case.get("elapsed_ms"))
 
     raw_request_info_value = case.get("request_info")
-    raw_request_info: JsonDict = raw_request_info_value if isinstance(raw_request_info_value, dict) else {}
+    raw_request_info: JsonDict = (
+        raw_request_info_value if isinstance(raw_request_info_value, dict) else {}
+    )
     req_headers = raw_request_info.get("headers")
     if not isinstance(req_headers, dict):
-        req_headers = case.get("headers") if isinstance(case.get("headers"), dict) else {}
+        req_headers = (
+            case.get("headers") if isinstance(case.get("headers"), dict) else {}
+        )
     req_params = raw_request_info.get("params")
     if not isinstance(req_params, dict):
         req_params = case.get("params") if isinstance(case.get("params"), dict) else {}
-    req_body = raw_request_info.get("body") if "body" in raw_request_info else case.get("body")
+    req_body = (
+        raw_request_info.get("body") if "body" in raw_request_info else case.get("body")
+    )
     request_info = {
         "headers": req_headers,
         "params": req_params,
@@ -116,10 +124,16 @@ def normalize_manual_case(case: JsonDict, default_folder: str) -> JsonDict:
     }
 
     raw_response_info_value = case.get("response_info")
-    raw_response_info: JsonDict = raw_response_info_value if isinstance(raw_response_info_value, dict) else {}
+    raw_response_info: JsonDict = (
+        raw_response_info_value if isinstance(raw_response_info_value, dict) else {}
+    )
     resp_headers = raw_response_info.get("headers")
     if not isinstance(resp_headers, dict):
-        resp_headers = case.get("response_headers") if isinstance(case.get("response_headers"), dict) else {}
+        resp_headers = (
+            case.get("response_headers")
+            if isinstance(case.get("response_headers"), dict)
+            else {}
+        )
     if "body" in raw_response_info:
         resp_body = raw_response_info.get("body")
     else:
@@ -146,8 +160,12 @@ def normalize_manual_case(case: JsonDict, default_folder: str) -> JsonDict:
         "message": message,
         "err_code": err_code,
         "retried": bool(case.get("retried", False)),
-        "retry_history": case.get("retry_history") if isinstance(case.get("retry_history"), list) else [],
-        "item_path": case.get("item_path") if isinstance(case.get("item_path"), list) else [],
+        "retry_history": case.get("retry_history")
+        if isinstance(case.get("retry_history"), list)
+        else [],
+        "item_path": case.get("item_path")
+        if isinstance(case.get("item_path"), list)
+        else [],
         "request_info": request_info,
         "response_info": response_info,
     }

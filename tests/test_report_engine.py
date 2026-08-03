@@ -1,6 +1,5 @@
 """ReportEngine 单元测试."""
 
-import pytest
 from postman_api_tester.core.report_engine import ReportEngine
 
 
@@ -36,8 +35,7 @@ class TestReportEngine:
     def test_calculate_p95(self) -> None:
         """测试 p95 计算."""
         results = [
-            {"status": "PASSED", "response_time_ms": i * 10}
-            for i in range(1, 21)
+            {"status": "PASSED", "response_time_ms": i * 10} for i in range(1, 21)
         ]
         summary = ReportEngine._calculate_summary(results)
         # 20 个元素，p95 索引为 int(20 * 0.95) = 19，即第 20 个元素 = 200
@@ -69,7 +67,11 @@ class TestReportEngine:
 
     def test_generate_preserves_config(self) -> None:
         """配置应在报告中保留。"""
-        config = {"collection_name": "test", "base_url": "http://api.com", "custom_field": "value"}
+        config = {
+            "collection_name": "test",
+            "base_url": "http://api.com",
+            "custom_field": "value",
+        }
         report = ReportEngine.generate([], config)
         assert report["config"] == config
 
@@ -132,7 +134,10 @@ class TestReportEngine:
 
     def test_merge_adds_manual_cases(self) -> None:
         """人工用例应追加到结果中。"""
-        report = {"results": [{"status": "PASSED", "response_time_ms": 100}], "summary": {"total": 1}}
+        report = {
+            "results": [{"status": "PASSED", "response_time_ms": 100}],
+            "summary": {"total": 1},
+        }
         manual = [{"status": "FAILED", "response_time_ms": 200}]
         merged = ReportEngine.merge_with_manual_cases(report, manual)
         assert len(merged["results"]) == 2
@@ -140,7 +145,10 @@ class TestReportEngine:
 
     def test_merge_recalculates_summary(self) -> None:
         """合并后应重新计算汇总。"""
-        report = {"results": [{"status": "PASSED", "response_time_ms": 100}], "summary": {"total": 1}}
+        report = {
+            "results": [{"status": "PASSED", "response_time_ms": 100}],
+            "summary": {"total": 1},
+        }
         manual = [{"status": "FAILED", "response_time_ms": 200}]
         merged = ReportEngine.merge_with_manual_cases(report, manual)
         assert merged["summary"]["total"] == 2
@@ -156,6 +164,8 @@ class TestReportEngine:
             "results": [],
             "summary": {},
         }
-        merged = ReportEngine.merge_with_manual_cases(report, [{"status": "PASSED", "response_time_ms": 100}])
+        merged = ReportEngine.merge_with_manual_cases(
+            report, [{"status": "PASSED", "response_time_ms": 100}]
+        )
         assert merged["collection_name"] == "test"
         assert merged["base_url"] == "http://test.com"

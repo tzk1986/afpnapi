@@ -1,7 +1,7 @@
 """server_routes 单元测试。"""
 
 from typing import Generator
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from flask import Flask
@@ -54,9 +54,7 @@ class TestApiEnvironments:
 
     def test_api_environments_with_empty_envs(self, app_context: None) -> None:
         """空环境配置返回空列表。"""
-        with patch(
-            "postman_api_tester.handlers.server_routes.ENVIRONMENTS", {}
-        ), patch(
+        with patch("postman_api_tester.handlers.server_routes.ENVIRONMENTS", {}), patch(
             "postman_api_tester.handlers.server_routes.DEFAULT_ENV_NAME", ""
         ), patch(
             "postman_api_tester.handlers.server_routes.build_environments_payload"
@@ -75,7 +73,9 @@ class TestApiEnvironments:
         ), patch(
             "postman_api_tester.handlers.server_routes.build_environments_payload"
         ) as mock_build:
-            mock_build.return_value = {"envs": [{"name": "prod", "base_url": "http://x", "has_token": True}]}
+            mock_build.return_value = {
+                "envs": [{"name": "prod", "base_url": "http://x", "has_token": True}]
+            }
             result = api_environments()
             payload = mock_build.call_args[1]
             env_list = payload["env_list"]
@@ -95,6 +95,7 @@ class TestApiReportDelete:
             result = api_report_delete("test_report")
             # jsonify 返回 Response 对象
             from flask import Response
+
             assert isinstance(result, Response)
 
     def test_api_report_delete_not_found(self, app_context: None) -> None:

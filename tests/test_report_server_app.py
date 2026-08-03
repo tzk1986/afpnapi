@@ -1,6 +1,5 @@
 """ReportServerApp 单元测试。"""
 
-import pytest
 from postman_api_tester.report_server_app import ReportServerApp
 
 

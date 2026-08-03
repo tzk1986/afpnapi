@@ -44,21 +44,28 @@ class UiExecutionManager:
     ) -> None:
         """启动无头浏览器后台执行。"""
         if not is_playwright_available():
-            self._store.update_step(job_id, {
-                "index": 0,
-                "action": "system",
-                "selector": {},
-                "value": "",
-                "status": "failed",
-                "error": "Playwright 未安装，无法使用无头浏览器模式",
-                "duration_ms": 0,
-            })
-            self._store.finalize_job(job_id, "failed", {
-                "steps_total": 0,
-                "steps_passed": 0,
-                "steps_failed": 1,
-                "total_duration_ms": 0,
-            })
+            self._store.update_step(
+                job_id,
+                {
+                    "index": 0,
+                    "action": "system",
+                    "selector": {},
+                    "value": "",
+                    "status": "failed",
+                    "error": "Playwright 未安装，无法使用无头浏览器模式",
+                    "duration_ms": 0,
+                },
+            )
+            self._store.finalize_job(
+                job_id,
+                "failed",
+                {
+                    "steps_total": 0,
+                    "steps_passed": 0,
+                    "steps_failed": 1,
+                    "total_duration_ms": 0,
+                },
+            )
             return
 
         cancel_event = threading.Event()
@@ -76,7 +83,9 @@ class UiExecutionManager:
         def run() -> None:
             try:
                 browser_type = options.get("headless_browser", UI_HEADLESS_BROWSER)
-                screenshots_dir = job_dir if options.get("take_screenshots", True) else None
+                screenshots_dir = (
+                    job_dir if options.get("take_screenshots", True) else None
+                )
                 engine = UiHeadlessEngine(
                     browser_type=browser_type,
                     screenshots_dir=screenshots_dir,
@@ -99,24 +108,34 @@ class UiExecutionManager:
                         on_complete(result)
             except HeadlessExecutionError as e:
                 logger.error("headless_execution_error: %s", e)
-                self._store.finalize_job(job_id, "failed", {
-                    "steps_total": 0,
-                    "steps_passed": 0,
-                    "steps_failed": 0,
-                    "total_duration_ms": 0,
-                })
+                self._store.finalize_job(
+                    job_id,
+                    "failed",
+                    {
+                        "steps_total": 0,
+                        "steps_passed": 0,
+                        "steps_failed": 0,
+                        "total_duration_ms": 0,
+                    },
+                )
                 if on_complete is not None:
                     result = self._store.get_result(job_id)
                     if result:
                         on_complete(result)
             except Exception as e:
-                logger.error("headless_execution_unexpected_error: %s", e, exc_info=True)
-                self._store.finalize_job(job_id, "failed", {
-                    "steps_total": 0,
-                    "steps_passed": 0,
-                    "steps_failed": 0,
-                    "total_duration_ms": 0,
-                })
+                logger.error(
+                    "headless_execution_unexpected_error: %s", e, exc_info=True
+                )
+                self._store.finalize_job(
+                    job_id,
+                    "failed",
+                    {
+                        "steps_total": 0,
+                        "steps_passed": 0,
+                        "steps_failed": 0,
+                        "total_duration_ms": 0,
+                    },
+                )
                 if on_complete is not None:
                     result = self._store.get_result(job_id)
                     if result:

@@ -1,7 +1,5 @@
 """Tests for postman_api_tester/utils/analytics_utils.py"""
 
-import pytest
-
 from postman_api_tester.utils.analytics_utils import (
     clamp_int,
     parse_histogram_buckets,

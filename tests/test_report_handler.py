@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from postman_api_tester.handlers.report_handler import (
     normalize_status_filter,
@@ -165,7 +164,9 @@ class TestFilterReportResults:
     def test_exclude_excluded_items(self, mock_load, mock_exclusion_key):
         """Test excluded items are filtered out when include_excluded=False."""
         mock_load.return_value = {}
-        mock_exclusion_key.side_effect = lambda item: f"{item.get('method')}:{item.get('url')}"
+        mock_exclusion_key.side_effect = (
+            lambda item: f"{item.get('method')}:{item.get('url')}"
+        )
 
         report = {
             "results": [
@@ -185,7 +186,9 @@ class TestFilterReportResults:
     def test_include_excluded_items(self, mock_load, mock_exclusion_key):
         """Test excluded items are included when include_excluded=True."""
         mock_load.return_value = {}
-        mock_exclusion_key.side_effect = lambda item: f"{item.get('method')}:{item.get('url')}"
+        mock_exclusion_key.side_effect = (
+            lambda item: f"{item.get('method')}:{item.get('url')}"
+        )
 
         report = {
             "results": [

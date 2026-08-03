@@ -73,6 +73,7 @@ def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
     错误码：HTTP_PROXY_001
     """
     from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
+
     if not PROXY_ALLOWED_HOSTS:
         return None
     parsed = urlparse(url)
@@ -89,10 +90,10 @@ def _resolve_judgment_params_for_proxy(source: Dict[str, Any]) -> dict:
         global_success_err_codes=_rsc.SUCCESS_ERR_CODES_SET,
         global_enable_message=_rsc.ENABLE_MESSAGE_JUDGMENT,
         global_success_messages=_rsc.SUCCESS_MESSAGES_SET,
-        item_x_enable_err_code=source.get('x_enable_err_code_judgment'),
-        item_x_success_err_codes=source.get('x_success_err_codes'),
-        item_x_enable_message=source.get('x_enable_message_judgment'),
-        item_x_success_messages=source.get('x_success_messages'),
+        item_x_enable_err_code=source.get("x_enable_err_code_judgment"),
+        item_x_success_err_codes=source.get("x_success_err_codes"),
+        item_x_enable_message=source.get("x_enable_message_judgment"),
+        item_x_success_messages=source.get("x_success_messages"),
     )
 
 
@@ -101,11 +102,17 @@ def test_token() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     token = str(payload.get("token", "")).strip()
     if not token:
-        return jsonify(build_test_token_payload(success=False, message="token 不能为空")), 400
-    return jsonify(build_test_token_payload(success=True, message="token 格式有效，可用于后续请求"))
+        return jsonify(
+            build_test_token_payload(success=False, message="token 不能为空")
+        ), 400
+    return jsonify(
+        build_test_token_payload(success=True, message="token 格式有效，可用于后续请求")
+    )
 
 
-def _build_request_response_info(exec_result: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+def _build_request_response_info(
+    exec_result: Dict[str, Any],
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
     """构建请求和响应信息字典。"""
     request_info = {
         "headers": exec_result["headers_to_send"],
@@ -114,7 +121,10 @@ def _build_request_response_info(exec_result: Dict[str, Any]) -> tuple[Dict[str,
         "body_mode": exec_result["stored_body_mode"],
         "body_data": exec_result["stored_body_data"],
     }
-    response_info = {"headers": exec_result["response_headers"], "body": exec_result["response_body"]}
+    response_info = {
+        "headers": exec_result["response_headers"],
+        "body": exec_result["response_body"],
+    }
     return request_info, response_info
 
 
@@ -125,7 +135,9 @@ def _evaluate_and_build_result(
     expected_status: int,
 ) -> tuple[str, str, str, Dict[str, Any]]:
     """评估结果判定并构建结果字段，返回 (status, message, err_code, result_fields)。"""
-    response_message, err_code = _utils_extract_msg_errcode(exec_result["response_body"])
+    response_message, err_code = _utils_extract_msg_errcode(
+        exec_result["response_body"]
+    )
 
     judgment_params = _resolve_judgment_params_for_proxy(source)
     judgment_passed, judgment_fail_reason = _evaluate_result_judgment(
@@ -133,10 +145,10 @@ def _evaluate_and_build_result(
         expected_status=expected_status,
         err_code=err_code,
         response_message=response_message,
-        success_err_codes=judgment_params['success_err_codes'],
-        success_messages=judgment_params['success_messages'],
-        enable_err_code_judgment=judgment_params['enable_err_code_judgment'],
-        enable_message_judgment=judgment_params['enable_message_judgment'],
+        success_err_codes=judgment_params["success_err_codes"],
+        success_messages=judgment_params["success_messages"],
+        enable_err_code_judgment=judgment_params["enable_err_code_judgment"],
+        enable_message_judgment=judgment_params["enable_message_judgment"],
     )
 
     result_status = "PASSED" if judgment_passed else "FAILED"
@@ -208,7 +220,9 @@ def re_request_api() -> ResponseReturnValue:
                 url=url,
                 method=method,
                 normalized_url=normalized_url,
-                actual_request_url=_merge_url_with_params(normalized_url, normalized_params),
+                actual_request_url=_merge_url_with_params(
+                    normalized_url, normalized_params
+                ),
                 message=exec_result["error_message"],
                 headers_to_send={},
                 normalized_params=normalized_params,
@@ -287,7 +301,11 @@ def api_proxy_request() -> ResponseReturnValue:
     )
 
     if not exec_result["success"]:
-        return _json_error(exec_result["error_message"], exec_result.get("error_code", 502), "HTTP_PROXY_003")
+        return _json_error(
+            exec_result["error_message"],
+            exec_result.get("error_code", 502),
+            "HTTP_PROXY_003",
+        )
 
     return jsonify(
         build_proxy_response_payload(

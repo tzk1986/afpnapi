@@ -1,7 +1,6 @@
 """file_utils 单元测试：atomic_write_json、sanitize_export_name、safe_report_artifact。"""
 
 import json
-import os
 from pathlib import Path
 
 import pytest

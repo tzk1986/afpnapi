@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import re
-import time
-from unittest.mock import patch
 
-import pytest
 
 from postman_api_tester.utils.variable_functions import (
     _BUILT_IN_FUNCTIONS,
@@ -17,7 +14,6 @@ from postman_api_tester.utils.variable_functions import (
 
 
 class TestBuiltInFunctions:
-
     def test_timestamp_returns_integer_string(self) -> None:
         result = _BUILT_IN_FUNCTIONS["timestamp"]()
         assert result.isdigit()
@@ -30,7 +26,9 @@ class TestBuiltInFunctions:
 
     def test_uuid_format(self) -> None:
         result = _BUILT_IN_FUNCTIONS["uuid"]()
-        pattern = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+        pattern = re.compile(
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        )
         assert pattern.match(result) is not None
 
     def test_uuid_uniqueness(self) -> None:
@@ -73,7 +71,6 @@ class TestBuiltInFunctions:
 
 
 class TestEvaluateFunction:
-
     def test_known_function_returns_result(self) -> None:
         result = evaluate_function("timestamp", "")
         assert result is not None
@@ -98,7 +95,6 @@ class TestEvaluateFunction:
 
 
 class TestRegister:
-
     def test_register_new_function(self) -> None:
         @register("test_func_unique_123")
         def _test_fn() -> str:
@@ -111,7 +107,6 @@ class TestRegister:
 
 
 class TestGetRegisteredNames:
-
     def test_contains_all_builtins(self) -> None:
         names = get_registered_names()
         assert "timestamp" in names

@@ -33,6 +33,7 @@ def _build_services(
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -99,7 +100,9 @@ def test_update_manual_cases_list_preserved(tmp_path: Path) -> None:
     """验证手动用例列表在更新中保持不变."""
     subdir = _make_stub_reports_dir(tmp_path)
     init_meta = {"manual_cases": [{"id": 1}], "manual_exclusions": [{"id": 2}]}
-    find_report, get_lock, invalidate_cache = _build_services(subdir, extra_meta=init_meta)
+    find_report, get_lock, invalidate_cache = _build_services(
+        subdir, extra_meta=init_meta
+    )
 
     def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
         meta["extra"] = True
@@ -125,7 +128,9 @@ def test_default_manual_cases_when_missing(tmp_path: Path) -> None:
     """当 meta 中没有 manual_cases 时自动初始化为空列表."""
     subdir = _make_stub_reports_dir(tmp_path)
     init_meta = {"title": "no list"}
-    find_report, get_lock, invalidate_cache = _build_services(subdir, extra_meta=init_meta)
+    find_report, get_lock, invalidate_cache = _build_services(
+        subdir, extra_meta=init_meta
+    )
 
     def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
         meta["manual_cases"].append({"id": 99})
@@ -147,7 +152,9 @@ def test_default_manual_exclusions_when_not_list(tmp_path: Path) -> None:
     """当 manual_exclusions 不是列表时（如被意外设为字符串），重置为空列表."""
     subdir = _make_stub_reports_dir(tmp_path)
     init_meta = {"manual_exclusions": "not-a-list"}
-    find_report, get_lock, invalidate_cache = _build_services(subdir, extra_meta=init_meta)
+    find_report, get_lock, invalidate_cache = _build_services(
+        subdir, extra_meta=init_meta
+    )
 
     def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
         meta["manual_exclusions"].append({"x": 1})
@@ -177,6 +184,7 @@ def test_missing_meta_file_raises(tmp_path: Path) -> None:
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -202,6 +210,7 @@ def test_empty_meta_file_string_raises(tmp_path: Path) -> None:
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -227,6 +236,7 @@ def test_meta_file_whitespace_only_raises(tmp_path: Path) -> None:
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -252,6 +262,7 @@ def test_nonexistent_meta_file_raises(tmp_path: Path) -> None:
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -323,6 +334,7 @@ def test_invalid_json_raises(tmp_path: Path) -> None:
 
     def get_lock(report_name: str):
         import threading
+
         return threading.Lock()
 
     def invalidate_cache() -> None:
@@ -344,7 +356,9 @@ def test_nested_meta_preserved(tmp_path: Path) -> None:
     subdir = _make_stub_reports_dir(tmp_path)
     nested = {"deep": {"level": {"items": [1, 2, 3]}}}
     init_meta = {"title": "nested", "config": nested}
-    find_report, get_lock, invalidate_cache = _build_services(subdir, extra_meta=init_meta)
+    find_report, get_lock, invalidate_cache = _build_services(
+        subdir, extra_meta=init_meta
+    )
 
     def updater(meta: Dict[str, Any]) -> Dict[str, Any]:
         meta["added"] = True

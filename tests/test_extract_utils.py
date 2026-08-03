@@ -1,6 +1,5 @@
 """JSONPath 提取工具单元测试."""
 
-import pytest
 from postman_api_tester.utils.extract_utils import (
     extract_by_jsonpath,
     extract_from_header,

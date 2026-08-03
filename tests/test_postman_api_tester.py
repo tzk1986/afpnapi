@@ -1,6 +1,5 @@
 """postman_api_tester.py CLI 入口测试."""
 
-import pytest
 from postman_api_tester.postman_api_tester import (
     run_postman_tests,
     PostmanTestReport,

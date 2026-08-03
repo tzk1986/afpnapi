@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from postman_api_tester.services.global_variables_service import (
     add_env,
@@ -25,7 +24,6 @@ from postman_api_tester.services.global_variables_service import (
 
 
 class TestReadWriteVariables:
-
     def test_read_nonexistent_file(self, tmp_path: Path) -> None:
         path = str(tmp_path / "nonexistent.json")
         data = read_variables(path)
@@ -55,7 +53,6 @@ class TestReadWriteVariables:
 
 
 class TestSetVariable:
-
     def test_set_new_variable(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         write_variables(path, {"existing": "val"})
@@ -81,7 +78,6 @@ class TestSetVariable:
 
 
 class TestDeleteVariable:
-
     def test_delete_existing(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         write_variables(path, {"a": "1", "b": "2"})
@@ -99,7 +95,6 @@ class TestDeleteVariable:
 
 
 class TestClearVariables:
-
     def test_clear(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         write_variables(path, {"a": "1", "b": "2"})
@@ -109,7 +104,6 @@ class TestClearVariables:
 
 
 class TestMaskValue:
-
     def test_short_value(self) -> None:
         assert mask_value("abc") == "***"
 
@@ -131,7 +125,6 @@ class TestMaskValue:
 
 
 class TestMultiEnvironment:
-
     def test_read_all_empty(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         data = read_all(path)
@@ -208,8 +201,14 @@ class TestMultiEnvironment:
 
     def test_old_format_migration(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
-        old_data = {"version": 1, "updated_at": "2026-01-01T00:00:00", "variables": {"old_key": "old_val"}}
-        Path(path).write_text(json.dumps(old_data, ensure_ascii=False), encoding="utf-8")
+        old_data = {
+            "version": 1,
+            "updated_at": "2026-01-01T00:00:00",
+            "variables": {"old_key": "old_val"},
+        }
+        Path(path).write_text(
+            json.dumps(old_data, ensure_ascii=False), encoding="utf-8"
+        )
         data = read_all(path)
         assert data["shared"] == {"old_key": "old_val"}
         assert data["environments"] == {"默认环境": {}}
@@ -225,7 +224,6 @@ class TestMultiEnvironment:
 
 
 class TestEnvManagement:
-
     def test_get_env_list_default(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         env_list = get_env_list(path)
@@ -268,4 +266,3 @@ class TestEnvManagement:
         assert "开发环境" in env_list
         scope = read_scope(path, "env", env_name="开发环境")
         assert scope["variables"] == {"db_host": "localhost"}
-

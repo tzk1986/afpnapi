@@ -15,38 +15,39 @@ from typing import Any, Optional
 
 
 def sanitize_export_name(name: str) -> str:
-	normalized = str(name or "").replace("\\", "/").split("/")[-1]
-	normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', normalized).strip(' .')
-	return normalized or "collection"
+    normalized = str(name or "").replace("\\", "/").split("/")[-1]
+    normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", normalized).strip(" .")
+    return normalized or "collection"
 
 
 def safe_report_artifact(reports_dir: Path, name: str) -> Optional[Path]:
-	normalized = str(name or "").strip().replace("\\", "/")
-	if not normalized:
-		return None
-	normalized = normalized.lstrip("/")
-	candidate = (reports_dir / normalized).resolve()
-	try:
-		candidate.relative_to(reports_dir)
-	except ValueError:
-		return None
-	return candidate
+    normalized = str(name or "").strip().replace("\\", "/")
+    if not normalized:
+        return None
+    normalized = normalized.lstrip("/")
+    candidate = (reports_dir / normalized).resolve()
+    try:
+        candidate.relative_to(reports_dir)
+    except ValueError:
+        return None
+    return candidate
+
 
 def atomic_write_json(path: Path, data: Any) -> None:
-	"""原子写入 JSON 文件：先写临时文件再 Path.replace，避免写入中断损坏原文件。"""
-	path.parent.mkdir(parents=True, exist_ok=True)
-	tmp_fd, tmp_str = tempfile.mkstemp(
-		dir=str(path.parent), suffix=".tmp", prefix=path.name + "."
-	)
-	tmp_path = Path(tmp_str)
-	try:
-		with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-			json.dump(data, f, indent=2, ensure_ascii=False)
-		tmp_path.replace(path)
-	except BaseException:
-		with contextlib.suppress(OSError):
-			tmp_path.unlink(missing_ok=True)
-		raise
+    """原子写入 JSON 文件：先写临时文件再 Path.replace，避免写入中断损坏原文件。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_fd, tmp_str = tempfile.mkstemp(
+        dir=str(path.parent), suffix=".tmp", prefix=path.name + "."
+    )
+    tmp_path = Path(tmp_str)
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        tmp_path.replace(path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            tmp_path.unlink(missing_ok=True)
+        raise
 
 
 __all__ = ["atomic_write_json", "safe_report_artifact", "sanitize_export_name"]

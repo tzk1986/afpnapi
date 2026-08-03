@@ -73,6 +73,7 @@ class UiSettingsStore:
     def reset_settings(self) -> Dict[str, Any]:
         """恢复默认设置。"""
         import copy
+
         with self._lock:
             default = copy.deepcopy(_DEFAULT_SETTINGS)
             self._write_settings(default)
@@ -82,6 +83,7 @@ class UiSettingsStore:
     def _read_settings(self) -> Dict[str, Any]:
         """从文件读取设置，与默认值合并。"""
         import copy
+
         settings = copy.deepcopy(_DEFAULT_SETTINGS)
         path = self._settings_file()
         if path.exists():

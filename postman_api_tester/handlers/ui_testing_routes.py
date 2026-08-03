@@ -119,6 +119,7 @@ def _check_ui_proxy_host_allowed(url: str) -> Optional[ResponseReturnValue]:
     返回 None 表示通过，否则返回 403 错误响应。
     """
     from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
+
     if not PROXY_ALLOWED_HOSTS:
         return None
     parsed = urlparse(url)
@@ -144,8 +145,11 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     _target_origin = ""
     if base_url:
         from urllib.parse import urlparse as _up
+
         _parsed = _up(base_url)
-        _target_origin = f"{_parsed.scheme}://{_parsed.netloc}" if _parsed.netloc else base_url
+        _target_origin = (
+            f"{_parsed.scheme}://{_parsed.netloc}" if _parsed.netloc else base_url
+        )
 
     sid = request.cookies.get("_proxy_session")
     if sid:
@@ -156,8 +160,13 @@ def _get_proxy_session_id(base_url: str = "") -> str:
             _session_origin = ""
             if _session_base_url:
                 from urllib.parse import urlparse as _up
+
                 _parsed = _up(_session_base_url)
-                _session_origin = f"{_parsed.scheme}://{_parsed.netloc}" if _parsed.netloc else _session_base_url
+                _session_origin = (
+                    f"{_parsed.scheme}://{_parsed.netloc}"
+                    if _parsed.netloc
+                    else _session_base_url
+                )
 
             # 如果传入了 base_url 且 origin 不匹配，查找或创建对应 origin 的 session
             if _target_origin and _session_origin and _target_origin != _session_origin:
@@ -171,19 +180,27 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                     },
                 )
                 # 查找目标 origin 的已有 session
-                existing_sid = _proxy_session_store.find_session_by_base_url(_target_origin)
+                existing_sid = _proxy_session_store.find_session_by_base_url(
+                    _target_origin
+                )
                 # 优先使用 loginOtherSystem 返回的子系统 Token，其次使用平台 Token
                 _subsystem_token = _proxy_session_store.get_subsystem_token(sid)
                 if existing_sid:
                     existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
                     # 跨域 session Token 传递：优先子系统 Token
-                    _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
+                    _cross_token = _subsystem_token or _proxy_session_store.get_token(
+                        sid
+                    )
                     if _cross_token:
                         target_token = _proxy_session_store.get_token(existing_sid)
-                        if not target_token or (_subsystem_token and target_token != _subsystem_token):
+                        if not target_token or (
+                            _subsystem_token and target_token != _subsystem_token
+                        ):
                             _proxy_session_store.set_token(existing_sid, _cross_token)
                             if _subsystem_token:
-                                _proxy_session_store.set_subsystem_token(existing_sid, _subsystem_token)
+                                _proxy_session_store.set_subsystem_token(
+                                    existing_sid, _subsystem_token
+                                )
                             logger.info(
                                 "proxy_session_shared_token_cross_origin",
                                 extra={
@@ -191,7 +208,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                                     "source_session_id": sid[:8],
                                     "target_session_id": existing_sid[:8],
                                     "target_origin": _target_origin,
-                                    "token_source": "subsystem" if _subsystem_token else "platform",
+                                    "token_source": "subsystem"
+                                    if _subsystem_token
+                                    else "platform",
                                 },
                             )
                     logger.info(
@@ -200,7 +219,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                             "event": "ui.proxy.session.reuse_cross_origin",
                             "session_id": existing_sid[:8],
                             "base_url": _target_origin,
-                            "cookies_in_jar": [c.name for c in existing_jar] if existing_jar else [],
+                            "cookies_in_jar": [c.name for c in existing_jar]
+                            if existing_jar
+                            else [],
                         },
                     )
                     return existing_sid
@@ -211,7 +232,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                 if _cross_token:
                     _proxy_session_store.set_token(new_sid, _cross_token)
                     if _subsystem_token:
-                        _proxy_session_store.set_subsystem_token(new_sid, _subsystem_token)
+                        _proxy_session_store.set_subsystem_token(
+                            new_sid, _subsystem_token
+                        )
                     logger.info(
                         "proxy_session_shared_token_new_cross_origin",
                         extra={
@@ -219,7 +242,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                             "source_session_id": sid[:8],
                             "new_session_id": new_sid[:8],
                             "target_origin": _target_origin,
-                            "token_source": "subsystem" if _subsystem_token else "platform",
+                            "token_source": "subsystem"
+                            if _subsystem_token
+                            else "platform",
                         },
                     )
                 logger.info(
@@ -259,6 +284,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         try:
             ref_qs = referer.split("/ui-testing/proxy?url=", 1)[1].split("&")[0]
             from urllib.parse import unquote as _uq2
+
             ref_base_url = _uq2(ref_qs)
             # 查找已有该 base_url 的 session
             existing_sid = _proxy_session_store.find_session_by_base_url(ref_base_url)
@@ -270,7 +296,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                         "event": "ui.proxy.session.reuse_referer",
                         "session_id": existing_sid[:8],
                         "base_url": ref_base_url,
-                        "cookies_in_jar": [c.name for c in existing_jar] if existing_jar else [],
+                        "cookies_in_jar": [c.name for c in existing_jar]
+                        if existing_jar
+                        else [],
                     },
                 )
                 return existing_sid
@@ -305,7 +333,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     # Token 继承：如果同 origin 已有带 Token 的 session，自动继承（解决 cookie 丢失场景）
     if base_url:
         _existing_sid = _proxy_session_store.find_session_by_base_url(
-            f"{_up(base_url).scheme}://{_up(base_url).netloc}" if _up(base_url).netloc else base_url
+            f"{_up(base_url).scheme}://{_up(base_url).netloc}"
+            if _up(base_url).netloc
+            else base_url
         )
         if _existing_sid and _existing_sid != new_sid:
             _inherited_token = _proxy_session_store.get_token(_existing_sid)
@@ -325,23 +355,36 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     browser_jsessionid = request.cookies.get("JSESSIONID")
     if browser_jsessionid:
         from http.cookiejar import Cookie as _Cookie
+
         # 构造 cookie 对象并加载到 proxy session jar
         cookie_jar = _proxy_session_store.get_cookie_jar(new_sid)
         if cookie_jar is not None:
             try:
                 # 解析 base_url 获取 domain 和 path
                 from urllib.parse import urlparse
+
                 parsed = urlparse(base_url or "")
                 domain = parsed.netloc if parsed.netloc else ""
                 path = parsed.path if parsed.path else "/"
                 # 创建新的 cookie 并添加到 jar
                 c = _Cookie(
-                    version=0, name="JSESSIONID", value=browser_jsessionid,
-                    port=None, port_specified=False,
-                    domain=domain, domain_specified=bool(domain), domain_initial_dot=False,
-                    path=path, path_specified=True,
-                    secure=False, expires=None, discard=True, comment=None,
-                    comment_url=None, rest={}, rfc2109=False,
+                    version=0,
+                    name="JSESSIONID",
+                    value=browser_jsessionid,
+                    port=None,
+                    port_specified=False,
+                    domain=domain,
+                    domain_specified=bool(domain),
+                    domain_initial_dot=False,
+                    path=path,
+                    path_specified=True,
+                    secure=False,
+                    expires=None,
+                    discard=True,
+                    comment=None,
+                    comment_url=None,
+                    rest={},
+                    rfc2109=False,
                 )
                 cookie_jar.set_cookie(c)
                 logger.info(
@@ -377,37 +420,48 @@ def _get_proxy_session_id(base_url: str = "") -> str:
 def ui_testing_proxy() -> ResponseReturnValue:
     """反向代理端点：获取外部 URL 并改写 HTML。"""
     target_url = request.args.get("url", "")
-    logger.info("proxy_request_incoming", extra={
-        "event": "ui.proxy.request_in",
-        "raw_url_param": target_url[:100] if target_url else "(empty)",
-        "full_request_url": request.url[:200],
-        "method": request.method,
-        "recording": request.args.get("recording", ""),
-        "replay": request.args.get("replay", ""),
-        "cookies": dict(request.cookies),
-    })
+    logger.info(
+        "proxy_request_incoming",
+        extra={
+            "event": "ui.proxy.request_in",
+            "raw_url_param": target_url[:100] if target_url else "(empty)",
+            "full_request_url": request.url[:200],
+            "method": request.method,
+            "recording": request.args.get("recording", ""),
+            "replay": request.args.get("replay", ""),
+            "cookies": dict(request.cookies),
+        },
+    )
 
     if not target_url:
         return json_error("缺少 url 参数", 400, "UIT_PROXY_001")
 
     target_url = unquote(target_url)
-    logger.info("proxy_url_decoded", extra={
-        "event": "ui.proxy.url_decoded",
-        "decoded_url": target_url[:200],
-    })
+    logger.info(
+        "proxy_url_decoded",
+        extra={
+            "event": "ui.proxy.url_decoded",
+            "decoded_url": target_url[:200],
+        },
+    )
 
     # 自动解包嵌套代理 URL：当 target_url 本身也是代理 URL 时，提取真实目标
     _max_unwrap = 5
     for _ in range(_max_unwrap):
         from urllib.parse import urlparse as _up2
+
         _parsed = _up2(target_url)
         if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
             # 任何指向代理自身的路径，都尝试提取 url 参数
             from urllib.parse import parse_qs as _pqs
+
             _qs = _pqs(_parsed.query)
             _inner_url = _qs.get("url", [""])[0]
             if _inner_url and _inner_url.startswith(("http://", "https://")):
-                logger.debug("unwrap_nested_proxy", extra={"from": target_url[:80], "to": _inner_url[:80]})
+                logger.debug(
+                    "unwrap_nested_proxy",
+                    extra={"from": target_url[:80], "to": _inner_url[:80]},
+                )
                 target_url = _inner_url
                 continue
         break
@@ -417,8 +471,13 @@ def ui_testing_proxy() -> ResponseReturnValue:
 
     # 检测循环引用：目标地址不能是代理服务器自身
     parsed_target = _up2(target_url)
-    if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
-        return json_error(f"目标地址不能是代理服务器自身: {target_url[:100]}", 400, "UIT_PROXY_005")
+    if (
+        parsed_target.hostname in ("127.0.0.1", "localhost")
+        and parsed_target.port == 5000
+    ):
+        return json_error(
+            f"目标地址不能是代理服务器自身: {target_url[:100]}", 400, "UIT_PROXY_005"
+        )
 
     host_error = _check_ui_proxy_host_allowed(target_url)
     if host_error is not None:
@@ -429,31 +488,41 @@ def ui_testing_proxy() -> ResponseReturnValue:
     recording_mode = request.args.get("recording", "") == "1"
     replay_mode = request.args.get("replay", "") == "1"
 
-    logger.info("proxy_mode_detected", extra={
-        "event": "ui.proxy.mode_detected",
-        "base_url": base_url,
-        "recording_mode": recording_mode,
-        "replay_mode": replay_mode,
-        "target_path": parsed_target.path,
-    })
+    logger.info(
+        "proxy_mode_detected",
+        extra={
+            "event": "ui.proxy.mode_detected",
+            "base_url": base_url,
+            "recording_mode": recording_mode,
+            "replay_mode": replay_mode,
+            "target_path": parsed_target.path,
+        },
+    )
 
     # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
     if recording_mode:
         old_sid = request.cookies.get("_proxy_session")
         if old_sid:
             _proxy_session_store.delete_session(old_sid)
-            logger.info("recording_clear_old_session", extra={
-                "event": "ui.recording.session_cleared",
-                "old_session_id": old_sid[:8],
-            })
+            logger.info(
+                "recording_clear_old_session",
+                extra={
+                    "event": "ui.recording.session_cleared",
+                    "old_session_id": old_sid[:8],
+                },
+            )
         # 创建新会话（不带之前的 cookie）
         session_id = _proxy_session_store.create_session(base_url)
-        logger.info("recording_new_session_created", extra={
-            "event": "ui.recording.session.new",
-            "session_id": session_id[:8],
-            "base_url": base_url,
-        })
+        logger.info(
+            "recording_new_session_created",
+            extra={
+                "event": "ui.recording.session.new",
+                "session_id": session_id[:8],
+                "base_url": base_url,
+            },
+        )
     else:
         session_id = _get_proxy_session_id(base_url)
 
@@ -477,27 +546,34 @@ def ui_testing_proxy() -> ResponseReturnValue:
             },
         )
 
-    logger.info("proxy_session_ready", extra={
-        "event": "ui.proxy.session_ready",
-        "session_id": session_id[:8],
-        "target_url": target_url[:200],
-        "base_url": base_url,
-        "session_cookies": session_cookies_detail,
-        "browser_cookies": dict(request.cookies),
-        "_proxy_session_store_id": id(_proxy_session_store),
-    })
+    logger.info(
+        "proxy_session_ready",
+        extra={
+            "event": "ui.proxy.session_ready",
+            "session_id": session_id[:8],
+            "target_url": target_url[:200],
+            "base_url": base_url,
+            "session_cookies": session_cookies_detail,
+            "browser_cookies": dict(request.cookies),
+            "_proxy_session_store_id": id(_proxy_session_store),
+        },
+    )
 
     started_at = time.perf_counter()
-    logger.info("proxy_fetch_start", extra={
-        "event": "ui.proxy.fetch_start",
-        "target_url": target_url[:200],
-        "session_id": session_id[:8],
-        "method": request.method,
-    })
+    logger.info(
+        "proxy_fetch_start",
+        extra={
+            "event": "ui.proxy.fetch_start",
+            "target_url": target_url[:200],
+            "session_id": session_id[:8],
+            "method": request.method,
+        },
+    )
     try:
         _replay_engine_js = ""
         if replay_mode:
             from postman_api_tester.services.ui_recorder_inject import get_replayer_js
+
             _replay_engine_js = get_replayer_js(base_url)
         body, status_code, headers = UiProxyService.fetch_and_rewrite(
             target_url,
@@ -509,13 +585,16 @@ def ui_testing_proxy() -> ResponseReturnValue:
             recording_mode=recording_mode,
             replay_engine_js=_replay_engine_js,
         )
-        logger.info("proxy_fetch_completed", extra={
-            "event": "ui.proxy.fetch_completed",
-            "target_url": target_url[:200],
-            "status_code": status_code,
-            "body_size": len(body) if isinstance(body, (str, bytes)) else 0,
-            "duration_ms": round((time.perf_counter() - started_at) * 1000),
-        })
+        logger.info(
+            "proxy_fetch_completed",
+            extra={
+                "event": "ui.proxy.fetch_completed",
+                "target_url": target_url[:200],
+                "status_code": status_code,
+                "body_size": len(body) if isinstance(body, (str, bytes)) else 0,
+                "duration_ms": round((time.perf_counter() - started_at) * 1000),
+            },
+        )
     except ValueError as e:
         logger.warning(
             "ui_proxy_invalid_url",
@@ -552,6 +631,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
     if "Location" in headers:
         loc = headers["Location"]
         from urllib.parse import quote as _quote2
+
         if loc.startswith(("http://", "https://")):
             headers["Location"] = "/ui-testing/proxy?url=" + _quote2(loc, safe="")
         elif loc.startswith("/"):
@@ -571,7 +651,10 @@ def ui_testing_proxy() -> ResponseReturnValue:
     resp.headers.pop("Content-Security-Policy", None)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     # 设置代理会话 Cookie（手动设置 header，避免 set_cookie 可能被覆盖）
-    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+    resp.headers.add(
+        "Set-Cookie",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+    )
 
     logger.info(
         "proxy_page_response_to_browser",
@@ -610,7 +693,10 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
 
     # 根据目标 URL 的 origin 匹配 session，确保跨系统资源使用正确的 session
     from urllib.parse import urlparse as _urlparse
-    _resource_origin = _urlparse(target_url).scheme + "://" + _urlparse(target_url).netloc
+
+    _resource_origin = (
+        _urlparse(target_url).scheme + "://" + _urlparse(target_url).netloc
+    )
     session_id = _get_proxy_session_id(_resource_origin)
 
     started_at = time.perf_counter()
@@ -662,8 +748,32 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     # 内容类型告警：请求静态资源但返回 text/html 说明目标服务器可能返回了错误页面
     # 不直接拦截返回 404，让原始响应返回给浏览器（可能是验证码等动态生成的资源）
     from urllib.parse import urlparse as _up
-    _ext = _up(target_url).path.rsplit(".", 1)[-1].lower() if "." in _up(target_url).path else ""
-    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf", "mp4", "webm", "ogg", "pdf", "zip"}
+
+    _ext = (
+        _up(target_url).path.rsplit(".", 1)[-1].lower()
+        if "." in _up(target_url).path
+        else ""
+    )
+    _binary_exts = {
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "svg",
+        "ico",
+        "webp",
+        "bmp",
+        "woff",
+        "woff2",
+        "ttf",
+        "eot",
+        "otf",
+        "mp4",
+        "webm",
+        "ogg",
+        "pdf",
+        "zip",
+    }
     if _ext in _binary_exts and content_type.startswith("text/"):
         logger.warning(
             "ui_proxy_resource_wrong_content_type",
@@ -680,7 +790,9 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     if content_type.startswith("text/css") or _ext == "css":
         try:
             css_text = body.decode("utf-8", errors="replace")
-            css_text = UiProxyService._rewrite_css_urls(css_text, target_url, target_url)
+            css_text = UiProxyService._rewrite_css_urls(
+                css_text, target_url, target_url
+            )
             body = css_text.encode("utf-8")
             content_type = "text/css; charset=utf-8"
             headers["Content-Type"] = content_type
@@ -691,10 +803,13 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     if "Location" in headers:
         loc = headers["Location"]
         from urllib.parse import quote as _quote
+
         if loc.startswith(("http://", "https://")):
             headers["Location"] = "/ui-testing/proxy?url=" + _quote(loc, safe="")
         elif loc.startswith("/"):
-            _target_base = target_url.rsplit("/", 1)[0] if "/" in target_url else target_url
+            _target_base = (
+                target_url.rsplit("/", 1)[0] if "/" in target_url else target_url
+            )
             full_loc = _target_base + loc
             headers["Location"] = "/ui-testing/proxy?url=" + _quote(full_loc, safe="")
 
@@ -708,10 +823,15 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
         else:
             resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    resp.headers["Access-Control-Allow-Methods"] = (
+        "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    )
     resp.headers["Access-Control-Allow-Headers"] = "*"
     # 设置代理会话 Cookie
-    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+    resp.headers.add(
+        "Set-Cookie",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+    )
 
     # 仅对 API 请求记录 cookie 详情（跳过静态资源）
     if "/api/" in target_url or target_url.endswith(("/login", "/kaptcha")):
@@ -753,6 +873,7 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
         url_param = parsed_ref.query
         if "url=" in url_param:
             from urllib.parse import parse_qs
+
             params = parse_qs(url_param)
             target_url = params.get("url", [""])[0]
 
@@ -770,7 +891,9 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
             all_sessions = list(_proxy_session_store._sessions.items())
         if all_sessions:
             # 取最近活跃的会话
-            latest_sid = max(all_sessions, key=lambda item: item[1].get("last_active", 0))[0]
+            latest_sid = max(
+                all_sessions, key=lambda item: item[1].get("last_active", 0)
+            )[0]
             base_url = _proxy_session_store.get_base_url(latest_sid)
             if base_url:
                 target_url = base_url
@@ -796,8 +919,27 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
     # 内容类型校验
     content_type = headers.get("Content-Type", "")
     from urllib.parse import urlparse as _up
-    _ext = _up(full_url).path.rsplit(".", 1)[-1].lower() if "." in _up(full_url).path else ""
-    _binary_exts = {"png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp", "woff", "woff2", "ttf", "eot", "otf"}
+
+    _ext = (
+        _up(full_url).path.rsplit(".", 1)[-1].lower()
+        if "." in _up(full_url).path
+        else ""
+    )
+    _binary_exts = {
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "svg",
+        "ico",
+        "webp",
+        "bmp",
+        "woff",
+        "woff2",
+        "ttf",
+        "eot",
+        "otf",
+    }
     if _ext in _binary_exts and content_type.startswith("text/"):
         return make_response(b"", 404)
 
@@ -809,7 +951,10 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
         else:
             resp.headers[key] = value
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers.add("Set-Cookie", f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/")
+    resp.headers.add(
+        "Set-Cookie",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+    )
     return resp
 
 
@@ -847,8 +992,11 @@ def api_ui_testing_case_get(case_id: str) -> ResponseReturnValue:
     """获取用例详情。"""
     case = _case_store.get_case(case_id)
     if not case:
-        logger.warning("Case not found: id=%s, available_files=%s", case_id,
-                       [f.name for f in _case_store._cases_dir.glob("case_*.json")])
+        logger.warning(
+            "Case not found: id=%s, available_files=%s",
+            case_id,
+            [f.name for f in _case_store._cases_dir.glob("case_*.json")],
+        )
         return json_error(f"用例不存在: {case_id}", 404, "UIT_CASE_002")
     logger.info("Case loaded: id=%s, steps=%d", case_id, len(case.get("steps", [])))
     return BaseHandler.json_response(case)
@@ -911,11 +1059,13 @@ def api_ui_testing_recording_start() -> ResponseReturnValue:
             "base_url": base_url,
         },
     )
-    return BaseHandler.json_response({
-        "session_id": session_id,
-        "status": "recording",
-        "started_at": session["started_at"],
-    })
+    return BaseHandler.json_response(
+        {
+            "session_id": session_id,
+            "status": "recording",
+            "started_at": session["started_at"],
+        }
+    )
 
 
 def api_ui_testing_recording_step() -> ResponseReturnValue:
@@ -958,12 +1108,14 @@ def api_ui_testing_recording_stop() -> ResponseReturnValue:
             "step_count": step_count,
         },
     )
-    return BaseHandler.json_response({
-        "session_id": session_id,
-        "status": "completed",
-        "step_count": step_count,
-        "ended_at": session["ended_at"],
-    })
+    return BaseHandler.json_response(
+        {
+            "session_id": session_id,
+            "status": "completed",
+            "step_count": step_count,
+            "ended_at": session["ended_at"],
+        }
+    )
 
 
 def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:
@@ -1014,9 +1166,11 @@ def api_ui_testing_recording_save_as_case(session_id: str = "") -> ResponseRetur
 def ui_proxy_sessions_debug() -> ResponseReturnValue:
     """调试端点：导出所有活跃代理会话的 cookie 状态。"""
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
-    sessions = _proxy_session_store.dump_sessions()
-    return BaseHandler.json_response({
-        "active_sessions": len(sessions),
-        "sessions": sessions,
-    })
 
+    sessions = _proxy_session_store.dump_sessions()
+    return BaseHandler.json_response(
+        {
+            "active_sessions": len(sessions),
+            "sessions": sessions,
+        }
+    )

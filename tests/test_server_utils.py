@@ -1,8 +1,10 @@
 """Tests for postman_api_tester/utils/server_utils.py"""
 
-import pytest
-
-from postman_api_tester.utils.server_utils import get_local_ip, clamp_page, clamp_page_size
+from postman_api_tester.utils.server_utils import (
+    get_local_ip,
+    clamp_page,
+    clamp_page_size,
+)
 
 
 # ── get_local_ip ─────────────────────────────────────────────────────
@@ -22,6 +24,7 @@ class TestGetLocalIP:
         # This is a fallback check — in most environments the LAN IP is detected
         # Just verify the returned value looks like an IP
         import re
+
         ip = get_local_ip()
         # Should be either loopback (127.0.0.1) or a valid IPv4 address
         assert re.match(r"^\d{1,3}(\.\d{1,3}){3}$", ip)
@@ -29,6 +32,7 @@ class TestGetLocalIP:
     def test_socket_closed_in_all_cases(self):
         """Socket must always be closed regardless of path taken."""
         import socket
+
         original_connect = socket.socket.connect
         call_count = [0]
 
@@ -131,9 +135,7 @@ class TestClampPageSize:
         assert clamp_page_size(None) == 20
 
     def test_custom_defaults(self):
-        result = clamp_page_size(
-            None, default=50, min_size=10, max_size=200
-        )
+        result = clamp_page_size(None, default=50, min_size=10, max_size=200)
         assert result == 50
 
     def test_value_below_custom_min(self):

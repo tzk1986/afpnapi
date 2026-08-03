@@ -50,7 +50,9 @@ class UiExecutionStore:
     def _result_file(self, job_id: str) -> Path:
         return self._job_dir(job_id) / "result.json"
 
-    def create_job(self, case_id: str, mode: str, case_name: str, steps_total: int = 0) -> str:
+    def create_job(
+        self, case_id: str, mode: str, case_name: str, steps_total: int = 0
+    ) -> str:
         """创建执行任务记录，返回 job_id。"""
         job_id = f"{uuid.uuid4().hex[:12]}"
         now = datetime.now().isoformat()
@@ -89,11 +91,27 @@ class UiExecutionStore:
         return job_id
 
     def update_step(self, job_id: str, step_result: Dict[str, Any]) -> None:
-        """追加单个步骤结果。"""
+        """追加单个步骤结果（幂等：同一 index 不重复追加）。"""
         with self._lock:
             record = self._read_result(job_id)
             if record is None:
                 return
+
+            # 幂等检查：同一 index 的步骤结果不重复追加
+            step_index = step_result.get("index")
+            if step_index is not None:
+                for existing in record.get("steps", []):
+                    if existing.get("index") == step_index:
+                        logger.debug(
+                            "ui_execution_step_duplicate",
+                            extra={
+                                "event": "ui.execution.step.duplicate",
+                                "job_id": job_id,
+                                "step_index": step_index,
+                            },
+                        )
+                        return
+
             record["steps"].append(step_result)
             status = step_result.get("status", "passed")
             if status == "passed":
@@ -124,9 +142,15 @@ class UiExecutionStore:
             record["status"] = status
             record["ended_at"] = datetime.now().isoformat()
             record["total_duration_ms"] = summary.get("total_duration_ms", 0)
-            record["steps_total"] = summary.get("steps_total", len(record.get("steps", [])))
-            record["steps_passed"] = summary.get("steps_passed", record.get("steps_passed", 0))
-            record["steps_failed"] = summary.get("steps_failed", record.get("steps_failed", 0))
+            record["steps_total"] = summary.get(
+                "steps_total", len(record.get("steps", []))
+            )
+            record["steps_passed"] = summary.get(
+                "steps_passed", record.get("steps_passed", 0)
+            )
+            record["steps_failed"] = summary.get(
+                "steps_failed", record.get("steps_failed", 0)
+            )
             self._write_result(job_id, record)
 
         logger.info(
@@ -173,23 +197,27 @@ class UiExecutionStore:
                         continue
                     if status and data.get("status") != status:
                         continue
-                    all_results.append({
-                        "job_id": data.get("job_id", ""),
-                        "case_id": data.get("case_id", ""),
-                        "case_name": data.get("case_name", ""),
-                        "mode": data.get("mode", ""),
-                        "status": data.get("status", ""),
-                        "steps_total": data.get("steps_total", 0),
-                        "steps_passed": data.get("steps_passed", 0),
-                        "steps_failed": data.get("steps_failed", 0),
-                        "total_duration_ms": data.get("total_duration_ms", 0),
-                        "started_at": data.get("started_at", ""),
-                        "ended_at": data.get("ended_at", ""),
-                    })
+                    all_results.append(
+                        {
+                            "job_id": data.get("job_id", ""),
+                            "case_id": data.get("case_id", ""),
+                            "case_name": data.get("case_name", ""),
+                            "mode": data.get("mode", ""),
+                            "status": data.get("status", ""),
+                            "steps_total": data.get("steps_total", 0),
+                            "steps_passed": data.get("steps_passed", 0),
+                            "steps_failed": data.get("steps_failed", 0),
+                            "total_duration_ms": data.get("total_duration_ms", 0),
+                            "started_at": data.get("started_at", ""),
+                            "ended_at": data.get("ended_at", ""),
+                        }
+                    )
                 except (json.JSONDecodeError, OSError) as e:
-                    logger.warning("Failed to read execution result %s: %s", job_dir.name, e)
+                    logger.warning(
+                        "Failed to read execution result %s: %s", job_dir.name, e
+                    )
 
-        return all_results[offset:offset + limit]
+        return all_results[offset : offset + limit]
 
     def count_results(
         self,
@@ -234,6 +262,7 @@ class UiExecutionStore:
     def cleanup_expired(self, retention_days: int = 30) -> int:
         """清理过期的执行记录目录，返回删除数量。"""
         import time
+
         cutoff = time.time() - retention_days * 86400
         deleted = 0
         with self._lock:

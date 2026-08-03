@@ -132,7 +132,9 @@ def _execute_with_signal_timeout(
 def _execute_with_timeout(expression: str, sandbox_globals: dict[str, object]) -> str:
     """跨平台超时执行：Unix 用 signal，Windows 用线程池。"""
     if sys.platform == "win32":
-        return _execute_with_thread_timeout(expression, sandbox_globals, _TIMEOUT_SECONDS)
+        return _execute_with_thread_timeout(
+            expression, sandbox_globals, _TIMEOUT_SECONDS
+        )
     return _execute_with_signal_timeout(expression, sandbox_globals, _TIMEOUT_SECONDS)
 
 

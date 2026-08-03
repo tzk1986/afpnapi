@@ -20,9 +20,8 @@ import sys
 import json
 import time
 import threading
-import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 # ── 确保项目根目录在 sys.path ──────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).parent
@@ -49,12 +48,19 @@ def test_config_env():
 
     import importlib
     import postman_api_tester.config as cfg
+
     importlib.reload(cfg)
 
-    _check("TOKEN 读取 POSTMAN_TOKEN 环境变量", cfg.TOKEN == "test_token_from_env",
-           repr(cfg.TOKEN))
-    _check("BASE_URL 读取 POSTMAN_BASE_URL 环境变量", cfg.BASE_URL == "http://env-host:9999",
-           repr(cfg.BASE_URL))
+    _check(
+        "TOKEN 读取 POSTMAN_TOKEN 环境变量",
+        cfg.TOKEN == "test_token_from_env",
+        repr(cfg.TOKEN),
+    )
+    _check(
+        "BASE_URL 读取 POSTMAN_BASE_URL 环境变量",
+        cfg.BASE_URL == "http://env-host:9999",
+        repr(cfg.BASE_URL),
+    )
 
     # 清除后 reload，TOKEN 应回退为 ""
     del os.environ["POSTMAN_TOKEN"]
@@ -70,23 +76,39 @@ def test_auth_token_isolation():
     print("\n── T2/T3  _auth_token 实例隔离 ──")
     from postman_api_tester.postman_api_tester import PostmanTestExecutor
 
-    dummy_api = {"name": "x", "method": "GET", "url": "/", "full_url": "http://x/",
-                 "headers": {}, "params": {}, "body": None}
+    dummy_api = {
+        "name": "x",
+        "method": "GET",
+        "url": "/",
+        "full_url": "http://x/",
+        "headers": {},
+        "params": {},
+        "body": None,
+    }
 
     e1 = PostmanTestExecutor(dummy_api, auth_token="token_A")
     e2 = PostmanTestExecutor(dummy_api, auth_token="token_B")
 
-    _check("e1._auth_token == token_A", e1._auth_token == "token_A", repr(e1._auth_token))
-    _check("e2._auth_token == token_B", e2._auth_token == "token_B", repr(e2._auth_token))
+    _check(
+        "e1._auth_token == token_A", e1._auth_token == "token_A", repr(e1._auth_token)
+    )
+    _check(
+        "e2._auth_token == token_B", e2._auth_token == "token_B", repr(e2._auth_token)
+    )
 
     # 修改 e1 不影响 e2
     e1.set_auth_token("token_A_new")
-    _check("set_auth_token 改 e1 不影响 e2",
-           e1._auth_token == "token_A_new" and e2._auth_token == "token_B",
-           f"e1={e1._auth_token!r} e2={e2._auth_token!r}")
+    _check(
+        "set_auth_token 改 e1 不影响 e2",
+        e1._auth_token == "token_A_new" and e2._auth_token == "token_B",
+        f"e1={e1._auth_token!r} e2={e2._auth_token!r}",
+    )
 
-    _check("get_auth_token 返回实例 token",
-           e2.get_auth_token() == "token_B", repr(e2.get_auth_token()))
+    _check(
+        "get_auth_token 返回实例 token",
+        e2.get_auth_token() == "token_B",
+        repr(e2.get_auth_token()),
+    )
 
     # 并发写入互不污染
     barrier = threading.Barrier(2)
@@ -100,11 +122,17 @@ def test_auth_token_isolation():
 
     t1 = threading.Thread(target=worker, args=("w1", "concurrent_A"))
     t2 = threading.Thread(target=worker, args=("w2", "concurrent_B"))
-    t1.start(); t2.start(); t1.join(); t2.join()
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
 
-    _check("并发实例 token 互不污染",
-           tokens_seen.get("w1") == "concurrent_A" and tokens_seen.get("w2") == "concurrent_B",
-           str(tokens_seen))
+    _check(
+        "并发实例 token 互不污染",
+        tokens_seen.get("w1") == "concurrent_A"
+        and tokens_seen.get("w2") == "concurrent_B",
+        str(tokens_seen),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -114,9 +142,15 @@ def test_execute_test_timeout():
     print("\n── T4  execute_test 超时参数 ──")
     from postman_api_tester.postman_api_tester import PostmanTestExecutor
 
-    dummy_api = {"name": "Ping", "method": "GET", "url": "/ping",
-                 "full_url": "http://mock/ping",
-                 "headers": {}, "params": {}, "body": None}
+    dummy_api = {
+        "name": "Ping",
+        "method": "GET",
+        "url": "/ping",
+        "full_url": "http://mock/ping",
+        "headers": {},
+        "params": {},
+        "body": None,
+    }
 
     captured = {}
     mock_resp = MagicMock()
@@ -132,8 +166,11 @@ def test_execute_test_timeout():
     e.session.get = fake_get
     e.execute_test()
 
-    _check("execute_test 传递 timeout=(10,30)",
-           captured.get("timeout") == (10, 30), str(captured.get("timeout")))
+    _check(
+        "execute_test 传递 timeout=(10,30)",
+        captured.get("timeout") == (10, 30),
+        str(captured.get("timeout")),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -144,18 +181,30 @@ def test_execute_test_timeout_message():
     import requests as req_lib
     from postman_api_tester.postman_api_tester import PostmanTestExecutor
 
-    dummy_api = {"name": "Slow", "method": "POST", "url": "/slow",
-                 "full_url": "http://mock/slow",
-                 "headers": {}, "params": {}, "body": {}}
+    dummy_api = {
+        "name": "Slow",
+        "method": "POST",
+        "url": "/slow",
+        "full_url": "http://mock/slow",
+        "headers": {},
+        "params": {},
+        "body": {},
+    }
 
     e = PostmanTestExecutor(dummy_api)
     e.session.post = MagicMock(side_effect=req_lib.exceptions.Timeout("timed out"))
 
     result = e.execute_test()
-    _check("超时异常 status == ERROR", result.get("status") == "ERROR",
-           repr(result.get("status")))
-    _check("超时异常 message 含'请求超时'",
-           "请求超时" in str(result.get("message")), repr(result.get("message")))
+    _check(
+        "超时异常 status == ERROR",
+        result.get("status") == "ERROR",
+        repr(result.get("status")),
+    )
+    _check(
+        "超时异常 message 含'请求超时'",
+        "请求超时" in str(result.get("message")),
+        repr(result.get("message")),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -166,8 +215,15 @@ def test_execute_test_session_closed():
     import requests as req_lib
     from postman_api_tester.postman_api_tester import PostmanTestExecutor
 
-    dummy_api = {"name": "X", "method": "GET", "url": "/",
-                 "full_url": "http://mock/", "headers": {}, "params": {}, "body": None}
+    dummy_api = {
+        "name": "X",
+        "method": "GET",
+        "url": "/",
+        "full_url": "http://mock/",
+        "headers": {},
+        "params": {},
+        "body": None,
+    }
 
     e = PostmanTestExecutor(dummy_api)
     close_called = []
@@ -180,19 +236,27 @@ def test_execute_test_session_closed():
     e.session.close = lambda: (close_called.append(1), orig_close())
 
     e.execute_test()
-    _check("execute_test 正常完成后 session.close() 被调用",
-           len(close_called) == 1, f"called {len(close_called)} times")
+    _check(
+        "execute_test 正常完成后 session.close() 被调用",
+        len(close_called) == 1,
+        f"called {len(close_called)} times",
+    )
 
     # 异常路径也要 close
     e2 = PostmanTestExecutor(dummy_api)
     close_called2 = []
-    e2.session.get = MagicMock(side_effect=req_lib.exceptions.ConnectionError("conn err"))
+    e2.session.get = MagicMock(
+        side_effect=req_lib.exceptions.ConnectionError("conn err")
+    )
     orig_close2 = e2.session.close
     e2.session.close = lambda: (close_called2.append(1), orig_close2())
 
     e2.execute_test()
-    _check("execute_test 异常后 session.close() 也被调用",
-           len(close_called2) == 1, f"called {len(close_called2)} times")
+    _check(
+        "execute_test 异常后 session.close() 也被调用",
+        len(close_called2) == 1,
+        f"called {len(close_called2)} times",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -224,7 +288,7 @@ def test_report_header_sanitize():
                     "X-Custom": "safe_value",
                 }
             },
-            "response_info": {"status_code": 200, "body": "{}"}
+            "response_info": {"status_code": 200, "body": "{}"},
         }
     ]
 
@@ -239,21 +303,31 @@ def test_report_header_sanitize():
             data = json.load(f)
 
         headers_in_file = data["0"]["request_info"]["headers"]
-        _check("Authorization 已脱敏为 ***",
-               headers_in_file.get("Authorization") == "***",
-               repr(headers_in_file.get("Authorization")))
-        _check("token 已脱敏为 ***",
-               headers_in_file.get("token") == "***",
-               repr(headers_in_file.get("token")))
-        _check("x-token 已脱敏为 ***",
-               headers_in_file.get("x-token") == "***",
-               repr(headers_in_file.get("x-token")))
-        _check("非敏感 X-Custom 保留原值",
-               headers_in_file.get("X-Custom") == "safe_value",
-               repr(headers_in_file.get("X-Custom")))
-        _check("Content-Type 保留原值",
-               headers_in_file.get("Content-Type") == "application/json",
-               repr(headers_in_file.get("Content-Type")))
+        _check(
+            "Authorization 已脱敏为 ***",
+            headers_in_file.get("Authorization") == "***",
+            repr(headers_in_file.get("Authorization")),
+        )
+        _check(
+            "token 已脱敏为 ***",
+            headers_in_file.get("token") == "***",
+            repr(headers_in_file.get("token")),
+        )
+        _check(
+            "x-token 已脱敏为 ***",
+            headers_in_file.get("x-token") == "***",
+            repr(headers_in_file.get("x-token")),
+        )
+        _check(
+            "非敏感 X-Custom 保留原值",
+            headers_in_file.get("X-Custom") == "safe_value",
+            repr(headers_in_file.get("X-Custom")),
+        )
+        _check(
+            "Content-Type 保留原值",
+            headers_in_file.get("Content-Type") == "application/json",
+            repr(headers_in_file.get("Content-Type")),
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -265,7 +339,7 @@ def test_original_name_sanitize():
 
     def sanitize(name: str) -> str:
         """与 report_server.py 中完全一致的清洗逻辑"""
-        _safe_name = _re.sub(r'[^\w\u4e00-\u9fff\-. ()（）【】]', '_', name).strip('. ')
+        _safe_name = _re.sub(r"[^\w\u4e00-\u9fff\-. ()（）【】]", "_", name).strip(". ")
         return _safe_name if _safe_name else "collection.json"
 
     # 说明：
@@ -273,12 +347,12 @@ def test_original_name_sanitize():
     #   "()"/括号在正则白名单中，保留；"<>" 被替换为 "_"
     #   "   .json" → strip 空格和点后剩 "json"（非空，不触发 fallback）
     cases = [
-        ("normal.json",                   "normal.json"),
-        ("数字餐厅（IFD）.json",           "数字餐厅（IFD）.json"),
-        ("../etc/passwd.json",             "_etc_passwd.json"),
+        ("normal.json", "normal.json"),
+        ("数字餐厅（IFD）.json", "数字餐厅（IFD）.json"),
+        ("../etc/passwd.json", "_etc_passwd.json"),
         ("<script>alert(1)</script>.json", "_script_alert(1)__script_.json"),
-        ("   .json",                       "json"),
-        ("a b-c_d.json",                   "a b-c_d.json"),
+        ("   .json", "json"),
+        ("a b-c_d.json", "a b-c_d.json"),
     ]
 
     all_ok = True
@@ -297,7 +371,8 @@ def test_run_jobs_eviction():
     print("\n── T9  RUN_JOBS 超上限清理 ──")
     import importlib
     from postman_api_tester import report_job_store as srv
-    importlib.reload(srv)          # 重置全局 RUN_JOBS 状态
+
+    importlib.reload(srv)  # 重置全局 RUN_JOBS 状态
 
     # 先填入 200 条已完成任务
     for i in range(200):
@@ -307,12 +382,14 @@ def test_run_jobs_eviction():
     srv.configure_run_jobs(200)
     srv.set_run_job("trigger_evict", status="running")
 
-    _check("RUN_JOBS 长度 ≤ 200 条（已清理旧任务）",
-           len(srv.RUN_JOBS) <= 200, f"当前 {len(srv.RUN_JOBS)} 条")
+    _check(
+        "RUN_JOBS 长度 ≤ 200 条（已清理旧任务）",
+        len(srv.RUN_JOBS) <= 200,
+        f"当前 {len(srv.RUN_JOBS)} 条",
+    )
 
     # 仍在运行的任务不应被清除
-    _check("正在运行的任务 trigger_evict 未被清理",
-           "trigger_evict" in srv.RUN_JOBS)
+    _check("正在运行的任务 trigger_evict 未被清理", "trigger_evict" in srv.RUN_JOBS)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -1,9 +1,7 @@
 """report_request_service 单元测试."""
 
-import json
 from typing import Dict, Any
 
-import pytest
 
 from postman_api_tester.services.report_request_service import (
     extract_http_request_fields,

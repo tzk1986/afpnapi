@@ -39,7 +39,9 @@ _REPORTS_CACHE_LOCK = threading.Lock()
 _REPORTS_CACHE_LAST_MTIME: float = 0.0  # 缓存建立时报告目录的最新修改时间
 
 
-def configure_report_repository(reports_dir: Path, cache_ttl: float | None = None) -> None:
+def configure_report_repository(
+    reports_dir: Path, cache_ttl: float | None = None
+) -> None:
     """配置报告仓储，优先使用 config.py 中的 REPORT_CACHE_TTL。"""
     global _REPORTS_DIR, _REPORTS_CACHE_TTL
     _REPORTS_DIR = Path(reports_dir).resolve()
@@ -48,7 +50,8 @@ def configure_report_repository(reports_dir: Path, cache_ttl: float | None = Non
     if cache_ttl is None:
         try:
             from postman_api_tester import config as _cfg
-            cache_ttl = float(getattr(_cfg, 'REPORT_CACHE_TTL', 10))
+
+            cache_ttl = float(getattr(_cfg, "REPORT_CACHE_TTL", 10))
         except (ImportError, AttributeError, TypeError, ValueError):
             cache_ttl = 10.0
 
@@ -82,7 +85,10 @@ def _get_latest_report_mtime() -> float:
                 latest_mtime = mtime
 
         for html_path in _REPORTS_DIR.rglob("*.html"):
-            if html_path.name.startswith("postman_report_") and "_page_" not in html_path.name:
+            if (
+                html_path.name.startswith("postman_report_")
+                and "_page_" not in html_path.name
+            ):
                 mtime = html_path.stat().st_mtime
                 if mtime > latest_mtime:
                     latest_mtime = mtime
@@ -105,9 +111,7 @@ def load_report_details_map(report: ReportRecord) -> ReportDetailsMap:
         if not isinstance(details, dict):
             return {}
         return {
-            str(key): value
-            for key, value in details.items()
-            if isinstance(value, dict)
+            str(key): value for key, value in details.items() if isinstance(value, dict)
         }
     except (TypeError, AttributeError, ValueError):
         return {}
@@ -125,20 +129,29 @@ def list_reports() -> List[ReportRecord]:
     enable_smart_invalidation = True
     try:
         from postman_api_tester import config as _cfg
-        enable_smart_invalidation = bool(getattr(_cfg, 'REPORT_CACHE_SMART_INVALIDATION', True))
+
+        enable_smart_invalidation = bool(
+            getattr(_cfg, "REPORT_CACHE_SMART_INVALIDATION", True)
+        )
     except (ImportError, AttributeError):
         pass
 
     with _REPORTS_CACHE_LOCK:
         # 基础 TTL 检查
-        ttl_valid = _REPORTS_CACHE["data"] is not None and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL
+        ttl_valid = (
+            _REPORTS_CACHE["data"] is not None
+            and (_now - _REPORTS_CACHE["ts"]) < _REPORTS_CACHE_TTL
+        )
 
         if ttl_valid:
             cached_data = _REPORTS_CACHE["data"]
             # 智能失效：检查是否有新报告生成
             if enable_smart_invalidation:
                 current_mtime = _get_latest_report_mtime()
-                if current_mtime <= _REPORTS_CACHE_LAST_MTIME and cached_data is not None:
+                if (
+                    current_mtime <= _REPORTS_CACHE_LAST_MTIME
+                    and cached_data is not None
+                ):
                     # 没有新文件，缓存有效
                     return list(cached_data)
                 # 有新文件，需要重新加载
@@ -156,21 +169,31 @@ def list_reports() -> List[ReportRecord]:
             if details_file and Path(details_file).name == details_file:
                 expected_details = meta_path.parent / details_file
                 if expected_details.exists():
-                    report["details_file"] = str(expected_details.relative_to(_REPORTS_DIR))
+                    report["details_file"] = str(
+                        expected_details.relative_to(_REPORTS_DIR)
+                    )
             reports.append(report)
             seen_report_names.add(report.get("report_name"))
         except Exception as exc:
-            reports.append({
-                "report_name": meta_path.name,
-                "generated_at": "",
-                "host_name": "",
-                "collection_name": "",
-                "source_file": "",
-                "summary": {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"},
-                "load_error": str(exc),
-                "results": [],
-                "_summary_only": True,
-            })
+            reports.append(
+                {
+                    "report_name": meta_path.name,
+                    "generated_at": "",
+                    "host_name": "",
+                    "collection_name": "",
+                    "source_file": "",
+                    "summary": {
+                        "total": 0,
+                        "passed": 0,
+                        "failed": 0,
+                        "error": 0,
+                        "success_rate": "0%",
+                    },
+                    "load_error": str(exc),
+                    "results": [],
+                    "_summary_only": True,
+                }
+            )
 
     for html_path in legacy_postman_html_files():
         if html_path.name in seen_report_names:
@@ -180,12 +203,18 @@ def list_reports() -> List[ReportRecord]:
         except (OSError, ValueError):
             continue
 
-    reports = [item for item in reports if _is_total_report_name(str(item.get("report_name", "") or ""))]
+    reports = [
+        item
+        for item in reports
+        if _is_total_report_name(str(item.get("report_name", "") or ""))
+    ]
     reports.sort(key=lambda item: str(item.get("generated_at", "") or ""), reverse=True)
 
     with _REPORTS_CACHE_LOCK:
         _REPORTS_CACHE["data"] = reports
-        _REPORTS_CACHE["by_name"] = {str(item.get("report_name") or ""): item for item in reports}
+        _REPORTS_CACHE["by_name"] = {
+            str(item.get("report_name") or ""): item for item in reports
+        }
         _REPORTS_CACHE["ts"] = _time.monotonic()
         # 记录缓存建立时的最新文件修改时间
         _REPORTS_CACHE_LAST_MTIME = _get_latest_report_mtime()
@@ -303,4 +332,3 @@ def collect_report_artifacts(report: ReportRecord) -> List[Path]:
                 seen.add(rel)
 
     return artifacts
-

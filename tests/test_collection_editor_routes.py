@@ -17,13 +17,21 @@ from postman_api_tester.handlers.collection_editor_routes import (
 
 
 SAMPLE_COLLECTION = {
-    "info": {"name": "test", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+    "info": {
+        "name": "test",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    },
     "item": [
         {
             "name": "req1",
             "request": {
                 "method": "GET",
-                "url": {"raw": "https://example.com/api", "protocol": "https", "host": ["example", "com"], "path": ["api"]},
+                "url": {
+                    "raw": "https://example.com/api",
+                    "protocol": "https",
+                    "host": ["example", "com"],
+                    "path": ["api"],
+                },
             },
         }
     ],
@@ -55,10 +63,21 @@ def app_context() -> Generator[None, None, None]:
 
 def _register_routes(app: Flask) -> None:
     """注册 collection editor 路由到测试应用。"""
-    app.add_url_rule("/api/collection-editor/parse", "parse", api_collection_parse, methods=["POST"])
-    app.add_url_rule("/api/collection-editor/save", "save", api_collection_save, methods=["PUT"])
-    app.add_url_rule("/api/collection-editor/dependency", "dependency", api_collection_dependency, methods=["POST"])
-    app.add_url_rule("/api/collection-editor/send", "send", api_collection_send, methods=["POST"])
+    app.add_url_rule(
+        "/api/collection-editor/parse", "parse", api_collection_parse, methods=["POST"]
+    )
+    app.add_url_rule(
+        "/api/collection-editor/save", "save", api_collection_save, methods=["PUT"]
+    )
+    app.add_url_rule(
+        "/api/collection-editor/dependency",
+        "dependency",
+        api_collection_dependency,
+        methods=["POST"],
+    )
+    app.add_url_rule(
+        "/api/collection-editor/send", "send", api_collection_send, methods=["POST"]
+    )
 
 
 class TestApiCollectionParse:
@@ -139,7 +158,9 @@ class TestApiCollectionParse:
         "postman_api_tester.services.collection_editor_service.parse_collection_to_flat",
         side_effect=RuntimeError("unexpected"),
     )
-    def test_service_exception_returns_ce_parse_004(self, mock_parse: MagicMock, app: Flask) -> None:
+    def test_service_exception_returns_ce_parse_004(
+        self, mock_parse: MagicMock, app: Flask
+    ) -> None:
         """服务层异常返回 500 + CE_PARSE_004。"""
         _register_routes(app)
         resp = app.test_client().post(
@@ -171,7 +192,9 @@ class TestApiCollectionSave:
         "postman_api_tester.services.collection_editor_service.validate_for_execution",
         return_value=["missing name"],
     )
-    def test_validation_failure_returns_ce_save_002(self, mock_validate: MagicMock, app: Flask) -> None:
+    def test_validation_failure_returns_ce_save_002(
+        self, mock_validate: MagicMock, app: Flask
+    ) -> None:
         """校验失败返回 400 + CE_SAVE_002。"""
         _register_routes(app)
         flat_data = {"groups": [], "allRequests": []}
@@ -193,7 +216,9 @@ class TestApiCollectionSave:
         "postman_api_tester.services.collection_editor_service.build_collection_json",
         return_value={"info": {}, "item": []},
     )
-    def test_success(self, mock_build: MagicMock, mock_validate: MagicMock, app: Flask) -> None:
+    def test_success(
+        self, mock_build: MagicMock, mock_validate: MagicMock, app: Flask
+    ) -> None:
         """有效数据保存成功。"""
         _register_routes(app)
         flat_data = {"groups": [], "allRequests": []}
@@ -210,7 +235,9 @@ class TestApiCollectionSave:
         "postman_api_tester.services.collection_editor_service.validate_for_execution",
         side_effect=RuntimeError("boom"),
     )
-    def test_service_exception_returns_ce_save_003(self, mock_validate: MagicMock, app: Flask) -> None:
+    def test_service_exception_returns_ce_save_003(
+        self, mock_validate: MagicMock, app: Flask
+    ) -> None:
         """服务层异常返回 500 + CE_SAVE_003。"""
         _register_routes(app)
         resp = app.test_client().put(
@@ -260,7 +287,9 @@ class TestApiCollectionDependency:
         "postman_api_tester.services.collection_editor_service.analyze_dependency_map",
         side_effect=RuntimeError("analysis failed"),
     )
-    def test_service_exception_returns_ce_dep_002(self, mock_analyze: MagicMock, app: Flask) -> None:
+    def test_service_exception_returns_ce_dep_002(
+        self, mock_analyze: MagicMock, app: Flask
+    ) -> None:
         """服务层异常返回 500 + CE_DEP_002。"""
         _register_routes(app)
         resp = app.test_client().post(
@@ -328,7 +357,9 @@ class TestApiCollectionSend:
         _register_routes(app)
         resp = app.test_client().post(
             "/api/collection-editor/send",
-            data=json.dumps({"request": {"method": "GET", "url": "https://example.com/api"}}),
+            data=json.dumps(
+                {"request": {"method": "GET", "url": "https://example.com/api"}}
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 200
@@ -339,14 +370,22 @@ class TestApiCollectionSend:
 
     @patch(
         "postman_api_tester.services.collection_editor_service.send_single_request",
-        return_value={"success": False, "status_code": 404, "error_message": "Not Found"},
+        return_value={
+            "success": False,
+            "status_code": 404,
+            "error_message": "Not Found",
+        },
     )
-    def test_target_api_error_returns_ce_send_004(self, mock_send: MagicMock, app: Flask) -> None:
+    def test_target_api_error_returns_ce_send_004(
+        self, mock_send: MagicMock, app: Flask
+    ) -> None:
         """目标接口返回错误返回 404 + CE_SEND_004。"""
         _register_routes(app)
         resp = app.test_client().post(
             "/api/collection-editor/send",
-            data=json.dumps({"request": {"method": "GET", "url": "https://example.com/api"}}),
+            data=json.dumps(
+                {"request": {"method": "GET", "url": "https://example.com/api"}}
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 404
@@ -358,12 +397,16 @@ class TestApiCollectionSend:
         "postman_api_tester.services.collection_editor_service.send_single_request",
         side_effect=RuntimeError("connection failed"),
     )
-    def test_service_exception_returns_ce_send_005(self, mock_send: MagicMock, app: Flask) -> None:
+    def test_service_exception_returns_ce_send_005(
+        self, mock_send: MagicMock, app: Flask
+    ) -> None:
         """服务层异常返回 500 + CE_SEND_005。"""
         _register_routes(app)
         resp = app.test_client().post(
             "/api/collection-editor/send",
-            data=json.dumps({"request": {"method": "GET", "url": "https://example.com/api"}}),
+            data=json.dumps(
+                {"request": {"method": "GET", "url": "https://example.com/api"}}
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 500

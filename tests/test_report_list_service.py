@@ -20,7 +20,13 @@ class TestReportListItem:
             "collection_name": "API Collection",
             "source_file": "api.json",
             "source_original_file": "api.json",
-            "summary": {"total": 10, "passed": 8, "failed": 1, "error": 1, "success_rate": "80%"},
+            "summary": {
+                "total": 10,
+                "passed": 8,
+                "failed": 1,
+                "error": 1,
+                "success_rate": "80%",
+            },
         }
         item = report_list_item(report)
         assert item["report_name"] == "test_report"
@@ -63,7 +69,11 @@ class TestReportListItem:
 
     def test_load_error(self) -> None:
         """load_error 字段传递。"""
-        report: Dict[str, Any] = {"report_name": "broken", "load_error": "parse failed", "summary": {}}
+        report: Dict[str, Any] = {
+            "report_name": "broken",
+            "load_error": "parse failed",
+            "summary": {},
+        }
         item = report_list_item(report)
         assert item["load_error"] == "parse failed"
 

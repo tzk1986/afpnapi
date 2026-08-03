@@ -40,7 +40,9 @@ class TestHmacSha256:
 
     def test_unicode(self):
         """Unicode 字符应正确编码为 UTF-8 后签名。"""
-        expected = hmac.new("密钥".encode("utf-8"), "数据".encode("utf-8"), hashlib.sha256).hexdigest()
+        expected = hmac.new(
+            "密钥".encode("utf-8"), "数据".encode("utf-8"), hashlib.sha256
+        ).hexdigest()
         assert evaluate_function("hmac_sha256", "数据,密钥") == expected
 
     def test_long_input(self):
@@ -96,12 +98,14 @@ class TestBase64Encode:
     def test_unicode(self):
         """Unicode 应正确编码。"""
         import base64
+
         expected = base64.b64encode("中文".encode("utf-8")).decode("utf-8")
         assert evaluate_function("base64_encode", "中文") == expected
 
     def test_special_chars(self):
         """特殊字符应正确处理。"""
         import base64
+
         expected = base64.b64encode(b"!@#$%").decode("utf-8")
         assert evaluate_function("base64_encode", "!@#$%") == expected
 

@@ -58,6 +58,7 @@ def index() -> ResponseReturnValue:
     """首页：报告列表与任务提交入口。"""
     reports = _repo_list_reports()
     from postman_api_tester.report_server_config import REPORT_SERVER_PORT as port
+
     return render_template(
         "index.html",
         host_name=socket.gethostname(),
@@ -126,7 +127,9 @@ def report_view() -> ResponseReturnValue:
     template_updated_at = "-"
     try:
         template_path = (PROJECT_ROOT / "templates" / "report_view.html").resolve()
-        template_updated_at = datetime.fromtimestamp(template_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        template_updated_at = datetime.fromtimestamp(
+            template_path.stat().st_mtime
+        ).strftime("%Y-%m-%d %H:%M:%S")
     except OSError:
         template_updated_at = "-"
 

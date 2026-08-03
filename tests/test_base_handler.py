@@ -45,6 +45,7 @@ def test_json_response(app_context: None) -> None:
     response, status = BaseHandler.json_response({"key": "value"}, 200)
     assert status == 200
     import json
+
     data = json.loads(response.get_data(as_text=True))
     assert data["code"] == 200
     assert data["data"] == {"key": "value"}
@@ -57,6 +58,7 @@ def test_error_response(app_context: None) -> None:
     response, status = BaseHandler.error_response(error, 400)
     assert status == 400
     import json
+
     data = json.loads(response.get_data(as_text=True))
     assert data["code"] == 400
     assert "ValidationError" in data["data"]["error"]

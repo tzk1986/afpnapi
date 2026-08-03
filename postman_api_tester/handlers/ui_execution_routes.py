@@ -83,7 +83,11 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
 
     if mode == "headless":
         if not is_playwright_available():
-            return json_error("Playwright 未安装，请运行: pip install playwright && playwright install chromium", 400, "UIT_EXEC_010")
+            return json_error(
+                "Playwright 未安装，请运行: pip install playwright && playwright install chromium",
+                400,
+                "UIT_EXEC_010",
+            )
         if not _execution_manager.can_start():
             return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
 
@@ -110,6 +114,7 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     base_url = case_data.get("base_url", "")
     if base_url and clear_login:
         from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
         _proxy_session_store.clear_cookies_by_base_url(base_url)
         logger.info(
             "ui_execution_init_cookies_cleared",
@@ -122,7 +127,9 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
 
     case_name = case_data.get("name", "")
     steps = case_data.get("steps", [])
-    job_id = _execution_store.create_job(case_id, mode, case_name, steps_total=len(steps))
+    job_id = _execution_store.create_job(
+        case_id, mode, case_name, steps_total=len(steps)
+    )
 
     logger.info(
         "ui_execution_created",
@@ -136,11 +143,15 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
 
     if mode == "headless":
         hl_settings = settings.get("headless", {})
-        options["headless_browser"] = hl_settings.get("browser_type", UI_HEADLESS_BROWSER)
+        options["headless_browser"] = hl_settings.get(
+            "browser_type", UI_HEADLESS_BROWSER
+        )
         options["viewport_width"] = hl_settings.get("viewport_width", 1280)
         options["viewport_height"] = hl_settings.get("viewport_height", 720)
         options["take_screenshots"] = hl_settings.get("take_screenshots", True)
-        _execution_manager.start_headless(job_id, case_data, options, on_complete=_send_webhook)
+        _execution_manager.start_headless(
+            job_id, case_data, options, on_complete=_send_webhook
+        )
         return BaseHandler.json_response(
             {
                 "job_id": job_id,
@@ -279,7 +290,11 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
         screenshot_path.write_text(html_content, encoding="utf-8")
         logger.info(
             "ui_screenshot_saved",
-            extra={"event": "ui.execution.screenshot_saved", "job_id": job_id, "step_index": step_index},
+            extra={
+                "event": "ui.execution.screenshot_saved",
+                "job_id": job_id,
+                "step_index": step_index,
+            },
         )
     except Exception as e:
         logger.warning(f"Failed to save screenshot: {e}")
@@ -297,15 +312,17 @@ def _extract_network_requests(steps: list) -> list:
         if not net_req:
             continue
         net_resp = step.get("network_response") or {}
-        network_requests.append({
-            "url": net_req.get("url", ""),
-            "url_path": net_req.get("url_path", ""),
-            "method": net_req.get("method", "GET"),
-            "headers": net_req.get("headers", {}),
-            "body": net_req.get("body", ""),
-            "response_status": net_resp.get("status", 0),
-            "response_body": net_resp.get("body", ""),
-        })
+        network_requests.append(
+            {
+                "url": net_req.get("url", ""),
+                "url_path": net_req.get("url_path", ""),
+                "method": net_req.get("method", "GET"),
+                "headers": net_req.get("headers", {}),
+                "body": net_req.get("body", ""),
+                "response_status": net_resp.get("status", 0),
+                "response_body": net_resp.get("body", ""),
+            }
+        )
     return network_requests
 
 
@@ -334,16 +351,20 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
                     "cleared": cleared,
                 },
             )
-        resp = make_response(BaseHandler.json_response({
-            "steps": [s for s in steps if s.get("action") != "api_call"],
-            "options": {
-                "delay_between_steps": UI_EXECUTION_DEFAULT_DELAY_MS,
-                "timeout": UI_EXECUTION_DEFAULT_TIMEOUT_MS,
-            },
-            "case_name": case_data.get("name", ""),
-            "base_url": base_url,
-            "network_requests": _extract_network_requests(steps),
-        }))
+        resp = make_response(
+            BaseHandler.json_response(
+                {
+                    "steps": [s for s in steps if s.get("action") != "api_call"],
+                    "options": {
+                        "delay_between_steps": UI_EXECUTION_DEFAULT_DELAY_MS,
+                        "timeout": UI_EXECUTION_DEFAULT_TIMEOUT_MS,
+                    },
+                    "case_name": case_data.get("name", ""),
+                    "base_url": base_url,
+                    "network_requests": _extract_network_requests(steps),
+                }
+            )
+        )
         # 清除浏览器旧 session cookie，确保 iframe 加载时创建新 session
         resp.set_cookie("_proxy_session", "", expires=0, path="/")
         return resp
@@ -364,13 +385,17 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
                 "cleared": cleared,
             },
         )
-    resp = make_response(BaseHandler.json_response({
-        "steps": [s for s in steps if s.get("action") != "api_call"],
-        "options": options,
-        "case_name": case_data.get("name", ""),
-        "base_url": base_url,
-        "network_requests": _extract_network_requests(steps),
-    }))
+    resp = make_response(
+        BaseHandler.json_response(
+            {
+                "steps": [s for s in steps if s.get("action") != "api_call"],
+                "options": options,
+                "case_name": case_data.get("name", ""),
+                "base_url": base_url,
+                "network_requests": _extract_network_requests(steps),
+            }
+        )
+    )
     if clear_login:
         resp.set_cookie("_proxy_session", "", expires=0, path="/")
     return resp
@@ -406,7 +431,13 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
         )
 
     status = result.get("status", "running")
-    status_labels = {"passed": "通过", "failed": "失败", "running": "执行中", "cancelled": "已取消", "ready": "就绪"}
+    status_labels = {
+        "passed": "通过",
+        "failed": "失败",
+        "running": "执行中",
+        "cancelled": "已取消",
+        "ready": "就绪",
+    }
     mode_labels = {"browser_replay": "浏览器回放", "headless": "无头浏览器"}
 
     raw_steps = result.get("steps", [])
@@ -414,7 +445,11 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
     for _i, s in enumerate(raw_steps):
         selector = s.get("selector", "")
         if isinstance(selector, dict):
-            selector_display = selector.get("primary", "") or selector.get("fallback_css", "") or selector.get("fallback_xpath", "")
+            selector_display = (
+                selector.get("primary", "")
+                or selector.get("fallback_css", "")
+                or selector.get("fallback_xpath", "")
+            )
         else:
             selector_display = str(selector) if selector else ""
 
@@ -422,38 +457,47 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
         value_display = str(value)[:60] if value else ""
 
         step_status = s.get("status", "skipped")
-        step_status_labels = {"passed": "通过", "failed": "失败", "skipped": "跳过", "error": "错误"}
+        step_status_labels = {
+            "passed": "通过",
+            "failed": "失败",
+            "skipped": "跳过",
+            "error": "错误",
+        }
 
         duration_ms = s.get("duration_ms", 0)
-        steps.append({
-            "status": step_status,
-            "action": s.get("action", "unknown"),
-            "selector_display": selector_display,
-            "value_display": value_display,
-            "status_label": step_status_labels.get(step_status, step_status),
-            "duration_s": f"{duration_ms / 1000:.2f}",
-            "error": s.get("error", ""),
-        })
+        steps.append(
+            {
+                "status": step_status,
+                "action": s.get("action", "unknown"),
+                "selector_display": selector_display,
+                "value_display": value_display,
+                "status_label": step_status_labels.get(step_status, step_status),
+                "duration_s": f"{duration_ms / 1000:.2f}",
+                "error": s.get("error", ""),
+            }
+        )
 
     total_duration_ms = result.get("total_duration_ms", 0)
 
-    resp = make_response(render_template(
-        "ui_testing_report.html",
-        job_id=job_id,
-        case_name=result.get("case_name", ""),
-        case_id=result.get("case_id", ""),
-        status=status,
-        status_label=status_labels.get(status, status),
-        mode_label=mode_labels.get(result.get("mode", ""), result.get("mode", "")),
-        started_at=result.get("started_at", ""),
-        ended_at=result.get("ended_at", "") or "",
-        steps_total=result.get("steps_total", len(raw_steps)),
-        steps_passed=result.get("steps_passed", 0),
-        steps_failed=result.get("steps_failed", 0),
-        duration_s=f"{total_duration_ms / 1000:.2f}",
-        steps=steps,
-        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    ))
+    resp = make_response(
+        render_template(
+            "ui_testing_report.html",
+            job_id=job_id,
+            case_name=result.get("case_name", ""),
+            case_id=result.get("case_id", ""),
+            status=status,
+            status_label=status_labels.get(status, status),
+            mode_label=mode_labels.get(result.get("mode", ""), result.get("mode", "")),
+            started_at=result.get("started_at", ""),
+            ended_at=result.get("ended_at", "") or "",
+            steps_total=result.get("steps_total", len(raw_steps)),
+            steps_passed=result.get("steps_passed", 0),
+            steps_failed=result.get("steps_failed", 0),
+            duration_s=f"{total_duration_ms / 1000:.2f}",
+            steps=steps,
+            generated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+    )
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
@@ -477,7 +521,10 @@ def api_ui_testing_replay_log() -> ResponseReturnValue:
     # 诊断：记录所有 replay-log 请求体
     event = payload.get("event", "")
     if event.startswith("early_") or event.startswith("new_tab"):
-        logger.info(f"replay-log DIAGNOSTIC: {payload}", extra={"event": f"ui.replay.{event}", "detail": payload})
+        logger.info(
+            f"replay-log DIAGNOSTIC: {payload}",
+            extra={"event": f"ui.replay.{event}", "detail": payload},
+        )
 
     job_id = payload.get("job_id", "")
     step_index = payload.get("step_index", -1)
@@ -540,7 +587,9 @@ def api_ui_testing_cleanup() -> ResponseReturnValue:
     settings = _settings_store.get_settings()
     retention_days = settings.get("retention_days", 30)
     deleted = _execution_store.cleanup_expired(retention_days)
-    return BaseHandler.json_response({"deleted": deleted, "retention_days": retention_days})
+    return BaseHandler.json_response(
+        {"deleted": deleted, "retention_days": retention_days}
+    )
 
 
 def ui_testing_settings_page() -> ResponseReturnValue:
@@ -552,10 +601,14 @@ def ui_testing_settings_page() -> ResponseReturnValue:
 
 def api_ui_testing_playwright_status() -> ResponseReturnValue:
     """检查 Playwright 安装状态。"""
-    return BaseHandler.json_response({
-        "available": is_playwright_available(),
-        "hint": "已安装" if is_playwright_available() else "未安装，请运行: pip install playwright && playwright install chromium",
-    })
+    return BaseHandler.json_response(
+        {
+            "available": is_playwright_available(),
+            "hint": "已安装"
+            if is_playwright_available()
+            else "未安装，请运行: pip install playwright && playwright install chromium",
+        }
+    )
 
 
 def api_ui_testing_reports_list() -> ResponseReturnValue:
@@ -574,13 +627,15 @@ def api_ui_testing_reports_list() -> ResponseReturnValue:
         offset=offset,
     )
 
-    return BaseHandler.json_response({
-        "items": results,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "total_pages": max(1, (total + page_size - 1) // page_size),
-    })
+    return BaseHandler.json_response(
+        {
+            "items": results,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total + page_size - 1) // page_size),
+        }
+    )
 
 
 def api_ui_testing_report_delete(job_id: str) -> ResponseReturnValue:
@@ -605,9 +660,16 @@ def ui_testing_reports_page() -> ResponseReturnValue:
     return resp
 
 
-def api_ui_testing_execution_screenshot(job_id: str, step_index: int) -> ResponseReturnValue:
+def api_ui_testing_execution_screenshot(
+    job_id: str, step_index: int
+) -> ResponseReturnValue:
     """返回失败步骤截图。"""
-    screenshot_path = _execution_store.base_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_fail.png"
+    screenshot_path = (
+        _execution_store.base_dir
+        / f"exec_{job_id}"
+        / "screenshots"
+        / f"step_{step_index}_fail.png"
+    )
     if not screenshot_path.is_file():
         return json_error("截图不存在", 404, "UIT_SCREENSHOT_001")
     return send_file(str(screenshot_path), mimetype="image/png")

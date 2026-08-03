@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 def sanitize_uploaded_name(original_name: str) -> str:
-    safe_name = re.sub(r'[^\w\u4e00-\u9fff\-. ()（）【】]', '_', str(original_name or "")).strip('. ')
+    safe_name = re.sub(
+        r"[^\w\u4e00-\u9fff\-. ()（）【】]", "_", str(original_name or "")
+    ).strip(". ")
     return safe_name if safe_name else "collection.json"
 
 

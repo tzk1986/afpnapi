@@ -7,7 +7,6 @@ import pytest
 import threading
 import time
 from typing import Any, Dict, List
-from unittest.mock import MagicMock
 
 from postman_api_tester.core.concurrent_executor import (
     ConcurrentProgressTracker,
@@ -56,7 +55,9 @@ class TestConcurrentProgressTracker:
     def test_on_item_done_percent_calculation(self):
         """百分比应正确计算。"""
         payloads: List[Dict[str, Any]] = []
-        tracker = ConcurrentProgressTracker(total=4, callback=lambda p: payloads.append(p))
+        tracker = ConcurrentProgressTracker(
+            total=4, callback=lambda p: payloads.append(p)
+        )
 
         for i in range(4):
             tracker.on_item_done(f"api{i}", "GET", f"/{i}", "PASSED")
@@ -69,7 +70,9 @@ class TestConcurrentProgressTracker:
     def test_on_item_done_with_zero_total(self):
         """total 为 0 时百分比应为 100。"""
         payloads: List[Dict[str, Any]] = []
-        tracker = ConcurrentProgressTracker(total=0, callback=lambda p: payloads.append(p))
+        tracker = ConcurrentProgressTracker(
+            total=0, callback=lambda p: payloads.append(p)
+        )
         tracker.on_item_done("api", "GET", "/x", "PASSED")
         assert payloads[0]["percent"] == 100
 
@@ -81,6 +84,7 @@ class TestConcurrentProgressTracker:
 
     def test_callback_exception_does_not_break_tracker(self):
         """回调异常不影响 completed 计数。"""
+
         def bad_callback(payload):
             raise RuntimeError("callback error")
 
@@ -200,6 +204,7 @@ class TestExecuteBatchConcurrently:
 
     def test_worker_exception_captured(self):
         """工作项异常应被捕获，不中断其他项。"""
+
         def flaky_worker(x):
             if x == 3:
                 raise ValueError("bad value")
@@ -213,11 +218,13 @@ class TestExecuteBatchConcurrently:
         assert results[0] == 2
         assert results[1] == 4
         from postman_api_tester.core.concurrent_executor import _FailedResult
+
         assert isinstance(results[2], _FailedResult)
         assert results[3] == 8
 
     def test_all_workers_fail_raises_exception(self):
         """所有工作项失败时抛出首个异常。"""
+
         def always_fail(x):
             raise RuntimeError(f"fail {x}")
 
@@ -230,6 +237,7 @@ class TestExecuteBatchConcurrently:
 
     def test_partial_failure_returns_results(self):
         """部分失败时返回部分结果，不抛异常。"""
+
         def sometimes_fail(x):
             if x == 2:
                 raise ValueError("fail")
@@ -242,11 +250,13 @@ class TestExecuteBatchConcurrently:
         )
         assert results[0] == 1
         from postman_api_tester.core.concurrent_executor import _FailedResult
+
         assert isinstance(results[1], _FailedResult)
         assert results[2] == 3
 
     def test_concurrent_execution(self):
         """验证实际并行执行（耗时检查）。"""
+
         def slow_worker(x):
             time.sleep(0.05)
             return x

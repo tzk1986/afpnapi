@@ -71,7 +71,9 @@ def main() -> None:
             assertion_strict_mode=False,
         ).execute_test()
         assert result_non_strict["status"] == "PASSED", result_non_strict
-        assert result_non_strict.get("assertion_engine_error") == "assertion-engine-boom", result_non_strict
+        assert (
+            result_non_strict.get("assertion_engine_error") == "assertion-engine-boom"
+        ), result_non_strict
 
         result_strict = PostmanTestExecutor(
             _build_api(),
@@ -80,7 +82,9 @@ def main() -> None:
         ).execute_test()
         assert result_strict["status"] == "FAILED", result_strict
         assert "断言失败" in str(result_strict.get("message", "")), result_strict
-        assert result_strict.get("assertion_engine_error") == "assertion-engine-boom", result_strict
+        assert (
+            result_strict.get("assertion_engine_error") == "assertion-engine-boom"
+        ), result_strict
 
         print("assertion-strict-mode-ok")
     finally:

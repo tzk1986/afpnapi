@@ -1,7 +1,6 @@
 """数据文件加载单元测试."""
 
 import json
-import os
 import tempfile
 from pathlib import Path
 

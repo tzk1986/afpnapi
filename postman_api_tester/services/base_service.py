@@ -33,13 +33,27 @@ class BaseService:
         """
         try:
             result = func(*args, **kwargs)
-            logger.debug("Service execution successful: %s", func.__name__, extra={"event": "service.success", "func_name": func.__name__})
+            logger.debug(
+                "Service execution successful: %s",
+                func.__name__,
+                extra={"event": "service.success", "func_name": func.__name__},
+            )
             return result
         except PostmanTestException:
             # PostmanTestException 直接抛出，不做包装
             raise
         except Exception as e:
-            logger.error("Unexpected error in %s: %s: %s", func.__name__, type(e).__name__, e, extra={"event": "service.error", "func_name": func.__name__, "error_type": type(e).__name__})
+            logger.error(
+                "Unexpected error in %s: %s: %s",
+                func.__name__,
+                type(e).__name__,
+                e,
+                extra={
+                    "event": "service.error",
+                    "func_name": func.__name__,
+                    "error_type": type(e).__name__,
+                },
+            )
             raise ExecutionError(f"Service execution failed: {e!s}") from e
 
     @staticmethod

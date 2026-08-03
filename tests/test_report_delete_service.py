@@ -1,7 +1,7 @@
 """report_delete_service 单元测试."""
 
 from pathlib import Path
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 import pytest
 
@@ -91,7 +91,12 @@ class TestDeleteNormal:
             assert isinstance(name, str)
             assert "/" not in name
             assert "\\" not in name
-        assert sorted(result) == ["details.json", "meta.yaml", "page.png", "summary.html"]
+        assert sorted(result) == [
+            "details.json",
+            "meta.yaml",
+            "page.png",
+            "summary.html",
+        ]
 
     def test_returned_names_are_set_of_originals(self, tmp_files):
         """Every original file name appears exactly once in the result."""
@@ -298,7 +303,9 @@ class TestLogging:
             _run(tmp_files["summary.html"].parent, list(tmp_files.values()))
 
         started_records = [
-            r for r in caplog.records if r.getMessage().startswith("report delete started")
+            r
+            for r in caplog.records
+            if r.getMessage().startswith("report delete started")
         ]
         assert len(started_records) == 1
         assert started_records[0].report_name == "test-report"
@@ -309,7 +316,9 @@ class TestLogging:
             _run(tmp_files["summary.html"].parent, list(tmp_files.values()))
 
         completed_records = [
-            r for r in caplog.records if "report.delete.completed" in getattr(r, "event", "")
+            r
+            for r in caplog.records
+            if "report.delete.completed" in getattr(r, "event", "")
         ]
         assert len(completed_records) == 1
         record = completed_records[0]
@@ -327,7 +336,9 @@ class TestLogging:
             )
 
         completed_records = [
-            r for r in caplog.records if "report.delete.completed" in getattr(r, "event", "")
+            r
+            for r in caplog.records
+            if "report.delete.completed" in getattr(r, "event", "")
         ]
         assert len(completed_records) == 1
         assert completed_records[0].deleted_count == 0

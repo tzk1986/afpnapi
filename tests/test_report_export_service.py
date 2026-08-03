@@ -14,7 +14,6 @@ from postman_api_tester.services.report_export_service import (
 
 
 class TestValidateExportSource:
-
     def test_missing_source_file_raises(self) -> None:
         with pytest.raises(ValueError, match="source_file"):
             _validate_export_source({})
@@ -35,14 +34,17 @@ class TestValidateExportSource:
 
 
 class TestApplyScopePruning:
-
     def _make_report(self, results: list) -> Dict[str, Any]:
         return {"results": results}
 
     def test_full_scope_returns_collection_unchanged(self) -> None:
         collection = {"info": {}, "item": []}
         final, count, same, warnings = _apply_scope_pruning(
-            collection, "full", self._make_report([]), 100, 0,
+            collection,
+            "full",
+            self._make_report([]),
+            100,
+            0,
         )
         assert final is collection
         assert count == 0
@@ -52,20 +54,29 @@ class TestApplyScopePruning:
     def test_report_only_without_paths_raises(self) -> None:
         collection = {"info": {}, "item": []}
         with pytest.raises(ValueError, match="item_path"):
-            _apply_scope_pruning(collection, "report_only", self._make_report([]), 100, 0)
+            _apply_scope_pruning(
+                collection, "report_only", self._make_report([]), 100, 0
+            )
 
     def test_report_only_with_matching_count_sets_same_as_full(self) -> None:
         collection: Dict[str, Any] = {
             "info": {"name": "test"},
             "item": [
-                {"name": "req1", "request": {"method": "GET", "url": {"raw": "http://a.com/1"}}},
+                {
+                    "name": "req1",
+                    "request": {"method": "GET", "url": {"raw": "http://a.com/1"}},
+                },
             ],
         }
         report = {
             "results": [{"item_path": [0]}],
         }
         final, count, same, warnings = _apply_scope_pruning(
-            collection, "report_only", report, 100, source_total_count=1,
+            collection,
+            "report_only",
+            report,
+            100,
+            source_total_count=1,
         )
         assert count == 1
         assert same is True
@@ -76,15 +87,25 @@ class TestApplyScopePruning:
         collection: Dict[str, Any] = {
             "info": {"name": "test"},
             "item": [
-                {"name": "req1", "request": {"method": "GET", "url": {"raw": "http://a.com/1"}}},
-                {"name": "req2", "request": {"method": "GET", "url": {"raw": "http://a.com/2"}}},
+                {
+                    "name": "req1",
+                    "request": {"method": "GET", "url": {"raw": "http://a.com/1"}},
+                },
+                {
+                    "name": "req2",
+                    "request": {"method": "GET", "url": {"raw": "http://a.com/2"}},
+                },
             ],
         }
         report = {
             "results": [{"item_path": [0]}],
         }
         final, count, same, warnings = _apply_scope_pruning(
-            collection, "report_only", report, 100, source_total_count=2,
+            collection,
+            "report_only",
+            report,
+            100,
+            source_total_count=2,
         )
         assert count == 1
         assert same is False

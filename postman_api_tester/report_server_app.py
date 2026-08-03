@@ -82,6 +82,7 @@ class ReportServerApp:
 
         configure_reports_dir(reports_dir)
         from postman_api_tester.report_server_config import REPORT_SCAN_EXCLUDE_DIRS
+
         configure_scan_excludes(REPORT_SCAN_EXCLUDE_DIRS)
         configure_report_repository(reports_dir, cache_ttl=30.0)
 
@@ -100,9 +101,7 @@ class ReportServerApp:
     def _resolve_reports_dir() -> Path:
         """解析报告目录。"""
         env_dir = (
-            os.environ.get("POSTMAN_REPORTS_DIR")
-            or os.environ.get("REPORTS_DIR")
-            or ""
+            os.environ.get("POSTMAN_REPORTS_DIR") or os.environ.get("REPORTS_DIR") or ""
         ).strip()
         if env_dir:
             return Path(env_dir).expanduser().resolve()
@@ -168,6 +167,7 @@ class ReportServerApp:
         """运行应用。"""
         # 导入 report_server 模块以注册路由（必须在 run_app 中导入，避免循环导入）
         from postman_api_tester import report_server
+
         # 使用 report_server.app 而不是传入的 app
         app = report_server.app
 
@@ -177,6 +177,7 @@ class ReportServerApp:
 
         try:
             from postman_api_tester.config import REPORT_SERVER_HOST, REPORT_SERVER_PORT
+
             port = REPORT_SERVER_PORT
             host = REPORT_SERVER_HOST
         except ImportError:

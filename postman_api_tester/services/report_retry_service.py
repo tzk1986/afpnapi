@@ -99,14 +99,18 @@ def parse_retry_runtime_params(
     """解析并校验重试运行参数，返回归一化的参数字典或错误信息。"""
     # 重试运行参数统一在此处做协议校验与默认值归一，
     # 避免不同重试入口出现行为漂移。
-    base_url = str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
+    base_url = (
+        str(payload.get("base_url", "") or report.get("base_url", "")).strip() or None
+    )
     if base_url:
         parsed = urlparse(base_url)
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             return None, "base_url 仅允许合法的 http/https 地址"
 
     token = str(payload.get("token", "")).strip() or None
-    results_per_page = clamp_run_results_per_page(payload.get("results_per_page", default_results_per_page))
+    results_per_page = clamp_run_results_per_page(
+        payload.get("results_per_page", default_results_per_page)
+    )
     return {
         "base_url": base_url,
         "token": token,

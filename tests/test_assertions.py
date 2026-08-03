@@ -1,7 +1,5 @@
 """Tests for postman_api_tester.assertions module."""
 
-import pytest
-
 from postman_api_tester.assertions import (
     evaluate_assertions,
     _compare,
@@ -98,7 +96,9 @@ class TestEvaluateAssertions:
 
     def test_regex_operator_pass(self):
         """Test regex operator with matching pattern."""
-        assertions = [{"path": "$.email", "op": "regex", "expected": r"^[\w.]+@[\w.]+\.\w+$"}]
+        assertions = [
+            {"path": "$.email", "op": "regex", "expected": r"^[\w.]+@[\w.]+\.\w+$"}
+        ]
         response = {"email": "test@example.com"}
 
         result = evaluate_assertions(response, assertions)
@@ -107,7 +107,9 @@ class TestEvaluateAssertions:
 
     def test_regex_operator_fail(self):
         """Test regex operator with non-matching pattern."""
-        assertions = [{"path": "$.email", "op": "regex", "expected": r"^[\w.]+@[\w.]+\.\w+$"}]
+        assertions = [
+            {"path": "$.email", "op": "regex", "expected": r"^[\w.]+@[\w.]+\.\w+$"}
+        ]
         response = {"email": "invalid-email"}
 
         result = evaluate_assertions(response, assertions)

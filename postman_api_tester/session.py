@@ -11,14 +11,11 @@ RequestTimeout = Tuple[int, int]
 
 
 class SessionLike(Protocol):
-    def get(self, url: str, **kwargs: Any) -> Any:
-        ...
+    def get(self, url: str, **kwargs: Any) -> Any: ...
 
-    def post(self, url: str, **kwargs: Any) -> Any:
-        ...
+    def post(self, url: str, **kwargs: Any) -> Any: ...
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
 
 def create_shared_session() -> SessionLike:
@@ -30,15 +27,20 @@ def create_shared_session() -> SessionLike:
     # 读取重试配置
     try:
         from postman_api_tester import config as _cfg
-        enable_retry = bool(getattr(_cfg, 'ENABLE_REQUEST_RETRY', False))
+
+        enable_retry = bool(getattr(_cfg, "ENABLE_REQUEST_RETRY", False))
 
         if enable_retry:
             from requests.adapters import HTTPAdapter
             from urllib3.util.retry import Retry
 
-            retry_total = int(getattr(_cfg, 'REQUEST_RETRY_TOTAL', 3))
-            backoff_factor = float(getattr(_cfg, 'REQUEST_RETRY_BACKOFF_FACTOR', 1.0))
-            status_forcelist = tuple(getattr(_cfg, 'REQUEST_RETRY_STATUS_FORCELIST', (429, 500, 502, 503, 504)))
+            retry_total = int(getattr(_cfg, "REQUEST_RETRY_TOTAL", 3))
+            backoff_factor = float(getattr(_cfg, "REQUEST_RETRY_BACKOFF_FACTOR", 1.0))
+            status_forcelist = tuple(
+                getattr(
+                    _cfg, "REQUEST_RETRY_STATUS_FORCELIST", (429, 500, 502, 503, 504)
+                )
+            )
 
             retry_strategy = Retry(
                 total=retry_total,
@@ -53,6 +55,7 @@ def create_shared_session() -> SessionLike:
             session.mount("https://", adapter)
     except (ImportError, AttributeError, TypeError, ValueError) as exc:
         import logging
+
         logging.getLogger(__name__).warning("配置请求重试失败，使用默认行为: %s", exc)
 
     return cast(SessionLike, session)
@@ -66,9 +69,11 @@ def close_session(session: Optional[SessionLike]) -> None:
         session.close()
     except OSError as exc:
         import logging
+
         logging.getLogger(__name__).warning("关闭 session 时发生 OSError: %s", exc)
     except Exception as exc:
         import logging
+
         logging.getLogger(__name__).warning("关闭 session 时发生未预期异常: %s", exc)
 
 
@@ -76,20 +81,29 @@ def resolve_request_timeout(default: RequestTimeout = (10, 30)) -> RequestTimeou
     """读取配置中的连接与读取超时，异常时回退默认值。"""
     try:
         from postman_api_tester import config as _cfg
-        connect_timeout = int(getattr(_cfg, 'REQUEST_CONNECT_TIMEOUT', default[0]))
-        read_timeout = int(getattr(_cfg, 'REQUEST_READ_TIMEOUT', default[1]))
+
+        connect_timeout = int(getattr(_cfg, "REQUEST_CONNECT_TIMEOUT", default[0]))
+        read_timeout = int(getattr(_cfg, "REQUEST_READ_TIMEOUT", default[1]))
         return (connect_timeout, read_timeout)
     except (ValueError, TypeError, AttributeError) as exc:
         import logging
-        logging.getLogger(__name__).warning("读取超时配置失败，回退默认值 %s: %s", default, exc)
+
+        logging.getLogger(__name__).warning(
+            "读取超时配置失败，回退默认值 %s: %s", default, exc
+        )
         return default
     except Exception as exc:
         import logging
-        logging.getLogger(__name__).warning("读取超时配置时发生未预期异常，回退默认值 %s: %s", default, exc)
+
+        logging.getLogger(__name__).warning(
+            "读取超时配置时发生未预期异常，回退默认值 %s: %s", default, exc
+        )
         return default
 
 
-def normalize_timeout(timeout: Optional[RequestTimeout], default: RequestTimeout = (10, 30)) -> RequestTimeout:
+def normalize_timeout(
+    timeout: Optional[RequestTimeout], default: RequestTimeout = (10, 30)
+) -> RequestTimeout:
     """Normalize timeout tuple and fallback to default when invalid."""
     if not timeout:
         return default

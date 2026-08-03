@@ -72,9 +72,13 @@ def _walk_items(items: List[Dict[str, Any]], depth: int) -> List[Dict[str, Any]]
                 child_request = child.get("request")
                 child_items_nested = child.get("item")
 
-                if child_request is not None and not isinstance(child_items_nested, list):
+                if child_request is not None and not isinstance(
+                    child_items_nested, list
+                ):
                     req_id = uuid.uuid4().hex[:8]
-                    group["requests"].append(_parse_request_node(child, child_request, req_id))
+                    group["requests"].append(
+                        _parse_request_node(child, child_request, req_id)
+                    )
                 elif isinstance(child_items_nested, list):
                     subgroup = {
                         "group_name": child.get("name", ""),
@@ -88,16 +92,20 @@ def _walk_items(items: List[Dict[str, Any]], depth: int) -> List[Dict[str, Any]]
 
     # 将没有文件夹的请求也作为独立的 group 返回
     if requests:
-        groups.append({
-            "group_name": "",
-            "requests": requests,
-            "subgroups": [],
-        })
+        groups.append(
+            {
+                "group_name": "",
+                "requests": requests,
+                "subgroups": [],
+            }
+        )
 
     return groups
 
 
-def _walk_items_into_group(items: List[Dict[str, Any]], group: Dict[str, Any], depth: int) -> None:
+def _walk_items_into_group(
+    items: List[Dict[str, Any]], group: Dict[str, Any], depth: int
+) -> None:
     """递归将 item 填充到指定的 group 中。"""
     for item in items:
         if not isinstance(item, dict):
@@ -119,7 +127,9 @@ def _walk_items_into_group(items: List[Dict[str, Any]], group: Dict[str, Any], d
             group["subgroups"].append(subgroup)
 
 
-def _parse_request_node(item: Dict[str, Any], request_obj: Dict[str, Any], req_id: str) -> Dict[str, Any]:
+def _parse_request_node(
+    item: Dict[str, Any], request_obj: Dict[str, Any], req_id: str
+) -> Dict[str, Any]:
     """解析单个请求节点为扁平结构。"""
     # 提取 method
     if isinstance(request_obj, dict):
@@ -147,7 +157,9 @@ def _parse_request_node(item: Dict[str, Any], request_obj: Dict[str, Any], req_i
     if isinstance(request_obj, dict):
         x_extract_raw = request_obj.get("x_extract", {})
         if isinstance(x_extract_raw, dict):
-            x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
+            x_extract = {
+                str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)
+            }
 
     return {
         "id": req_id,
@@ -179,7 +191,8 @@ def _get_url_str(url_obj: Any) -> str:
             if isinstance(query, list) and query:
                 query_str = "&".join(
                     f"{q.get('key', '')}={q.get('value', '')}"
-                    for q in query if isinstance(q, dict)
+                    for q in query
+                    if isinstance(q, dict)
                 )
                 if query_str:
                     url_str += "?" + query_str
@@ -194,7 +207,8 @@ def _extract_params_from_url(url_obj: Any) -> List[Dict[str, str]]:
         if isinstance(query, list):
             return [
                 {"key": q.get("key", ""), "value": q.get("value", "")}
-                for q in query if isinstance(q, dict)
+                for q in query
+                if isinstance(q, dict)
             ]
     return []
 
@@ -222,8 +236,12 @@ def _extract_body_mode(body_obj: Any) -> Tuple[str, Optional[Dict[str, Any]]]:
     elif mode == "graphql":
         graphql_data = body_obj.get("graphql", {})
         return "graphql", {
-            "query": graphql_data.get("query", "") if isinstance(graphql_data, dict) else "",
-            "variables": graphql_data.get("variables", "") if isinstance(graphql_data, dict) else "",
+            "query": graphql_data.get("query", "")
+            if isinstance(graphql_data, dict)
+            else "",
+            "variables": graphql_data.get("variables", "")
+            if isinstance(graphql_data, dict)
+            else "",
         }
     elif mode == "file":
         return "binary", {"src": body_obj.get("file", {}).get("src", "")}
@@ -246,7 +264,10 @@ def build_collection_json(flat_data: Dict[str, Any]) -> Dict[str, Any]:
     collection: Dict[str, Any] = {
         "info": {
             "name": info.get("name", "Collection"),
-            "schema": info.get("schema", "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"),
+            "schema": info.get(
+                "schema",
+                "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            ),
             "_postman_id": info.get("_postman_id", uuid.uuid4().hex),
         },
         "item": _assemble_items(groups),
@@ -315,7 +336,8 @@ def _build_url_object(url_str: str, params: List[Dict[str, str]]) -> Dict[str, A
     if params:
         url_obj["query"] = [
             {"key": p.get("key", ""), "value": p.get("value", "")}
-            for p in params if isinstance(p, dict)
+            for p in params
+            if isinstance(p, dict)
         ]
 
     return url_obj
@@ -409,10 +431,12 @@ def analyze_dependency_map(groups: List[Dict[str, Any]]) -> Dict[str, Any]:
                 for var_ref in var_refs:
                     if var_ref not in consumed:
                         consumed[var_ref] = {"by_requests": []}
-                    consumed[var_ref]["by_requests"].append({
-                        "request_id": req["id"],
-                        "location": f"{req.get('method', '')} {req.get('name', '')}",
-                    })
+                    consumed[var_ref]["by_requests"].append(
+                        {
+                            "request_id": req["id"],
+                            "location": f"{req.get('method', '')} {req.get('name', '')}",
+                        }
+                    )
             walk_consume(g.get("subgroups", []))
 
     walk_consume(groups)
@@ -420,11 +444,13 @@ def analyze_dependency_map(groups: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Phase 3: 生成警告
     for var_name, consume_info in consumed.items():
         if var_name not in produced:
-            warnings.append({
-                "var_name": var_name,
-                "issue": "not_produced",
-                "affected_by": consume_info["by_requests"],
-            })
+            warnings.append(
+                {
+                    "var_name": var_name,
+                    "issue": "not_produced",
+                    "affected_by": consume_info["by_requests"],
+                }
+            )
 
     return {
         "produced": produced,
@@ -433,7 +459,9 @@ def analyze_dependency_map(groups: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-def send_single_request(request_data: Dict[str, Any], variables: Dict[str, str]) -> Dict[str, Any]:
+def send_single_request(
+    request_data: Dict[str, Any], variables: Dict[str, str]
+) -> Dict[str, Any]:
     """对单个请求执行变量替换后发送，返回完整响应。
 
     Args:

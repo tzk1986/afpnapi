@@ -1,7 +1,7 @@
 """Tests for postman_api_tester.services.report_results_service."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from postman_api_tester.services.report_results_service import (
     build_report_results_payload,
@@ -67,9 +67,7 @@ class TestBuildReportResultsPayload:
         mock_paginate.return_value = {"items": [], "total": 0}
 
         report = {"report_name": "R1", "results": []}
-        result = build_report_results_payload(
-            report, 1, 10, "", "", "", None, False
-        )
+        result = build_report_results_payload(report, 1, 10, "", "", "", None, False)
 
         assert result["status"] == "all"
 
@@ -204,9 +202,7 @@ class TestBuildResultDetailPayload:
         mock_load.return_value = {}
 
         report = {
-            "results": [
-                {"name": "API1", "method": "GET", "url": "http://test.com"}
-            ],
+            "results": [{"name": "API1", "method": "GET", "url": "http://test.com"}],
             "manual_exclusions": [],
         }
 
@@ -218,7 +214,9 @@ class TestBuildResultDetailPayload:
 class TestBuildManualCasesPayload:
     """Tests for build_manual_cases_payload."""
 
-    @patch("postman_api_tester.services.report_results_service.normalize_manual_exclusions")
+    @patch(
+        "postman_api_tester.services.report_results_service.normalize_manual_exclusions"
+    )
     @patch("postman_api_tester.services.report_results_service.normalize_manual_case")
     def test_basic_flow(self, mock_normalize_case, mock_normalize_exclusions):
         """Test basic manual cases payload building."""
@@ -238,10 +236,16 @@ class TestBuildManualCasesPayload:
         assert len(result["manual_cases"]) == 1
         assert result["manual_cases"][0]["normalized"] is True
 
-    @patch("postman_api_tester.services.report_results_service.manual_case_exclusion_key")
-    @patch("postman_api_tester.services.report_results_service.normalize_manual_exclusions")
+    @patch(
+        "postman_api_tester.services.report_results_service.manual_case_exclusion_key"
+    )
+    @patch(
+        "postman_api_tester.services.report_results_service.normalize_manual_exclusions"
+    )
     @patch("postman_api_tester.services.report_results_service.normalize_manual_case")
-    def test_exclusion_matching(self, mock_normalize_case, mock_normalize_exclusions, mock_exclusion_key):
+    def test_exclusion_matching(
+        self, mock_normalize_case, mock_normalize_exclusions, mock_exclusion_key
+    ):
         """Test exclusion status is correctly matched."""
         mock_normalize_case.side_effect = lambda c, f: {**c, "normalized": True}
         mock_normalize_exclusions.return_value = ["key1", "key2"]
@@ -272,9 +276,7 @@ class TestPayloadBuilders:
 
     def test_build_manual_case_delete_payload(self):
         """Test manual case delete payload structure."""
-        result = build_manual_case_delete_payload(
-            "Report1", {"manual_cases": []}
-        )
+        result = build_manual_case_delete_payload("Report1", {"manual_cases": []})
 
         assert result["report_name"] == "Report1"
         assert result["manual_cases"] == []
@@ -388,7 +390,9 @@ class TestPayloadBuilders:
     def test_build_collection_preview_payload(self):
         """Test collection preview payload structure."""
         items = [{"name": "API1"}, {"name": "API2"}]
-        result = build_collection_preview_payload("collection.json", 10, False, 5, items)
+        result = build_collection_preview_payload(
+            "collection.json", 10, False, 5, items
+        )
 
         assert result["file_name"] == "collection.json"
         assert result["total"] == 10

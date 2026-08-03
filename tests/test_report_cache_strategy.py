@@ -2,8 +2,7 @@
 
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
-import pytest
+from unittest.mock import patch
 
 from postman_api_tester import report_repository
 
@@ -17,7 +16,7 @@ class TestReportCacheStrategy:
 
     def test_cache_ttl_default(self):
         """默认 TTL 应为 10 秒。"""
-        with patch('postman_api_tester.config.REPORT_CACHE_TTL', 10):
+        with patch("postman_api_tester.config.REPORT_CACHE_TTL", 10):
             report_repository.configure_report_repository(Path("reports"))
             assert report_repository._REPORTS_CACHE_TTL == 10.0
 
@@ -28,16 +27,21 @@ class TestReportCacheStrategy:
 
     def test_cache_ttl_from_config(self):
         """从 config.py 读取 TTL。"""
-        with patch('postman_api_tester.config.REPORT_CACHE_TTL', 15):
+        with patch("postman_api_tester.config.REPORT_CACHE_TTL", 15):
             report_repository.configure_report_repository(Path("reports"))
             assert report_repository._REPORTS_CACHE_TTL == 15.0
 
     def test_smart_invalidation_enabled(self):
         """智能失效启用时应检查文件修改时间。"""
-        with patch('postman_api_tester.config.REPORT_CACHE_SMART_INVALIDATION', True), \
-             patch('postman_api_tester.config.REPORT_CACHE_TTL', 10):
+        with patch(
+            "postman_api_tester.config.REPORT_CACHE_SMART_INVALIDATION", True
+        ), patch("postman_api_tester.config.REPORT_CACHE_TTL", 10):
             # 模拟有新文件
-            with patch.object(report_repository, '_get_latest_report_mtime', return_value=time.time() + 100):
+            with patch.object(
+                report_repository,
+                "_get_latest_report_mtime",
+                return_value=time.time() + 100,
+            ):
                 # 先加载一次缓存
                 report_repository._REPORTS_CACHE["data"] = []
                 report_repository._REPORTS_CACHE["ts"] = time.monotonic()
@@ -49,8 +53,9 @@ class TestReportCacheStrategy:
 
     def test_smart_invalidation_disabled(self):
         """智能失效禁用时只依赖 TTL。"""
-        with patch('postman_api_tester.config.REPORT_CACHE_SMART_INVALIDATION', False), \
-             patch('postman_api_tester.config.REPORT_CACHE_TTL', 10):
+        with patch(
+            "postman_api_tester.config.REPORT_CACHE_SMART_INVALIDATION", False
+        ), patch("postman_api_tester.config.REPORT_CACHE_TTL", 10):
             # 即使有新文件，只要 TTL 未过期就使用缓存
             report_repository._REPORTS_CACHE["data"] = [{"report_name": "test"}]
             report_repository._REPORTS_CACHE["ts"] = time.monotonic()
@@ -69,7 +74,7 @@ class TestReportCacheStrategy:
 
     def test_get_latest_report_mtime_no_dir(self):
         """目录不存在时返回 0。"""
-        with patch.object(report_repository, '_REPORTS_DIR', Path("/nonexistent")):
+        with patch.object(report_repository, "_REPORTS_DIR", Path("/nonexistent")):
             mtime = report_repository._get_latest_report_mtime()
             assert mtime == 0.0
 
@@ -77,6 +82,7 @@ class TestReportCacheStrategy:
         """有文件时返回最新修改时间。"""
         # 使用临时目录模拟
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             report_repository._REPORTS_DIR = tmpdir_path
