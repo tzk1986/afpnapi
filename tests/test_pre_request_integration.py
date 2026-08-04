@@ -4,13 +4,11 @@
 """
 
 import json
-import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 from postman_api_tester.core.variable_context import VariableContext
 from postman_api_tester.parser import PostmanApiParser
@@ -141,9 +139,12 @@ class TestExecutorPreRequestIntegration:
         original_value = ENABLE_PRE_REQUEST_SCRIPT
         try:
             import postman_api_tester.config as cfg
+
             cfg.ENABLE_PRE_REQUEST_SCRIPT = False
 
-            from postman_api_tester.utils.pre_request_executor import execute_pre_request
+            from postman_api_tester.utils.pre_request_executor import (
+                execute_pre_request,
+            )
 
             expressions = {"ts": "str(999)"}
             if not cfg.ENABLE_PRE_REQUEST_SCRIPT:

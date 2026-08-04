@@ -9,12 +9,12 @@ from .executor import PostmanTestExecutor
 from .parser import PostmanApiParser
 from .postman_api_tester import PostmanTestReport, run_postman_tests
 
-__version__ = "1.30.116"
+__version__ = "1.30.117"
 __author__ = "API Testing Team"
 
 __all__ = [
-    'PostmanApiParser',
-    'PostmanTestExecutor',
-    'PostmanTestReport',
-    'run_postman_tests'
+    "PostmanApiParser",
+    "PostmanTestExecutor",
+    "PostmanTestReport",
+    "run_postman_tests",
 ]

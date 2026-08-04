@@ -1,7 +1,5 @@
 """CheckpointManager 单元测试."""
 
-import json
-import os
 import tempfile
 from pathlib import Path
 from typing import Generator

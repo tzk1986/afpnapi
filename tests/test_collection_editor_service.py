@@ -67,7 +67,10 @@ class TestBuildCollectionJson:
 
     def test_round_trip(self) -> None:
         original = {
-            "info": {"name": "Test", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+            "info": {
+                "name": "Test",
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            },
             "item": [
                 {
                     "name": "Ping",
@@ -90,21 +93,56 @@ class TestAnalyzeDependencyMap:
     """analyze_dependency_map 测试."""
 
     def test_no_variables(self) -> None:
-        groups = [{"group_name": "g", "requests": [{"id": "r1", "name": "req", "url": "http://api", "headers": [], "params": [], "body_data": None}], "subgroups": []}]
+        groups = [
+            {
+                "group_name": "g",
+                "requests": [
+                    {
+                        "id": "r1",
+                        "name": "req",
+                        "url": "http://api",
+                        "headers": [],
+                        "params": [],
+                        "body_data": None,
+                    }
+                ],
+                "subgroups": [],
+            }
+        ]
         result = analyze_dependency_map(groups)
         assert result["produced"] == {}
         assert result["consumed"] == {}
         assert result["warnings"] == []
 
     def test_produced_and_consumed(self) -> None:
-        groups = [{
-            "group_name": "",
-            "requests": [
-                {"id": "r1", "name": "login", "url": "http://api/login", "headers": [], "params": [], "body_data": None, "x_extract": {"token": "$.data.token"}},
-                {"id": "r2", "name": "get_user", "url": "http://api/user", "headers": [{"key": "Authorization", "value": "Bearer {{token}}"}], "params": [], "body_data": None, "x_extract": {}},
-            ],
-            "subgroups": [],
-        }]
+        groups = [
+            {
+                "group_name": "",
+                "requests": [
+                    {
+                        "id": "r1",
+                        "name": "login",
+                        "url": "http://api/login",
+                        "headers": [],
+                        "params": [],
+                        "body_data": None,
+                        "x_extract": {"token": "$.data.token"},
+                    },
+                    {
+                        "id": "r2",
+                        "name": "get_user",
+                        "url": "http://api/user",
+                        "headers": [
+                            {"key": "Authorization", "value": "Bearer {{token}}"}
+                        ],
+                        "params": [],
+                        "body_data": None,
+                        "x_extract": {},
+                    },
+                ],
+                "subgroups": [],
+            }
+        ]
         result = analyze_dependency_map(groups)
         assert "token" in result["produced"]
         assert result["produced"]["token"]["by_request"] == "r1"
@@ -112,13 +150,23 @@ class TestAnalyzeDependencyMap:
         assert result["warnings"] == []
 
     def test_warning_for_unproduced_variable(self) -> None:
-        groups = [{
-            "group_name": "",
-            "requests": [
-                {"id": "r1", "name": "req", "url": "http://api/{{undefined_var}}", "headers": [], "params": [], "body_data": None, "x_extract": {}},
-            ],
-            "subgroups": [],
-        }]
+        groups = [
+            {
+                "group_name": "",
+                "requests": [
+                    {
+                        "id": "r1",
+                        "name": "req",
+                        "url": "http://api/{{undefined_var}}",
+                        "headers": [],
+                        "params": [],
+                        "body_data": None,
+                        "x_extract": {},
+                    },
+                ],
+                "subgroups": [],
+            }
+        ]
         result = analyze_dependency_map(groups)
         assert len(result["warnings"]) == 1
         assert result["warnings"][0]["var_name"] == "undefined_var"
@@ -132,12 +180,32 @@ class TestValidateForExecution:
         assert any("没有接口" in e for e in errors)
 
     def test_missing_name(self) -> None:
-        flat = {"groups": [{"group_name": "", "requests": [{"id": "r1", "name": "", "url": "http://api", "method": "GET"}], "subgroups": []}]}
+        flat = {
+            "groups": [
+                {
+                    "group_name": "",
+                    "requests": [
+                        {"id": "r1", "name": "", "url": "http://api", "method": "GET"}
+                    ],
+                    "subgroups": [],
+                }
+            ]
+        }
         errors = validate_for_execution(flat)
         assert any("缺少名称" in e for e in errors)
 
     def test_valid_request(self) -> None:
-        flat = {"groups": [{"group_name": "", "requests": [{"id": "r1", "name": "OK", "url": "http://api", "method": "GET"}], "subgroups": []}]}
+        flat = {
+            "groups": [
+                {
+                    "group_name": "",
+                    "requests": [
+                        {"id": "r1", "name": "OK", "url": "http://api", "method": "GET"}
+                    ],
+                    "subgroups": [],
+                }
+            ]
+        }
         errors = validate_for_execution(flat)
         assert errors == []
 
@@ -149,7 +217,13 @@ class TestSendSingleRequest:
     def test_basic_get(self, mock_exec: Any) -> None:
         mock_exec.return_value = _fake_exec_result()
         result = send_single_request(
-            {"url": "http://test/api", "method": "GET", "headers": [], "params": [], "body_mode": "none"},
+            {
+                "url": "http://test/api",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body_mode": "none",
+            },
             {},
         )
         assert result["success"] is True
@@ -162,7 +236,13 @@ class TestSendSingleRequest:
     def test_variable_substitution_in_url(self, mock_exec: Any) -> None:
         mock_exec.return_value = _fake_exec_result()
         result = send_single_request(
-            {"url": "{{host}}/api", "method": "GET", "headers": [], "params": [], "body_mode": "none"},
+            {
+                "url": "{{host}}/api",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body_mode": "none",
+            },
             {"host": "http://resolved"},
         )
         assert result["success"] is True
@@ -226,7 +306,13 @@ class TestSendSingleRequest:
     def test_unmatched_variable_preserved(self, mock_exec: Any) -> None:
         mock_exec.return_value = _fake_exec_result()
         send_single_request(
-            {"url": "http://test/{{unknown}}", "method": "GET", "headers": [], "params": [], "body_mode": "none"},
+            {
+                "url": "http://test/{{unknown}}",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body_mode": "none",
+            },
             {},
         )
         assert mock_exec.call_args.kwargs["url"] == "http://test/{{unknown}}"

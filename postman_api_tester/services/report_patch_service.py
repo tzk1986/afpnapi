@@ -22,7 +22,9 @@ def _build_retry_history_and_judgement(
     old_history: List[Dict[str, Any]] = old_result.pop("retry_history", [])
     retry_history = [*old_history, old_result]
     old_judgement_value = old_result.get("manual_judgement")
-    old_judgement: Dict[str, Any] = old_judgement_value if isinstance(old_judgement_value, dict) else {}
+    old_judgement: Dict[str, Any] = (
+        old_judgement_value if isinstance(old_judgement_value, dict) else {}
+    )
     manual_judgement = {
         **old_judgement,
         "active": False,
@@ -43,20 +45,26 @@ def _build_merged_result(
         "folder": old_result.get("folder", ""),
         "method": new_result_fields.get("method", old_result.get("method", "")),
         "url": new_result_fields.get("url", old_result.get("url", "")),
-        "item_path": new_result_fields.get("item_path", old_result.get("item_path", [])),
-        "expected_status": new_result_fields.get("expected_status", old_result.get("expected_status", 200)),
+        "item_path": new_result_fields.get(
+            "item_path", old_result.get("item_path", [])
+        ),
+        "expected_status": new_result_fields.get(
+            "expected_status", old_result.get("expected_status", 200)
+        ),
         **new_result_fields,
         "retry_history": retry_history,
         "retried": True,
         "manual_judgement": manual_judgement,
         "judgement_history": old_result.get("judgement_history", []),
     }
-    merged["key"] = " | ".join([
-        merged.get("folder", "") or "-",
-        merged.get("name", "") or "-",
-        merged.get("method", "") or "-",
-        merged.get("url", "") or "-",
-    ])
+    merged["key"] = " | ".join(
+        [
+            merged.get("folder", "") or "-",
+            merged.get("name", "") or "-",
+            merged.get("method", "") or "-",
+            merged.get("url", "") or "-",
+        ]
+    )
     return merged
 
 
@@ -123,7 +131,9 @@ def patch_report_result(
 
         old_result = dict(results[result_index])
         retry_history, manual_judgement = _build_retry_history_and_judgement(old_result)
-        merged = _build_merged_result(old_result, new_result_fields, retry_history, manual_judgement)
+        merged = _build_merged_result(
+            old_result, new_result_fields, retry_history, manual_judgement
+        )
         results[result_index] = merged
         meta["results"] = results
 
@@ -141,7 +151,13 @@ def patch_report_result(
         atomic_write_json(meta_path, meta)
 
         details_file_name = str(report.get("details_file") or "").strip()
-        _update_details_file(details_file_name, result_index, new_request_info, new_response_info, reports_dir)
+        _update_details_file(
+            details_file_name,
+            result_index,
+            new_request_info,
+            new_response_info,
+            reports_dir,
+        )
 
         invalidate_reports_cache()
         return cast(Dict[str, Any], meta["summary"])

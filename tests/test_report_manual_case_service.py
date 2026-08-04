@@ -14,16 +14,22 @@ from postman_api_tester.services.report_manual_case_service import (
 
 
 @pytest.fixture  # type: ignore[untyped-decorator]
-def caplog_fixture(caplog: pytest.LogCaptureFixture) -> Generator[pytest.LogCaptureFixture, None, None]:
+def caplog_fixture(
+    caplog: pytest.LogCaptureFixture,
+) -> Generator[pytest.LogCaptureFixture, None, None]:
     """提供日志捕获 fixture."""
-    caplog.set_level(logging.INFO, logger="postman_api_tester.services.report_manual_case_service")
+    caplog.set_level(
+        logging.INFO, logger="postman_api_tester.services.report_manual_case_service"
+    )
     yield caplog
 
 
 # ---- 辅助工厂 ----
 
 
-def _make_mock_update_report_meta() -> "Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]]":
+def _make_mock_update_report_meta() -> (
+    "Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]]"
+):
     """返回一个默认 meta 字典，通过 updater 可变引用共享状态."""
     meta_holder: Dict[str, Any] = {"manual_cases": [], "manual_exclusions": []}
 

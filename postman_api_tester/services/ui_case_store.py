@@ -45,7 +45,9 @@ class UiCaseStore:
 
         file_path = self._cases_dir / f"case_{case_id}.json"
         with self._lock:
-            file_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+            file_path.write_text(
+                json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
 
         logger.info("Created UI test case: %s", case_id)
         return case_id
@@ -54,19 +56,25 @@ class UiCaseStore:
         """列出所有用例（不含完整 steps，只返回摘要）。"""
         result: List[Dict[str, Any]] = []
         with self._lock:
-            for file_path in sorted(self._cases_dir.glob("case_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+            for file_path in sorted(
+                self._cases_dir.glob("case_*.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            ):
                 try:
                     data = json.loads(file_path.read_text(encoding="utf-8"))
-                    result.append({
-                        "id": data.get("id", ""),
-                        "name": data.get("name", ""),
-                        "description": data.get("description", ""),
-                        "base_url": data.get("base_url", ""),
-                        "step_count": len(data.get("steps", [])),
-                        "tags": data.get("tags", []),
-                        "created_at": data.get("created_at", ""),
-                        "updated_at": data.get("updated_at", ""),
-                    })
+                    result.append(
+                        {
+                            "id": data.get("id", ""),
+                            "name": data.get("name", ""),
+                            "description": data.get("description", ""),
+                            "base_url": data.get("base_url", ""),
+                            "step_count": len(data.get("steps", [])),
+                            "tags": data.get("tags", []),
+                            "created_at": data.get("created_at", ""),
+                            "updated_at": data.get("updated_at", ""),
+                        }
+                    )
                 except (json.JSONDecodeError, OSError) as e:
                     logger.warning("Failed to read case file %s: %s", file_path, e)
 
@@ -95,12 +103,22 @@ class UiCaseStore:
             except (json.JSONDecodeError, OSError):
                 return False
 
-            for key in ("name", "description", "base_url", "steps", "assertions", "variables", "tags"):
+            for key in (
+                "name",
+                "description",
+                "base_url",
+                "steps",
+                "assertions",
+                "variables",
+                "tags",
+            ):
                 if key in updates:
                     data[key] = updates[key]
 
             data["updated_at"] = datetime.now().isoformat()
-            file_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            file_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
 
         logger.info("Updated UI test case: %s", case_id)
         return True

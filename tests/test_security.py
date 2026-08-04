@@ -14,7 +14,10 @@ class TestSanitizeHeaders:
 
     def test_masks_sensitive_headers(self) -> None:
         """敏感头被替换为 ***。"""
-        headers = {"Authorization": "Bearer token123", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": "Bearer token123",
+            "Content-Type": "application/json",
+        }
         result = sanitize_headers(headers)
         assert result["Authorization"] == "***"
         assert result["Content-Type"] == "application/json"
@@ -171,7 +174,9 @@ class TestIsSafeUrl:
         """无效 URL 应禁止。"""
         assert is_safe_url("") is False
         assert is_safe_url("not-a-url") is False
-        assert is_safe_url("ftp://example.com") is True  # ftp 协议允许，但不在 http/https 范围
+        assert (
+            is_safe_url("ftp://example.com") is True
+        )  # ftp 协议允许，但不在 http/https 范围
 
     def test_url_without_hostname_is_unsafe(self) -> None:
         """无主机名的 URL 应禁止。"""

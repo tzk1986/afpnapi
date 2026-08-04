@@ -58,7 +58,10 @@ _RETRY_ERROR_CODES: Dict[str, Dict[str, Tuple[str, int, str]]] = {
 
 _RETRY_REPORT_ERROR_CODE = {"failures": "RPT_RETRY_003", "all": "RPT_RETRY_008"}
 _RETRY_RUNTIME_ERROR_CODE = {"failures": "RPT_RETRY_005", "all": "RPT_RETRY_010"}
-_RETRY_QUEUED_MESSAGE = {"failures": "重试任务已入队，等待执行。", "all": "全量重试任务已入队，等待执行。"}
+_RETRY_QUEUED_MESSAGE = {
+    "failures": "重试任务已入队，等待执行。",
+    "all": "全量重试任务已入队，等待执行。",
+}
 
 
 def _dispatch_retry(retry_mode: str) -> ResponseReturnValue:
@@ -93,7 +96,9 @@ def _dispatch_retry(retry_mode: str) -> ResponseReturnValue:
         return _json_error(msg, status, code)
 
     if source_runtime_error:
-        return _json_error(source_runtime_error, 400, _RETRY_RUNTIME_ERROR_CODE[retry_mode])
+        return _json_error(
+            source_runtime_error, 400, _RETRY_RUNTIME_ERROR_CODE[retry_mode]
+        )
     assert source_runtime_ctx is not None
     saved_file = str(source_runtime_ctx["saved_file"])
     runtime = source_runtime_ctx["runtime"]

@@ -3,8 +3,6 @@
 覆盖正常表达式、危险关键字拦截、超时保护、语法错误、空输入等路径。
 """
 
-from unittest.mock import patch
-
 from postman_api_tester.utils.pre_request_executor import (
     _contains_dangerous_keyword,
     execute_pre_request,
@@ -65,8 +63,15 @@ class TestDangerousKeywordCheck:
     def test_safe_expression_allowed(self):
         """安全表达式不被拦截。"""
         assert _contains_dangerous_keyword("hashlib.md5(b'test').hexdigest()") is False
-        assert _contains_dangerous_keyword("hmac.new(b'k', b'd', hashlib.sha256).hexdigest()") is False
-        assert _contains_dangerous_keyword("base64.b64encode(b'test').decode()") is False
+        assert (
+            _contains_dangerous_keyword(
+                "hmac.new(b'k', b'd', hashlib.sha256).hexdigest()"
+            )
+            is False
+        )
+        assert (
+            _contains_dangerous_keyword("base64.b64encode(b'test').decode()") is False
+        )
         assert _contains_dangerous_keyword("int(time.time())") is False
         assert _contains_dangerous_keyword("'hello'.upper()") is False
 
@@ -276,7 +281,9 @@ class TestSandboxIsolation:
 
     def test_no_class_traversal(self):
         """无法通过 __class__ 逃逸。"""
-        result = execute_pre_request({"val": "''.__class__.__bases__[0].__subclasses__()"}, {})
+        result = execute_pre_request(
+            {"val": "''.__class__.__bases__[0].__subclasses__()"}, {}
+        )
         assert result["val"] == ""
 
     def test_safe_builtins_only(self):

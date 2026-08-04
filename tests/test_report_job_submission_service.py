@@ -1,6 +1,5 @@
 """报告任务提交服务单元测试."""
 
-import re
 import pytest
 from pathlib import Path
 from postman_api_tester.services.report_job_submission_service import (
@@ -18,12 +17,17 @@ class TestSanitizeUploadedName:
         """测试普通文件名保持不变."""
         assert sanitize_uploaded_name("collection.json") == "collection.json"
         assert sanitize_uploaded_name("api-test_v2.yaml") == "api-test_v2.yaml"
-        assert sanitize_uploaded_name("My Collection (1).json") == "My Collection (1).json"
+        assert (
+            sanitize_uploaded_name("My Collection (1).json") == "My Collection (1).json"
+        )
 
     def test_cjk_characters_preserved(self) -> None:
         """测试中日韩字符保留."""
         assert sanitize_uploaded_name("集合.json") == "集合.json"
-        assert sanitize_uploaded_name("API测试_ collection.json") == "API测试_ collection.json"
+        assert (
+            sanitize_uploaded_name("API测试_ collection.json")
+            == "API测试_ collection.json"
+        )
         # 一-鿿 范围的 CJK 统一表意字符应被保留
         assert sanitize_uploaded_name("测试文件.json") == "测试文件.json"
 
@@ -31,7 +35,7 @@ class TestSanitizeUploadedName:
         """测试危险字符被替换为下划线."""
         assert sanitize_uploaded_name("file<>name.txt") == "file__name.txt"
         assert sanitize_uploaded_name("path\\to\\file.json") == "path_to_file.json"
-        assert sanitize_uploaded_name('file"name.json') == 'file_name.json'
+        assert sanitize_uploaded_name('file"name.json') == "file_name.json"
         assert sanitize_uploaded_name("file|name.json") == "file_name.json"
         assert sanitize_uploaded_name("file*name.json") == "file_name.json"
         assert sanitize_uploaded_name("file?name.json") == "file_name.json"
@@ -77,7 +81,9 @@ class TestSanitizeUploadedName:
 
     def test_multiple_dots_in_name(self) -> None:
         """测试文件名中多个点号的处理."""
-        assert sanitize_uploaded_name("my.collection.v2.json") == "my.collection.v2.json"
+        assert (
+            sanitize_uploaded_name("my.collection.v2.json") == "my.collection.v2.json"
+        )
 
 
 class TestBuildRunPostmanJobParams:

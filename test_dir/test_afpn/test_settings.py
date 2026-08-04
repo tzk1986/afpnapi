@@ -67,7 +67,7 @@ class TestRequest(seldom.TestCase):
         设置-支付配置
         """
         payload = {
-            "merchantId":"2021040701",
+            "merchantId": "2021040701",
         }
         self.s.get(
             "/api/get/recharge/switch",
@@ -82,7 +82,7 @@ class TestRequest(seldom.TestCase):
         设置-绑盘配置
         """
         payload = {
-            "merchantId":"2021040701",
+            "merchantId": "2021040701",
         }
         self.s.get(
             "/api/mer/merchantlimitconfig/query",
@@ -145,4 +145,4 @@ if __name__ == "__main__":
     seldom.main(
         # debug=True,
         base_url="http://10.50.11.120:9001"
-    )   
+    )

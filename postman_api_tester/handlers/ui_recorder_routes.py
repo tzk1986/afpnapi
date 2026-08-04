@@ -53,7 +53,9 @@ class _RecordingSessionStore:
             self._sessions[session_id] = session
         return session
 
-    def add_event(self, session_id: str, event_type: str, data: Dict[str, Any]) -> Optional[int]:
+    def add_event(
+        self, session_id: str, event_type: str, data: Dict[str, Any]
+    ) -> Optional[int]:
         with self._lock:
             session = self._sessions.get(session_id)
             if not session:
@@ -136,18 +138,24 @@ def api_ui_recorder_event() -> ResponseReturnValue:
     data = payload.get("data", {})
 
     if not session_id or not event_type:
-        return _add_cors_headers(BaseHandler.json_response(None, 400, "Missing session_id or event_type"))
+        return _add_cors_headers(
+            BaseHandler.json_response(None, 400, "Missing session_id or event_type")
+        )
 
     if event_type == "session_start":
         _store.create_session(session_id)
         logger.info("Recording session started: %s", session_id)
-        return _add_cors_headers(BaseHandler.json_response({"session_id": session_id, "status": "created"}))
+        return _add_cors_headers(
+            BaseHandler.json_response({"session_id": session_id, "status": "created"})
+        )
 
     if event_type == "session_end":
         total = data.get("total_steps", 0)
         _store.end_session(session_id, total)
         logger.info("Recording session ended: %s, steps=%d", session_id, total)
-        return _add_cors_headers(BaseHandler.json_response({"session_id": session_id, "status": "completed"}))
+        return _add_cors_headers(
+            BaseHandler.json_response({"session_id": session_id, "status": "completed"})
+        )
 
     if event_type in ("step", "navigation"):
         idx = _store.add_event(session_id, event_type, data)
@@ -156,7 +164,9 @@ def api_ui_recorder_event() -> ResponseReturnValue:
             _store.add_event(session_id, event_type, data)
         return _add_cors_headers(BaseHandler.json_response({"ok": True, "index": idx}))
 
-    return _add_cors_headers(BaseHandler.json_response(None, 400, f"Unknown event_type: {event_type}"))
+    return _add_cors_headers(
+        BaseHandler.json_response(None, 400, f"Unknown event_type: {event_type}")
+    )
 
 
 def api_ui_recorder_sessions() -> ResponseReturnValue:

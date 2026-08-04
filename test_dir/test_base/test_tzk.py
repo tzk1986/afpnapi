@@ -1,8 +1,8 @@
 import seldom
-from seldom import Steps
 
 # 商户简称
-MerchantName ="艾佩"
+MerchantName = "艾佩"
+
 
 class TestRequest(seldom.TestCase):
     """
@@ -10,19 +10,14 @@ class TestRequest(seldom.TestCase):
     """
 
     def start(self):
-        
         print("测试开始")
-        
-        
-    
-        
+
     def test_Afpn_001_2(self):
         """
         会员列表
         """
         self.post(
             "http://10.50.11.120:9001/api/order/queryPage",
-
         )
         self.assertStatusCode(200)
         self.assertPath("errCode", 0)
@@ -40,11 +35,9 @@ class TestRequest(seldom.TestCase):
             print(f"查询失败的错误码是：{errCode}")
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # seldom.main(debug=True, base_url="https://httpbin.org")
     seldom.main(
-        debug=True, 
+        debug=True,
         # base_url="http://10.50.11.120:9001"
-        )
+    )

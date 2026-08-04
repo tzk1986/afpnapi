@@ -1,6 +1,5 @@
 """异常体系单元测试."""
 
-import pytest
 from postman_api_tester.exceptions import (
     PostmanTestException,
     ParseError,

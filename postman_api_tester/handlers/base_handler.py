@@ -73,13 +73,9 @@ class BaseHandler:
 
         length = len(value)
         if length < min_length:
-            raise ValidationError(
-                f"{param_name} too short: {length} < {min_length}"
-            )
+            raise ValidationError(f"{param_name} too short: {length} < {min_length}")
         if length > max_length:
-            raise ValidationError(
-                f"{param_name} too long: {length} > {max_length}"
-            )
+            raise ValidationError(f"{param_name} too long: {length} > {max_length}")
 
         return value
 
@@ -155,7 +151,11 @@ class BaseHandler:
             "handler error: %s: %s",
             type(error).__name__,
             error,
-            extra={"event": "handler.error", "error_type": type(error).__name__, "error_code": error_code},
+            extra={
+                "event": "handler.error",
+                "error_type": type(error).__name__,
+                "error_code": error_code,
+            },
         )
         response_body = {
             "code": status_code,
@@ -171,7 +171,9 @@ class BaseHandler:
         return jsonify(response_body), status_code
 
 
-def json_error(message: str, status_code: int, error_code: str = "") -> ResponseReturnValue:
+def json_error(
+    message: str, status_code: int, error_code: str = ""
+) -> ResponseReturnValue:
     """快捷 JSON 错误响应，统一各路由文件的 _json_error 实现。
 
     错误码命名规则：模块前缀_序号，如 CE_PARSE_001。
@@ -207,6 +209,7 @@ def get_report_or_error(
     finder = find_report
     if finder is None:
         from postman_api_tester.report_repository import find_report as _default_finder
+
         finder = _default_finder
     try:
         return finder(report_name)

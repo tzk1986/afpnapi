@@ -1,6 +1,5 @@
 """变量替换引擎单元测试."""
 
-import pytest
 from postman_api_tester.parser import ApiConfig
 from postman_api_tester.utils.variable_substitution import (
     api_references_variables,
@@ -14,7 +13,9 @@ class TestSubstituteVariables:
     """substitute_variables() 基础替换测试."""
 
     def test_basic_substitution(self) -> None:
-        assert substitute_variables("Hello {{name}}", {"name": "World"}) == "Hello World"
+        assert (
+            substitute_variables("Hello {{name}}", {"name": "World"}) == "Hello World"
+        )
 
     def test_multiple_variables(self) -> None:
         result = substitute_variables(

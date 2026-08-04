@@ -1,7 +1,5 @@
 """UI 代理服务单元测试。"""
 
-import pytest
-
 from postman_api_tester.services.ui_proxy_service import UiProxyService
 
 
@@ -54,10 +52,10 @@ class TestRewriteHtml:
 
     def test_skip_script_content_dynamic_url(self) -> None:
         html = (
-            '<script>'
+            "<script>"
             "document.write('<script src=\"' + window.location.protocol + '//' + "
             "window.location.host + '/config.js' + '\"></scr' + 'ipt>')"
-            '</script>'
+            "</script>"
         )
         result = UiProxyService.rewrite_html(html, "http://10.50.11.120:9001/login")
         assert "window.location.protocol" in result
@@ -70,7 +68,7 @@ class TestRewriteHtml:
     def test_skip_script_content_preserves_html_attrs(self) -> None:
         html = (
             '<a href="/page">Link</a>'
-            '<script>var x = \'<img src="/img.png">\';</script>'
+            "<script>var x = '<img src=\"/img.png\">';</script>"
             '<img src="/logo.png">'
         )
         result = UiProxyService.rewrite_html(html, "https://example.com")
@@ -119,7 +117,7 @@ class TestRewriteHtml:
         assert "<base" not in result.lower()
 
     def test_remove_frame_busting(self) -> None:
-        html = '<script>if(top!==self)top.location=self.location;</script><body></body>'
+        html = "<script>if(top!==self)top.location=self.location;</script><body></body>"
         result = UiProxyService.rewrite_html(html, "https://example.com")
         assert "frame-busting removed" in result
 
@@ -129,7 +127,7 @@ class TestRewriteHtml:
         assert "/ui-testing/proxy-resource?url=" in result
 
     def test_rewrite_style_tag_url(self) -> None:
-        html = '<style>.bg { background: url(/img/bg.jpg); }</style>'
+        html = "<style>.bg { background: url(/img/bg.jpg); }</style>"
         result = UiProxyService.rewrite_html(html, "https://example.com/page")
         assert "/ui-testing/proxy-resource?url=" in result
 
@@ -164,22 +162,30 @@ class TestRewriteCssUrls:
 
     def test_single_quoted_url(self) -> None:
         css = "background: url('/img/bg.png');"
-        result = UiProxyService._rewrite_css_urls(css, "https://example.com", "https://example.com")
+        result = UiProxyService._rewrite_css_urls(
+            css, "https://example.com", "https://example.com"
+        )
         assert "/ui-testing/proxy-resource?url=" in result
 
     def test_double_quoted_url(self) -> None:
         css = 'background: url("/img/bg.png");'
-        result = UiProxyService._rewrite_css_urls(css, "https://example.com", "https://example.com")
+        result = UiProxyService._rewrite_css_urls(
+            css, "https://example.com", "https://example.com"
+        )
         assert "/ui-testing/proxy-resource?url=" in result
 
     def test_unquoted_url(self) -> None:
         css = "background: url(/img/bg.png);"
-        result = UiProxyService._rewrite_css_urls(css, "https://example.com", "https://example.com")
+        result = UiProxyService._rewrite_css_urls(
+            css, "https://example.com", "https://example.com"
+        )
         assert "/ui-testing/proxy-resource?url=" in result
 
     def test_preserve_data_url(self) -> None:
         css = "background: url('data:image/png;base64,abc');"
-        result = UiProxyService._rewrite_css_urls(css, "https://example.com", "https://example.com")
+        result = UiProxyService._rewrite_css_urls(
+            css, "https://example.com", "https://example.com"
+        )
         assert "data:image/png" in result
 
 
@@ -187,7 +193,9 @@ class TestResolveUrl:
     """URL 解析测试。"""
 
     def test_absolute_url(self) -> None:
-        result = UiProxyService._resolve_url("https://other.com/page", "https://example.com")
+        result = UiProxyService._resolve_url(
+            "https://other.com/page", "https://example.com"
+        )
         assert result == "https://other.com/page"
 
     def test_relative_url(self) -> None:
@@ -195,15 +203,21 @@ class TestResolveUrl:
         assert result == "https://example.com/about"
 
     def test_protocol_relative(self) -> None:
-        result = UiProxyService._resolve_url("//cdn.example.com/lib.js", "https://example.com")
+        result = UiProxyService._resolve_url(
+            "//cdn.example.com/lib.js", "https://example.com"
+        )
         assert result == "https://cdn.example.com/lib.js"
 
     def test_javascript_url(self) -> None:
-        result = UiProxyService._resolve_url("javascript:void(0)", "https://example.com")
+        result = UiProxyService._resolve_url(
+            "javascript:void(0)", "https://example.com"
+        )
         assert result is None
 
     def test_data_url(self) -> None:
-        result = UiProxyService._resolve_url("data:image/png;base64,abc", "https://example.com")
+        result = UiProxyService._resolve_url(
+            "data:image/png;base64,abc", "https://example.com"
+        )
         assert result is None
 
     def test_hash_url(self) -> None:
@@ -215,5 +229,7 @@ class TestResolveUrl:
         assert result is None
 
     def test_mailto_url(self) -> None:
-        result = UiProxyService._resolve_url("mailto:test@example.com", "https://example.com")
+        result = UiProxyService._resolve_url(
+            "mailto:test@example.com", "https://example.com"
+        )
         assert result is None

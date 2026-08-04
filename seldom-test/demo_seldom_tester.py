@@ -6,7 +6,6 @@
 import json
 import os
 import sys
-from typing import Dict, List, Any, Optional
 from datetime import datetime
 import seldom
 from seldom_postman_tester import PostmanApiParser, PostmanTestReport
@@ -15,13 +14,8 @@ from seldom_postman_tester import PostmanApiParser, PostmanTestReport
 def create_demo_postman_file():
     """创建演示用的Postman文件"""
     demo_data = {
-        "info": {
-            "name": "Demo API Collection",
-            "description": "演示用的API集合"
-        },
-        "variable": [
-            {"key": "baseUrl", "value": "https://httpbin.org"}
-        ],
+        "info": {"name": "Demo API Collection", "description": "演示用的API集合"},
+        "variable": [{"key": "baseUrl", "value": "https://httpbin.org"}],
         "item": [
             {
                 "name": "获取用户信息",
@@ -32,34 +26,32 @@ def create_demo_postman_file():
                         "raw": "{{baseUrl}}/get",
                         "protocol": "https",
                         "host": ["httpbin", "org"],
-                        "path": ["get"]
-                    }
-                }
+                        "path": ["get"],
+                    },
+                },
             },
             {
                 "name": "创建用户",
                 "request": {
                     "method": "POST",
-                    "header": [
-                        {"key": "Content-Type", "value": "application/json"}
-                    ],
+                    "header": [{"key": "Content-Type", "value": "application/json"}],
                     "body": {
                         "mode": "raw",
-                        "raw": "{\"name\": \"张三\", \"email\": \"zhangsan@example.com\"}"
+                        "raw": '{"name": "张三", "email": "zhangsan@example.com"}',
                     },
                     "url": {
                         "raw": "{{baseUrl}}/post",
                         "protocol": "https",
                         "host": ["httpbin", "org"],
-                        "path": ["post"]
-                    }
-                }
-            }
-        ]
+                        "path": ["post"],
+                    },
+                },
+            },
+        ],
     }
 
     demo_file = "demo_api_collection.json"
-    with open(demo_file, 'w', encoding='utf-8') as f:
+    with open(demo_file, "w", encoding="utf-8") as f:
         json.dump(demo_data, f, indent=2, ensure_ascii=False)
 
     return demo_file
@@ -97,31 +89,31 @@ def demo_basic_functionality():
         # 添加模拟测试结果
         mock_results = [
             {
-                'name': '获取用户信息',
-                'method': 'GET',
-                'url': 'https://httpbin.org/get',
-                'status': 'PASSED',
-                'message': '响应状态码: 200',
-                'status_code': 200,
-                'folder': ''
+                "name": "获取用户信息",
+                "method": "GET",
+                "url": "https://httpbin.org/get",
+                "status": "PASSED",
+                "message": "响应状态码: 200",
+                "status_code": 200,
+                "folder": "",
             },
             {
-                'name': '创建用户',
-                'method': 'POST',
-                'url': 'https://httpbin.org/post',
-                'status': 'PASSED',
-                'message': '响应状态码: 200',
-                'status_code': 200,
-                'folder': ''
-            }
+                "name": "创建用户",
+                "method": "POST",
+                "url": "https://httpbin.org/post",
+                "status": "PASSED",
+                "message": "响应状态码: 200",
+                "status_code": 200,
+                "folder": "",
+            },
         ]
 
         for result in mock_results:
             report.add_result(result)
 
         # 生成报告
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        report_file = f'demo_report_{timestamp}.html'
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = f"demo_report_{timestamp}.html"
         report.generate_html_report(report_file)
         print(f"  ✓ HTML报告已生成: {report_file}")
 
@@ -158,13 +150,14 @@ def demo_seldom_integration():
     print("  4. 使用 seldom.main() 运行测试")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("基于 Seldom 框架的 Postman API 测试 - 演示")
     print("=" * 60)
 
     # 检查 seldom
     try:
         import seldom
+
         print(f"✓ Seldom 已安装 (版本: {seldom.__version__})")
     except ImportError:
         print("✗ Seldom 未安装")

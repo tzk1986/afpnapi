@@ -95,16 +95,26 @@ def _assert_shape(result: Dict[str, Any], status: str) -> None:
 
 
 def main() -> None:
-    passed_result = PostmanTestExecutor(_build_api(200), session=_PassedSession()).execute_test()
+    passed_result = PostmanTestExecutor(
+        _build_api(200), session=_PassedSession()
+    ).execute_test()
     _assert_shape(passed_result, "PASSED")
 
-    failed_result = PostmanTestExecutor(_build_api(200), session=_FailedSession()).execute_test()
+    failed_result = PostmanTestExecutor(
+        _build_api(200), session=_FailedSession()
+    ).execute_test()
     _assert_shape(failed_result, "FAILED")
-    assert "db_feedback" in failed_result, f"FAILED should keep db_feedback: {failed_result}"
+    assert (
+        "db_feedback" in failed_result
+    ), f"FAILED should keep db_feedback: {failed_result}"
 
-    error_result = PostmanTestExecutor(_build_api(200), session=_ErrorSession()).execute_test()
+    error_result = PostmanTestExecutor(
+        _build_api(200), session=_ErrorSession()
+    ).execute_test()
     _assert_shape(error_result, "ERROR")
-    assert "db_feedback" in error_result, f"ERROR should keep db_feedback: {error_result}"
+    assert (
+        "db_feedback" in error_result
+    ), f"ERROR should keep db_feedback: {error_result}"
 
     print("executor-result-shape-ok")
 

@@ -101,7 +101,7 @@ def is_safe_url(url: str) -> bool:
             return False
 
         # 禁止访问常见内网地址
-        if hostname in ('127.0.0.1', 'localhost', '0.0.0.0', '[::1]'):
+        if hostname in ("127.0.0.1", "localhost", "0.0.0.0", "[::1]"):
             return False
 
         # 禁止私有 IP 段

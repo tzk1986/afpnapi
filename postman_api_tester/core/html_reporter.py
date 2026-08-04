@@ -40,27 +40,24 @@ class HtmlReporter:
         """构建详情数据并执行请求头脱敏。"""
         details_data: DetailsData = {}
         for idx, result in enumerate(report.results):
-            req_info = result.get('request_info', {})
-            raw_req_headers = req_info.get('headers', {}) or {}
-            sanitized_headers = sanitize_headers(raw_req_headers, mask='***')
+            req_info = result.get("request_info", {})
+            raw_req_headers = req_info.get("headers", {}) or {}
+            sanitized_headers = sanitize_headers(raw_req_headers, mask="***")
             details_data[str(idx)] = {
-                'request_info': {**req_info, 'headers': sanitized_headers},
-                'response_info': result.get('response_info', {}),
+                "request_info": {**req_info, "headers": sanitized_headers},
+                "response_info": result.get("response_info", {}),
             }
         return details_data
 
-
     @staticmethod
     def _write_json_file(report: Any, file_path: str, payload: object) -> None:
-        with Path(file_path).open('w', encoding='utf-8') as f:
+        with Path(file_path).open("w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
-
 
     @staticmethod
     def _write_text_file(report: Any, file_path: str, content: str) -> None:
-        with Path(file_path).open('w', encoding='utf-8') as f:
+        with Path(file_path).open("w", encoding="utf-8") as f:
             f.write(content)
-
 
     @staticmethod
     def _write_report_pages(
@@ -73,30 +70,32 @@ class HtmlReporter:
         details_file_name: str,
     ) -> None:
         for page in range(1, total_pages + 1):
-            page_content = HtmlReporter._generate_page_html(report, page, results_per_page, summary, details_file_name)
+            page_content = HtmlReporter._generate_page_html(
+                report, page, results_per_page, summary, details_file_name
+            )
             page_path = f"{base_name}_page_{page}.html"
             HtmlReporter._write_text_file(report, page_path, page_content)
-
 
     @staticmethod
     def _build_index_results_data(report: Any) -> IndexResultsData:
         """构建首页报告表格数据（包含详情字段）。"""
         results_data: IndexResultsData = []
         for result in report.results:
-            results_data.append({
-                'name': result.get('name', ''),
-                'folder': result.get('folder', ''),
-                'method': result.get('method', ''),
-                'url': result.get('url', ''),
-                'status': result.get('status', ''),
-                'status_code': result.get('status_code', ''),
-                'message': result.get('message', ''),
-                'err_code': result.get('err_code', ''),
-                'request_info': result.get('request_info', {}),
-                'response_info': result.get('response_info', {}),
-            })
+            results_data.append(
+                {
+                    "name": result.get("name", ""),
+                    "folder": result.get("folder", ""),
+                    "method": result.get("method", ""),
+                    "url": result.get("url", ""),
+                    "status": result.get("status", ""),
+                    "status_code": result.get("status_code", ""),
+                    "message": result.get("message", ""),
+                    "err_code": result.get("err_code", ""),
+                    "request_info": result.get("request_info", {}),
+                    "response_info": result.get("response_info", {}),
+                }
+            )
         return results_data
-
 
     @staticmethod
     def _normalize_index_page_size(report: Any, results_per_page: int) -> int:
@@ -104,35 +103,36 @@ class HtmlReporter:
         page_size_options = {20, 30, 50, 100, 200}
         return results_per_page if results_per_page in page_size_options else 20
 
-
     @staticmethod
     def _render_page_size_options(report: Any, selected_page_size: int) -> str:
         option_values = [20, 30, 50, 100, 200]
         options: List[str] = []
         for value in option_values:
-            selected = ' selected' if value == selected_page_size else ''
+            selected = " selected" if value == selected_page_size else ""
             options.append(f'<option value="{value}"{selected}>{value}条</option>')
-        return '\n                    '.join(options)
-
+        return "\n                    ".join(options)
 
     @staticmethod
-    def _get_page_window(report: Any, page: int, results_per_page: int) -> Tuple[int, int, List[TestResultRecord]]:
+    def _get_page_window(
+        report: Any, page: int, results_per_page: int
+    ) -> Tuple[int, int, List[TestResultRecord]]:
         """返回分页窗口和当前页结果。"""
         start_idx = (page - 1) * results_per_page
         end_idx = min(page * results_per_page, len(report.results))
         page_results = report.results[start_idx:end_idx]
         return start_idx, end_idx, page_results
 
-
     @staticmethod
-    def _build_page_table_rows(report: Any, page_results: List[TestResultRecord], start_idx: int) -> str:
+    def _build_page_table_rows(
+        report: Any, page_results: List[TestResultRecord], start_idx: int
+    ) -> str:
         """构建分页报告表格行。"""
         _esc = _html.escape
         table_rows = ""
         for idx, result in enumerate(page_results):
             global_idx = start_idx + idx
             status_class = f"status-{_esc(str(result['status']).lower())}"
-            status_lower = _esc(str(result['status']).lower())
+            status_lower = _esc(str(result["status"]).lower())
             detail_id = f"detail-{global_idx}"
 
             table_rows += f"""
@@ -156,9 +156,10 @@ class HtmlReporter:
 """
         return table_rows
 
-
     @staticmethod
-    def generate_html_report(report: Any, output_path: str, results_per_page: int = 30) -> None:
+    def generate_html_report(
+        report: Any, output_path: str, results_per_page: int = 30
+    ) -> None:
         """生成 HTML 报告。"""
         summary = report.generate_summary()
         output_dir = Path(output_path).parent
@@ -170,19 +171,28 @@ class HtmlReporter:
         details_data = HtmlReporter._build_details_data(report)
 
         # 保存详情 JSON 文件
-        base_name = str(Path(output_path).with_suffix(''))
+        base_name = str(Path(output_path).with_suffix(""))
         details_file = f"{base_name}_details.json"
         HtmlReporter._write_json_file(report, details_file, details_data)
 
         meta_file = f"{base_name}_meta.json"
-        HtmlReporter._write_json_file(report, meta_file, HtmlReporter._build_report_metadata(report, summary, output_path, details_file))
+        HtmlReporter._write_json_file(
+            report,
+            meta_file,
+            HtmlReporter._build_report_metadata(
+                report, summary, output_path, details_file
+            ),
+        )
 
         # 生成索引页面
-        index_content = HtmlReporter._generate_index_html(report, summary, total_pages, results_per_page, total_results)
+        index_content = HtmlReporter._generate_index_html(
+            report, summary, total_pages, results_per_page, total_results
+        )
         HtmlReporter._write_text_file(report, output_path, index_content)
 
         # 生成分页页面
-        HtmlReporter._write_report_pages(report,
+        HtmlReporter._write_report_pages(
+            report,
             base_name=base_name,
             total_pages=total_pages,
             results_per_page=results_per_page,
@@ -194,69 +204,83 @@ class HtmlReporter:
         report.generated_details_file = details_file
         report.generated_meta_file = meta_file
 
-
     @staticmethod
-    def _build_report_metadata(report: Any, summary: SummaryData, output_path: str, details_file: str) -> ReportMetadata:
+    def _build_report_metadata(
+        report: Any, summary: SummaryData, output_path: str, details_file: str
+    ) -> ReportMetadata:
         """构建历史报告和差异比对所需的结构化元数据。"""
         return {
-            'report_name': Path(output_path).name,
-            'generated_at': summary['end_time'],
-            'host_name': socket.gethostname(),
-            'collection_name': report.collection_name,
-            'source_file': report.source_file,
-            'source_original_file': report.source_original_file,
-            'base_url': report.base_url,
-            'execution_mode': report.execution_mode,
-            'interrupted': bool(report.interrupted),
-            'interrupt_reason': report.interrupt_reason,
-            'assertion_strict_mode': bool(report.assertion_strict_mode),
-            'summary': summary,
-            'details_file': Path(details_file).name,
-            'results': [
+            "report_name": Path(output_path).name,
+            "generated_at": summary["end_time"],
+            "host_name": socket.gethostname(),
+            "collection_name": report.collection_name,
+            "source_file": report.source_file,
+            "source_original_file": report.source_original_file,
+            "base_url": report.base_url,
+            "execution_mode": report.execution_mode,
+            "interrupted": bool(report.interrupted),
+            "interrupt_reason": report.interrupt_reason,
+            "assertion_strict_mode": bool(report.assertion_strict_mode),
+            "summary": summary,
+            "details_file": Path(details_file).name,
+            "results": [
                 {
-                    'key': ' | '.join([
-                        result.get('folder', '') or '-',
-                        result.get('name', '') or '-',
-                        result.get('method', '') or '-',
-                        result.get('url', '') or '-',
-                    ]),
-                    'name': result.get('name', ''),
-                    'folder': result.get('folder', ''),
-                    'method': result.get('method', ''),
-                    'url': result.get('url', ''),
-                    'actual_request_url': result.get('actual_request_url', ''),
-                    'item_path': result.get('item_path', []),
-                    'expected_status': result.get('expected_status', 200),
-                    'status': result.get('status', ''),
-                    'status_code': result.get('status_code'),
-                    'message': result.get('message', ''),
-                    'err_code': result.get('err_code', ''),
-                    'response_time_ms': result.get('response_time_ms', 0),
+                    "key": " | ".join(
+                        [
+                            result.get("folder", "") or "-",
+                            result.get("name", "") or "-",
+                            result.get("method", "") or "-",
+                            result.get("url", "") or "-",
+                        ]
+                    ),
+                    "name": result.get("name", ""),
+                    "folder": result.get("folder", ""),
+                    "method": result.get("method", ""),
+                    "url": result.get("url", ""),
+                    "actual_request_url": result.get("actual_request_url", ""),
+                    "item_path": result.get("item_path", []),
+                    "expected_status": result.get("expected_status", 200),
+                    "status": result.get("status", ""),
+                    "status_code": result.get("status_code"),
+                    "message": result.get("message", ""),
+                    "err_code": result.get("err_code", ""),
+                    "response_time_ms": result.get("response_time_ms", 0),
                 }
                 for result in report.results
-            ]
+            ],
         }
 
-
     @staticmethod
-    def _generate_index_html(report: Any, summary: SummaryData, total_pages: int, results_per_page: int, total_results: int) -> str:
+    def _generate_index_html(
+        report: Any,
+        summary: SummaryData,
+        total_pages: int,
+        results_per_page: int,
+        total_results: int,
+    ) -> str:
         """生成索引页面 HTML，使用 Jinja2 模板渲染。"""
         results_data = HtmlReporter._build_index_results_data(report)
-        results_json = json.dumps(results_data, ensure_ascii=False).replace("</", "<\\/")
-        selected_page_size = HtmlReporter._normalize_index_page_size(report, results_per_page)
-        page_size_options_html = HtmlReporter._render_page_size_options(report, selected_page_size)
+        results_json = json.dumps(results_data, ensure_ascii=False).replace(
+            "</", "<\\/"
+        )
+        selected_page_size = HtmlReporter._normalize_index_page_size(
+            report, results_per_page
+        )
+        page_size_options_html = HtmlReporter._render_page_size_options(
+            report, selected_page_size
+        )
 
         env = _get_jinja_env()
         template = env.get_template("report_index.html")
         return template.render(
-            summary_total=summary['total'],
-            summary_passed=summary['passed'],
-            summary_failed=summary['failed'],
-            summary_error=summary['error'],
-            summary_success_rate=summary['success_rate'],
-            summary_duration=summary['duration'],
-            summary_start_time=summary['start_time'],
-            summary_end_time=summary['end_time'],
+            summary_total=summary["total"],
+            summary_passed=summary["passed"],
+            summary_failed=summary["failed"],
+            summary_error=summary["error"],
+            summary_success_rate=summary["success_rate"],
+            summary_duration=summary["duration"],
+            summary_start_time=summary["start_time"],
+            summary_end_time=summary["end_time"],
             total_pages=total_pages,
             total_results=total_results,
             results_json=results_json,
@@ -264,12 +288,21 @@ class HtmlReporter:
             page_size_options_html=page_size_options_html,
         )
 
-
     @staticmethod
-    def _generate_page_html(report: Any, page: int, results_per_page: int, summary: SummaryData, details_filename: str) -> str:
+    def _generate_page_html(
+        report: Any,
+        page: int,
+        results_per_page: int,
+        summary: SummaryData,
+        details_filename: str,
+    ) -> str:
         """生成分页页面 HTML。"""
-        start_idx, end_idx, page_results = HtmlReporter._get_page_window(report, page, results_per_page)
-        table_rows = HtmlReporter._build_page_table_rows(report, page_results, start_idx)
+        start_idx, end_idx, page_results = HtmlReporter._get_page_window(
+            report, page, results_per_page
+        )
+        table_rows = HtmlReporter._build_page_table_rows(
+            report, page_results, start_idx
+        )
 
         return f"""
 <!DOCTYPE html>
@@ -459,7 +492,6 @@ class HtmlReporter:
 </html>
 """
 
-
     @staticmethod
     def print_console_report(report: Any) -> None:
         """在控制台输出测试报告（通过 logger 保持等价格式化输出）。"""
@@ -478,8 +510,16 @@ class HtmlReporter:
         ]
 
         for result in report.results:
-            status_symbol = "PASS" if result['status'] == 'PASSED' else "FAIL" if result['status'] == 'FAILED' else "ERR"
-            lines.append(f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}")
+            status_symbol = (
+                "PASS"
+                if result["status"] == "PASSED"
+                else "FAIL"
+                if result["status"] == "FAILED"
+                else "ERR"
+            )
+            lines.append(
+                f"[{status_symbol}] {result['name']:30} | {result['method']:6} | {result['status']:8} | {result['status_code'] or '-'}"
+            )
             lines.append(f"    URL: {result['url']}")
             lines.append(f"    {result['message']}")
 

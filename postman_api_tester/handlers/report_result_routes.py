@@ -1,6 +1,5 @@
 """报告结果与分析路由处理函数。"""
 
-
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -87,7 +86,10 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
     """报告分析统计 API。"""
     if not ENABLE_REPORT_ANALYTICS:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError("当前环境未启用测试结果分析能力。"), 403)
+
+        return BaseHandler.error_response(
+            ValidationError("当前环境未启用测试结果分析能力。"), 403
+        )
 
     report = get_report_or_error(report_name, "")
     if isinstance(report, tuple):
@@ -123,13 +125,19 @@ def api_report_analytics_compare() -> ResponseReturnValue:
     """报告分析对比 API。"""
     if not ENABLE_REPORT_ANALYTICS:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError("当前环境未启用测试结果分析能力。"), 403)
+
+        return BaseHandler.error_response(
+            ValidationError("当前环境未启用测试结果分析能力。"), 403
+        )
 
     left_name = str(request.args.get("left", "")).strip()
     right_name = str(request.args.get("right", "")).strip()
     if not left_name or not right_name:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError("left 和 right 参数不能为空"), 400)
+
+        return BaseHandler.error_response(
+            ValidationError("left 和 right 参数不能为空"), 400
+        )
 
     left_report = get_report_or_error(left_name, "")
     if isinstance(left_report, tuple):
@@ -165,7 +173,9 @@ def api_report_analytics_compare() -> ResponseReturnValue:
     return jsonify(payload)
 
 
-def api_report_result_detail(report_name: str, result_index: int) -> ResponseReturnValue:
+def api_report_result_detail(
+    report_name: str, result_index: int
+) -> ResponseReturnValue:
     """单条结果详情 API。"""
     report = get_report_or_error(report_name, "")
     if isinstance(report, tuple):
@@ -175,7 +185,10 @@ def api_report_result_detail(report_name: str, result_index: int) -> ResponseRet
         return jsonify(build_result_detail_payload(report, result_index))
     except IndexError:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"结果索引不存在: {result_index}"), 404)
+
+        return BaseHandler.error_response(
+            ValidationError(f"结果索引不存在: {result_index}"), 404
+        )
 
 
 def api_compare() -> ResponseReturnValue:
@@ -184,7 +197,10 @@ def api_compare() -> ResponseReturnValue:
     right_name = request.args.get("right", "")
     if not left_name or not right_name:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError("left 和 right 参数不能为空"), 400)
+
+        return BaseHandler.error_response(
+            ValidationError("left 和 right 参数不能为空"), 400
+        )
     left = get_report_or_error(left_name, "")
     if isinstance(left, tuple):
         return left

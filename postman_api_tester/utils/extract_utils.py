@@ -9,7 +9,9 @@ import re
 from typing import Any
 
 _HEADER_PREFIX = "$header."
-_FIELD_PATTERN = re.compile(r"^\$(?:\.([A-Za-z_][A-Za-z0-9_]*))*(?:\[(-?\d+)\])?(?:\.([A-Za-z_][A-Za-z0-9_]*)(?:\[(-?\d+)\])?)*$")
+_FIELD_PATTERN = re.compile(
+    r"^\$(?:\.([A-Za-z_][A-Za-z0-9_]*))*(?:\[(-?\d+)\])?(?:\.([A-Za-z_][A-Za-z0-9_]*)(?:\[(-?\d+)\])?)*$"
+)
 
 
 def _parse_path(expression: str) -> list[tuple[str, int | None]] | None:
@@ -19,7 +21,12 @@ def _parse_path(expression: str) -> list[tuple[str, int | None]] | None:
     """
     if not expression or not expression.startswith("$."):
         return None
-    if ".." in expression or "*" in expression or "?" in expression or "[" in expression.split("$.", 1)[0]:
+    if (
+        ".." in expression
+        or "*" in expression
+        or "?" in expression
+        or "[" in expression.split("$.", 1)[0]
+    ):
         return None
 
     body = expression[2:]
@@ -36,7 +43,7 @@ def _parse_path(expression: str) -> list[tuple[str, int | None]] | None:
         if not match:
             return None
         field = match.group(1)
-        remaining = remaining[match.end():]
+        remaining = remaining[match.end() :]
 
         index: int | None = None
         if remaining.startswith("["):
@@ -44,7 +51,7 @@ def _parse_path(expression: str) -> list[tuple[str, int | None]] | None:
             if not idx_match:
                 return None
             index = int(idx_match.group(1))
-            remaining = remaining[idx_match.end():]
+            remaining = remaining[idx_match.end() :]
 
         segments.append((field, index))
 
@@ -105,6 +112,7 @@ def extract_by_jsonpath(data: Any, expression: str) -> str | None:
         return "true" if result else "false"
     if isinstance(result, (dict, list)):
         import json
+
         return json.dumps(result, ensure_ascii=False)
     return str(result)
 
@@ -135,7 +143,7 @@ def extract_from_response(
             continue
         value: str | None = None
         if expression.startswith(_HEADER_PREFIX):
-            header_name = expression[len(_HEADER_PREFIX):]
+            header_name = expression[len(_HEADER_PREFIX) :]
             if header_name:
                 value = extract_from_header(response_headers, header_name)
         else:

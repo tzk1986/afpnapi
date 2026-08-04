@@ -48,7 +48,7 @@ class TestRequest(seldom.TestCase):
         plaload = {"pageNum": 1, "ageSize": 10}
         self.s.get(
             "/api/mat/materialBrand/queryMaterialBrandList",
-            params = plaload,
+            params=plaload,
             headers={"token": self.token},
         )
         self.assertStatusCode(200)
@@ -117,11 +117,11 @@ class TestRequest(seldom.TestCase):
             headers={"token": self.token},
         )
         self.assertStatusCode(200)
-        self.assertPath("errCode", 0)    
+        self.assertPath("errCode", 0)
 
 
 if __name__ == "__main__":
     seldom.main(
         # debug=True,
         base_url="http://10.50.11.120:9005"
-    )   
+    )

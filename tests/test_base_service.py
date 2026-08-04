@@ -9,7 +9,9 @@ from postman_api_tester.exceptions import ExecutionError, ValidationError
 
 
 @pytest.fixture  # type: ignore[untyped-decorator]
-def caplog_fixture(caplog: pytest.LogCaptureFixture) -> Generator[pytest.LogCaptureFixture, None, None]:
+def caplog_fixture(
+    caplog: pytest.LogCaptureFixture,
+) -> Generator[pytest.LogCaptureFixture, None, None]:
     """提供日志捕获 fixture."""
     caplog.set_level(logging.INFO, logger="postman_api_tester.services.base_service")
     yield caplog
@@ -17,6 +19,7 @@ def caplog_fixture(caplog: pytest.LogCaptureFixture) -> Generator[pytest.LogCapt
 
 def test_safe_execute_success() -> None:
     """验证安全执行成功."""
+
     def success_func(a: int, b: int) -> int:
         return a + b
 
@@ -26,6 +29,7 @@ def test_safe_execute_success() -> None:
 
 def test_safe_execute_postman_exception() -> None:
     """验证 PostmanTestException 直接抛出."""
+
     def failing_func() -> None:
         raise ValidationError("Validation failed")
 
@@ -35,6 +39,7 @@ def test_safe_execute_postman_exception() -> None:
 
 def test_safe_execute_unexpected_exception() -> None:
     """验证其他异常被包装为 ExecutionError."""
+
     def failing_func() -> None:
         raise RuntimeError("Unexpected error")
 

@@ -25,7 +25,9 @@ def main() -> None:
     base = "http://127.0.0.1:5000"
     out: Dict[str, Any] = {}
 
-    out["health"] = _must_ok(requests.get(f"{base}/health", timeout=20), "health").get("status")
+    out["health"] = _must_ok(requests.get(f"{base}/health", timeout=20), "health").get(
+        "status"
+    )
     out["index_status"] = requests.get(f"{base}/", timeout=20).status_code
 
     reports = _must_ok(requests.get(f"{base}/api/reports", timeout=20), "api/reports")
@@ -60,7 +62,10 @@ def main() -> None:
     ).get("total")
 
     # manual-cases CRUD
-    _must_ok(requests.get(f"{base}/api/manual-cases/{report_name}", timeout=20), "manual-cases get")
+    _must_ok(
+        requests.get(f"{base}/api/manual-cases/{report_name}", timeout=20),
+        "manual-cases get",
+    )
     case_payload = {
         "name": "自动验证-临时用例",
         "folder": "人工补录",
@@ -118,7 +123,11 @@ def main() -> None:
     export_resp = _must_ok(
         requests.post(
             f"{base}/api/export-collection",
-            json={"report_name": report_name, "include_auth": False, "export_scope": "full"},
+            json={
+                "report_name": report_name,
+                "include_auth": False,
+                "export_scope": "full",
+            },
             timeout=30,
         ),
         "export-collection",
@@ -128,10 +137,14 @@ def main() -> None:
 
     # security checks
     out["re_request_invalid_scheme_status"] = requests.post(
-        f"{base}/re-request-api", json={"url": "ftp://example.com/a", "method": "GET"}, timeout=20
+        f"{base}/re-request-api",
+        json={"url": "ftp://example.com/a", "method": "GET"},
+        timeout=20,
     ).status_code
     out["proxy_invalid_scheme_status"] = requests.post(
-        f"{base}/api/proxy-request", json={"url": "file:///etc/passwd", "method": "GET"}, timeout=20
+        f"{base}/api/proxy-request",
+        json={"url": "file:///etc/passwd", "method": "GET"},
+        timeout=20,
     ).status_code
 
     if out["re_request_invalid_scheme_status"] != 400:

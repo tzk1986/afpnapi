@@ -108,7 +108,11 @@ class CheckpointManager:
             )
             return data
         except (json.JSONDecodeError, OSError) as e:
-            logger.warning("Corrupted checkpoint, removing: %s", e, extra={"event": "checkpoint.corrupted", "error": str(e)})
+            logger.warning(
+                "Corrupted checkpoint, removing: %s",
+                e,
+                extra={"event": "checkpoint.corrupted", "error": str(e)},
+            )
             checkpoint_path.unlink(missing_ok=True)
             return None
 
@@ -135,6 +139,7 @@ class CheckpointManager:
         """
         executed_set = {_item_path_text(p) for p in executed_item_paths}
         return [
-            api for api in apis
+            api
+            for api in apis
             if _item_path_text(api.get("item_path")) not in executed_set
         ]

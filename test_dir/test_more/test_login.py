@@ -1,10 +1,12 @@
 """
 AOM: https://seldomqa.github.io/api-testing/api_object.html
 """
-import sys , os 
+
+import sys
+
 # base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # print(base_dir)
-base_dir = '/tangzk/py/seldom-api-testing'
+base_dir = "/tangzk/py/seldom-api-testing"
 
 sys.path.append(base_dir)
 
@@ -15,7 +17,6 @@ from api_object.user_api import UserApiObject
 
 
 class TestRequest(seldom.TestCase):
-
     def test_user_login(self):
         """
         test case
@@ -26,5 +27,5 @@ class TestRequest(seldom.TestCase):
         self.assertStatusCode(200)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     seldom.main(debug=True)

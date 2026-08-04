@@ -62,7 +62,9 @@ def _load_json(file_path: str) -> list[dict[str, str]]:
     return rows
 
 
-def validate_data_file(file_path: str, max_rows: int) -> tuple[list[dict[str, str]], str]:
+def validate_data_file(
+    file_path: str, max_rows: int
+) -> tuple[list[dict[str, str]], str]:
     """验证数据文件并返回 (数据行列表, 格式标识)。
 
     校验项：

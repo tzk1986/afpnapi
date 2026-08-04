@@ -21,7 +21,9 @@ class TestCreateCase:
     """创建用例测试。"""
 
     def test_create_basic_case(self, store: UiCaseStore) -> None:
-        case_id = store.create_case({"name": "测试用例", "base_url": "https://example.com"})
+        case_id = store.create_case(
+            {"name": "测试用例", "base_url": "https://example.com"}
+        )
         assert case_id
         case = store.get_case(case_id)
         assert case is not None
@@ -59,7 +61,9 @@ class TestListCases:
 
     def test_list_multiple(self, store: UiCaseStore) -> None:
         store.create_case({"name": "用例 A", "steps": [{"action": "click"}]})
-        store.create_case({"name": "用例 B", "steps": [{"action": "type"}, {"action": "click"}]})
+        store.create_case(
+            {"name": "用例 B", "steps": [{"action": "type"}, {"action": "click"}]}
+        )
         cases = store.list_cases()
         assert len(cases) == 2
         names = {c["name"] for c in cases}
@@ -67,7 +71,9 @@ class TestListCases:
         assert "用例 B" in names
 
     def test_list_returns_summary(self, store: UiCaseStore) -> None:
-        store.create_case({"name": "有步骤", "steps": [{"action": "click"}, {"action": "type"}]})
+        store.create_case(
+            {"name": "有步骤", "steps": [{"action": "click"}, {"action": "type"}]}
+        )
         cases = store.list_cases()
         assert len(cases) == 1
         assert cases[0]["step_count"] == 2
@@ -102,7 +108,9 @@ class TestUpdateCase:
         assert case["name"] == "新名"
 
     def test_update_steps(self, store: UiCaseStore) -> None:
-        case_id = store.create_case({"name": "更新步骤", "steps": [{"action": "click"}]})
+        case_id = store.create_case(
+            {"name": "更新步骤", "steps": [{"action": "click"}]}
+        )
         new_steps = [{"action": "type", "value": "new"}]
         store.update_case(case_id, {"steps": new_steps})
         case = store.get_case(case_id)

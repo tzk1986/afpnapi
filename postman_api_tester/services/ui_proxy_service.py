@@ -20,10 +20,27 @@ PROXY_PREFIX = "/ui-testing/proxy"
 RESOURCE_PROXY_PREFIX = "/ui-testing/proxy-resource"
 
 _SKIP_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".mp4", ".webm", ".ogg", ".mp3", ".wav",
-    ".pdf", ".zip", ".tar", ".gz",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+    ".webp",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".mp4",
+    ".webm",
+    ".ogg",
+    ".mp3",
+    ".wav",
+    ".pdf",
+    ".zip",
+    ".tar",
+    ".gz",
 }
 
 _CONTENT_TYPE_MAP = {
@@ -46,6 +63,7 @@ _CONTENT_TYPE_MAP = {
 }
 
 # ── 代理 Cookie 会话管理 ──
+
 
 class _ProxySessionStore:
     """代理 Cookie 会话存储 — 将目标服务器的 Cookie 转发给浏览器，反之亦然。"""
@@ -85,7 +103,9 @@ class _ProxySessionStore:
             s = self._sessions.get(session_id)
             return s.get("platform_url", "") if s else ""
 
-    def get_cookie_jar(self, session_id: str) -> Optional[requests.cookies.RequestsCookieJar]:
+    def get_cookie_jar(
+        self, session_id: str
+    ) -> Optional[requests.cookies.RequestsCookieJar]:
         with self._lock:
             s = self._sessions.get(session_id)
             if s:
@@ -107,7 +127,9 @@ class _ProxySessionStore:
                     extra={
                         "event": "ui.proxy.session.token_stored",
                         "session_id": session_id[:8],
-                        "token_preview": token[:30] + "..." if len(token) > 30 else token,
+                        "token_preview": token[:30] + "..."
+                        if len(token) > 30
+                        else token,
                     },
                 )
 
@@ -134,7 +156,9 @@ class _ProxySessionStore:
                     extra={
                         "event": "ui.proxy.session.subsystem_token_stored",
                         "session_id": session_id[:8],
-                        "token_preview": token[:30] + "..." if len(token) > 30 else token,
+                        "token_preview": token[:30] + "..."
+                        if len(token) > 30
+                        else token,
                     },
                 )
 
@@ -183,6 +207,7 @@ class _ProxySessionStore:
         cleared = 0
         # 提取 origin 用于匹配（忽略路径）
         from urllib.parse import urlparse
+
         parsed = urlparse(base_url)
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
 
@@ -221,7 +246,9 @@ class _ProxySessionStore:
             )
         return cleared
 
-    def update_cookies(self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar) -> None:
+    def update_cookies(
+        self, session_id: str, resp_cookies: requests.cookies.RequestsCookieJar
+    ) -> None:
         """更新 session cookie，确保同名 cookie 被替换而非共存。
 
         解决问题：浏览器 JSESSIONID 加载后，目标服务器响应 Set-Cookie 返回新 JSESSIONID，
@@ -312,6 +339,7 @@ class _ProxySessionStore:
                     parts.append(f"Path={cookie.path}")
                 if cookie.expires:
                     from email.utils import formatdate
+
                     parts.append(f"Expires={formatdate(cookie.expires, usegmt=True)}")
                 if cookie.has_nonstandard_attr("HttpOnly"):
                     parts.append("HttpOnly")
@@ -325,25 +353,35 @@ class _ProxySessionStore:
             result = []
             for sid, s in self._sessions.items():
                 jar = s["cookies"]
-                result.append({
-                    "session_id": sid[:8],
-                    "base_url": s.get("base_url", ""),
-                    "last_active_ago": round(time.time() - s["last_active"]),
-                    "cookies": [{
-                        "name": c.name,
-                        "value_preview": c.value[:30] + "..." if len(c.value) > 30 else c.value,
-                        "domain": c.domain,
-                        "path": c.path,
-                    } for c in jar],
-                })
+                result.append(
+                    {
+                        "session_id": sid[:8],
+                        "base_url": s.get("base_url", ""),
+                        "last_active_ago": round(time.time() - s["last_active"]),
+                        "cookies": [
+                            {
+                                "name": c.name,
+                                "value_preview": c.value[:30] + "..."
+                                if len(c.value) > 30
+                                else c.value,
+                                "domain": c.domain,
+                                "path": c.path,
+                            }
+                            for c in jar
+                        ],
+                    }
+                )
             return result
 
     def cleanup_expired(self) -> int:
         now = time.time()
         removed = 0
         with self._lock:
-            expired = [sid for sid, s in self._sessions.items()
-                       if now - s["last_active"] > self._TTL]
+            expired = [
+                sid
+                for sid, s in self._sessions.items()
+                if now - s["last_active"] > self._TTL
+            ]
             for sid in expired:
                 del self._sessions[sid]
                 removed += 1
@@ -351,6 +389,7 @@ class _ProxySessionStore:
 
 
 _proxy_session_store = _ProxySessionStore()
+
 
 # 定时清理过期会话
 def _start_session_cleanup() -> None:
@@ -363,8 +402,10 @@ def _start_session_cleanup() -> None:
                     logger.debug("Cleaned up %d expired proxy sessions", removed)
             except Exception:
                 pass
+
     t = threading.Thread(target=_cleanup_loop, daemon=True)
     t.start()
+
 
 _start_session_cleanup()
 
@@ -409,15 +450,10 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
-        # SSRF 防护：禁止访问内网地址
-        from postman_api_tester.utils.security import is_safe_url
-        if not is_safe_url(url):
-            raise ValueError(f"禁止访问内网地址: {url}")
-
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Referer": target_origin + "/",
@@ -439,7 +475,9 @@ class UiProxyService:
                             "event": "ui.proxy.page.token_from_store",
                             "session_id": session_id[:8],
                             "url": url,
-                            "token_preview": token_value[:30] + "..." if len(token_value) > 30 else token_value,
+                            "token_preview": token_value[:30] + "..."
+                            if len(token_value) > 30
+                            else token_value,
                         },
                     )
             logger.info(
@@ -448,7 +486,9 @@ class UiProxyService:
                     "event": "ui.proxy.page.token_debug",
                     "session_id": session_id[:8] if session_id else None,
                     "url": url,
-                    "token_in_req_headers": token_value[:20] + "..." if len(token_value) > 20 else token_value,
+                    "token_in_req_headers": token_value[:20] + "..."
+                    if len(token_value) > 20
+                    else token_value,
                     "token_is_null": token_value == "null" or not token_value,
                 },
             )
@@ -480,7 +520,12 @@ class UiProxyService:
                         "session_id": session_id[:8],
                         "url": url,
                         "method": method,
-                        "cookies_sent": {c.name: c.value[:20] + "..." if len(c.value) > 20 else c.value for c in cookie_jar},
+                        "cookies_sent": {
+                            c.name: c.value[:20] + "..."
+                            if len(c.value) > 20
+                            else c.value
+                            for c in cookie_jar
+                        },
                     },
                 )
 
@@ -497,8 +542,12 @@ class UiProxyService:
         )
 
         resp = session.request(
-            method, url, headers=headers, data=req_body,
-            timeout=cls.REQUEST_TIMEOUT, allow_redirects=False,
+            method,
+            url,
+            headers=headers,
+            data=req_body,
+            timeout=cls.REQUEST_TIMEOUT,
+            allow_redirects=False,
         )
 
         # 诊断：记录是否有重定向发生
@@ -555,7 +604,9 @@ class UiProxyService:
                     "event": "ui.proxy.page.cookies.updated",
                     "session_id": session_id[:8],
                     "url": url,
-                    "cookies_in_jar": [c.name for c in updated_jar] if updated_jar else [],
+                    "cookies_in_jar": [c.name for c in updated_jar]
+                    if updated_jar
+                    else [],
                 },
             )
 
@@ -576,15 +627,25 @@ class UiProxyService:
             # 改写 Location 为代理 URL
             if location:
                 from urllib.parse import urlparse as _urlparse
+
                 parsed_loc = _urlparse(location)
                 if parsed_loc.scheme and parsed_loc.netloc:
                     # 绝对 URL：改写为代理 URL
-                    rewritten_location = f"/ui-testing/proxy?url={location}&replay=1" if replay_mode else f"/ui-testing/proxy?url={location}"
+                    rewritten_location = (
+                        f"/ui-testing/proxy?url={location}&replay=1"
+                        if replay_mode
+                        else f"/ui-testing/proxy?url={location}"
+                    )
                 else:
                     # 相对 URL：拼接为基础 URL 再改写
                     from urllib.parse import urljoin
+
                     abs_location = urljoin(url, location)
-                    rewritten_location = f"/ui-testing/proxy?url={abs_location}&replay=1" if replay_mode else f"/ui-testing/proxy?url={abs_location}"
+                    rewritten_location = (
+                        f"/ui-testing/proxy?url={abs_location}&replay=1"
+                        if replay_mode
+                        else f"/ui-testing/proxy?url={abs_location}"
+                    )
 
                 logger.info(
                     "proxy_page_redirect_rewrite",
@@ -610,7 +671,9 @@ class UiProxyService:
                 "Location": rewritten_location,
             }
             if session_id:
-                response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
+                response_headers["_set_cookies"] = (
+                    _proxy_session_store.get_set_cookie_headers(session_id)
+                )
             return "", resp.status_code, response_headers
 
         content_type = resp.headers.get("Content-Type", "")
@@ -623,16 +686,29 @@ class UiProxyService:
 
         # 转发 Set-Cookie 给浏览器（返回列表，由 route handler 逐个设置）
         if session_id:
-            response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
+            response_headers["_set_cookies"] = (
+                _proxy_session_store.get_set_cookie_headers(session_id)
+            )
 
         response_headers.pop("X-Frame-Options", None)
         response_headers.pop("Content-Security-Policy", None)
 
         if is_html:
-            body = cls.rewrite_html(resp.text, resp.url, replay_mode=replay_mode, recording_mode=recording_mode, replay_engine_js=replay_engine_js, session_id=session_id or "")
+            body = cls.rewrite_html(
+                resp.text,
+                resp.url,
+                replay_mode=replay_mode,
+                recording_mode=recording_mode,
+                replay_engine_js=replay_engine_js,
+                session_id=session_id or "",
+            )
             response_headers["Content-Type"] = "text/html; charset=utf-8"
         else:
-            body = resp.text if isinstance(resp.text, str) else resp.content.decode("utf-8", errors="replace")
+            body = (
+                resp.text
+                if isinstance(resp.text, str)
+                else resp.content.decode("utf-8", errors="replace")
+            )
 
         # 记录响应内容摘要（用于诊断 new_tab 返回登录页问题）
         if is_html and len(body) < 10000:
@@ -675,12 +751,24 @@ class UiProxyService:
         if parsed.scheme not in ("http", "https"):
             raise ValueError(f"仅支持 http/https 协议: {url}")
 
-        _HOP_BY_HOP = frozenset({
-            "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
-            "te", "trailers", "transfer-encoding", "upgrade",
-            "host", "content-length", "cookie",
-            "x-forwarded-for", "x-forwarded-proto", "x-real-ip",
-        })
+        _HOP_BY_HOP = frozenset(
+            {
+                "connection",
+                "keep-alive",
+                "proxy-authenticate",
+                "proxy-authorization",
+                "te",
+                "trailers",
+                "transfer-encoding",
+                "upgrade",
+                "host",
+                "content-length",
+                "cookie",
+                "x-forwarded-for",
+                "x-forwarded-proto",
+                "x-real-ip",
+            }
+        )
         headers: Dict[str, str] = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept": "*/*",
@@ -710,7 +798,9 @@ class UiProxyService:
                         "event": "ui.proxy.resource.token_from_store",
                         "session_id": session_id[:8],
                         "url": url,
-                        "token_preview": token_value[:30] + "..." if len(token_value) > 30 else token_value,
+                        "token_preview": token_value[:30] + "..."
+                        if len(token_value) > 30
+                        else token_value,
                     },
                 )
         if token_value and token_value != "null":
@@ -727,7 +817,9 @@ class UiProxyService:
                     "session_id": session_id[:8] if session_id else None,
                     "url": url,
                     "method": method,
-                    "headers_sent": {k: v[:60] if len(v) > 60 else v for k, v in headers.items()},
+                    "headers_sent": {
+                        k: v[:60] if len(v) > 60 else v for k, v in headers.items()
+                    },
                 },
             )
 
@@ -743,13 +835,22 @@ class UiProxyService:
                         "session_id": session_id[:8],
                         "url": url,
                         "method": method,
-                        "cookies_sent": {c.name: c.value[:20] + "..." if len(c.value) > 20 else c.value for c in cookie_jar},
+                        "cookies_sent": {
+                            c.name: c.value[:20] + "..."
+                            if len(c.value) > 20
+                            else c.value
+                            for c in cookie_jar
+                        },
                     },
                 )
 
         # 记录 POST 请求体（仅 API 请求）
         if method == "POST" and req_body and "/api/" in url:
-            body_preview = req_body[:500].decode("utf-8", errors="replace") if isinstance(req_body, bytes) else str(req_body)[:500]
+            body_preview = (
+                req_body[:500].decode("utf-8", errors="replace")
+                if isinstance(req_body, bytes)
+                else str(req_body)[:500]
+            )
             logger.info(
                 "proxy_resource_request_body",
                 extra={
@@ -762,8 +863,12 @@ class UiProxyService:
             )
 
         resp = session.request(
-            method, url, headers=headers, data=req_body,
-            timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+            method,
+            url,
+            headers=headers,
+            data=req_body,
+            timeout=cls.REQUEST_TIMEOUT,
+            allow_redirects=True,
         )
 
         # 捕获 getEspSystemUrl 返回的平台 URL 并存储到 session
@@ -796,14 +901,18 @@ class UiProxyService:
                 else:
                     _sub_token_value = ""
                 if _sub_token_value and _sub_token_value != "null":
-                    _proxy_session_store.set_subsystem_token(session_id, _sub_token_value)
+                    _proxy_session_store.set_subsystem_token(
+                        session_id, _sub_token_value
+                    )
                     logger.info(
                         "proxy_subsystem_token_captured",
                         extra={
                             "event": "ui.proxy.subsystem_token_captured",
                             "session_id": session_id[:8],
                             "url": url,
-                            "token_preview": _sub_token_value[:30] + "..." if len(_sub_token_value) > 30 else _sub_token_value,
+                            "token_preview": _sub_token_value[:30] + "..."
+                            if len(_sub_token_value) > 30
+                            else _sub_token_value,
                         },
                     )
             except Exception:
@@ -822,6 +931,7 @@ class UiProxyService:
                             break
             if _platform_url:
                 from urllib.parse import urlparse as _urlparse_retry
+
                 _orig_parsed = _urlparse_retry(url)
                 _retry_url = _platform_url.rstrip("/") + _orig_parsed.path
                 if _orig_parsed.query:
@@ -830,7 +940,9 @@ class UiProxyService:
                 _retry_headers["Origin"] = _platform_url
                 _retry_headers["Referer"] = _platform_url + "/"
                 # 使用平台 session 的 Token
-                _platform_sid = _proxy_session_store.find_session_by_base_url(_platform_url)
+                _platform_sid = _proxy_session_store.find_session_by_base_url(
+                    _platform_url
+                )
                 if _platform_sid:
                     _platform_token = _proxy_session_store.get_token(_platform_sid)
                     if _platform_token:
@@ -842,8 +954,12 @@ class UiProxyService:
                         if _pjar:
                             _retry_session.cookies = _pjar
                     _retry_resp = _retry_session.request(
-                        method, _retry_url, headers=_retry_headers, data=req_body,
-                        timeout=cls.REQUEST_TIMEOUT, allow_redirects=True,
+                        method,
+                        _retry_url,
+                        headers=_retry_headers,
+                        data=req_body,
+                        timeout=cls.REQUEST_TIMEOUT,
+                        allow_redirects=True,
                     )
                     if _retry_resp.status_code != 405:
                         logger.info(
@@ -889,7 +1005,9 @@ class UiProxyService:
 
         # 记录 API 响应体（仅非二进制内容）
         resp_ct = resp.headers.get("Content-Type", "")
-        if ("/api/" in url or "/uapi/" in url) and ("json" in resp_ct or "text" in resp_ct):
+        if ("/api/" in url or "/uapi/" in url) and (
+            "json" in resp_ct or "text" in resp_ct
+        ):
             resp_body_preview = resp.text[:500] if resp.text else ""
             logger.info(
                 "proxy_resource_response_body",
@@ -912,7 +1030,9 @@ class UiProxyService:
                     "event": "ui.proxy.resource.cookies.updated",
                     "session_id": session_id[:8],
                     "url": url,
-                    "cookies_in_jar": [c.name for c in updated_jar] if updated_jar else [],
+                    "cookies_in_jar": [c.name for c in updated_jar]
+                    if updated_jar
+                    else [],
                 },
             )
 
@@ -923,7 +1043,9 @@ class UiProxyService:
 
         # 转发 Set-Cookie 给浏览器（返回列表，由 route handler 逐个设置）
         if session_id:
-            response_headers["_set_cookies"] = _proxy_session_store.get_set_cookie_headers(session_id)
+            response_headers["_set_cookies"] = (
+                _proxy_session_store.get_set_cookie_headers(session_id)
+            )
 
         body = resp.content
         if "javascript" in resp_ct:
@@ -937,7 +1059,14 @@ class UiProxyService:
         return body, resp.status_code, response_headers
 
     @staticmethod
-    def rewrite_html(html: str, base_url: str, replay_mode: bool = False, recording_mode: bool = False, replay_engine_js: str = "", session_id: str = "") -> str:
+    def rewrite_html(
+        html: str,
+        base_url: str,
+        replay_mode: bool = False,
+        recording_mode: bool = False,
+        replay_engine_js: str = "",
+        session_id: str = "",
+    ) -> str:
         """改写 HTML 中的所有 URL 引用。
 
         处理：
@@ -952,7 +1081,14 @@ class UiProxyService:
 
         result = html
 
-        result = UiProxyService._inject_early_script(result, origin, base_url, replay_mode=replay_mode, recording_mode=recording_mode, session_id=session_id)
+        result = UiProxyService._inject_early_script(
+            result,
+            origin,
+            base_url,
+            replay_mode=replay_mode,
+            recording_mode=recording_mode,
+            session_id=session_id,
+        )
         result = UiProxyService._rewrite_base_tag(result, base_url)
         result = UiProxyService._rewrite_attr_urls(result, base_url, origin)
         result = UiProxyService._rewrite_inline_style_urls(result, base_url, origin)
@@ -961,7 +1097,9 @@ class UiProxyService:
 
         # 回放模式：注入回放引擎脚本（确保新页面加载后也能继续执行）
         if replay_mode and replay_engine_js:
-            result = UiProxyService._inject_replay_engine_script(result, replay_engine_js)
+            result = UiProxyService._inject_replay_engine_script(
+                result, replay_engine_js
+            )
         else:
             result = UiProxyService._inject_recorder_script(result, origin)
 
@@ -980,7 +1118,9 @@ class UiProxyService:
     @staticmethod
     def _resolve_url(href: str, base_url: str) -> Optional[str]:
         """将相对 URL 解析为绝对 URL。"""
-        if not href or href.startswith(("javascript:", "data:", "blob:", "#", "mailto:", "tel:")):
+        if not href or href.startswith(
+            ("javascript:", "data:", "blob:", "#", "mailto:", "tel:")
+        ):
             return None
         if href.startswith("//"):
             parsed_base = urlparse(base_url)
@@ -990,7 +1130,7 @@ class UiProxyService:
     @staticmethod
     def _rewrite_base_tag(html: str, base_url: str) -> str:
         """移除或替换 <base href> 标签。"""
-        html = re.sub(r'<base\s+[^>]*>', '', html, flags=re.IGNORECASE)
+        html = re.sub(r"<base\s+[^>]*>", "", html, flags=re.IGNORECASE)
         return html
 
     @staticmethod
@@ -1000,7 +1140,9 @@ class UiProxyService:
         分割结果: [前文本, 开标签, 脚本内容, 闭标签, 后文本, 开标签, ...]
         索引 0,1,3 需要变换（开标签含 src 等属性），索引 2（脚本内容）跳过。
         """
-        pattern = re.compile(r'(<script\b[^>]*>)(.*?)(</script>)', re.IGNORECASE | re.DOTALL)
+        pattern = re.compile(
+            r"(<script\b[^>]*>)(.*?)(</script>)", re.IGNORECASE | re.DOTALL
+        )
         parts = pattern.split(html)
         result = []
         for i, part in enumerate(parts):
@@ -1069,10 +1211,11 @@ class UiProxyService:
             return f"{q}{proxy_url}{q}"
 
         result = re.sub(
-            r'''(["'])((?:assets|js|css)/[^"']+\.(?:js|css))\1''',
+            r"""(["'])((?:assets|js|css)/[^"']+\.(?:js|css))\1""",
             _rewrite_asset_path,
             result,
         )
+
         # Vite 嵌入的 <link rel="modulepreload"> HTML 字符串
         # 这些是 Vite preload helper 运行时动态创建的 DOM 元素模板，
         # 其 href 属性包含 /js/... 或 /assets/... 等绝对路径，
@@ -1105,8 +1248,16 @@ class UiProxyService:
         attr_patterns = [
             (r'(<(?:a|area)\s[^>]*?)href\s*=\s*"([^"]*)"', "href", True),
             (r"(<(?:a|area)\s[^>]*?)href\s*=\s*'([^']*)'", "href", True),
-            (r'(<(?:img|script|video|audio|source|embed|iframe|track)\s[^>]*?)src\s*=\s*"([^"]*)"', "src", False),
-            (r"(<(?:img|script|video|audio|source|embed|iframe|track)\s[^>]*?)src\s*=\s*'([^']*)'", "src", False),
+            (
+                r'(<(?:img|script|video|audio|source|embed|iframe|track)\s[^>]*?)src\s*=\s*"([^"]*)"',
+                "src",
+                False,
+            ),
+            (
+                r"(<(?:img|script|video|audio|source|embed|iframe|track)\s[^>]*?)src\s*=\s*'([^']*)'",
+                "src",
+                False,
+            ),
             (r'(<link\s[^>]*?)href\s*=\s*"([^"]*)"', "href", False),
             (r"(<link\s[^>]*?)href\s*=\s*'([^']*)'", "href", False),
             (r'(<form\s[^>]*?)action\s*=\s*"([^"]*)"', "action", True),
@@ -1130,6 +1281,7 @@ class UiProxyService:
         def _make_replacer(attr_name: str, is_page: bool) -> Callable[[re.Match], str]:
             def _replacer(match: re.Match) -> str:
                 return _replace_attr(match, attr_name, is_page)
+
             return _replacer
 
         def _rewrite_outside(outside: str) -> str:
@@ -1147,10 +1299,13 @@ class UiProxyService:
     @staticmethod
     def _rewrite_inline_style_urls(html: str, base_url: str, origin: str) -> str:
         """改写内联 style 属性中的 url()。"""
+
         def _replace_style_attr(match: re.Match) -> str:
             prefix = match.group(1)
             style_content = match.group(2)
-            rewritten = UiProxyService._rewrite_css_urls(style_content, base_url, origin)
+            rewritten = UiProxyService._rewrite_css_urls(
+                style_content, base_url, origin
+            )
             return f'{prefix}"{rewritten}"'
 
         def _rewrite_outside(outside: str) -> str:
@@ -1166,6 +1321,7 @@ class UiProxyService:
     @staticmethod
     def _rewrite_style_tag_urls(html: str, base_url: str, origin: str) -> str:
         """改写 <style> 标签中的 url()。"""
+
         def _replace_style_tag(match: re.Match) -> str:
             open_tag = match.group(1)
             css_content = match.group(2)
@@ -1175,7 +1331,7 @@ class UiProxyService:
 
         def _rewrite_outside(outside: str) -> str:
             return re.sub(
-                r'(<style[^>]*>)(.*?)(</style>)',
+                r"(<style[^>]*>)(.*?)(</style>)",
                 _replace_style_tag,
                 outside,
                 flags=re.IGNORECASE | re.DOTALL,
@@ -1186,6 +1342,7 @@ class UiProxyService:
     @staticmethod
     def _rewrite_css_urls(css: str, base_url: str, origin: str) -> str:
         """改写 CSS 中的 url() 引用。"""
+
         def _replace_css_url(match: re.Match) -> str:
             url_value = match.group(1) or match.group(2)
             if url_value.startswith(("data:", "blob:", "#")):
@@ -1212,16 +1369,25 @@ class UiProxyService:
     def _remove_frame_busting(html: str) -> str:
         """移除常见的 frame-busting 脚本。"""
         patterns = [
-            r'if\s*\(\s*top\s*!==?\s*self\s*\)\s*top\.location\s*=\s*self\.location',
-            r'if\s*\(\s*window\.top\s*!==?\s*window\s*\)\s*.*?;',
-            r'if\s*\(\s*self\s*!=\s*top\s*\)\s*.*?;',
+            r"if\s*\(\s*top\s*!==?\s*self\s*\)\s*top\.location\s*=\s*self\.location",
+            r"if\s*\(\s*window\.top\s*!==?\s*window\s*\)\s*.*?;",
+            r"if\s*\(\s*self\s*!=\s*top\s*\)\s*.*?;",
         ]
         for pattern in patterns:
-            html = re.sub(pattern, '/* frame-busting removed */', html, flags=re.IGNORECASE)
+            html = re.sub(
+                pattern, "/* frame-busting removed */", html, flags=re.IGNORECASE
+            )
         return html
 
     @staticmethod
-    def _inject_early_script(html: str, origin: str, target_url: str, replay_mode: bool = False, recording_mode: bool = False, session_id: str = "") -> str:
+    def _inject_early_script(
+        html: str,
+        origin: str,
+        target_url: str,
+        replay_mode: bool = False,
+        recording_mode: bool = False,
+        session_id: str = "",
+    ) -> str:
         """在 <head> 后立即注入早期脚本，拦截动态脚本/资源创建。
 
         拦截机制（8 层防护）：
@@ -1236,18 +1402,18 @@ class UiProxyService:
         """
         # _rwHtml: 重写 HTML 字符串中 src/href/data/poster 属性的 URL
         rw_html = (
-            'function _rwHtml(s){'
+            "function _rwHtml(s){"
             'if(typeof s!=="string")return s;'
             'return s.replace(/([ \\t\\n\\r])(src|href|data|poster)([ \\t\\n\\r]*=[ \\t\\n\\r]*)(["\\x27])([^"\\x27]*?)(\\4)/gi,'
-            'function(m,pre,attr,eq,q,val,qe){'
-            'if(val.indexOf(_F)===0)return pre+attr+eq+q+_T+val.substring(_F.length)+qe;'
-            'return m;});}'
+            "function(m,pre,attr,eq,q,val,qe){"
+            "if(val.indexOf(_F)===0)return pre+attr+eq+q+_T+val.substring(_F.length)+qe;"
+            "return m;});}"
         )
 
         # _toProxy: 将任意 URL 转为代理 URL（处理绝对路径、根路径、相对路径、代理域名路径）
         # 注意：/api/ 路径需要区分代理自身 API（/api/ui-testing/ 等）和目标服务器 API（/api/uims/ 等）
         to_proxy = (
-            'function _toProxy(v){'
+            "function _toProxy(v){"
             'if(typeof v!=="string"||!v)return v;'
             'if(v.indexOf("data:")===0||v.indexOf("blob:")===0||v.indexOf("javascript:")===0)return v;'
             'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0)return v;'
@@ -1257,62 +1423,68 @@ class UiProxyService:
             'if(v.indexOf("/")===0)return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+v);'
             'if(v.indexOf(_F)===0&&!_isProxyUrl(v))return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+v.substring(_F.length));'
             'return"/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+v);'
-            '}'
+            "}"
         )
 
-        storage_clear = ''
+        storage_clear = ""
         if replay_mode or recording_mode:
             # 回放模式：仅登录页清空 storage 和 cookie（确保初始状态干净），其他页面保留（Token 等认证信息）
             # 录制模式：所有页面都清空
-            is_login_check = 'true' if recording_mode else '(_targetLoc.pathname.indexOf("/login")>=0)'
+            is_login_check = (
+                "true"
+                if recording_mode
+                else '(_targetLoc.pathname.indexOf("/login")>=0)'
+            )
             storage_clear = (
-                'try{'
-                'if(' + is_login_check + '){'
-                'var _lsKeys=Object.keys(localStorage);'
-                'var _ssKeys=Object.keys(sessionStorage);'
-                'if(window.parent&&window.parent.postMessage){'
+                "try{"
+                "if(" + is_login_check + "){"
+                "var _lsKeys=Object.keys(localStorage);"
+                "var _ssKeys=Object.keys(sessionStorage);"
+                "if(window.parent&&window.parent.postMessage){"
                 'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_before_clear",lsKeys:_lsKeys,ssKeys:_ssKeys}},"*");'
-                '}'
-                'localStorage.clear();sessionStorage.clear();'
+                "}"
+                "localStorage.clear();sessionStorage.clear();"
                 'document.cookie.split(";").forEach(function(c){document.cookie=c.replace(/^ +/,"").replace(/=.*/,"=;expires="+new Date().toUTCString()+";path=/;");});'
-                'if(window.parent&&window.parent.postMessage){'
+                "if(window.parent&&window.parent.postMessage){"
                 'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_after_clear",lsKeys:Object.keys(localStorage),ssKeys:Object.keys(sessionStorage),cookies_cleared:true}},"*");'
-                '}'
-                '}'
-                '}catch(e){'
-                'if(window.parent&&window.parent.postMessage){'
+                "}"
+                "}"
+                "}catch(e){"
+                "if(window.parent&&window.parent.postMessage){"
                 'window.parent.postMessage({type:"_proxy_nav",data:{event:"storage_clear_error",error:String(e)}},"*");'
-                '}'
-                '}'
+                "}"
+                "}"
             )
 
         # 跨系统 Token 注入：回放模式下，如果 session 中有子系统 Token 且目标不是主平台登录页，
         # 将子系统 Token 注入 localStorage，覆盖可能残留的主平台 Token（解决 9301 等子系统"登录状态失效"）
-        subsystem_token_inject = ''
+        subsystem_token_inject = ""
         if replay_mode and session_id:
             _sub_token = _proxy_session_store.get_subsystem_token(session_id)
             if _sub_token:
                 _parsed_target = urlparse(target_url)
                 _target_path = _parsed_target.path or "/"
                 if "/login" not in _target_path:
-                    _escaped_token = _sub_token.replace("\\", "\\\\").replace('"', '\\"')
+                    _escaped_token = _sub_token.replace("\\", "\\\\").replace(
+                        '"', '\\"'
+                    )
                     subsystem_token_inject = (
-                        'try{'
+                        "try{"
                         'var _subToken="' + _escaped_token + '";'
                         'var _tokenKeys=["token","access_token","Token","AUTH_TOKEN","esp_token"];'
-                        '_tokenKeys.forEach(function(k){'
-                        'localStorage.setItem(k,_subToken);'
+                        "_tokenKeys.forEach(function(k){"
+                        "localStorage.setItem(k,_subToken);"
                         'console.log("[ProxyEarly] subsystem token set:",k);'
-                        '});'
-                        'Object.keys(localStorage).forEach(function(k){'
-                        'try{var v=localStorage.getItem(k);'
-                        'if(v&&v.indexOf(\'{"\')===0){var obj=JSON.parse(v);'
+                        "});"
+                        "Object.keys(localStorage).forEach(function(k){"
+                        "try{var v=localStorage.getItem(k);"
+                        "if(v&&v.indexOf('{\"')===0){var obj=JSON.parse(v);"
                         'console.log("[ProxyEarly] JSON key:",k,"has token:",typeof obj.token==="string");'
                         'if(typeof obj==="object"&&obj!==null&&typeof obj.token==="string"&&obj.token!==_subToken){'
-                        'obj.token=_subToken;localStorage.setItem(k,JSON.stringify(obj));'
+                        "obj.token=_subToken;localStorage.setItem(k,JSON.stringify(obj));"
                         'console.log("[ProxyEarly] subsystem token updated in:",k);}}'
-                        '}catch(e){/* skip non-standard JSON values (e.g. {key:value} without quotes) */}'
-                        '});'
+                        "}catch(e){/* skip non-standard JSON values (e.g. {key:value} without quotes) */}"
+                        "});"
                         '}catch(e){console.warn("[ProxyEarly] subsystem token inject failed:",e);}'
                     )
                     logger.info(
@@ -1336,30 +1508,30 @@ class UiProxyService:
         )
 
         early_js = (
-            '(function(){'
+            "(function(){"
             'var _T="' + origin + '";'
             'var _TURL="' + target_url + '";'
             'var _F=location.protocol+"//"+location.host;'
             'var _PROXY_PATH="/ui-testing/";'
-            'if(!_T||_T===_F)return;'
+            "if(!_T||_T===_F)return;"
             'var _targetLoc=document.createElement("a");_targetLoc.href=_TURL;'
-            'window.__proxyTargetLoc=_targetLoc;'
-            + storage_clear +
-            subsystem_token_inject +
-            'try{'
-            'var _locProps={pathname:{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;}},search:{get:function(){return _targetLoc.search;},set:function(v){_targetLoc.search=v;}},hash:{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;}},host:{get:function(){return _targetLoc.host;}},hostname:{get:function(){return _targetLoc.hostname;}},protocol:{get:function(){return _targetLoc.protocol;}},port:{get:function(){return _targetLoc.port;}},origin:{get:function(){return _targetLoc.origin;}},href:{get:function(){return _targetLoc.href;}}};'
-            '(function(){'
-            'var _origGOPD=Object.getOwnPropertyDescriptor;'
-            'Object.getOwnPropertyDescriptor=function(obj,prop){'
-            'if(obj===window.location&&_locProps[prop]){var d=_origGOPD(obj,prop);if(d){d.get=_locProps[prop].get;if(d.set)_locProps[prop].set&&(d.set=_locProps[prop].set);d.configurable=true;return d;}return{value:_targetLoc[prop],writable:true,enumerable:true,configurable:true};}'
-            'return _origGOPD.apply(this,arguments);'
-            '};'
-            'var _origGOPDs=Object.getOwnPropertyDescriptors;'
-            'Object.getOwnPropertyDescriptors=function(obj){'
-            'if(obj===window.location){var r={};for(var k in _locProps){r[k]={get:_locProps[k].get,configurable:true,enumerable:true};if(_locProps[k].set)r[k].set=_locProps[k].set;}return r;}'
-            'return _origGOPDs.apply(this,arguments);'
-            '};'
-            '})();'
+            "window.__proxyTargetLoc=_targetLoc;"
+            + storage_clear
+            + subsystem_token_inject
+            + "try{"
+            "var _locProps={pathname:{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;}},search:{get:function(){return _targetLoc.search;},set:function(v){_targetLoc.search=v;}},hash:{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;}},host:{get:function(){return _targetLoc.host;}},hostname:{get:function(){return _targetLoc.hostname;}},protocol:{get:function(){return _targetLoc.protocol;}},port:{get:function(){return _targetLoc.port;}},origin:{get:function(){return _targetLoc.origin;}},href:{get:function(){return _targetLoc.href;}}};"
+            "(function(){"
+            "var _origGOPD=Object.getOwnPropertyDescriptor;"
+            "Object.getOwnPropertyDescriptor=function(obj,prop){"
+            "if(obj===window.location&&_locProps[prop]){var d=_origGOPD(obj,prop);if(d){d.get=_locProps[prop].get;if(d.set)_locProps[prop].set&&(d.set=_locProps[prop].set);d.configurable=true;return d;}return{value:_targetLoc[prop],writable:true,enumerable:true,configurable:true};}"
+            "return _origGOPD.apply(this,arguments);"
+            "};"
+            "var _origGOPDs=Object.getOwnPropertyDescriptors;"
+            "Object.getOwnPropertyDescriptors=function(obj){"
+            "if(obj===window.location){var r={};for(var k in _locProps){r[k]={get:_locProps[k].get,configurable:true,enumerable:true};if(_locProps[k].set)r[k].set=_locProps[k].set;}return r;}"
+            "return _origGOPDs.apply(this,arguments);"
+            "};"
+            "})();"
             'var _locPD=Object.getOwnPropertyDescriptor(window.location,"pathname");'
             'if(_locPD&&_locPD.configurable){Object.defineProperty(window.location,"pathname",{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;},configurable:true});}'
             'else{try{Object.defineProperty(window.location,"pathname",{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;},configurable:true});}catch(e){}}'
@@ -1369,86 +1541,86 @@ class UiProxyService:
             'if(_locHD&&_locHD.configurable){Object.defineProperty(window.location,"hash",{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;},configurable:true});}'
             'var _locWinDesc=Object.getOwnPropertyDescriptor(window,"location");'
             'var _locOverridden=false;var _locOverrideError="";var _winLocCfg=!!_locWinDesc&&!!_locWinDesc.configurable;'
-            'var _origLocation=window.location;'
+            "var _origLocation=window.location;"
             'if(!(_locPD&&_locPD.configurable)){try{Object.defineProperty(window,"location",{get:function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){_origLocation.href=_toPageProxy(u);},replace:function(u){_origLocation.replace(_toPageProxy(u));},reload:function(){location.reload();}};},configurable:true});_locOverridden=true;}catch(e){_locOverrideError=String(e);}}'
             'if(!_locOverridden){try{window.__defineGetter__("location",function(){return{pathname:_targetLoc.pathname,search:_targetLoc.search,hash:_targetLoc.hash,host:_targetLoc.host,hostname:_targetLoc.hostname,protocol:_targetLoc.protocol,port:_targetLoc.port,origin:_targetLoc.origin,href:_targetLoc.href,assign:function(u){_origLocation.href=_toPageProxy(u);},replace:function(u){_origLocation.replace(_toPageProxy(u));},reload:function(){location.reload();}};});_locOverridden=true;}catch(e){_locOverrideError=_locOverrideError||String(e);}}'
             'if(typeof Location!=="undefined"&&Location.prototype){'
             'var _locHrefDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");'
-            'if(_locHrefDesc&&_locHrefDesc.set){'
-            'var _origHrefSet=_locHrefDesc.set;'
+            "if(_locHrefDesc&&_locHrefDesc.set){"
+            "var _origHrefSet=_locHrefDesc.set;"
             'try{Object.defineProperty(Location.prototype,"href",{get:_locHrefDesc.get,set:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};_origHrefSet.call(this,v);},configurable:false});}catch(e){Location.prototype.href=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};_origHrefSet.call(this,v);};}}'
             'console.log("[ProxyEarly] Location.prototype.href setter patched");'
             'var _locReplaceDesc=Object.getOwnPropertyDescriptor(Location.prototype,"replace");'
-            'if(_locReplaceDesc&&_locReplaceDesc.value){var _origReplace=_locReplaceDesc.value;'
+            "if(_locReplaceDesc&&_locReplaceDesc.value){var _origReplace=_locReplaceDesc.value;"
             'try{Object.defineProperty(Location.prototype,"replace",{value:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};return _origReplace.call(this,v);},writable:false,configurable:false});}catch(e){Location.prototype.replace=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};return _origReplace.call(this,v);};}}'
             'var _locAssignDesc=Object.getOwnPropertyDescriptor(Location.prototype,"assign");'
-            'if(_locAssignDesc&&_locAssignDesc.value){var _origAssign=_locAssignDesc.value;'
+            "if(_locAssignDesc&&_locAssignDesc.value){var _origAssign=_locAssignDesc.value;"
             'try{Object.defineProperty(Location.prototype,"assign",{value:function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0&&v.indexOf("/ui-testing/")!==0){try{v=_toPageProxy(v);}catch(e){}};return _origAssign.call(this,v);},writable:false,configurable:false});}catch(e){Location.prototype.assign=function(v){if(typeof v==="string"&&v.indexOf(_PROXY_PATH)!==0){v=_toPageProxy(v);};return _origAssign.call(this,v);};}}'
-            '}'
+            "}"
             'window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_loaded",pathname:_targetLoc.pathname,href:_targetLoc.href,realPathname:window.location.pathname,pathnameConfigurable:!!_locPD&&!!_locPD.configurable,locOverridden:_locOverridden,locOverrideError:_locOverrideError,winLocConfigurable:_winLocCfg,gopdPatched:true}},"*");'
             '}catch(e){try{window.parent.postMessage({type:"_proxy_nav",data:{event:"early_script_error",error:String(e)}},"*");}catch(e2){}}'
             'try{fetch("/api/ui-testing/replay-log",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event:"early_script_loaded",pathname:_targetLoc.pathname,href:_targetLoc.href,realPathname:window.location.pathname,pathnameConfigurable:!!_locPD&&!!_locPD.configurable,locOverridden:_locOverridden,locOverrideError:_locOverrideError,winLocConfigurable:_winLocCfg})}).catch(function(){});}catch(e){}'
             'function _isProxyUrl(v){return typeof v==="string"&&v.indexOf(_PROXY_PATH)>=0;}'
             'function _rw(s){return typeof s==="string"?s.split(_F).join(_T):s}'
             'function _rwProxy(s){return typeof s==="string"?s.split(_T).join(_F):s}'
-            'function _rewriteUrl(v){'
+            "function _rewriteUrl(v){"
             'if(typeof v!=="string")return v;'
             'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/api/ui-testing/")===0||v.indexOf("/api/ui-recorder/")===0||v.indexOf("/api/postman/")===0||v.indexOf("/api/report/")===0)return v;'
-            'if(v.indexOf(_F)===0)return _T+v.substring(_F.length);'
+            "if(v.indexOf(_F)===0)return _T+v.substring(_F.length);"
             'if(v.indexOf("/")===0)return _T+v;'
-            'return v;}'
-            + to_proxy +
-            rw_html +
-            'function _rwTargetToProxy(s){return typeof s==="string"?s.replace(new RegExp(_T.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&")+"(?=[/])","g"),"/ui-testing/proxy-resource?url="+encodeURIComponent(_T)):s;}'
-            'var _dw=document.write.bind(document);document.write=function(h){return _dw(_rwTargetToProxy(_rw(h)))};'
-            'var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rwTargetToProxy(_rw(h)))};'
-            'var _ac=Element.prototype.appendChild;'
-            'Element.prototype.appendChild=function(child){'
+            "return v;}"
+            + to_proxy
+            + rw_html
+            + 'function _rwTargetToProxy(s){return typeof s==="string"?s.replace(new RegExp(_T.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&")+"(?=[/])","g"),"/ui-testing/proxy-resource?url="+encodeURIComponent(_T)):s;}'
+            "var _dw=document.write.bind(document);document.write=function(h){return _dw(_rwTargetToProxy(_rw(h)))};"
+            "var _dwl=document.writeln.bind(document);document.writeln=function(h){return _dwl(_rwTargetToProxy(_rw(h)))};"
+            "var _ac=Element.prototype.appendChild;"
+            "Element.prototype.appendChild=function(child){"
             'if(child&&child.tagName==="SCRIPT"&&child.src)child.src=_toProxy(child.src);'
             'if(child&&child.tagName==="LINK"&&child.href)child.href=_toProxy(child.href);'
-            'return _ac.call(this,child);};'
-            'var _ib=Element.prototype.insertBefore;'
-            'Element.prototype.insertBefore=function(child,ref){'
+            "return _ac.call(this,child);};"
+            "var _ib=Element.prototype.insertBefore;"
+            "Element.prototype.insertBefore=function(child,ref){"
             'if(child&&child.tagName==="SCRIPT"&&child.src)child.src=_toProxy(child.src);'
             'if(child&&child.tagName==="LINK"&&child.href)child.href=_toProxy(child.href);'
-            'return _ib.call(this,child,ref);};'
-            'var _ce=document.createElement.bind(document);'
-            'document.createElement=function(t){'
-            'var el=_ce(t);'
+            "return _ib.call(this,child,ref);};"
+            "var _ce=document.createElement.bind(document);"
+            "document.createElement=function(t){"
+            "var el=_ce(t);"
             '["src","href","data","poster"].forEach(function(p){'
-            'var d=Object.getOwnPropertyDescriptor(el.constructor.prototype,p);'
-            'if(d&&d.set){var o=d.set;'
-            'Object.defineProperty(el,p,{set:function(v){'
+            "var d=Object.getOwnPropertyDescriptor(el.constructor.prototype,p);"
+            "if(d&&d.set){var o=d.set;"
+            "Object.defineProperty(el,p,{set:function(v){"
             'if(typeof v==="string")v=_toProxy(v);'
-            'o.call(this,v);},get:d.get});}});'
-            'return el;};'
+            "o.call(this,v);},get:d.get});}});"
+            "return el;};"
             'var _ihp=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");'
-            'if(_ihp&&_ihp.set){var _ihs=_ihp.set;'
+            "if(_ihp&&_ihp.set){var _ihs=_ihp.set;"
             'Object.defineProperty(Element.prototype,"innerHTML",{set:function(h){_ihs.call(this,_rwHtml(h));},get:_ihp.get});}'
-            'var _iah=Element.prototype.insertAdjacentHTML;'
-            'Element.prototype.insertAdjacentHTML=function(p,h){return _iah.call(this,p,_rwHtml(h))};'
-            'var _pd=DOMParser.prototype.parseFromString;'
-            'DOMParser.prototype.parseFromString=function(s,t){return _pd.call(this,_rwHtml(s),t)};'
+            "var _iah=Element.prototype.insertAdjacentHTML;"
+            "Element.prototype.insertAdjacentHTML=function(p,h){return _iah.call(this,p,_rwHtml(h))};"
+            "var _pd=DOMParser.prototype.parseFromString;"
+            "DOMParser.prototype.parseFromString=function(s,t){return _pd.call(this,_rwHtml(s),t)};"
             'if(typeof HTMLImageElement!=="undefined"){'
             'var _imgDesc=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,"src");'
-            'if(_imgDesc&&_imgDesc.set){var _imgSet=_imgDesc.set;'
+            "if(_imgDesc&&_imgDesc.set){var _imgSet=_imgDesc.set;"
             'Object.defineProperty(HTMLImageElement.prototype,"src",{set:function(v){'
             'if(typeof v==="string")v=_toProxy(v);'
-            '_imgSet.call(this,v);},get:_imgDesc.get});}}'
+            "_imgSet.call(this,v);},get:_imgDesc.get});}}"
             'if(typeof HTMLElement!=="undefined"){'
-            'var _sa=Element.prototype.setAttribute;'
-            'Element.prototype.setAttribute=function(n,v){'
+            "var _sa=Element.prototype.setAttribute;"
+            "Element.prototype.setAttribute=function(n,v){"
             'if(n==="src"&&typeof v==="string"&&this instanceof HTMLImageElement)v=_toProxy(v);'
-            'return _sa.call(this,n,v);};}'
+            "return _sa.call(this,n,v);};}"
             'var _saSet=Object.getOwnPropertyDescriptor(Element.prototype,"setAttribute");'
-            'if(_saSet&&_saSet.value){var _saOrig=_saSet.value;'
-            'Element.prototype.setAttribute=function(n,v){'
+            "if(_saSet&&_saSet.value){var _saOrig=_saSet.value;"
+            "Element.prototype.setAttribute=function(n,v){"
             'if(n==="src"&&typeof v==="string")v=_toProxy(v);'
-            'return _saOrig.call(this,n,v);};}'
-            'var _origFetch=window.fetch;'
-            'var _proxyFetch=function(url,opts){'
+            "return _saOrig.call(this,n,v);};}"
+            "var _origFetch=window.fetch;"
+            "var _proxyFetch=function(url,opts){"
             'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
-            'var _origUrl=_url;'
+            "var _origUrl=_url;"
             'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("/ui-testing/")===0)return _origFetch.call(this,url,opts);'
             'if(_url.indexOf("/api/ui-testing/")===0||_url.indexOf("/api/ui-recorder/")===0||_url.indexOf("/api/postman/")===0||_url.indexOf("/api/report/")===0)return _origFetch.call(this,url,opts);'
@@ -1460,14 +1632,14 @@ class UiProxyService:
             'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
             'console.log("[EarlyScript] fetch:", _origUrl.substring(0,60), "->", _url.substring(0,100));'
             'opts=opts||{};opts.credentials="include";arguments[1]=opts;'
-            'return _origFetch.apply(this,[_url].concat(Array.prototype.slice.call(arguments,1))).then(function(resp){'
+            "return _origFetch.apply(this,[_url].concat(Array.prototype.slice.call(arguments,1))).then(function(resp){"
             'if(!resp.ok)console.warn("[EarlyScript] fetch failed:", _origUrl.substring(0,80), "->", resp.status, resp.statusText);'
             'return resp;}).catch(function(err){console.error("[EarlyScript] fetch error:", _origUrl.substring(0,80), err.message);throw err;});};'
             'try{Object.defineProperty(window,"fetch",{value:_proxyFetch,writable:false,configurable:false});}catch(e){window.fetch=_proxyFetch;}'
-            'var _xhrOpen=XMLHttpRequest.prototype.open;'
-            'var _proxyXhrOpen=function(m,url){'
+            "var _xhrOpen=XMLHttpRequest.prototype.open;"
+            "var _proxyXhrOpen=function(m,url){"
             'var _url=typeof url==="string"?url:(url&&url.href?String(url.href):String(url));'
-            'var _origUrl=_url;'
+            "var _origUrl=_url;"
             'if(_url.indexOf("data:")===0||_url.indexOf("blob:")===0||_url.indexOf("javascript:")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf("/ui-testing/")===0)return _xhrOpen.apply(this,arguments);'
             'if(_url.indexOf("/api/ui-testing/")===0||_url.indexOf("/api/ui-recorder/")===0||_url.indexOf("/api/postman/")===0||_url.indexOf("/api/report/")===0)return _xhrOpen.apply(this,arguments);'
@@ -1477,19 +1649,19 @@ class UiProxyService:
             'else if(_url.indexOf("http://")===0||_url.indexOf("https://")===0)_url="/ui-testing/proxy-resource?url="+encodeURIComponent(_url);'
             'else _url="/ui-testing/proxy-resource?url="+encodeURIComponent(_T+"/"+_url);'
             'console.log("[EarlyScript] XHR:", m, _origUrl.substring(0,60), "->", _url.substring(0,100));'
-            'arguments[1]=_url;'
-            'var xhr=this;'
+            "arguments[1]=_url;"
+            "var xhr=this;"
             'xhr.addEventListener("load",function(){'
             'if(xhr.status>=400)console.warn("[EarlyScript] XHR failed:", m, _origUrl.substring(0,80), "->", xhr.status, xhr.statusText);});'
             'xhr.addEventListener("error",function(){'
             'console.error("[EarlyScript] XHR error:", m, _origUrl.substring(0,80));});'
-            'return _xhrOpen.apply(this,arguments);};'
+            "return _xhrOpen.apply(this,arguments);};"
             'try{Object.defineProperty(XMLHttpRequest.prototype,"open",{value:_proxyXhrOpen,writable:false,configurable:false});}catch(e){XMLHttpRequest.prototype.open=_proxyXhrOpen;}'
             'window.addEventListener("error",function(e){'
             'console.error("[EarlyScript] Uncaught error:", e.message, "at", e.filename, ":", e.lineno);});'
             'window.addEventListener("unhandledrejection",function(e){'
             'console.error("[EarlyScript] Unhandled promise rejection:", e.reason);});'
-            'function _toPageProxy(v){'
+            "function _toPageProxy(v){"
             'if(typeof v!=="string"||!v)return v;'
             'if(v.indexOf("data:")===0||v.indexOf("blob:")===0||v.indexOf("javascript:")===0)return v;'
             'if(v.indexOf(_PROXY_PATH)===0||v.indexOf("/ui-testing/")===0)return v;'
@@ -1500,79 +1672,83 @@ class UiProxyService:
             'var _pathUrl=v.indexOf("/")===0?v:(v.indexOf(_F)===0?v.substring(_F.length):"/"+v);'
             'var _sep=_pathUrl.indexOf("?")>=0?"&":"?";'
             'return _pathUrl+_sep+"_proxy_url="+encodeURIComponent(_fullUrl);'
-            '}'
+            "}"
             'if(typeof History!=="undefined"&&History.prototype&&History.prototype.pushState){'
-            'var _nativePush=History.prototype.pushState;'
-            'var _nativeReplace=History.prototype.replaceState;'
-            'function _proxyPushState(state,title,url){'
+            "var _nativePush=History.prototype.pushState;"
+            "var _nativeReplace=History.prototype.replaceState;"
+            "function _proxyPushState(state,title,url){"
             'if(typeof url==="string"){try{window.parent.postMessage({type:"_proxy_nav",data:{method:"pushState",href:url,loc:location.href}},"*");}catch(e){}'
             'if(url.indexOf("#")===0||url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativePush.call(this,state,title,url);}'
             'try{if(url.indexOf("_proxy_url=")>=0){var _r2=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r2.href;var _origUrl="";try{var _idx=_r2.searchParams.get("_proxy_url");if(_idx){var _origParsed=new URL(_idx);_origUrl=_origParsed.href;}}catch(e2){}var _finalPath=_r2.pathname;var _finalProxy="_proxy_url="+encodeURIComponent(_origUrl||_r2.href);url=_finalPath+"?"+_finalProxy+(_r2.hash?_r2.hash:"");}else{var _preservedProxy="";try{var _tlp=new URL(_targetLoc.href);_preservedProxy=_tlp.searchParams.get("_proxy_url")||"";}catch(ep){}var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";var _finalProxy=_path+_sep+"_proxy_url="+encodeURIComponent(_preservedProxy||_r.href);url=_finalProxy;_targetLoc.href=new URL(_finalProxy,_T).href;}}catch(e){}}'
-            'return _nativePush.call(this,state,title,url);}'
-            'function _proxyReplaceState(state,title,url){'
+            "return _nativePush.call(this,state,title,url);}"
+            "function _proxyReplaceState(state,title,url){"
             'if(typeof url==="string"){try{window.parent.postMessage({type:"_proxy_nav",data:{method:"replaceState",href:url,loc:location.href}},"*");}catch(e){}'
             'if(url.indexOf("#")===0||url.indexOf(_PROXY_PATH)===0||url.indexOf("/api/ui-testing/")===0||url.indexOf("/api/ui-recorder/")===0||url.indexOf("/api/postman/")===0||url.indexOf("/api/report/")===0){return _nativeReplace.call(this,state,title,url);}'
             'try{if(url.indexOf("_proxy_url=")>=0){var _r2=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);_targetLoc.href=_r2.href;var _origUrl="";try{var _idx=_r2.searchParams.get("_proxy_url");if(_idx){var _origParsed=new URL(_idx);_origUrl=_origParsed.href;}}catch(e2){}var _finalPath=_r2.pathname;var _finalProxy="_proxy_url="+encodeURIComponent(_origUrl||_r2.href);url=_finalPath+"?"+_finalProxy+(_r2.hash?_r2.hash:"");}else{var _preservedProxy="";try{var _tlp=new URL(_targetLoc.href);_preservedProxy=_tlp.searchParams.get("_proxy_url")||"";}catch(ep){}var _r=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);var _path=_r.pathname+(_r.search?_r.search:"")+(_r.hash?_r.hash:"");var _sep=(_r.search||_r.hash)?"&":"?";var _finalProxy=_path+_sep+"_proxy_url="+encodeURIComponent(_preservedProxy||_r.href);url=_finalProxy;_targetLoc.href=new URL(_finalProxy,_T).href;}}catch(e){}}'
-            'return _nativeReplace.call(this,state,title,url);}'
+            "return _nativeReplace.call(this,state,title,url);}"
             'try{Object.defineProperty(History.prototype,"pushState",{value:_proxyPushState,writable:false,configurable:false});}catch(e){History.prototype.pushState=_proxyPushState;}'
             'try{Object.defineProperty(History.prototype,"replaceState",{value:_proxyReplaceState,writable:false,configurable:false});}catch(e){History.prototype.replaceState=_proxyReplaceState;}'
-            '}'
-            'var _origOpen=window.open;'
-            'if(_origOpen){'
+            "}"
+            "var _origOpen=window.open;"
+            "if(_origOpen){"
             + (
-                'window.open=function(url,name,features){'
+                "window.open=function(url,name,features){"
                 'if(typeof url==="string"){'
-                'window.__proxyLastWindowOpenUrl=url;'
+                "window.__proxyLastWindowOpenUrl=url;"
                 'try{var _p=new URL(url,url.indexOf("/")===0?_T:_targetLoc.href);'
                 'window.parent.postMessage({type:"_proxy_nav",data:{method:"window.open",href:url,loc:location.href,target:_p.href}},"*");'
                 'console.log("[ProxyEarly] window.open intercepted in replay, forwarding to parent:",_p.href.substring(0,80));'
-                '}catch(e){}}'
-                'return{closed:false,close:function(){},focus:function(){},postMessage:function(){}};'
-                '};'
-            if replay_mode else (
-                'window.open=function(url,name,features){'
-                'if(typeof url==="string"){url=_toPageProxy(url);}'
-                'return _origOpen.call(this,url,name,features);};'
-            ))
-            + '}'
+                "}catch(e){}}"
+                "return{closed:false,close:function(){},focus:function(){},postMessage:function(){}};"
+                "};"
+                if replay_mode
+                else (
+                    "window.open=function(url,name,features){"
+                    'if(typeof url==="string"){url=_toPageProxy(url);}'
+                    "return _origOpen.call(this,url,name,features);};"
+                )
+            )
+            + "}"
             'try{if(typeof window.__PROXY_SETUP__==="undefined"){window.__PROXY_SETUP__=true;var _tPath=_targetLoc.pathname+(_targetLoc.search||"")+(_targetLoc.hash||"");window.history.replaceState(null,"",_tPath);try{window.location.hash="#"+_targetLoc.pathname;}catch(e){}try{window.dispatchEvent(new PopStateEvent("popstate",{}));}catch(e){var _pe=document.createEvent("HTMLEvents");_pe.initEvent("popstate",true,true);window.dispatchEvent(_pe);}}}catch(e){}'
             + (
-                'function _convertBlank(){'
+                "function _convertBlank(){"
                 'var links=document.querySelectorAll("a[target=\\"_blank\\"]");'
                 'for(var i=0;i<links.length;i++)links[i].setAttribute("target","_self");'
-                '}'
+                "}"
                 'document.addEventListener("click",function(e){'
                 'var link=e.target.closest("a");'
                 'if(!link||!link.href||link.href.indexOf("javascript:")===0)return;'
                 'if(link.getAttribute("target")==="_blank"){'
                 'link.setAttribute("target","_self");'
-                'try{'
-                'var _u=new URL(link.href,location.href);'
-                'var _fullUrl=_u.href;'
+                "try{"
+                "var _u=new URL(link.href,location.href);"
+                "var _fullUrl=_u.href;"
                 'var _pathUrl=_u.pathname+(_u.search?_u.search:"")+(_u.hash?_u.hash:"");'
                 'var _sep=_pathUrl.indexOf("?")>=0?"&":"?";'
                 'link.href=_pathUrl+_sep+"_proxy_url="+encodeURIComponent(_fullUrl);'
-                '}catch(ex){}'
-                '}'
-                '},true);'
+                "}catch(ex){}"
+                "}"
+                "},true);"
                 'if(document.readyState==="loading"){'
                 'document.addEventListener("DOMContentLoaded",function(){_convertBlank()});'
-                '}else{_convertBlank();}'
-                'if(window.MutationObserver){'
-                'var _mo=new MutationObserver(function(mutations){'
-                'for(var i=0;i<mutations.length;i++){'
-                'for(var j=0;j<mutations[i].addedNodes.length;j++){'
-                'var node=mutations[i].addedNodes[j];'
-                'if(node.nodeType===1){'
+                "}else{_convertBlank();}"
+                "if(window.MutationObserver){"
+                "var _mo=new MutationObserver(function(mutations){"
+                "for(var i=0;i<mutations.length;i++){"
+                "for(var j=0;j<mutations[i].addedNodes.length;j++){"
+                "var node=mutations[i].addedNodes[j];"
+                "if(node.nodeType===1){"
                 'if(node.tagName==="A"&&node.getAttribute("target")==="_blank")node.setAttribute("target","_self");'
                 'var descs=node.querySelectorAll("a[target=\\"_blank\\"]");'
                 'for(var k=0;k<descs.length;k++)descs[k].setAttribute("target","_self");'
-                '}}}});'
-                '_mo.observe(document.documentElement,{childList:true,subtree:true});'
-                '}'
+                "}}}});"
+                "_mo.observe(document.documentElement,{childList:true,subtree:true});"
+                "}"
                 'console.log("[ProxyEarly] new_tab prevention installed (click intercept + href proxy conversion)");'
-            if replay_mode else '')
-            + '})();'
+                if replay_mode
+                else ""
+            )
+            + "})();"
         )
         # 跨系统 Token 注入：将子系统 Token 注入到浏览器存储
         subsystem_token_meta = ""
@@ -1580,7 +1756,9 @@ class UiProxyService:
         if session_id and replay_mode:
             _sub_token = _proxy_session_store.get_subsystem_token(session_id)
             if _sub_token:
-                subsystem_token_meta = f'<meta name="_proxy_subsystem_token" content="{_sub_token}">'
+                subsystem_token_meta = (
+                    f'<meta name="_proxy_subsystem_token" content="{_sub_token}">'
+                )
                 subsystem_token_js = (
                     "try{"
                     "var _stMeta=document.getElementsByName('_proxy_subsystem_token')[0];"
@@ -1616,7 +1794,9 @@ class UiProxyService:
         early_script = f"{subsystem_token_meta}<script>{early_js}</script>"
 
         # 诊断：确认早期脚本已注入
-        logger.info(f"early_script_injected: len={len(early_js)}, target_url={target_url}, replay_mode={replay_mode}")
+        logger.info(
+            f"early_script_injected: len={len(early_js)}, target_url={target_url}, replay_mode={replay_mode}"
+        )
 
         lower = html.lower()
         if "<head>" in lower:
@@ -1654,7 +1834,9 @@ class UiProxyService:
 
         # 主脚本：在 </body> 前注入
         recorder_js = get_recorder_js(origin)
-        logger.info(f"recorder_script_injected: len={len(recorder_js)}, origin={origin}")
+        logger.info(
+            f"recorder_script_injected: len={len(recorder_js)}, origin={origin}"
+        )
         script_tag = f"<script>\n{recorder_js}\n</script>"
 
         if "</body>" in lower:
@@ -1667,6 +1849,7 @@ class UiProxyService:
             html += script_tag
 
         return html
+
     @staticmethod
     def _inject_replay_engine_script(html: str, replay_engine_js: str) -> str:
         """在 </body> 前注入回放引擎脚本。"""

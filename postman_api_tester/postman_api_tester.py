@@ -71,12 +71,12 @@ class PostmanTestReport:
         failed = 0
         error = 0
         for result in self.results:
-            status = result.get('status')
-            if status == 'PASSED':
+            status = result.get("status")
+            if status == "PASSED":
                 passed += 1
-            elif status == 'FAILED':
+            elif status == "FAILED":
                 failed += 1
-            elif status == 'ERROR':
+            elif status == "ERROR":
                 error += 1
 
         total = len(self.results)
@@ -84,7 +84,11 @@ class PostmanTestReport:
         duration = (self.end_time - self.start_time).total_seconds()
 
         # 响应时间统计
-        times = [r.get('response_time_ms', 0) for r in self.results if r.get('response_time_ms', 0) > 0]
+        times = [
+            r.get("response_time_ms", 0)
+            for r in self.results
+            if r.get("response_time_ms", 0) > 0
+        ]
         avg_response_ms = round(sum(times) / len(times)) if times else 0
         max_response_ms = max(times) if times else 0
         times_sorted = sorted(times)
@@ -92,24 +96,28 @@ class PostmanTestReport:
         p95_response_ms = times_sorted[p95_idx] if times_sorted else 0
 
         summary: SummaryData = {
-            'total': total,
-            'passed': passed,
-            'failed': failed,
-            'error': error,
-            'success_rate': f"{(passed/total*100):.2f}%" if total > 0 else "0%",
-            'duration': f"{duration:.2f}s",
-            'start_time': self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'end_time': self.end_time.strftime('%Y-%m-%d %H:%M:%S'),
-            'avg_response_ms': avg_response_ms,
-            'max_response_ms': max_response_ms,
-            'p95_response_ms': p95_response_ms,
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "error": error,
+            "success_rate": f"{(passed/total*100):.2f}%" if total > 0 else "0%",
+            "duration": f"{duration:.2f}s",
+            "start_time": self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": self.end_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "avg_response_ms": avg_response_ms,
+            "max_response_ms": max_response_ms,
+            "p95_response_ms": p95_response_ms,
         }
         self._summary_cache = summary
         return copy_summary(summary)
 
-    def generate_html_report(self, output_path: str, results_per_page: int = 30) -> None:
+    def generate_html_report(
+        self, output_path: str, results_per_page: int = 30
+    ) -> None:
         """生成 HTML 报告。"""
-        HtmlReporter.generate_html_report(self, output_path, results_per_page=results_per_page)
+        HtmlReporter.generate_html_report(
+            self, output_path, results_per_page=results_per_page
+        )
 
     def print_console_report(self) -> None:
         """在控制台输出测试报告。"""
@@ -181,6 +189,7 @@ def run_postman_tests(
             get_data_columns,
             validate_data_file,
         )
+
         max_rows = int(getattr(_cfg, "DATA_FILE_MAX_ROWS", 10000))
         rows, _fmt = validate_data_file(data_file, max_rows)
         data_rows = rows
@@ -192,6 +201,7 @@ def run_postman_tests(
     global_variables_max_count = int(getattr(_cfg, "GLOBAL_VARIABLES_MAX_COUNT", 1000))
     if getattr(_cfg, "ENABLE_VARIABLE_EXTRACTION", False):
         from postman_api_tester.core.variable_context import VariableContext
+
         if global_variables_file:
             variable_context = VariableContext.load_from_file(
                 global_variables_file,
@@ -199,7 +209,11 @@ def run_postman_tests(
                 max_count=global_variables_max_count,
                 env_name=env_name,
             )
-            logger.info("全局变量已从文件加载: %s（%d 个变量）", global_variables_file, len(variable_context.variables))
+            logger.info(
+                "全局变量已从文件加载: %s（%d 个变量）",
+                global_variables_file,
+                len(variable_context.variables),
+            )
         else:
             variable_context = VariableContext(initial_variables)
 
@@ -211,26 +225,30 @@ def run_postman_tests(
         data_columns=data_columns,
     )
 
-    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_and_progress(
-        enable_checkpoint_recovery=enable_checkpoint_recovery,
-        output_dir=output_dir,
-        postman_file=postman_file,
-        parser_base_url=parser.base_url,
-        selected_item_paths=selected_item_paths,
-        apis=apis,
-        checkpoint_dir=checkpoint_dir,
-        progress_callback=progress_callback,
-        total_apis_count=total_apis_count,
-        data_file=data_file,
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = (
+        _prepare_checkpoint_and_progress(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            output_dir=output_dir,
+            postman_file=postman_file,
+            parser_base_url=parser.base_url,
+            selected_item_paths=selected_item_paths,
+            apis=apis,
+            checkpoint_dir=checkpoint_dir,
+            progress_callback=progress_callback,
+            total_apis_count=total_apis_count,
+            data_file=data_file,
+        )
     )
 
-    resolved_token, report, request_timeout, shared_session = _prepare_execution_context(
-        token=token,
-        apis=apis,
-        parser=parser,
-        postman_file=postman_file,
-        source_original_file=source_original_file,
-        assertion_strict_mode=assertion_strict_mode,
+    resolved_token, report, request_timeout, shared_session = (
+        _prepare_execution_context(
+            token=token,
+            apis=apis,
+            parser=parser,
+            postman_file=postman_file,
+            source_original_file=source_original_file,
+            assertion_strict_mode=assertion_strict_mode,
+        )
     )
 
     enable_concurrent = bool(getattr(_cfg, "ENABLE_CONCURRENT", False))
@@ -272,13 +290,19 @@ def run_postman_tests(
     )
 
     if variable_context is not None and global_variables_file:
-        variable_context.save_to_file(global_variables_file, max_count=global_variables_max_count)
-        logger.info("全局变量已持久化: %s（%d 个变量）", global_variables_file, len(variable_context.variables))
+        variable_context.save_to_file(
+            global_variables_file, max_count=global_variables_max_count
+        )
+        logger.info(
+            "全局变量已持久化: %s（%d 个变量）",
+            global_variables_file,
+            len(variable_context.variables),
+        )
 
     return report
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     使用示例:
     1. 将 Postman 导出的 JSON 文件放在项目目录
@@ -298,7 +322,7 @@ if __name__ == '__main__':
             if arg4.isdigit() and len(sys.argv) == 5:
                 results_per_page = int(arg4)
             else:
-                token = None if arg4.lower() in {'', 'none', 'null', '-'} else arg4
+                token = None if arg4.lower() in {"", "none", "null", "-"} else arg4
 
         if len(sys.argv) > 5:
             results_per_page = int(sys.argv[5])
@@ -312,7 +336,9 @@ if __name__ == '__main__':
         )
     else:
         print("使用方法:")
-        print("  python postman_api_tester.py <postman_file_path> [base_url] [output_dir] [token] [results_per_page]")
+        print(
+            "  python postman_api_tester.py <postman_file_path> [base_url] [output_dir] [token] [results_per_page]"
+        )
         print("\n参数说明:")
         print("  postman_file_path: Postman导出的JSON文件路径（必需）")
         print("  base_url: 基础URL（可选，将覆盖Postman文件中的配置）")

@@ -6,10 +6,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from postman_api_tester.handlers.report_analytics_handler import build_analytics_compare_payload
+from postman_api_tester.handlers.report_analytics_handler import (
+    build_analytics_compare_payload,
+)
 
 
-def _report(report_name: str, success_rate: str, avg_ms: int, failed: int, error: int) -> Dict[str, Any]:
+def _report(
+    report_name: str, success_rate: str, avg_ms: int, failed: int, error: int
+) -> Dict[str, Any]:
     return {
         "report_name": report_name,
         "collection_name": "demo",

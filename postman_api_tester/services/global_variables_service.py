@@ -37,7 +37,13 @@ def _resolve_path(config_path: str) -> Path:
 
 
 def _empty_store() -> dict[str, Any]:
-    return {"version": 2, "updated_at": "", "shared": {}, "env_list": ["默认环境"], "environments": {"默认环境": {}}}
+    return {
+        "version": 2,
+        "updated_at": "",
+        "shared": {},
+        "env_list": ["默认环境"],
+        "environments": {"默认环境": {}},
+    }
 
 
 def _read_store(file_path: str) -> dict[str, Any]:
@@ -64,7 +70,9 @@ def _read_store(file_path: str) -> dict[str, Any]:
         store: dict[str, Any] = {
             "version": 2,
             "updated_at": raw.get("updated_at", ""),
-            "shared": raw.get("shared", {}) if isinstance(raw.get("shared"), dict) else {},
+            "shared": raw.get("shared", {})
+            if isinstance(raw.get("shared"), dict)
+            else {},
             "env_list": [str(e) for e in env_list],
             "environments": envs,
         }
@@ -106,6 +114,7 @@ def _count_store(store: dict[str, Any]) -> int:
 
 # ── 新版多环境 API ──────────────────────────────────────────────────────
 
+
 def read_all(file_path: str, max_count: int = DEFAULT_MAX_COUNT) -> dict[str, Any]:
     """读取完整多环境结构，返回 {version, updated_at, shared, env_list, environments, total_count}。"""
     store = _read_store(file_path)
@@ -114,12 +123,18 @@ def read_all(file_path: str, max_count: int = DEFAULT_MAX_COUNT) -> dict[str, An
         "updated_at": store["updated_at"],
         "shared": dict(store.get("shared", {})),
         "env_list": list(store.get("env_list", [])),
-        "environments": {k: dict(v) for k, v in store.get("environments", {}).items() if isinstance(v, dict)},
+        "environments": {
+            k: dict(v)
+            for k, v in store.get("environments", {}).items()
+            if isinstance(v, dict)
+        },
         "total_count": _count_store(store),
     }
 
 
-def read_scope(file_path: str, scope: str, env_name: str = "", max_count: int = DEFAULT_MAX_COUNT) -> dict[str, Any]:
+def read_scope(
+    file_path: str, scope: str, env_name: str = "", max_count: int = DEFAULT_MAX_COUNT
+) -> dict[str, Any]:
     """读取指定作用域的变量。scope='shared' 或 scope='env'。"""
     store = _read_store(file_path)
     if scope == "env":
@@ -134,8 +149,12 @@ def read_scope(file_path: str, scope: str, env_name: str = "", max_count: int = 
 
 
 def set_variable(
-    file_path: str, scope: str, key: str, value: str,
-    env_name: str = "", max_count: int = DEFAULT_MAX_COUNT,
+    file_path: str,
+    scope: str,
+    key: str,
+    value: str,
+    env_name: str = "",
+    max_count: int = DEFAULT_MAX_COUNT,
 ) -> dict[str, Any]:
     """在指定作用域设置单个变量。"""
     store = _read_store(file_path)
@@ -191,6 +210,7 @@ def clear_scope(file_path: str, scope: str, env_name: str = "") -> None:
 
 # ── 环境列表管理 ──────────────────────────────────────────────────────
 
+
 def get_env_list(file_path: str) -> list[str]:
     """返回环境名称列表（按顺序）。"""
     store = _read_store(file_path)
@@ -232,7 +252,10 @@ def remove_env(file_path: str, env_name: str) -> dict[str, Any]:
 
 # ── 兼容层（v1 单文件 API）──────────────────────────────────────────────
 
-def read_variables(file_path: str, max_count: int = DEFAULT_MAX_COUNT) -> dict[str, Any]:
+
+def read_variables(
+    file_path: str, max_count: int = DEFAULT_MAX_COUNT
+) -> dict[str, Any]:
     """兼容旧接口：读取 shared 变量。"""
     result = read_scope(file_path, "shared", max_count=max_count)
     store = _read_store(file_path)
@@ -245,7 +268,8 @@ def read_variables(file_path: str, max_count: int = DEFAULT_MAX_COUNT) -> dict[s
 
 
 def write_variables(
-    file_path: str, variables: dict[str, str],
+    file_path: str,
+    variables: dict[str, str],
     max_count: int = DEFAULT_MAX_COUNT,
 ) -> dict[str, Any]:
     """兼容旧接口：整体替换 shared 变量。"""

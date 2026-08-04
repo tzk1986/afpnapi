@@ -1404,29 +1404,6 @@ _REPLAYER_JS = r"""
       this.paused = false;
       this.stopped = false;
       this.startTime = Date.now();
-      // 恢复待保存的步骤结果（页面导航后可能丢失）
-      // 只恢复 index 等于 currentIndex - 1 的结果，避免重复保存
-      try {
-        var _pendingResults = JSON.parse(sessionStorage.getItem('_ui_replay_pending_results') || '[]');
-        if (_pendingResults.length > 0) {
-          console.log('[ReplayEngine] Found', _pendingResults.length, 'pending step results in sessionStorage');
-          var _expectedIndex = this.currentIndex - 1;
-          var _restoredCount = 0;
-          for (var _pi = 0; _pi < _pendingResults.length; _pi++) {
-            if (_pendingResults[_pi].index === _expectedIndex) {
-              console.log('[ReplayEngine] Restoring pending result for step', _expectedIndex);
-              this._notifyParent('step_complete', _pendingResults[_pi]);
-              _restoredCount++;
-            }
-          }
-          if (_restoredCount > 0) {
-            console.log('[ReplayEngine] Restored', _restoredCount, 'pending step result(s)');
-          }
-          sessionStorage.removeItem('_ui_replay_pending_results');
-        }
-      } catch(e) {
-        console.error('[ReplayEngine] Failed to restore pending results:', e);
-      }
       console.log('[ReplayEngine] Starting execution from step', this.currentIndex + 1);
       this._executeNext();
     },
@@ -1467,10 +1444,6 @@ _REPLAYER_JS = r"""
         return;
       }
       if (this.paused) return;
-
-      // 保存当前状态，以防下一步导致页面导航
-      // 必须在 currentIndex++ 之前保存，否则恢复时会跳过当前步骤
-      self._saveState();
 
       this.currentIndex++;
       if (this.currentIndex >= this.steps.length) {
@@ -1524,9 +1497,9 @@ _REPLAYER_JS = r"""
       }
 
       // new_tab 动作：保存回放状态并导航到新页面
+      // 注意：_saveStateToParent() 在 _doNavigate 中 results.push 之后调用，
+      // 确保保存的状态包含 new_tab 步骤结果，否则跨页面恢复后 _finishAll 会少计数
       if (action === 'new_tab') {
-        // 保存回放状态到父页面，页面跳转后新页面的引擎从此状态恢复
-        self._saveStateToParent();
 
         // 在页面上显示调试信息并发送到后端
         var _debugDiv = document.createElement('div');
@@ -1608,6 +1581,8 @@ _REPLAYER_JS = r"""
           }
           // 导航触发后才标记步骤完成
           self.results.push(result);
+          // 保存状态到父页面（必须在 results.push 之后，确保跨页面恢复时包含本步骤）
+          self._saveStateToParent();
           self._notifyParent('step_complete', result);
           _debug('step_complete notified after navigation');
         }
@@ -1827,12 +1802,8 @@ _REPLAYER_JS = r"""
 
         result.duration_ms = Date.now() - stepStart;
         self.results.push(result);
-        // 同步保存步骤结果到 sessionStorage，防止页面导航时丢失
-        try {
-          var _pendingResults = JSON.parse(sessionStorage.getItem('_ui_replay_pending_results') || '[]');
-          _pendingResults.push(result);
-          sessionStorage.setItem('_ui_replay_pending_results', JSON.stringify(_pendingResults));
-        } catch(e) {}
+        // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
+        self._saveState();
         self._notifyParent('step_complete', result);
         if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
 

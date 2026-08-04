@@ -52,6 +52,7 @@ def _log_request(job_id: str, step_index: int, request_data: Dict[str, Any]) -> 
     except OSError:
         pass
 
+
 try:
     from playwright.sync_api import (
         Browser,
@@ -132,30 +133,40 @@ class UiHeadlessEngine:
             # 只记录 API 请求，跳过静态资源
             if "/api/" not in url:
                 return
-            _log_request(job_id, current_step_index[0], {
-                "event": "request",
-                "method": request.method,
-                "url": url,
-                "headers": dict(request.headers),
-            })
+            _log_request(
+                job_id,
+                current_step_index[0],
+                {
+                    "event": "request",
+                    "method": request.method,
+                    "url": url,
+                    "headers": dict(request.headers),
+                },
+            )
 
         def _on_response(response: Any) -> None:
             """记录响应状态。"""
             url = response.url
             if "/api/" not in url:
                 return
-            _log_request(job_id, current_step_index[0], {
-                "event": "response",
-                "method": response.request.method,
-                "url": url,
-                "status": response.status,
-                "status_text": response.status_text,
-            })
+            _log_request(
+                job_id,
+                current_step_index[0],
+                {
+                    "event": "response",
+                    "method": response.request.method,
+                    "url": url,
+                    "status": response.status,
+                    "status_text": response.status_text,
+                },
+            )
 
         try:
             launcher = getattr(pw, self._browser_type, pw.chromium)
             browser = launcher.launch(headless=True)
-            context = browser.new_context(viewport={"width": viewport_w, "height": viewport_h})
+            context = browser.new_context(
+                viewport={"width": viewport_w, "height": viewport_h}
+            )
             page = context.new_page()
             page.set_default_timeout(timeout_ms)
 
@@ -318,7 +329,11 @@ class UiHeadlessEngine:
         """确保 selector 在结果中以 dict 形式返回。"""
         if isinstance(selector, dict):
             return selector
-        return {"primary": str(selector) if selector else "", "fallback_css": "", "fallback_xpath": ""}
+        return {
+            "primary": str(selector) if selector else "",
+            "fallback_css": "",
+            "fallback_xpath": "",
+        }
 
     # ---- Action implementations ----
 
@@ -327,14 +342,30 @@ class UiHeadlessEngine:
         if url and not url.startswith(("http://", "https://", "about:")) and base_url:
             target = base_url.rstrip("/") + "/" + url.lstrip("/")
         page.goto(target, wait_until="domcontentloaded")
-        return {"action": "navigate", "selector": {}, "value": target, "status": "passed", "error": ""}
+        return {
+            "action": "navigate",
+            "selector": {},
+            "value": target,
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_click(self, page: "Page", selector: Any, timeout_ms: int) -> Dict[str, Any]:
+    def _action_click(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         el.click()
-        return {"action": "click", "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+        return {
+            "action": "click",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_type(self, page: "Page", selector: Any, value: str, timeout_ms: int) -> Dict[str, Any]:
+    def _action_type(
+        self, page: "Page", selector: Any, value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         try:
             el.fill(value)
@@ -343,26 +374,64 @@ class UiHeadlessEngine:
             if "cannot be filled" in err:
                 # radio/checkbox — 回退为点击
                 el.click()
-                return {"action": "type", "selector": self._selector_to_dict(selector), "value": value, "status": "passed", "error": ""}
+                return {
+                    "action": "type",
+                    "selector": self._selector_to_dict(selector),
+                    "value": value,
+                    "status": "passed",
+                    "error": "",
+                }
             raise
-        return {"action": "type", "selector": self._selector_to_dict(selector), "value": value, "status": "passed", "error": ""}
+        return {
+            "action": "type",
+            "selector": self._selector_to_dict(selector),
+            "value": value,
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_clear(self, page: "Page", selector: Any, timeout_ms: int) -> Dict[str, Any]:
+    def _action_clear(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         el.fill("")
-        return {"action": "clear", "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+        return {
+            "action": "clear",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_select(self, page: "Page", selector: Any, value: str, timeout_ms: int) -> Dict[str, Any]:
+    def _action_select(
+        self, page: "Page", selector: Any, value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         el.select_option(value)
-        return {"action": "select", "selector": self._selector_to_dict(selector), "value": value, "status": "passed", "error": ""}
+        return {
+            "action": "select",
+            "selector": self._selector_to_dict(selector),
+            "value": value,
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_hover(self, page: "Page", selector: Any, timeout_ms: int) -> Dict[str, Any]:
+    def _action_hover(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         el.hover()
-        return {"action": "hover", "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+        return {
+            "action": "hover",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_check(self, page: "Page", selector: Any, action: str, timeout_ms: int) -> Dict[str, Any]:
+    def _action_check(
+        self, page: "Page", selector: Any, action: str, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         if action == "check":
             el.check()
@@ -371,7 +440,13 @@ class UiHeadlessEngine:
         else:
             # select_radio → 点击 radio 按钮
             el.click()
-        return {"action": action, "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+        return {
+            "action": action,
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
     def _action_wait(self, page: "Page", value: str) -> Dict[str, Any]:
         try:
@@ -379,13 +454,27 @@ class UiHeadlessEngine:
         except (ValueError, TypeError):
             ms = 1000
         time.sleep(ms / 1000.0)
-        return {"action": "wait", "selector": {}, "value": value, "status": "passed", "error": ""}
+        return {
+            "action": "wait",
+            "selector": {},
+            "value": value,
+            "status": "passed",
+            "error": "",
+        }
 
-    def _action_assert_text(self, page: "Page", selector: Any, expected: str, timeout_ms: int) -> Dict[str, Any]:
+    def _action_assert_text(
+        self, page: "Page", selector: Any, expected: str, timeout_ms: int
+    ) -> Dict[str, Any]:
         el = self._find_element(page, selector, timeout_ms)
         actual = (el.inner_text() or "").strip()
         if expected in actual:
-            return {"action": "assert_text", "selector": self._selector_to_dict(selector), "value": expected, "status": "passed", "error": ""}
+            return {
+                "action": "assert_text",
+                "selector": self._selector_to_dict(selector),
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
         return {
             "action": "assert_text",
             "selector": self._selector_to_dict(selector),
@@ -394,14 +483,28 @@ class UiHeadlessEngine:
             "error": f"断言失败: 期望包含 '{expected}', 实际 '{actual[:80]}'",
         }
 
-    def _action_assert_visible(self, page: "Page", selector: Any, timeout_ms: int) -> Dict[str, Any]:
+    def _action_assert_visible(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
         self._find_element(page, selector, timeout_ms)
-        return {"action": "assert_visible", "selector": self._selector_to_dict(selector), "value": "", "status": "passed", "error": ""}
+        return {
+            "action": "assert_visible",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
     def _action_assert_url(self, page: "Page", expected: str) -> Dict[str, Any]:
         actual = page.url
         if expected in actual:
-            return {"action": "assert_url", "selector": {}, "value": expected, "status": "passed", "error": ""}
+            return {
+                "action": "assert_url",
+                "selector": {},
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
         return {
             "action": "assert_url",
             "selector": {},
@@ -416,10 +519,22 @@ class UiHeadlessEngine:
         except (ValueError, TypeError):
             px = 300
         page.evaluate(f"window.scrollBy(0, {px})")
-        return {"action": "scroll", "selector": {}, "value": value, "status": "passed", "error": ""}
+        return {
+            "action": "scroll",
+            "selector": {},
+            "value": value,
+            "status": "passed",
+            "error": "",
+        }
 
     def _action_screenshot(self, page: "Page") -> Dict[str, Any]:
-        return {"action": "screenshot", "selector": {}, "value": "", "status": "passed", "error": ""}
+        return {
+            "action": "screenshot",
+            "selector": {},
+            "value": "",
+            "status": "passed",
+            "error": "",
+        }
 
     def _take_screenshot(self, page: "Page", job_id: str, step_index: int) -> None:
         """失败时截图保存。"""

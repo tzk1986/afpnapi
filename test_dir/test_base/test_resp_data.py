@@ -10,7 +10,7 @@ class TestRespData(seldom.TestCase):
         """
         Get the returned data
         """
-        payload = {'key1': 'value1', 'key2': 'value2'}
+        payload = {"key1": "value1", "key2": "value2"}
         self.post("/post", data=payload)
         self.assertStatusCode(200)
         self.assertPath("form.key1", "value1")
@@ -25,9 +25,9 @@ class TestRespData(seldom.TestCase):
         self.assertStatusCode(200)
 
         username = self.response["headers"]["X-Account-Fullname"]
-        self.post("/post", data={'username': username})
+        self.post("/post", data={"username": username})
         self.assertStatusCode(200)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     seldom.main(debug=True, base_url="https://httpbin.org")

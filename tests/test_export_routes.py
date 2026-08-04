@@ -33,9 +33,7 @@ class TestApiExportJUnit:
         """报告不存在返回 404。"""
         with patch(
             "postman_api_tester.handlers.export_routes.ENABLE_JUNIT_EXPORT", True
-        ), patch(
-            "postman_api_tester.report_repository.find_report"
-        ) as mock_find:
+        ), patch("postman_api_tester.report_repository.find_report") as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_export_junit("missing_report")
             assert isinstance(result, tuple)
@@ -54,5 +52,6 @@ class TestApiExportJUnit:
             mock_build.return_value = '<testsuite name="test"></testsuite>'
             result = api_export_junit("test_report")
             from flask import Response
+
             assert isinstance(result, Response)
             assert result.content_type == "application/xml; charset=utf-8"

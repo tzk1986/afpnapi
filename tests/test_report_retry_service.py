@@ -20,6 +20,7 @@ from postman_api_tester.services.report_retry_service import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_report(
     results: List[Dict[str, Any]] | None = None,
     source_file: str | None = None,
@@ -40,6 +41,7 @@ def _make_report(
 # collect_failed_item_paths
 # ===========================================================================
 
+
 class TestCollectFailedItemPaths:
     """Tests for collect_failed_item_paths()."""
 
@@ -50,72 +52,91 @@ class TestCollectFailedItemPaths:
         assert collect_failed_item_paths({}) == []
 
     def test_all_passed(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [0]},
-            {"status": "PASSED", "item_path": [1]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [0]},
+                {"status": "PASSED", "item_path": [1]},
+            ]
+        )
         assert collect_failed_item_paths(report) == []
 
     def test_single_failed(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": [2]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": [2]},
+            ]
+        )
         assert collect_failed_item_paths(report) == [[2]]
 
     def test_single_error(self) -> None:
-        report = _make_report(results=[
-            {"status": "ERROR", "item_path": [3]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "ERROR", "item_path": [3]},
+            ]
+        )
         assert collect_failed_item_paths(report) == [[3]]
 
     def test_mixed_statuses(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [0]},
-            {"status": "FAILED", "item_path": [1]},
-            {"status": "ERROR", "item_path": [2]},
-            {"status": "PASSED", "item_path": [3]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [0]},
+                {"status": "FAILED", "item_path": [1]},
+                {"status": "ERROR", "item_path": [2]},
+                {"status": "PASSED", "item_path": [3]},
+            ]
+        )
         result = collect_failed_item_paths(report)
         assert result == [[1], [2]]
 
     def test_invalid_item_path_none(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": None},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": None},
+            ]
+        )
         assert collect_failed_item_paths(report) == []
 
     def test_invalid_item_path_empty_list(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": []},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": []},
+            ]
+        )
         assert collect_failed_item_paths(report) == []
 
     def test_invalid_item_path_string(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": "not-a-list"},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": "not-a-list"},
+            ]
+        )
         assert collect_failed_item_paths(report) == []
 
     def test_multiple_failed_items(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": [0]},
-            {"status": "PASSED", "item_path": [1]},
-            {"status": "FAILED", "item_path": [2]},
-            {"status": "ERROR", "item_path": [3]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": [0]},
+                {"status": "PASSED", "item_path": [1]},
+                {"status": "FAILED", "item_path": [2]},
+                {"status": "ERROR", "item_path": [3]},
+            ]
+        )
         assert collect_failed_item_paths(report) == [[0], [2], [3]]
 
     def test_nested_item_paths(self) -> None:
-        report = _make_report(results=[
-            {"status": "FAILED", "item_path": [1, 2, 3]},
-            {"status": "ERROR", "item_path": [4, 5]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "FAILED", "item_path": [1, 2, 3]},
+                {"status": "ERROR", "item_path": [4, 5]},
+            ]
+        )
         assert collect_failed_item_paths(report) == [[1, 2, 3], [4, 5]]
 
 
 # ===========================================================================
 # collect_all_item_paths
 # ===========================================================================
+
 
 class TestCollectAllItemPaths:
     """Tests for collect_all_item_paths()."""
@@ -127,40 +148,49 @@ class TestCollectAllItemPaths:
         assert collect_all_item_paths({}) == []
 
     def test_all_passed(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [0]},
-            {"status": "PASSED", "item_path": [1]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [0]},
+                {"status": "PASSED", "item_path": [1]},
+            ]
+        )
         assert collect_all_item_paths(report) == [[0], [1]]
 
     def test_mixed_statuses(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [0]},
-            {"status": "FAILED", "item_path": [1]},
-            {"status": "ERROR", "item_path": [2]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [0]},
+                {"status": "FAILED", "item_path": [1]},
+                {"status": "ERROR", "item_path": [2]},
+            ]
+        )
         assert collect_all_item_paths(report) == [[0], [1], [2]]
 
     def test_skip_invalid_paths(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [0]},
-            {"status": "FAILED", "item_path": None},
-            {"status": "ERROR", "item_path": []},
-            {"status": "PASSED", "item_path": "bad"},
-            {"status": "FAILED", "item_path": [3]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [0]},
+                {"status": "FAILED", "item_path": None},
+                {"status": "ERROR", "item_path": []},
+                {"status": "PASSED", "item_path": "bad"},
+                {"status": "FAILED", "item_path": [3]},
+            ]
+        )
         assert collect_all_item_paths(report) == [[0], [3]]
 
     def test_nested_paths_included(self) -> None:
-        report = _make_report(results=[
-            {"status": "PASSED", "item_path": [1, 2, 3]},
-        ])
+        report = _make_report(
+            results=[
+                {"status": "PASSED", "item_path": [1, 2, 3]},
+            ]
+        )
         assert collect_all_item_paths(report) == [[1, 2, 3]]
 
 
 # ===========================================================================
 # resolve_existing_source_file
 # ===========================================================================
+
 
 class TestResolveExistingSourceFile:
     """Tests for resolve_existing_source_file()."""
@@ -212,6 +242,7 @@ class TestResolveExistingSourceFile:
 # build_retry_queue_record
 # ===========================================================================
 
+
 class TestBuildRetryQueueRecord:
     """Tests for build_retry_queue_record()."""
 
@@ -239,21 +270,37 @@ class TestBuildRetryQueueRecord:
 
     def test_file_name_extracts_basename(self) -> None:
         record = build_retry_queue_record(
-            job_id="j1", saved_file="C:\\Windows\\Path\\to\\file.json",
-            output_dir="/o", selected_count=0, queued_message="",
+            job_id="j1",
+            saved_file="C:\\Windows\\Path\\to\\file.json",
+            output_dir="/o",
+            selected_count=0,
+            queued_message="",
         )
         # Path.name on Windows with backslashes returns the basename
         assert record["file_name"] in ("file.json", "to\\file.json")
 
     def test_all_required_fields_present(self) -> None:
         record = build_retry_queue_record(
-            job_id="x", saved_file="/f", output_dir="/o",
-            selected_count=1, queued_message="m",
+            job_id="x",
+            saved_file="/f",
+            output_dir="/o",
+            selected_count=1,
+            queued_message="m",
         )
         expected_keys = {
-            "id", "status", "message", "total", "completed",
-            "percent", "current_name", "file_name", "saved_file",
-            "output_dir", "report_name", "run_scope", "selected_count",
+            "id",
+            "status",
+            "message",
+            "total",
+            "completed",
+            "percent",
+            "current_name",
+            "file_name",
+            "saved_file",
+            "output_dir",
+            "report_name",
+            "run_scope",
+            "selected_count",
         }
         assert set(record.keys()) == expected_keys
 
@@ -262,13 +309,18 @@ class TestBuildRetryQueueRecord:
 # build_retry_worker_args
 # ===========================================================================
 
+
 class TestBuildRetryWorkerArgs:
     """Tests for build_retry_worker_args()."""
 
     def test_returns_tuple(self) -> None:
         args = build_retry_worker_args(
-            job_id="j1", saved_file="/c.json", base_url="http://x.com",
-            output_dir="/o", token="tok", results_per_page=10,
+            job_id="j1",
+            saved_file="/c.json",
+            base_url="http://x.com",
+            output_dir="/o",
+            token="tok",
+            results_per_page=10,
             selected_paths=[[0], [1]],
         )
         assert isinstance(args, tuple)
@@ -276,8 +328,12 @@ class TestBuildRetryWorkerArgs:
 
     def test_correct_values(self) -> None:
         args = build_retry_worker_args(
-            job_id="j1", saved_file="/c.json", base_url="http://x.com",
-            output_dir="/o", token="tok", results_per_page=10,
+            job_id="j1",
+            saved_file="/c.json",
+            base_url="http://x.com",
+            output_dir="/o",
+            token="tok",
+            results_per_page=10,
             selected_paths=[[0, 1]],
         )
         assert args == (
@@ -294,8 +350,12 @@ class TestBuildRetryWorkerArgs:
 
     def test_none_base_url_preserved(self) -> None:
         args = build_retry_worker_args(
-            job_id="j1", saved_file="/c.json", base_url=None,
-            output_dir="/o", token=None, results_per_page=5,
+            job_id="j1",
+            saved_file="/c.json",
+            base_url=None,
+            output_dir="/o",
+            token=None,
+            results_per_page=5,
             selected_paths=[],
         )
         assert args[2] is None
@@ -303,9 +363,13 @@ class TestBuildRetryWorkerArgs:
 
     def test_file_name_extracted(self) -> None:
         args = build_retry_worker_args(
-            job_id="j1", saved_file="/deep/path/my_collection.json",
-            base_url=None, output_dir="/o", token=None,
-            results_per_page=1, selected_paths=[],
+            job_id="j1",
+            saved_file="/deep/path/my_collection.json",
+            base_url=None,
+            output_dir="/o",
+            token=None,
+            results_per_page=1,
+            selected_paths=[],
         )
         assert args[6] == "my_collection.json"
 
@@ -313,6 +377,7 @@ class TestBuildRetryWorkerArgs:
 # ===========================================================================
 # parse_retry_runtime_params
 # ===========================================================================
+
 
 class TestParseRetryRuntimeParams:
     """Tests for parse_retry_runtime_params()."""
@@ -325,8 +390,11 @@ class TestParseRetryRuntimeParams:
     def test_valid_url_from_payload(self, clamp_fn) -> None:
         payload = {"base_url": "https://api.example.com"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] == "https://api.example.com"
@@ -335,8 +403,11 @@ class TestParseRetryRuntimeParams:
         payload = {}
         report = {"base_url": "http://report-url.com"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report=report, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report=report,
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] == "http://report-url.com"
@@ -345,8 +416,11 @@ class TestParseRetryRuntimeParams:
         payload = {"base_url": "https://payload.com"}
         report = {"base_url": "http://report.com"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report=report, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report=report,
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] == "https://payload.com"
@@ -354,8 +428,11 @@ class TestParseRetryRuntimeParams:
     def test_invalid_ftp_url(self, clamp_fn) -> None:
         payload = {"base_url": "ftp://files.example.com"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert runtime is None
         assert err == "base_url 仅允许合法的 http/https 地址"
@@ -363,8 +440,11 @@ class TestParseRetryRuntimeParams:
     def test_no_scheme_url_rejected(self, clamp_fn) -> None:
         payload = {"base_url": "example.com/api"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert runtime is None
         assert err == "base_url 仅允许合法的 http/https 地址"
@@ -373,8 +453,11 @@ class TestParseRetryRuntimeParams:
         # e.g. just a scheme + path but no host
         payload = {"base_url": "http:///some-path"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert runtime is None
         assert err == "base_url 仅允许合法的 http/https 地址"
@@ -382,8 +465,11 @@ class TestParseRetryRuntimeParams:
     def test_empty_base_url_becomes_none(self, clamp_fn) -> None:
         payload = {"base_url": ""}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] is None
@@ -391,8 +477,11 @@ class TestParseRetryRuntimeParams:
     def test_whitespace_token_trimmed(self, clamp_fn) -> None:
         payload = {"token": "  my-token  "}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["token"] == "my-token"
@@ -400,16 +489,21 @@ class TestParseRetryRuntimeParams:
     def test_whitespace_only_token_becomes_none(self, clamp_fn) -> None:
         payload = {"token": "   "}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["token"] is None
 
     def test_results_per_page_clamped(self, clamp_fn) -> None:
         runtime, err = parse_retry_runtime_params(
-            payload={"results_per_page": 5000}, report={},
-            output_dir="/out", default_results_per_page=50,
+            payload={"results_per_page": 5000},
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
@@ -417,7 +511,9 @@ class TestParseRetryRuntimeParams:
 
     def test_results_per_page_defaults_when_missing(self, clamp_fn) -> None:
         runtime, err = parse_retry_runtime_params(
-            payload={}, report={}, output_dir="/out",
+            payload={},
+            report={},
+            output_dir="/out",
             default_results_per_page=75,
             clamp_run_results_per_page=clamp_fn,
         )
@@ -426,8 +522,11 @@ class TestParseRetryRuntimeParams:
 
     def test_output_dir_passed_through(self, clamp_fn) -> None:
         runtime, err = parse_retry_runtime_params(
-            payload={}, report={}, output_dir="/custom/output/dir",
-            default_results_per_page=10, clamp_run_results_per_page=clamp_fn,
+            payload={},
+            report={},
+            output_dir="/custom/output/dir",
+            default_results_per_page=10,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["output_dir"] == "/custom/output/dir"
@@ -435,8 +534,11 @@ class TestParseRetryRuntimeParams:
     def test_https_allowed(self, clamp_fn) -> None:
         payload = {"base_url": "https://secure.api.com/v1"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] == "https://secure.api.com/v1"
@@ -444,8 +546,11 @@ class TestParseRetryRuntimeParams:
     def test_http_allowed(self, clamp_fn) -> None:
         payload = {"base_url": "http://localhost:8080/api"}
         runtime, err = parse_retry_runtime_params(
-            payload=payload, report={}, output_dir="/out",
-            default_results_per_page=50, clamp_run_results_per_page=clamp_fn,
+            payload=payload,
+            report={},
+            output_dir="/out",
+            default_results_per_page=50,
+            clamp_run_results_per_page=clamp_fn,
         )
         assert err is None
         assert runtime["base_url"] == "http://localhost:8080/api"
@@ -454,6 +559,7 @@ class TestParseRetryRuntimeParams:
 # ===========================================================================
 # build_retry_source_runtime_context
 # ===========================================================================
+
 
 class TestBuildRetrySourceRuntimeContext:
     """Tests for build_retry_source_runtime_context()."""
@@ -465,17 +571,23 @@ class TestBuildRetrySourceRuntimeContext:
     def test_missing_source_file_returns_error(self, clamp_fn) -> None:
         report = {"results": [], "source_file": None}
         ctx, err = build_retry_source_runtime_context(
-            payload={}, report=report, output_dir="/out",
+            payload={},
+            report=report,
+            output_dir="/out",
             default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
         assert ctx is None
         assert "找不到原始集合文件" in err
 
-    def test_nonexistent_source_file_returns_error(self, tmp_path: Path, clamp_fn) -> None:
+    def test_nonexistent_source_file_returns_error(
+        self, tmp_path: Path, clamp_fn
+    ) -> None:
         report = {"results": [], "source_file": str(tmp_path / "no_such.json")}
         ctx, err = build_retry_source_runtime_context(
-            payload={}, report=report, output_dir="/out",
+            payload={},
+            report=report,
+            output_dir="/out",
             default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
@@ -488,7 +600,9 @@ class TestBuildRetrySourceRuntimeContext:
         report = {"results": [], "source_file": str(test_file)}
         payload = {"base_url": "ftp://bad-url"}
         ctx, err = build_retry_source_runtime_context(
-            payload=payload, report=report, output_dir="/out",
+            payload=payload,
+            report=report,
+            output_dir="/out",
             default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
@@ -505,7 +619,9 @@ class TestBuildRetrySourceRuntimeContext:
         }
         payload = {"token": "test-token", "results_per_page": 25}
         ctx, err = build_retry_source_runtime_context(
-            payload=payload, report=report, output_dir="/out",
+            payload=payload,
+            report=report,
+            output_dir="/out",
             default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
@@ -520,7 +636,9 @@ class TestBuildRetrySourceRuntimeContext:
     def test_empty_source_file_tripped_to_none(self, tmp_path: Path, clamp_fn) -> None:
         report = {"results": [], "source_file": ""}
         ctx, err = build_retry_source_runtime_context(
-            payload={}, report=report, output_dir="/out",
+            payload={},
+            report=report,
+            output_dir="/out",
             default_results_per_page=50,
             clamp_run_results_per_page=clamp_fn,
         )
@@ -531,6 +649,7 @@ class TestBuildRetrySourceRuntimeContext:
 # ===========================================================================
 # build_retry_job_plan
 # ===========================================================================
+
 
 class TestBuildRetryJobPlan:
     """Tests for build_retry_job_plan()."""
@@ -548,12 +667,16 @@ class TestBuildRetryJobPlan:
 
     def test_job_id_is_uuid_hex(self) -> None:
         plan1 = build_retry_job_plan(
-            saved_file="/f", runtime={"output_dir": "/o", "results_per_page": 50},
-            selected_paths=[], queued_message="",
+            saved_file="/f",
+            runtime={"output_dir": "/o", "results_per_page": 50},
+            selected_paths=[],
+            queued_message="",
         )
         plan2 = build_retry_job_plan(
-            saved_file="/f", runtime={"output_dir": "/o", "results_per_page": 50},
-            selected_paths=[], queued_message="",
+            saved_file="/f",
+            runtime={"output_dir": "/o", "results_per_page": 50},
+            selected_paths=[],
+            queued_message="",
         )
         # UUID hex is 32 lowercase hex characters
         assert len(plan1["job_id"]) == 32
@@ -575,8 +698,12 @@ class TestBuildRetryJobPlan:
     def test_worker_args_matches_job_id(self) -> None:
         plan = build_retry_job_plan(
             saved_file="/path/collection.json",
-            runtime={"output_dir": "/out", "base_url": "http://x.com",
-                     "token": "tok", "results_per_page": 10},
+            runtime={
+                "output_dir": "/out",
+                "base_url": "http://x.com",
+                "token": "tok",
+                "results_per_page": 10,
+            },
             selected_paths=[[0], [1]],
             queued_message="2 items",
         )
@@ -587,8 +714,10 @@ class TestBuildRetryJobPlan:
     def test_selected_count_matches_length(self) -> None:
         paths = [[i] for i in range(7)]
         plan = build_retry_job_plan(
-            saved_file="/f", runtime={"output_dir": "/o", "results_per_page": 50},
-            selected_paths=paths, queued_message="",
+            saved_file="/f",
+            runtime={"output_dir": "/o", "results_per_page": 50},
+            selected_paths=paths,
+            queued_message="",
         )
         assert plan["queue_record"]["selected_count"] == len(paths)
 
@@ -596,7 +725,8 @@ class TestBuildRetryJobPlan:
         plan = build_retry_job_plan(
             saved_file="/f",
             runtime={"output_dir": Path("/tmp/test_out"), "results_per_page": 50},
-            selected_paths=[], queued_message="",
+            selected_paths=[],
+            queued_message="",
         )
         assert isinstance(plan["queue_record"]["output_dir"], str)
         assert isinstance(plan["worker_args"][3], str)
@@ -605,14 +735,17 @@ class TestBuildRetryJobPlan:
         plan = build_retry_job_plan(
             saved_file="/f",
             runtime={"output_dir": "/o", "results_per_page": 42},
-            selected_paths=[], queued_message="",
+            selected_paths=[],
+            queued_message="",
         )
         assert plan["worker_args"][7] == 42
 
     def test_queue_record_status_is_queued(self) -> None:
         plan = build_retry_job_plan(
-            saved_file="/f", runtime={"output_dir": "/o", "results_per_page": 50},
-            selected_paths=[], queued_message="msg",
+            saved_file="/f",
+            runtime={"output_dir": "/o", "results_per_page": 50},
+            selected_paths=[],
+            queued_message="msg",
         )
         assert plan["queue_record"]["status"] == "queued"
         assert plan["queue_record"]["message"] == "msg"

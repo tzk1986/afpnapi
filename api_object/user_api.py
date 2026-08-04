@@ -3,13 +3,12 @@ from seldom.request import HttpRequest
 
 
 class UserApiObject(HttpRequest):
-
     @check_response(
         describe="获取登录用户名",
         status_code=200,
         ret="form",
         check={"headers.Host": "httpbin.org"},
-        debug=True
+        debug=True,
     )
     def user_account_login(self, username, password):
         """
@@ -22,6 +21,6 @@ class UserApiObject(HttpRequest):
         return r
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     c = UserApiObject()
     c.user_account_login()

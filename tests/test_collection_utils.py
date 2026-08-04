@@ -1,6 +1,6 @@
 """collection_utils 单元测试。"""
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pytest
 
@@ -22,11 +22,17 @@ SAMPLE_COLLECTION: Dict[str, Any] = {
             "item": [
                 {
                     "name": "req1",
-                    "request": {"method": "GET", "url": {"raw": "https://example.com/api/1"}},
+                    "request": {
+                        "method": "GET",
+                        "url": {"raw": "https://example.com/api/1"},
+                    },
                 },
                 {
                     "name": "req2",
-                    "request": {"method": "POST", "url": {"raw": "https://example.com/api/2"}},
+                    "request": {
+                        "method": "POST",
+                        "url": {"raw": "https://example.com/api/2"},
+                    },
                 },
             ],
         },
@@ -139,7 +145,9 @@ class TestExtractCollectionPreviewItems:
 
     def test_empty_collection(self) -> None:
         """空 Collection 返回空列表。"""
-        items = extract_collection_preview_items({"info": {}, "item": []}, max_items=100)
+        items = extract_collection_preview_items(
+            {"info": {}, "item": []}, max_items=100
+        )
         assert items == []
 
     def test_missing_item_field(self) -> None:
@@ -149,7 +157,6 @@ class TestExtractCollectionPreviewItems:
 
 
 class TestValidateAdhocUrl:
-
     def test_valid_http_url(self) -> None:
         # 合法 HTTP URL 不应抛出异常
         _validate_adhoc_url("http://example.com/api", None, 0)
@@ -192,7 +199,6 @@ class TestValidateAdhocUrl:
 
 
 class TestParseAdhocBody:
-
     def test_none_mode(self) -> None:
         mode, data = _parse_adhoc_body({"body_mode": "none"}, 0)
         assert mode == "none"
@@ -209,7 +215,9 @@ class TestParseAdhocBody:
         assert data == "fallback"
 
     def test_urlencoded_mode(self) -> None:
-        mode, data = _parse_adhoc_body({"body_mode": "urlencoded", "body_data": '[{"key":"a","value":"1"}]'}, 0)
+        mode, data = _parse_adhoc_body(
+            {"body_mode": "urlencoded", "body_data": '[{"key":"a","value":"1"}]'}, 0
+        )
         assert mode == "urlencoded"
         assert isinstance(data, list)
 
@@ -223,7 +231,6 @@ class TestParseAdhocBody:
 
 
 class TestParseAdhocJudgmentFields:
-
     def test_empty_raw_returns_empty(self) -> None:
         assert _parse_adhoc_judgment_fields({}) == {}
 

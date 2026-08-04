@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from unittest.mock import patch
 
-import pytest
 
 from postman_api_tester.utils.variable_substitution import (
     substitute_variables,
@@ -16,7 +15,6 @@ from postman_api_tester.utils.variable_substitution import (
 
 
 class TestFunctionSubstitution:
-
     def test_timestamp_replaced(self) -> None:
         result = substitute_variables("ts={{timestamp()}}", {})
         assert result.startswith("ts=")
@@ -47,7 +45,10 @@ class TestFunctionSubstitution:
         assert result == "{{unknown_func()}}"
 
     def test_function_disabled_preserves_expression(self) -> None:
-        with patch("postman_api_tester.utils.variable_substitution._is_functions_enabled", return_value=False):
+        with patch(
+            "postman_api_tester.utils.variable_substitution._is_functions_enabled",
+            return_value=False,
+        ):
             result = substitute_variables("{{timestamp()}}", {})
             assert result == "{{timestamp()}}"
 
@@ -72,7 +73,6 @@ class TestFunctionSubstitution:
 
 
 class TestSubstituteBodyWithFunctions:
-
     def test_string_body_function_replaced(self) -> None:
         body = '{"ts": "{{timestamp()}}"}'
         result = _substitute_body(body, {})
@@ -91,7 +91,6 @@ class TestSubstituteBodyWithFunctions:
 
 
 class TestSubstituteParamsWithFunctions:
-
     def test_param_value_function_replaced(self) -> None:
         params = {"ts": "{{timestamp()}}"}
         result = _substitute_params(params, {})
@@ -105,7 +104,6 @@ class TestSubstituteParamsWithFunctions:
 
 
 class TestExtractReferencedVariables:
-
     def test_extracts_simple_variables(self) -> None:
         result = extract_referenced_variables("hello {{name}} {{age}}")
         assert result == {"name", "age"}

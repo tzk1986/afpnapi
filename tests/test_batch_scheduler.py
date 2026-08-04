@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-import pytest
 
 from postman_api_tester.core.batch_scheduler import (
     BatchScheduler,
@@ -35,7 +34,6 @@ def _make_api(
 
 
 class TestExtractProducedVariables:
-
     def test_no_x_extract(self) -> None:
         assert extract_produced_variables({"name": "req"}) == set()
 
@@ -47,9 +45,11 @@ class TestExtractProducedVariables:
         assert result == {"token"}
 
     def test_multiple_producers(self) -> None:
-        result = extract_produced_variables({
-            "x_extract": {"token": "$.data.token", "user_id": "$.data.id"},
-        })
+        result = extract_produced_variables(
+            {
+                "x_extract": {"token": "$.data.token", "user_id": "$.data.id"},
+            }
+        )
         assert result == {"token", "user_id"}
 
     def test_non_dict_x_extract(self) -> None:
@@ -57,7 +57,6 @@ class TestExtractProducedVariables:
 
 
 class TestExtractConsumedVariables:
-
     def test_no_variables(self) -> None:
         api = _make_api(url="http://example.com/api")
         assert extract_consumed_variables(api) == set()
@@ -107,7 +106,6 @@ class TestExtractConsumedVariables:
 
 
 class TestBatchScheduler:
-
     def test_empty_list(self) -> None:
         scheduler = BatchScheduler([])
         assert scheduler.compute_batches() == []
@@ -133,7 +131,11 @@ class TestBatchScheduler:
     def test_linear_chain_three_batches(self) -> None:
         apis = [
             _make_api(name="a", x_extract={"token": "$.token"}),
-            _make_api(name="b", url="http://example.com/{{token}}", x_extract={"order_id": "$.id"}),
+            _make_api(
+                name="b",
+                url="http://example.com/{{token}}",
+                x_extract={"order_id": "$.id"},
+            ),
             _make_api(name="c", url="http://example.com/order/{{order_id}}"),
         ]
         scheduler = BatchScheduler(apis)
@@ -181,8 +183,14 @@ class TestBatchScheduler:
     def test_diamond_dependency(self) -> None:
         apis = [
             _make_api(name="root", x_extract={"base": "$.base"}),
-            _make_api(name="left", url="http://{{base}}/left", x_extract={"left_id": "$.id"}),
-            _make_api(name="right", url="http://{{base}}/right", x_extract={"right_id": "$.id"}),
+            _make_api(
+                name="left", url="http://{{base}}/left", x_extract={"left_id": "$.id"}
+            ),
+            _make_api(
+                name="right",
+                url="http://{{base}}/right",
+                x_extract={"right_id": "$.id"},
+            ),
             _make_api(name="merge", url="http://{{left_id}}/{{right_id}}"),
         ]
         scheduler = BatchScheduler(apis)

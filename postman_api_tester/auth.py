@@ -34,7 +34,13 @@ def _is_login_candidate(api: ApiLoginCandidate) -> bool:
 
 
 def _extract_token_from_payload(response_data: Any) -> Optional[str]:
-    token_fields = ["token", "access_token", "accessToken", "auth_token", "authorization"]
+    token_fields = [
+        "token",
+        "access_token",
+        "accessToken",
+        "auth_token",
+        "authorization",
+    ]
     if not isinstance(response_data, dict):
         return None
 
@@ -76,22 +82,34 @@ def get_auth_token(
             if not _is_login_candidate(login_api):
                 continue
 
-            raw_url = login_api.get('full_url', '') or (base_url.rstrip('/') + '/' + login_api.get('url', '').lstrip('/'))
-            method = str(login_api.get('method', 'POST')).lower()
-            headers = login_api.get('headers', {})
-            body = login_api.get('body')
-            params = login_api.get('params', {})
+            raw_url = login_api.get("full_url", "") or (
+                base_url.rstrip("/") + "/" + login_api.get("url", "").lstrip("/")
+            )
+            method = str(login_api.get("method", "POST")).lower()
+            headers = login_api.get("headers", {})
+            body = login_api.get("body")
+            params = login_api.get("params", {})
             url, params = normalize_url_and_params(raw_url, params)
 
             logger.info("尝试登录获取 token: %s", url)
             try:
-                if method == 'post':
-                    response = local_session.post(url, json=body, params=params, headers=headers, timeout=timeout_value)
+                if method == "post":
+                    response = local_session.post(
+                        url,
+                        json=body,
+                        params=params,
+                        headers=headers,
+                        timeout=timeout_value,
+                    )
                 else:
-                    response = local_session.get(url, params=params, headers=headers, timeout=timeout_value)
+                    response = local_session.get(
+                        url, params=params, headers=headers, timeout=timeout_value
+                    )
 
                 if response.status_code != 200:
-                    logger.warning("登录请求失败，状态码: %s, url=%s", response.status_code, url)
+                    logger.warning(
+                        "登录请求失败，状态码: %s, url=%s", response.status_code, url
+                    )
                     continue
 
                 try:

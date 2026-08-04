@@ -1,6 +1,5 @@
 """可配置结果判定工具单元测试."""
 
-import pytest
 from postman_api_tester.utils.judgment_utils import (
     evaluate_result_judgment,
     parse_success_list,

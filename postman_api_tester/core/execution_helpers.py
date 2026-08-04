@@ -61,6 +61,7 @@ from postman_api_tester.utils.logging_utils import get_log_sample_rate, log_samp
 logger = logging.getLogger(__name__)
 PASSED_TEST_LOG_SAMPLE_RATE = get_log_sample_rate(default=0.1)
 
+
 def _resolve_runtime_config(
     token: str | None,
     base_url: str | None,
@@ -73,24 +74,31 @@ def _resolve_runtime_config(
 
     try:
         from postman_api_tester import config as _cfg_module
+
         cfg: ModuleType | None = _cfg_module
 
-        cfg_token = str(getattr(cfg, 'TOKEN', '') or '').strip()
+        cfg_token = str(getattr(cfg, "TOKEN", "") or "").strip()
         if token is None and cfg_token:
             token = cfg_token
 
-        cfg_base_url = str(getattr(cfg, 'BASE_URL', '') or '').strip()
+        cfg_base_url = str(getattr(cfg, "BASE_URL", "") or "").strip()
         if base_url is None and cfg_base_url:
             base_url = cfg_base_url
 
-        cfg_output_dir = str(getattr(cfg, 'REPORT_OUTPUT_DIR', '') or '').strip()
+        cfg_output_dir = str(getattr(cfg, "REPORT_OUTPUT_DIR", "") or "").strip()
         if output_dir is None and cfg_output_dir:
             output_dir = cfg_output_dir
 
-        enable_checkpoint_recovery = bool(getattr(cfg, 'ENABLE_CHECKPOINT_RECOVERY', False))
-        checkpoint_flush_every_n = max(1, int(getattr(cfg, 'CHECKPOINT_FLUSH_EVERY_N', 1)))
-        checkpoint_dir = str(getattr(cfg, 'CHECKPOINT_DIR', '') or '').strip()
-        assertion_strict_mode = bool(getattr(cfg, 'ENABLE_ASSERTION_STRICT_MODE', False))
+        enable_checkpoint_recovery = bool(
+            getattr(cfg, "ENABLE_CHECKPOINT_RECOVERY", False)
+        )
+        checkpoint_flush_every_n = max(
+            1, int(getattr(cfg, "CHECKPOINT_FLUSH_EVERY_N", 1))
+        )
+        checkpoint_dir = str(getattr(cfg, "CHECKPOINT_DIR", "") or "").strip()
+        assertion_strict_mode = bool(
+            getattr(cfg, "ENABLE_ASSERTION_STRICT_MODE", False)
+        )
     except (ImportError, AttributeError, TypeError, ValueError):
         pass
 
@@ -108,13 +116,14 @@ def _resolve_runtime_config(
 def _resolve_output_dir(output_dir: str | None) -> str:
     if output_dir is not None:
         return output_dir
-    return str(Path(__file__).resolve().parent.parent / 'reports')
+    return str(Path(__file__).resolve().parent.parent / "reports")
 
 
 def _validate_base_url(base_url: str | None) -> None:
     if base_url is None:
         return
     from urllib.parse import urlparse as _urlparse
+
     _parsed = _urlparse(base_url)
     if _parsed.scheme not in ("http", "https") or not _parsed.netloc:
         raise ValidationError(f"base_url 格式无效（仅支持 http/https）：{base_url!r}")
@@ -134,14 +143,19 @@ def _filter_selected_apis(
                 normalized_paths.append(tuple(path))
         selected_path_set = set(normalized_paths)
         if not selected_path_set:
-            raise ValidationError("selected_item_paths 格式无效，未解析到可执行接口路径。")
+            raise ValidationError(
+                "selected_item_paths 格式无效，未解析到可执行接口路径。"
+            )
 
         apis = [
-            api for api in apis
-            if tuple(api.get('item_path') or []) in selected_path_set
+            api
+            for api in apis
+            if tuple(api.get("item_path") or []) in selected_path_set
         ]
         if not apis:
-            raise ValidationError("未匹配到可执行接口，请确认所选接口是否仍存在于当前集合。")
+            raise ValidationError(
+                "未匹配到可执行接口，请确认所选接口是否仍存在于当前集合。"
+            )
     return apis, selected_path_set
 
 
@@ -165,25 +179,44 @@ def _prepare_checkpoint_recovery(
 
     try:
         collection_fingerprint = _compute_collection_fingerprint(
-            postman_file, parser_base_url, selected_item_paths, data_file=data_file,
+            postman_file,
+            parser_base_url,
+            selected_item_paths,
+            data_file=data_file,
         )
-        checkpoint_path = _checkpoint_file_path(output_dir, postman_file, collection_fingerprint, checkpoint_dir=checkpoint_dir)
+        checkpoint_path = _checkpoint_file_path(
+            output_dir,
+            postman_file,
+            collection_fingerprint,
+            checkpoint_dir=checkpoint_dir,
+        )
         checkpoint = _load_checkpoint(checkpoint_path)
         if checkpoint:
-            fingerprint_match = str(checkpoint.get("collection_fingerprint") or "") == collection_fingerprint
-            base_url_match = str(checkpoint.get("base_url") or "") == str(parser_base_url or "")
+            fingerprint_match = (
+                str(checkpoint.get("collection_fingerprint") or "")
+                == collection_fingerprint
+            )
+            base_url_match = str(checkpoint.get("base_url") or "") == str(
+                parser_base_url or ""
+            )
             if fingerprint_match and base_url_match:
                 executed_item_paths = set(checkpoint.get("executed_item_paths") or [])
                 if executed_item_paths:
                     original_count = len(apis)
                     apis = [
-                        api for api in apis
+                        api
+                        for api in apis
                         if _checkpoint_key(
                             api.get("item_path"),
                             int(api.get("data_index", 0) or 0),
-                        ) not in executed_item_paths
+                        )
+                        not in executed_item_paths
                     ]
-                    logger.info("断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个", original_count - len(apis), len(apis))
+                    logger.info(
+                        "断点恢复生效，跳过已执行接口 %d 个，待执行 %d 个",
+                        original_count - len(apis),
+                        len(apis),
+                    )
             else:
                 logger.warning("检测到 checkpoint 与当前集合不匹配，已忽略恢复数据。")
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -192,7 +225,9 @@ def _prepare_checkpoint_recovery(
     return checkpoint_path, collection_fingerprint, executed_item_paths, apis
 
 
-def _parse_collection_apis(postman_file: str) -> tuple[PostmanApiParser, list[ApiConfig], int]:
+def _parse_collection_apis(
+    postman_file: str,
+) -> tuple[PostmanApiParser, list[ApiConfig], int]:
     logger.info("开始加载 Postman 文件: %s", postman_file)
     parser = PostmanApiParser(postman_file)
     apis = parser.extract_apis()
@@ -209,7 +244,9 @@ def _log_execution_scope(
 ) -> None:
     logger.info("成功加载 %d 个 API 接口，基础 URL: %s", current_count, parser_base_url)
     if selected_path_set is not None:
-        logger.info("本次执行范围：已选接口 %d / 全量 %d", current_count, total_apis_count)
+        logger.info(
+            "本次执行范围：已选接口 %d / 全量 %d", current_count, total_apis_count
+        )
 
 
 def _resolve_checkpoint_execution_apis(
@@ -224,15 +261,17 @@ def _resolve_checkpoint_execution_apis(
     data_file: str = "",
 ) -> tuple[str, str, set[str], list[ApiConfig]]:
     apis_before_recovery = list(apis)
-    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _prepare_checkpoint_recovery(
-        enable_checkpoint_recovery=enable_checkpoint_recovery,
-        output_dir=output_dir,
-        postman_file=postman_file,
-        parser_base_url=parser_base_url,
-        selected_item_paths=selected_item_paths,
-        apis=apis,
-        checkpoint_dir=checkpoint_dir,
-        data_file=data_file,
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = (
+        _prepare_checkpoint_recovery(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            output_dir=output_dir,
+            postman_file=postman_file,
+            parser_base_url=parser_base_url,
+            selected_item_paths=selected_item_paths,
+            apis=apis,
+            checkpoint_dir=checkpoint_dir,
+            data_file=data_file,
+        )
     )
     if enable_checkpoint_recovery and not apis:
         # 防止生成空报告：若 checkpoint 覆盖全部接口，则回退为全量执行。
@@ -251,10 +290,16 @@ def _apply_base_url_override(
         return
     parser.base_url = base_url
     for api in apis:
-        api['full_url'] = urljoin(base_url, api['url']) if not api['url'].startswith('http') else api['url']
+        api["full_url"] = (
+            urljoin(base_url, api["url"])
+            if not api["url"].startswith("http")
+            else api["url"]
+        )
 
 
-def _emit_progress(progress_callback: ProgressCallback | None, payload: ProgressPayload) -> None:
+def _emit_progress(
+    progress_callback: ProgressCallback | None, payload: ProgressPayload
+) -> None:
     if not progress_callback:
         return
     # 外部回调异常不应中断执行流程，保持宽捕获。
@@ -268,17 +313,20 @@ def _emit_start_progress(
     current_total: int,
     total_apis_count: int,
 ) -> None:
-    _emit_progress(progress_callback, {
-        'stage': 'running',
-        'total': current_total,
-        'total_all': total_apis_count,
-        'completed': 0,
-        'percent': 0,
-        'current_name': '',
-        'current_method': '',
-        'current_url': '',
-        'message': '开始执行测试',
-    })
+    _emit_progress(
+        progress_callback,
+        {
+            "stage": "running",
+            "total": current_total,
+            "total_all": total_apis_count,
+            "completed": 0,
+            "percent": 0,
+            "current_name": "",
+            "current_method": "",
+            "current_url": "",
+            "message": "开始执行测试",
+        },
+    )
 
 
 def _resolve_auth_token(
@@ -293,7 +341,9 @@ def _resolve_auth_token(
         logger.info("使用手动指定的 token: %s...", token[:20])
         return token
 
-    auth_token = get_auth_token(apis, base_url, session=auth_session, request_timeout=request_timeout)
+    auth_token = get_auth_token(
+        apis, base_url, session=auth_session, request_timeout=request_timeout
+    )
 
     if auth_token:
         logger.info("已获取认证 token: %s...", auth_token[:20])
@@ -307,7 +357,9 @@ def _build_runtime_context(
 ) -> tuple[str | None, RequestTimeout, SessionLike]:
     """Build runtime context with unified timeout and shared session lifecycle."""
     shared_session = create_shared_session()
-    request_timeout = normalize_timeout(resolve_request_timeout(default=(10, 30)), default=(10, 30))
+    request_timeout = normalize_timeout(
+        resolve_request_timeout(default=(10, 30)), default=(10, 30)
+    )
     resolved_token = _resolve_auth_token(
         token,
         apis,
@@ -319,14 +371,16 @@ def _build_runtime_context(
 
 
 def _resolve_report_file_path(output_dir: str, report_name: str | None) -> str:
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    default_report_name = f'postman_report_{timestamp}.html'
-    selected_report_name = str(report_name or '').strip()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    default_report_name = f"postman_report_{timestamp}.html"
+    selected_report_name = str(report_name or "").strip()
     if selected_report_name:
-        normalized_name = selected_report_name.replace('\\', '/').split('/')[-1]
-        normalized_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', '_', normalized_name).strip(' .')
-        if normalized_name and not normalized_name.lower().endswith('.html'):
-            normalized_name = f'{normalized_name}.html'
+        normalized_name = selected_report_name.replace("\\", "/").split("/")[-1]
+        normalized_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", normalized_name).strip(
+            " ."
+        )
+        if normalized_name and not normalized_name.lower().endswith(".html"):
+            normalized_name = f"{normalized_name}.html"
         report_file_name = normalized_name or default_report_name
     else:
         report_file_name = default_report_name
@@ -359,7 +413,7 @@ def _flush_checkpoint_state(
         "executed_item_paths": sorted(executed_item_paths),
         "completed": bool(completed),
         "last_error": str(last_error or ""),
-        "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     _save_checkpoint_atomic(checkpoint_path, payload)
 
@@ -419,22 +473,22 @@ def _execute_api_suite_concurrent(
     # 展开 x_repeat > 1 的接口为多次执行项
     expanded_apis: list[ApiConfig] = []
     for api in apis:
-        repeat = int(api.get('x_repeat') or 1)
+        repeat = int(api.get("x_repeat") or 1)
         if repeat <= 1:
             expanded_apis.append(api)
         else:
             repeat = min(repeat, 10)  # 上限 10
-            base_name = str(api.get('name') or '')
-            item_path_value = api.get('item_path')
+            base_name = str(api.get("name") or "")
+            item_path_value = api.get("item_path")
             item_path = item_path_value if isinstance(item_path_value, list) else []
             for ri in range(repeat):
                 dup = dict(api)
-                dup['repeat_index'] = ri
-                dup['repeat_total'] = repeat
-                dup['repeat_group'] = base_name
-                dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
+                dup["repeat_index"] = ri
+                dup["repeat_total"] = repeat
+                dup["repeat_group"] = base_name
+                dup["name"] = f"{base_name} ({ri + 1}/{repeat})"
                 if item_path:
-                    dup['item_path'] = [*item_path, ri]
+                    dup["item_path"] = [*item_path, ri]
                 expanded_apis.append(cast(ApiConfig, dup))
     apis = expanded_apis
 
@@ -449,7 +503,9 @@ def _execute_api_suite_concurrent(
 
     logger.info(
         "并发执行模式：%d 个接口分为 %d 个批次，最大线程数 %d",
-        len(apis), total_batches, concurrent_workers,
+        len(apis),
+        total_batches,
+        concurrent_workers,
     )
 
     def _run_single(api: ApiConfig) -> TestResultRecord:
@@ -461,9 +517,9 @@ def _execute_api_suite_concurrent(
             assertion_strict_mode=assertion_strict_mode,
             judgment_config=judgment_config,
             variable_context=variable_context,  # type: ignore[arg-type]
-            repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
-            repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
-            repeat_group=str(api.get('repeat_group') or ''),
+            repeat_index=int(api.get("repeat_index") or 0),  # type: ignore[call-overload]
+            repeat_total=int(api.get("repeat_total") or 1),  # type: ignore[call-overload]
+            repeat_group=str(api.get("repeat_group") or ""),
             uploaded_files=uploaded_files,
         )
         executor.start()
@@ -483,10 +539,10 @@ def _execute_api_suite_concurrent(
                         executed_item_paths.add(item_path_key)
                     completed_count += 1
                 tracker.on_item_done(
-                    name=str(api.get('name', '')),
-                    method=str(api.get('method', '')),
-                    url=str(api.get('url', '')),
-                    status=str(result.get('status', '')),
+                    name=str(api.get("name", "")),
+                    method=str(api.get("method", "")),
+                    url=str(api.get("url", "")),
+                    status=str(result.get("status", "")),
                 )
 
             execute_batch_concurrently(
@@ -507,7 +563,12 @@ def _execute_api_suite_concurrent(
                     completed=False,
                 )
 
-            logger.info("批次 %d/%d 完成，%d 个接口", batch_idx + 1, total_batches, len(batch_apis))
+            logger.info(
+                "批次 %d/%d 完成，%d 个接口",
+                batch_idx + 1,
+                total_batches,
+                len(batch_apis),
+            )
 
     except Exception as exc:
         execution_error = exc
@@ -539,76 +600,89 @@ def _execute_single_api(
     progress_callback: ProgressCallback | None,
     uploaded_files: dict[str, str] | None = None,
 ) -> TestResultRecord:
-	"""执行单个 API 并将结果写入 report，同时处理 checkpoint 与进度回调。"""
-	logger.debug("[%d/%d] 测试: %s (%s %s)", idx, total, api['name'], api['method'], api['url'])
+    """执行单个 API 并将结果写入 report，同时处理 checkpoint 与进度回调。"""
+    logger.debug(
+        "[%d/%d] 测试: %s (%s %s)", idx, total, api["name"], api["method"], api["url"]
+    )
 
-	executor = PostmanTestExecutor(
-		api,
-		auth_token=resolved_token,
-		session=shared_session,
-		request_timeout=request_timeout,
-		assertion_strict_mode=assertion_strict_mode,
-		judgment_config=judgment_config,
-		variable_context=variable_context,  # type: ignore[arg-type]
-		repeat_index=int(api.get('repeat_index') or 0),  # type: ignore[call-overload]
-		repeat_total=int(api.get('repeat_total') or 1),  # type: ignore[call-overload]
-		repeat_group=str(api.get('repeat_group') or ''),
-		uploaded_files=uploaded_files,
-	)
-	executor.start()
-	result: TestResultRecord = executor.execute_test()
-	report.add_result(result)
+    executor = PostmanTestExecutor(
+        api,
+        auth_token=resolved_token,
+        session=shared_session,
+        request_timeout=request_timeout,
+        assertion_strict_mode=assertion_strict_mode,
+        judgment_config=judgment_config,
+        variable_context=variable_context,  # type: ignore[arg-type]
+        repeat_index=int(api.get("repeat_index") or 0),  # type: ignore[call-overload]
+        repeat_total=int(api.get("repeat_total") or 1),  # type: ignore[call-overload]
+        repeat_group=str(api.get("repeat_group") or ""),
+        uploaded_files=uploaded_files,
+    )
+    executor.start()
+    result: TestResultRecord = executor.execute_test()
+    report.add_result(result)
 
-	data_index = int(api.get("data_index", 0) or 0)
-	item_path_key = _checkpoint_key(api.get("item_path"), data_index)
-	if item_path_key:
-		executed_item_paths.add(item_path_key)
-	if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
-		_flush_checkpoint_state(
-			enable_checkpoint_recovery=enable_checkpoint_recovery,
-			checkpoint_path=checkpoint_path,
-			collection_fingerprint=collection_fingerprint,
-			parser_base_url=parser_base_url,
-			selected_total_count=selected_total_count,
-			executed_item_paths=executed_item_paths,
-			completed=False,
-		)
+    data_index = int(api.get("data_index", 0) or 0)
+    item_path_key = _checkpoint_key(api.get("item_path"), data_index)
+    if item_path_key:
+        executed_item_paths.add(item_path_key)
+    if enable_checkpoint_recovery and (idx % checkpoint_flush_every_n == 0):
+        _flush_checkpoint_state(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            checkpoint_path=checkpoint_path,
+            collection_fingerprint=collection_fingerprint,
+            parser_base_url=parser_base_url,
+            selected_total_count=selected_total_count,
+            executed_item_paths=executed_item_paths,
+            completed=False,
+        )
 
-	event_payload = {
-		'event': 'test.run.executed',
-		'api_name': str(api.get('name', '')),
-		'method': str(api.get('method', '')),
-		'status': str(result.get('status', '')),
-		'response_time_ms': int(result.get('response_time_ms', 0) or 0),
-	}
-	if result['status'] == 'PASSED':
-		log_sampled(
-			logger,
-			logging.INFO,
-			"[%d/%d] %s %s → %s",
-			idx,
-			total,
-			api['method'],
-			api['name'],
-			result['status'],
-			sample_rate=PASSED_TEST_LOG_SAMPLE_RATE,
-			extra=event_payload,
-		)
-	else:
-		logger.warning("[%d/%d] %s %s → %s", idx, total, api['method'], api['name'], result['status'], extra=event_payload)
+    event_payload = {
+        "event": "test.run.executed",
+        "api_name": str(api.get("name", "")),
+        "method": str(api.get("method", "")),
+        "status": str(result.get("status", "")),
+        "response_time_ms": int(result.get("response_time_ms", 0) or 0),
+    }
+    if result["status"] == "PASSED":
+        log_sampled(
+            logger,
+            logging.INFO,
+            "[%d/%d] %s %s → %s",
+            idx,
+            total,
+            api["method"],
+            api["name"],
+            result["status"],
+            sample_rate=PASSED_TEST_LOG_SAMPLE_RATE,
+            extra=event_payload,
+        )
+    else:
+        logger.warning(
+            "[%d/%d] %s %s → %s",
+            idx,
+            total,
+            api["method"],
+            api["name"],
+            result["status"],
+            extra=event_payload,
+        )
 
-	_emit_progress(progress_callback, {
-		'stage': 'running',
-		'total': total,
-		'total_all': total_apis_count,
-		'completed': idx,
-		'percent': int(idx * 100 / total) if total > 0 else 100,
-		'current_name': str(api.get('name', '')),
-		'current_method': str(api.get('method', '')),
-		'current_url': str(api.get('url', '')),
-		'last_status': str(result.get('status', '')),
-	})
-	return result
+    _emit_progress(
+        progress_callback,
+        {
+            "stage": "running",
+            "total": total,
+            "total_all": total_apis_count,
+            "completed": idx,
+            "percent": int(idx * 100 / total) if total > 0 else 100,
+            "current_name": str(api.get("name", "")),
+            "current_method": str(api.get("method", "")),
+            "current_url": str(api.get("url", "")),
+            "last_status": str(result.get("status", "")),
+        },
+    )
+    return result
 
 
 def _execute_api_suite(
@@ -637,22 +711,22 @@ def _execute_api_suite(
     # 展开 x_repeat > 1 的接口为多次执行项
     expanded_apis: list[ApiConfig] = []
     for api in apis:
-        repeat = int(api.get('x_repeat') or 1)
+        repeat = int(api.get("x_repeat") or 1)
         if repeat <= 1:
             expanded_apis.append(api)
         else:
             repeat = min(repeat, 10)  # 上限 10
-            base_name = str(api.get('name') or '')
-            item_path_value = api.get('item_path')
+            base_name = str(api.get("name") or "")
+            item_path_value = api.get("item_path")
             item_path = item_path_value if isinstance(item_path_value, list) else []
             for ri in range(repeat):
                 dup = dict(api)
-                dup['repeat_index'] = ri
-                dup['repeat_total'] = repeat
-                dup['repeat_group'] = base_name
-                dup['name'] = f'{base_name} ({ri + 1}/{repeat})'
+                dup["repeat_index"] = ri
+                dup["repeat_total"] = repeat
+                dup["repeat_group"] = base_name
+                dup["name"] = f"{base_name} ({ri + 1}/{repeat})"
                 if item_path:
-                    dup['item_path'] = [*item_path, ri]
+                    dup["item_path"] = [*item_path, ri]
                 expanded_apis.append(cast(ApiConfig, dup))
     apis = expanded_apis
 
@@ -686,7 +760,9 @@ def _execute_api_suite(
     try:
         for idx, api in enumerate(apis, 1):
             _execute_single_api(
-                idx, total, api,
+                idx,
+                total,
+                api,
                 report=report,
                 resolved_token=resolved_token,
                 request_timeout=request_timeout,
@@ -785,7 +861,9 @@ def _prepare_execution_context(
     assertion_strict_mode: bool,
 ) -> tuple[str | None, PostmanTestReport, RequestTimeout, SessionLike]:
     # 预获取认证 token，并使用统一 runtime context（shared_session + timeout）。
-    resolved_token, request_timeout, shared_session = _build_runtime_context(token, apis, parser.base_url)
+    resolved_token, request_timeout, shared_session = _build_runtime_context(
+        token, apis, parser.base_url
+    )
 
     # 创建报告对象
     report = _build_report_context(
@@ -842,7 +920,9 @@ def _expand_apis_with_data(
 
     logger.info(
         "数据驱动展开: %d 个接口 → %d 个（数据行 %d）",
-        len(apis), len(expanded), len(data_rows),
+        len(apis),
+        len(expanded),
+        len(data_rows),
     )
     return expanded
 
@@ -923,15 +1003,17 @@ def _prepare_checkpoint_and_progress(
     total_apis_count: int,
     data_file: str = "",
 ) -> tuple[str, str, set[str], list[ApiConfig]]:
-    checkpoint_path, collection_fingerprint, executed_item_paths, apis = _resolve_checkpoint_execution_apis(
-        enable_checkpoint_recovery=enable_checkpoint_recovery,
-        output_dir=output_dir,
-        postman_file=postman_file,
-        parser_base_url=parser_base_url,
-        selected_item_paths=selected_item_paths,
-        apis=apis,
-        checkpoint_dir=checkpoint_dir,
-        data_file=data_file,
+    checkpoint_path, collection_fingerprint, executed_item_paths, apis = (
+        _resolve_checkpoint_execution_apis(
+            enable_checkpoint_recovery=enable_checkpoint_recovery,
+            output_dir=output_dir,
+            postman_file=postman_file,
+            parser_base_url=parser_base_url,
+            selected_item_paths=selected_item_paths,
+            apis=apis,
+            checkpoint_dir=checkpoint_dir,
+            data_file=data_file,
+        )
     )
 
     _emit_start_progress(
@@ -949,20 +1031,25 @@ def _build_report_context(
     assertion_strict_mode: bool,
 ) -> PostmanTestReport:
     from postman_api_tester.postman_api_tester import PostmanTestReport
+
     report = PostmanTestReport()
-    raw_info = parser.data.get('info') if isinstance(parser.data, dict) else None
-    report.collection_name = str(raw_info.get('name', '') or '') if isinstance(raw_info, dict) else ''
+    raw_info = parser.data.get("info") if isinstance(parser.data, dict) else None
+    report.collection_name = (
+        str(raw_info.get("name", "") or "") if isinstance(raw_info, dict) else ""
+    )
     report.source_file = str(Path(postman_file).resolve())
-    report.source_original_file = str(source_original_file or '').strip()
+    report.source_original_file = str(source_original_file or "").strip()
     report.base_url = parser.base_url
     report.assertion_strict_mode = assertion_strict_mode
     return report
 
 
-def _set_report_execution_outcome(report: PostmanTestReport, execution_error: Exception | None) -> None:
-    report.execution_mode = 'partial' if execution_error is not None else 'full'
+def _set_report_execution_outcome(
+    report: PostmanTestReport, execution_error: Exception | None
+) -> None:
+    report.execution_mode = "partial" if execution_error is not None else "full"
     report.interrupted = execution_error is not None
-    report.interrupt_reason = str(execution_error or '')
+    report.interrupt_reason = str(execution_error or "")
 
 
 def _emit_finish_progress(
@@ -973,14 +1060,21 @@ def _emit_finish_progress(
     current_total: int,
     total_apis_count: int,
 ) -> None:
-    _emit_progress(progress_callback, {
-        'stage': 'finished' if execution_error is None else 'partial',
-        'total': current_total,
-        'total_all': total_apis_count,
-        'completed': completed_count,
-        'percent': int(completed_count * 100 / current_total) if current_total > 0 else 100,
-        'message': '执行完成' if execution_error is None else f'执行中断，已生成部分报告: {execution_error}',
-    })
+    _emit_progress(
+        progress_callback,
+        {
+            "stage": "finished" if execution_error is None else "partial",
+            "total": current_total,
+            "total_all": total_apis_count,
+            "completed": completed_count,
+            "percent": int(completed_count * 100 / current_total)
+            if current_total > 0
+            else 100,
+            "message": "执行完成"
+            if execution_error is None
+            else f"执行中断，已生成部分报告: {execution_error}",
+        },
+    )
 
 
 def _generate_and_log_report(
@@ -995,7 +1089,9 @@ def _generate_and_log_report(
     report.generate_summary()
 
     report_file = _resolve_report_file_path(output_dir, report_name)
-    HtmlReporter.generate_html_report(report, report_file, results_per_page=results_per_page)
+    HtmlReporter.generate_html_report(
+        report, report_file, results_per_page=results_per_page
+    )
     logger.info("HTML 报告已保存: %s", report_file)
     logger.info("报告元数据已保存: %s", report.generated_meta_file)
     if execution_error is not None:

@@ -27,7 +27,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
-def normalize_url_and_params(raw_url: str, params: Optional[Dict[str, Any]]) -> Tuple[str, Dict[str, Any]]:
+def normalize_url_and_params(
+    raw_url: str, params: Optional[Dict[str, Any]]
+) -> Tuple[str, Dict[str, Any]]:
     """Normalize a request URL and merge query params without duplicates."""
     url_text = str(raw_url or "").strip()
     split = urlsplit(url_text)
@@ -41,7 +43,9 @@ def normalize_url_and_params(raw_url: str, params: Optional[Dict[str, Any]]) -> 
             merged_params[str(key)] = value
 
     if split.query:
-        clean_url = urlunsplit((split.scheme, split.netloc, split.path, "", split.fragment))
+        clean_url = urlunsplit(
+            (split.scheme, split.netloc, split.path, "", split.fragment)
+        )
     else:
         clean_url = url_text
 
@@ -52,10 +56,15 @@ def merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
     clean_url, merged_params = normalize_url_and_params(raw_url, params)
     if not merged_params:
         return clean_url
-    normalized = {str(key): "" if value is None else str(value) for key, value in merged_params.items()}
+    normalized = {
+        str(key): "" if value is None else str(value)
+        for key, value in merged_params.items()
+    }
     split = urlsplit(clean_url)
     new_query = urlencode(normalized, doseq=False)
-    return urlunsplit((split.scheme, split.netloc, split.path, new_query, split.fragment))
+    return urlunsplit(
+        (split.scheme, split.netloc, split.path, new_query, split.fragment)
+    )
 
 
 def item_path_text(path: Any) -> str:
@@ -94,7 +103,11 @@ def compute_collection_fingerprint(
                 break
             hasher.update(chunk)
     hasher.update((base_url or "").encode("utf-8"))
-    hasher.update(json.dumps(selected_item_paths or [], ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    hasher.update(
+        json.dumps(
+            selected_item_paths or [], ensure_ascii=False, sort_keys=True
+        ).encode("utf-8")
+    )
     if data_file and Path(data_file).is_file():
         with Path(data_file).open("rb") as df:
             while True:
@@ -105,13 +118,18 @@ def compute_collection_fingerprint(
     return hasher.hexdigest()
 
 
-def checkpoint_file_path(output_dir: str, postman_file: str, fingerprint: str, checkpoint_dir: str = "") -> str:
+def checkpoint_file_path(
+    output_dir: str, postman_file: str, fingerprint: str, checkpoint_dir: str = ""
+) -> str:
     if checkpoint_dir:
         base_dir = checkpoint_dir
     else:
         base_dir = str(Path(output_dir) / "checkpoints")
     Path(base_dir).mkdir(parents=True, exist_ok=True)
-    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(postman_file).stem).strip("._") or "collection"
+    stem = (
+        re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(postman_file).stem).strip("._")
+        or "collection"
+    )
     return str(Path(base_dir) / f"{stem}_{fingerprint[:16]}.checkpoint.json")
 
 

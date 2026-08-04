@@ -60,17 +60,19 @@ class ConcurrentProgressTracker:
         total = self._total
         percent = int(completed * 100 / total) if total > 0 else 100
         with contextlib.suppress(Exception):
-            self._callback({
-                'stage': 'running',
-                'total': total,
-                'total_all': total,
-                'completed': completed,
-                'percent': percent,
-                'current_name': name,
-                'current_method': method,
-                'current_url': url,
-                'last_status': status,
-            })
+            self._callback(
+                {
+                    "stage": "running",
+                    "total": total,
+                    "total_all": total,
+                    "completed": completed,
+                    "percent": percent,
+                    "current_name": name,
+                    "current_method": method,
+                    "current_url": url,
+                    "last_status": status,
+                }
+            )
 
     @property
     def completed(self) -> int:
@@ -117,8 +119,7 @@ def execute_batch_concurrently(
 
     with ThreadPoolExecutor(max_workers=effective_workers) as pool:
         future_to_idx = {
-            pool.submit(worker_fn, item): idx
-            for idx, item in enumerate(work_items)
+            pool.submit(worker_fn, item): idx for idx, item in enumerate(work_items)
         }
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]

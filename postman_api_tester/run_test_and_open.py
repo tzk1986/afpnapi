@@ -40,12 +40,14 @@ def get_local_ip() -> str:
 
 def main() -> None:
     """主函数"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("Postman API 快速测试工具".center(80))
-    print("="*80)
+    print("=" * 80)
 
     # 获取Postman文件列表
-    postman_files = [f for f in os.listdir('.') if f.endswith(('.postman.json', '.json'))]
+    postman_files = [
+        f for f in os.listdir(".") if f.endswith((".postman.json", ".json"))
+    ]
 
     if not postman_files:
         print("\n✗ 未找到Postman JSON文件!")
@@ -61,7 +63,7 @@ def main() -> None:
         try:
             choice = input(f"\n请选择文件 (1-{len(postman_files)}) [默认: 1]: ").strip()
             if not choice:
-                choice = '1'
+                choice = "1"
             idx = int(choice) - 1
             if 0 <= idx < len(postman_files):
                 postman_file = postman_files[idx]
@@ -77,8 +79,12 @@ def main() -> None:
         base_url = None
 
     # 可选：输入报告输出目录
-    default_report_dir = getattr(cfg, "REPORT_OUTPUT_DIR", "").strip() or str(PROJECT_ROOT / "reports")
-    report_dir_input = input(f"\n请输入报告输出目录 (可选，默认: {default_report_dir}): ").strip()
+    default_report_dir = getattr(cfg, "REPORT_OUTPUT_DIR", "").strip() or str(
+        PROJECT_ROOT / "reports"
+    )
+    report_dir_input = input(
+        f"\n请输入报告输出目录 (可选，默认: {default_report_dir}): "
+    ).strip()
     output_dir = report_dir_input or default_report_dir
 
     # 可选：选择每页显示条数
@@ -93,7 +99,7 @@ def main() -> None:
         try:
             choice = input("\n请选择每页显示条数 (1-4) [默认: 1]: ").strip()
             if not choice:
-                choice = '1'
+                choice = "1"
             page_choice = int(choice)
             if 1 <= page_choice <= 4:
                 results_per_page = page_sizes[page_choice]
@@ -132,14 +138,14 @@ def main() -> None:
             import time
 
             # 启动Flask服务器
-            server_cmd = [sys.executable, '-m', 'postman_api_tester.report_server']
+            server_cmd = [sys.executable, "-m", "postman_api_tester.report_server"]
             server_process = subprocess.Popen(server_cmd, cwd=PROJECT_ROOT)
 
             # 等待服务器启动
             time.sleep(2)
 
             # 打开浏览器
-            webbrowser.open('http://localhost:5000')
+            webbrowser.open("http://localhost:5000")
             local_ip = get_local_ip()
             print("✓ 已在浏览器中打开报告 (http://localhost:5000)")
             print("✓ 服务器正在后台运行，支持Token测试和重新请求功能")
@@ -170,15 +176,16 @@ def main() -> None:
         except Exception as e:
             print(f"✗ 启动服务器失败: {e}")
             print("将直接打开HTML文件...")
-            webbrowser.open('file://' + report_path)
+            webbrowser.open("file://" + report_path)
             print("✓ 已在浏览器中打开报告")
             print("注意：Token测试和重新请求功能需要服务器支持")
 
     except Exception as e:
         print(f"\n✗ 测试执行失败: {e}")
         import traceback
+
         traceback.print_exc()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

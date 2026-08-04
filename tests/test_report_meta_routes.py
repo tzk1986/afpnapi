@@ -36,6 +36,7 @@ class TestApiReports:
             mock_list.return_value = [{"report_name": "test"}]
             result = api_reports()
             from flask import Response
+
             assert isinstance(result, Response)
 
 
@@ -44,9 +45,7 @@ class TestApiReportDetail:
 
     def test_report_not_found(self, app_context: None) -> None:
         """报告不存在返回 404。"""
-        with patch(
-            "postman_api_tester.report_repository.find_report"
-        ) as mock_find:
+        with patch("postman_api_tester.report_repository.find_report") as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_report_detail("missing")
             assert isinstance(result, tuple)
@@ -58,9 +57,7 @@ class TestApiManualCases:
 
     def test_report_not_found(self, app_context: None) -> None:
         """报告不存在返回 404。"""
-        with patch(
-            "postman_api_tester.report_repository.find_report"
-        ) as mock_find:
+        with patch("postman_api_tester.report_repository.find_report") as mock_find:
             mock_find.side_effect = FileNotFoundError()
             result = api_manual_cases("missing")
             assert isinstance(result, tuple)
@@ -86,7 +83,9 @@ class TestApiManualCaseAdd:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             long_name = "x" * 300
-            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "case": {}})
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": long_name, "case": {}}
+            )
             result = api_manual_case_add()
             assert isinstance(result, tuple)
             assert result[1] == 400
@@ -121,7 +120,9 @@ class TestApiManualCaseDelete:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             long_name = "x" * 300
-            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "case_id": "c1"})
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": long_name, "case_id": "c1"}
+            )
             result = api_manual_case_delete()
             assert isinstance(result, tuple)
             assert result[1] == 400
@@ -132,7 +133,9 @@ class TestApiManualCaseDelete:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             long_id = "x" * 150
-            mock_request.get_json = MagicMock(return_value={"report_name": "test", "case_id": long_id})
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": "test", "case_id": long_id}
+            )
             result = api_manual_case_delete()
             assert isinstance(result, tuple)
             assert result[1] == 400
@@ -157,7 +160,9 @@ class TestApiReportCaseExclusion:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             long_name = "x" * 300
-            mock_request.get_json = MagicMock(return_value={"report_name": long_name, "exclusion_key": "key"})
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": long_name, "exclusion_key": "key"}
+            )
             result = api_report_case_exclusion()
             assert isinstance(result, tuple)
             assert result[1] == 400
@@ -168,7 +173,9 @@ class TestApiReportCaseExclusion:
             "postman_api_tester.handlers.report_meta_routes.request"
         ) as mock_request:
             long_key = "x" * 600
-            mock_request.get_json = MagicMock(return_value={"report_name": "test", "exclusion_key": long_key})
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": "test", "exclusion_key": long_key}
+            )
             result = api_report_case_exclusion()
             assert isinstance(result, tuple)
             assert result[1] == 400

@@ -1,6 +1,5 @@
 """URL 处理工具单元测试."""
 
-import pytest
 from postman_api_tester.utils.url_utils import (
     UrlHandler,
     normalize_url_and_params,
@@ -14,18 +13,14 @@ class TestUrlHandler:
     def test_merge_base_and_relative_simple(self) -> None:
         """测试简单 URL 合并."""
         result = UrlHandler.merge_base_and_relative(
-            "http://localhost:8080",
-            "/api/users",
-            None
+            "http://localhost:8080", "/api/users", None
         )
         assert result == "http://localhost:8080/api/users"
 
     def test_merge_base_and_relative_with_params(self) -> None:
         """测试带查询参数的 URL 合并."""
         result = UrlHandler.merge_base_and_relative(
-            "http://localhost:8080",
-            "/api/users",
-            {"id": "123", "name": "test"}
+            "http://localhost:8080", "/api/users", {"id": "123", "name": "test"}
         )
         assert "http://localhost:8080/api/users?" in result
         assert "id=123" in result
@@ -34,9 +29,7 @@ class TestUrlHandler:
     def test_merge_base_and_relative_trailing_slash(self) -> None:
         """测试处理末尾斜杠."""
         result = UrlHandler.merge_base_and_relative(
-            "http://localhost:8080/",
-            "api/users",
-            None
+            "http://localhost:8080/", "api/users", None
         )
         assert result == "http://localhost:8080/api/users"
 
@@ -81,15 +74,14 @@ class TestNormalizeUrlAndParams:
         """测试 URL 带列表参数."""
         url, params = normalize_url_and_params(
             "http://example.com/api",
-            [{"key": "id", "value": "123"}, {"key": "name", "value": "test"}]
+            [{"key": "id", "value": "123"}, {"key": "name", "value": "test"}],
         )
         assert params == {"id": "123", "name": "test"}
 
     def test_url_with_query_and_params(self) -> None:
         """测试 URL 同时带查询字符串和参数."""
         url, params = normalize_url_and_params(
-            "http://example.com/api?key1=value1",
-            {"key2": "value2"}
+            "http://example.com/api?key1=value1", {"key2": "value2"}
         )
         assert params == {"key1": "value1", "key2": "value2"}
 
@@ -116,8 +108,7 @@ class TestMergeUrlWithParams:
     def test_merge_multiple_params(self) -> None:
         """测试多个参数合并."""
         result = merge_url_with_params(
-            "http://example.com/api",
-            {"id": "123", "name": "test"}
+            "http://example.com/api", {"id": "123", "name": "test"}
         )
         assert "id=123" in result
         assert "name=test" in result
@@ -125,8 +116,7 @@ class TestMergeUrlWithParams:
     def test_merge_with_existing_query(self) -> None:
         """测试与现有查询字符串合并."""
         result = merge_url_with_params(
-            "http://example.com/api?existing=yes",
-            {"new": "param"}
+            "http://example.com/api?existing=yes", {"new": "param"}
         )
         assert "existing=yes" in result
         assert "new=param" in result

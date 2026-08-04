@@ -108,7 +108,7 @@ def build_db_feedback(
     response_body: Any,
 ) -> Dict[str, Any]:
     """识别数据库迁移相关异常并返回结构化建议。"""
-    if status == 'PASSED':
+    if status == "PASSED":
         return {}
 
     if isinstance(response_body, (dict, list)):
@@ -117,33 +117,35 @@ def build_db_feedback(
         except (TypeError, ValueError):
             body_text = str(response_body)
     else:
-        body_text = str(response_body or '')
+        body_text = str(response_body or "")
 
-    diagnosis_text = " | ".join([
-        str(response_message or ''),
-        str(err_code or ''),
-        body_text,
-        str(status_code or ''),
-    ]).lower()
+    diagnosis_text = " | ".join(
+        [
+            str(response_message or ""),
+            str(err_code or ""),
+            body_text,
+            str(status_code or ""),
+        ]
+    ).lower()
 
     for category, patterns, title, suggestion in DB_FEEDBACK_RULES:
         if any(pattern.lower() in diagnosis_text for pattern in patterns):
             return {
-                'is_db_related': True,
-                'category': category,
-                'title': title,
-                'suggestion': suggestion,
-                'raw_status': status,
-                'status_code': status_code,
-                'err_code': err_code,
+                "is_db_related": True,
+                "category": category,
+                "title": title,
+                "suggestion": suggestion,
+                "raw_status": status,
+                "status_code": status_code,
+                "err_code": err_code,
             }
 
     return {
-        'is_db_related': False,
-        'category': 'unknown',
-        'title': '未识别为典型数据库异常',
-        'suggestion': '建议结合应用日志确认是否为数据库迁移导致；若重复出现可补充识别关键词。',
-        'raw_status': status,
-        'status_code': status_code,
-        'err_code': err_code,
+        "is_db_related": False,
+        "category": "unknown",
+        "title": "未识别为典型数据库异常",
+        "suggestion": "建议结合应用日志确认是否为数据库迁移导致；若重复出现可补充识别关键词。",
+        "raw_status": status,
+        "status_code": status_code,
+        "err_code": err_code,
     }

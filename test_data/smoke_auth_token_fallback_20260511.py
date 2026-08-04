@@ -14,7 +14,12 @@ from postman_api_tester.auth import get_auth_token
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, payload: Optional[Dict[str, Any]] = None, raise_json: bool = False):
+    def __init__(
+        self,
+        status_code: int,
+        payload: Optional[Dict[str, Any]] = None,
+        raise_json: bool = False,
+    ):
         self.status_code = status_code
         self._payload = payload or {}
         self._raise_json = raise_json
@@ -79,11 +84,15 @@ def main() -> None:
     fake = _FakeSession(
         responses=[
             _FakeResponse(status_code=500, payload={"msg": "failed"}),
-            _FakeResponse(status_code=200, payload={"data": {"access_token": "abc-token-123"}}),
+            _FakeResponse(
+                status_code=200, payload={"data": {"access_token": "abc-token-123"}}
+            ),
         ]
     )
 
-    token = get_auth_token(apis, "http://example.local", session=fake, request_timeout=(9, 19))
+    token = get_auth_token(
+        apis, "http://example.local", session=fake, request_timeout=(9, 19)
+    )
 
     assert token == "abc-token-123", f"unexpected token: {token}"
     assert len(fake.calls) == 2, f"unexpected call count: {len(fake.calls)}"

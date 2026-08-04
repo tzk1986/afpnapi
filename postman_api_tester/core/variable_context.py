@@ -51,11 +51,17 @@ class VariableContext:
         返回本次成功提取的变量字典（用于报告记录）。
         提取失败的字段不写入上下文（不覆盖已有值）。
         """
-        extracted = extract_from_response(response_data, response_headers, extract_config)
+        extracted = extract_from_response(
+            response_data, response_headers, extract_config
+        )
         with self._lock:
             for var_name, value in extracted.items():
                 self._variables[var_name] = value
-                logger.debug("variable extracted: %s = %s", var_name, value[:50] if len(value) > 50 else value)
+                logger.debug(
+                    "variable extracted: %s = %s",
+                    var_name,
+                    value[:50] if len(value) > 50 else value,
+                )
 
         failed_keys = set(extract_config.keys()) - set(extracted.keys())
         for var_name in failed_keys:
@@ -76,12 +82,15 @@ class VariableContext:
             _read_store,
             _write_store,
         )
+
         with self._lock:
             snapshot = dict(self._variables)
         if len(snapshot) > max_count:
             logger.warning(
                 "变量数量 %d 超过上限 %d，仅保存前 %d 个",
-                len(snapshot), max_count, max_count,
+                len(snapshot),
+                max_count,
+                max_count,
             )
             snapshot = dict(list(snapshot.items())[:max_count])
         try:
@@ -113,7 +122,8 @@ class VariableContext:
         if len(merged) > max_count:
             logger.warning(
                 "合并后变量数量 %d 超过上限 %d，截断处理",
-                len(merged), max_count,
+                len(merged),
+                max_count,
             )
             merged = dict(list(merged.items())[:max_count])
         return cls(initial_variables=merged)

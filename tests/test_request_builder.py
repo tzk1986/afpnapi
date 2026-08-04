@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import unittest
 from typing import Any, Dict
 
@@ -22,13 +21,15 @@ from postman_api_tester.utils.request_builder import (
 # set_request_url
 # ---------------------------------------------------------------------------
 
-class TestSetRequestUrl(unittest.TestCase):
 
+class TestSetRequestUrl(unittest.TestCase):
     def test_url_is_dict_updates_raw_and_query(self) -> None:
         req: Dict[str, Any] = {"url": {"raw": "http://old.com", "query": []}}
         set_request_url(req, "http://example.com/api", {"page": "1", "size": "20"})
-        assert req["url"]["raw"] == "http://example.com/api?page=1&size=20" or \
-               "example.com" in req["url"]["raw"]
+        assert (
+            req["url"]["raw"] == "http://example.com/api?page=1&size=20"
+            or "example.com" in req["url"]["raw"]
+        )
         assert isinstance(req["url"]["query"], list)
 
     def test_url_is_string_replaced(self) -> None:
@@ -53,11 +54,13 @@ class TestSetRequestUrl(unittest.TestCase):
 # set_request_headers
 # ---------------------------------------------------------------------------
 
-class TestSetRequestHeaders(unittest.TestCase):
 
+class TestSetRequestHeaders(unittest.TestCase):
     def test_sets_header_list(self) -> None:
         req: Dict[str, Any] = {}
-        set_request_headers(req, {"Authorization": "Bearer xyz", "Accept": "application/json"})
+        set_request_headers(
+            req, {"Authorization": "Bearer xyz", "Accept": "application/json"}
+        )
         assert len(req["header"]) == 2
         keys = {row["key"] for row in req["header"]}
         assert "Authorization" in keys
@@ -82,8 +85,8 @@ class TestSetRequestHeaders(unittest.TestCase):
 # normalize_urlencoded_rows
 # ---------------------------------------------------------------------------
 
-class TestNormalizeUrlencodedRows(unittest.TestCase):
 
+class TestNormalizeUrlencodedRows(unittest.TestCase):
     def test_dict_with_urlencoded_key(self) -> None:
         data = {"urlencoded": [{"key": "name", "value": "tom"}]}
         result = normalize_urlencoded_rows(data)
@@ -126,8 +129,8 @@ class TestNormalizeUrlencodedRows(unittest.TestCase):
 # normalize_formdata_rows
 # ---------------------------------------------------------------------------
 
-class TestNormalizeFormdataRows(unittest.TestCase):
 
+class TestNormalizeFormdataRows(unittest.TestCase):
     def test_dict_with_formdata_key(self) -> None:
         data = {"formdata": [{"key": "file", "type": "file", "file_name": "a.txt"}]}
         result = normalize_formdata_rows(data)
@@ -165,8 +168,8 @@ class TestNormalizeFormdataRows(unittest.TestCase):
 # normalize_graphql_data
 # ---------------------------------------------------------------------------
 
-class TestNormalizeGraphqlData(unittest.TestCase):
 
+class TestNormalizeGraphqlData(unittest.TestCase):
     def test_valid_dict_with_variables_dict(self) -> None:
         data = {"query": "{ users { id } }", "variables": {"limit": 10}}
         result = normalize_graphql_data(data)
@@ -200,10 +203,14 @@ class TestNormalizeGraphqlData(unittest.TestCase):
 # infer_body_mode_from_stored_body
 # ---------------------------------------------------------------------------
 
-class TestInferBodyModeFromStoredBody(unittest.TestCase):
 
+class TestInferBodyModeFromStoredBody(unittest.TestCase):
     def test_manual_mode_raw(self) -> None:
-        body = {"__manual_body_mode": "raw", "raw_content": '{"a":1}', "raw_language": "json"}
+        body = {
+            "__manual_body_mode": "raw",
+            "raw_content": '{"a":1}',
+            "raw_language": "json",
+        }
         result = infer_body_mode_from_stored_body(body)
         assert result is not None
         assert result["mode"] == "raw"
@@ -263,8 +270,8 @@ class TestInferBodyModeFromStoredBody(unittest.TestCase):
 # set_request_body
 # ---------------------------------------------------------------------------
 
-class TestSetRequestBody(unittest.TestCase):
 
+class TestSetRequestBody(unittest.TestCase):
     def test_none_mode_removes_body(self) -> None:
         req: Dict[str, Any] = {"body": {"mode": "raw", "raw": "old"}}
         set_request_body(req, None, body_mode="none")
@@ -329,8 +336,8 @@ class TestSetRequestBody(unittest.TestCase):
 # build_request_kwargs
 # ---------------------------------------------------------------------------
 
-class TestBuildRequestKwargs(unittest.TestCase):
 
+class TestBuildRequestKwargs(unittest.TestCase):
     def _default_kwargs(self, **overrides: Any) -> Dict[str, Any]:
         defaults: Dict[str, Any] = dict(
             is_multipart=False,
@@ -349,29 +356,46 @@ class TestBuildRequestKwargs(unittest.TestCase):
         assert result["stored_body"] is None
 
     def test_raw_mode_sets_data_and_content_type(self) -> None:
-        body_data = {"raw_content": '{"x":1}', "raw_language": "json", "raw_content_type": "application/json"}
-        result = build_request_kwargs(**self._default_kwargs(body_mode="raw", body_data=body_data))
+        body_data = {
+            "raw_content": '{"x":1}',
+            "raw_language": "json",
+            "raw_content_type": "application/json",
+        }
+        result = build_request_kwargs(
+            **self._default_kwargs(body_mode="raw", body_data=body_data)
+        )
         assert result["request_kwargs"]["data"] == '{"x":1}'
         assert result["headers_to_send"].get("Content-Type") == "application/json"
 
     def test_urlencoded_mode_encodes_data(self) -> None:
         body_data = [{"key": "a", "value": "1"}, {"key": "b", "value": "2"}]
-        result = build_request_kwargs(**self._default_kwargs(body_mode="urlencoded", body_data=body_data))
+        result = build_request_kwargs(
+            **self._default_kwargs(body_mode="urlencoded", body_data=body_data)
+        )
         assert "a=1" in result["request_kwargs"]["data"]
-        assert result["headers_to_send"]["Content-Type"] == "application/x-www-form-urlencoded"
+        assert (
+            result["headers_to_send"]["Content-Type"]
+            == "application/x-www-form-urlencoded"
+        )
 
     def test_graphql_mode_sets_json(self) -> None:
         body_data = {"query": "{ ok }", "variables": {}}
-        result = build_request_kwargs(**self._default_kwargs(body_mode="graphql", body_data=body_data))
+        result = build_request_kwargs(
+            **self._default_kwargs(body_mode="graphql", body_data=body_data)
+        )
         assert "json" in result["request_kwargs"]
         assert result["request_kwargs"]["json"]["query"] == "{ ok }"
 
     def test_legacy_mode_with_body(self) -> None:
-        result = build_request_kwargs(**self._default_kwargs(body_mode="legacy", legacy_body={"x": 1}))
+        result = build_request_kwargs(
+            **self._default_kwargs(body_mode="legacy", legacy_body={"x": 1})
+        )
         assert result["request_kwargs"]["json"] == {"x": 1}
 
     def test_legacy_mode_without_body(self) -> None:
-        result = build_request_kwargs(**self._default_kwargs(body_mode="legacy", legacy_body=None))
+        result = build_request_kwargs(
+            **self._default_kwargs(body_mode="legacy", legacy_body=None)
+        )
         assert result["request_kwargs"]["data"] is None
 
     def test_invalid_body_mode_raises(self) -> None:
@@ -381,29 +405,45 @@ class TestBuildRequestKwargs(unittest.TestCase):
     def test_multipart_formdata_separates_files_and_data(self) -> None:
         body_data = [
             {"key": "name", "type": "text", "value": "tom"},
-            {"key": "file", "type": "file", "file_name": "a.txt", "upload_key": "upload_0"},
+            {
+                "key": "file",
+                "type": "file",
+                "file_name": "a.txt",
+                "upload_key": "upload_0",
+            },
         ]
         file_obj_mock = _make_file_mock("a.txt", b"content", "text/plain")
-        result = build_request_kwargs(**self._default_kwargs(
-            is_multipart=True, body_mode="formdata", body_data=body_data,
-            files_source={"upload_0": file_obj_mock},
-        ))
+        result = build_request_kwargs(
+            **self._default_kwargs(
+                is_multipart=True,
+                body_mode="formdata",
+                body_data=body_data,
+                files_source={"upload_0": file_obj_mock},
+            )
+        )
         assert len(result["request_kwargs"]["data"]) == 1
         assert len(result["request_kwargs"]["files"]) == 1
         assert "Content-Type" not in result["headers_to_send"]
 
     def test_multipart_binary_requires_file(self) -> None:
         with self.assertRaises(ValueError):
-            build_request_kwargs(**self._default_kwargs(
-                is_multipart=True, body_mode="binary", body_data={"upload_key": "upload_0"},
-                files_source={},
-            ))
+            build_request_kwargs(
+                **self._default_kwargs(
+                    is_multipart=True,
+                    body_mode="binary",
+                    body_data={"upload_key": "upload_0"},
+                    files_source={},
+                )
+            )
 
     def test_multipart_with_unsupported_mode_raises(self) -> None:
         with self.assertRaises(ValueError):
-            build_request_kwargs(**self._default_kwargs(
-                is_multipart=True, body_mode="raw",
-            ))
+            build_request_kwargs(
+                **self._default_kwargs(
+                    is_multipart=True,
+                    body_mode="raw",
+                )
+            )
 
     def test_return_structure(self) -> None:
         result = build_request_kwargs(**self._default_kwargs())
@@ -416,6 +456,7 @@ class TestBuildRequestKwargs(unittest.TestCase):
 
 def _make_file_mock(filename: str, content: bytes, mimetype: str) -> Any:
     import io
+
     mock: Dict[str, Any] = {
         "filename": filename,
         "stream": io.BytesIO(content),

@@ -119,5 +119,6 @@ class TestRequest(seldom.TestCase):
 
 if __name__ == "__main__":
     seldom.main(
-        # debug=True, 
-        base_url="http://10.50.11.120:9001")
+        # debug=True,
+        base_url="http://10.50.11.120:9001"
+    )

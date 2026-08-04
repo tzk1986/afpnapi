@@ -18,14 +18,18 @@ def add_manual_case(
     enable_manual_cases: bool,
     default_folder_name: str,
     normalize_manual_case: Callable[[Dict[str, Any], str], Dict[str, Any]],
-    update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
+    update_report_meta: Callable[
+        [str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]
+    ],
     create_id: Callable[[], str],
 ) -> Dict[str, Any]:
     """新增人工用例并追加到报告的 manual_cases 列表中。"""
     if not enable_manual_cases:
         raise ValueError("当前环境未启用人工用例能力。")
 
-    case = normalize_manual_case(payload, str(payload.get("folder") or default_folder_name))
+    case = normalize_manual_case(
+        payload, str(payload.get("folder") or default_folder_name)
+    )
     if not case.get("id"):
         case["id"] = create_id()
     if not case.get("created_at"):
@@ -62,7 +66,9 @@ def update_manual_case(
     enable_manual_cases: bool,
     default_folder_name: str,
     normalize_manual_case: Callable[[Dict[str, Any], str], Dict[str, Any]],
-    update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
+    update_report_meta: Callable[
+        [str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]
+    ],
 ) -> Dict[str, Any]:
     """按 case_id 更新已有的人工用例信息。"""
     if not enable_manual_cases:
@@ -83,7 +89,9 @@ def update_manual_case(
                 continue
             merged = dict(raw)
             merged.update(payload)
-            normalized = normalize_manual_case(merged, str(merged.get("folder") or default_folder_name))
+            normalized = normalize_manual_case(
+                merged, str(merged.get("folder") or default_folder_name)
+            )
             normalized["id"] = case_id
             updated.append(normalized)
             holder["case"] = normalized
@@ -102,7 +110,10 @@ def update_manual_case(
             "case_id": case_id,
         },
     )
-    return {"case": holder.get("case"), "manual_cases": updated_meta.get("manual_cases", [])}
+    return {
+        "case": holder.get("case"),
+        "manual_cases": updated_meta.get("manual_cases", []),
+    }
 
 
 def delete_manual_case(
@@ -112,7 +123,9 @@ def delete_manual_case(
     enable_manual_cases: bool,
     manual_case_exclusion_key: Callable[[Dict[str, Any]], str],
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
-    update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
+    update_report_meta: Callable[
+        [str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]
+    ],
 ) -> Dict[str, Any]:
     """按 case_id 删除人工用例并清理关联的排除标记。"""
     if not enable_manual_cases:
@@ -137,7 +150,11 @@ def delete_manual_case(
         if not found:
             raise FileNotFoundError(f"未找到指定人工用例: {case_id}")
         meta["manual_cases"] = kept
-        exclusions = [x for x in normalize_manual_exclusions(meta.get("manual_exclusions") or []) if x != removed_key]
+        exclusions = [
+            x
+            for x in normalize_manual_exclusions(meta.get("manual_exclusions") or [])
+            if x != removed_key
+        ]
         meta["manual_exclusions"] = exclusions
         return meta
 
@@ -161,7 +178,9 @@ def set_case_exclusion(
     *,
     normalize_exclusion_key: Callable[[str], str],
     normalize_manual_exclusions: Callable[[List[str]], List[str]],
-    update_report_meta: Callable[[str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]],
+    update_report_meta: Callable[
+        [str, Callable[[Dict[str, Any]], Dict[str, Any]]], Dict[str, Any]
+    ],
 ) -> Dict[str, Any]:
     """设置或清除人工用例的排除标记。"""
     exclusion_key = normalize_exclusion_key(exclusion_key)

@@ -61,7 +61,9 @@ def _apply_request_details_to_collection(
 
     for index, result in enumerate(report.get("results", [])):
         detail = details_map.get(str(index)) or {}
-        request_info_obj = detail.get("request_info") if isinstance(detail, dict) else {}
+        request_info_obj = (
+            detail.get("request_info") if isinstance(detail, dict) else {}
+        )
         request_info = request_info_obj if isinstance(request_info_obj, dict) else {}
 
         item = item_by_path(collection_data, result.get("item_path") or [])
@@ -69,13 +71,17 @@ def _apply_request_details_to_collection(
             item = find_item_fallback(collection_data, result)
             if item is None:
                 skipped_count += 1
-                warnings.append(f"索引 {index} 无法定位到集合节点: {result.get('name', '-')}")
+                warnings.append(
+                    f"索引 {index} 无法定位到集合节点: {result.get('name', '-')}"
+                )
                 continue
 
         request_obj = item.setdefault("request", {})
         if not isinstance(request_obj, dict):
             skipped_count += 1
-            warnings.append(f"索引 {index} 的 request 结构异常: {result.get('name', '-')}")
+            warnings.append(
+                f"索引 {index} 的 request 结构异常: {result.get('name', '-')}"
+            )
             continue
 
         method = str(result.get("method") or request_obj.get("method") or "GET").upper()
@@ -131,11 +137,15 @@ def _apply_scope_pruning(
         raise ValueError("导出范围为 report_only 时，报告中缺少可用 item_path。")
 
     final_collection = prune_collection_to_paths(collection_data, selected_paths)
-    pruned_items = extract_collection_preview_items(final_collection, collection_preview_max_items)
+    pruned_items = extract_collection_preview_items(
+        final_collection, collection_preview_max_items
+    )
     report_only_count = len(pruned_items)
     scope_effective_same_as_full = report_only_count == source_total_count
     if scope_effective_same_as_full:
-        warnings.append("当前报告接口与源集合接口一致，report_only 与 full 导出内容相同。")
+        warnings.append(
+            "当前报告接口与源集合接口一致，report_only 与 full 导出内容相同。"
+        )
 
     return final_collection, report_only_count, scope_effective_same_as_full, warnings
 
@@ -173,16 +183,30 @@ def export_collection_with_latest_params(
     if scope == "report_only" and not report_export_allow_report_only:
         scope = "full"
 
-    source_preview_items = extract_collection_preview_items(collection_data, collection_preview_max_items)
+    source_preview_items = extract_collection_preview_items(
+        collection_data, collection_preview_max_items
+    )
     source_total_count = len(source_preview_items)
 
     details_map = load_report_details_map(report)
     updated_count, skipped_count, warnings = _apply_request_details_to_collection(
-        collection_data, report, details_map, include_auth,
+        collection_data,
+        report,
+        details_map,
+        include_auth,
     )
 
-    final_collection, report_only_count, scope_effective_same_as_full, scope_warnings = _apply_scope_pruning(
-        collection_data, scope, report, collection_preview_max_items, source_total_count,
+    (
+        final_collection,
+        report_only_count,
+        scope_effective_same_as_full,
+        scope_warnings,
+    ) = _apply_scope_pruning(
+        collection_data,
+        scope,
+        report,
+        collection_preview_max_items,
+        source_total_count,
     )
     warnings.extend(scope_warnings)
 
@@ -193,7 +217,9 @@ def export_collection_with_latest_params(
                 default_folder = str(case.get("folder") or manual_case_folder_name)
                 manual_cases.append(normalize_manual_case(case, default_folder))
 
-    manual_exclusions = normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    manual_exclusions = normalize_manual_exclusions(
+        report.get("manual_exclusions") or []
+    )
     folder_name = str(manual_case_folder_name).strip() or manual_case_folder_name
     # 统一导出语义：原始集合(已回填) + manual_cases - manual_exclusions。
     appended_manual_count = append_manual_cases_to_collection(
@@ -246,4 +272,3 @@ def export_collection_with_latest_params(
         },
         "warnings": warnings,
     }
-

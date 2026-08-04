@@ -9,7 +9,6 @@ UI 优化冒烟验证脚本
 """
 
 import requests
-import json
 import os
 import sys
 import urllib.parse
@@ -56,28 +55,29 @@ def check_report_results_api(report_name):
         data = resp.json()
         items = data.get("items", [])
         if not items:
-            print(f"   ⚠️  无数据")
+            print("   ⚠️  无数据")
             return True
-        
+
         # 检查第一条记录
         first_item = items[0]
         has_exclusion_key = "exclusion_key" in first_item
         has_excluded = "excluded" in first_item
-        
+
         if has_exclusion_key and has_excluded:
-            print(f"   ✅ 接口正常")
+            print("   ✅ 接口正常")
             print(f"      - 返回条数: {len(items)}")
             print(f"      - exclusion_key 存在: {has_exclusion_key}")
             print(f"      - excluded 字段存在: {has_excluded}")
             return True
         else:
-            print(f"   ❌ 缺少关键字段")
+            print("   ❌ 缺少关键字段")
             print(f"      - exclusion_key: {has_exclusion_key}")
             print(f"      - excluded: {has_excluded}")
             return False
     except Exception as e:
         print(f"   ❌ 请求失败: {e}")
         return False
+
 
 def check_manual_cases_api(report_name):
     """检查人工用例 API 是否返回新字段"""
@@ -91,18 +91,24 @@ def check_manual_cases_api(report_name):
             return False
         data = resp.json()
         cases = data.get("manual_cases", [])
-        
+
         if not cases:
-            print(f"   ⚠️  无人工用例数据")
+            print("   ⚠️  无人工用例数据")
             return True
-        
+
         # 检查第一条用例
         first_case = cases[0]
-        required_fields = ["status_code", "message", "err_code", "exclusion_key", "excluded"]
+        required_fields = [
+            "status_code",
+            "message",
+            "err_code",
+            "exclusion_key",
+            "excluded",
+        ]
         missing_fields = [f for f in required_fields if f not in first_case]
-        
+
         if not missing_fields:
-            print(f"   ✅ 接口正常")
+            print("   ✅ 接口正常")
             print(f"      - 返回用例数: {len(cases)}")
             print(f"      - 包含字段: {', '.join(required_fields)}")
             print(f"      - 第一条用例状态码: {first_case.get('status_code')}")
@@ -114,19 +120,20 @@ def check_manual_cases_api(report_name):
         print(f"   ❌ 请求失败: {e}")
         return False
 
+
 def check_html_template():
     """检查前端 HTML 模板中是否包含新的样式和函数"""
     print("\n3️⃣  检查前端模板...")
     template_path = "d:\\tangzk\\py\\seldom-api-testing\\templates\\report_view.html"
-    
+
     if not os.path.exists(template_path):
         print(f"   ❌ 模板文件不存在: {template_path}")
         return False
-    
+
     try:
-        with open(template_path, 'r', encoding='utf-8') as f:
+        with open(template_path, "r", encoding="utf-8") as f:
             content = f.read()
-        
+
         checks = {
             ".btn-compact": "新按钮样式类",
             "td.td-op": "操作列容器样式",
@@ -137,7 +144,7 @@ def check_html_template():
             "'排'": "单字排除按钮标文本",
             "'恢'": "单字恢复按钮标文本",
         }
-        
+
         missing = []
         found = []
         for check_str, desc in checks.items():
@@ -145,20 +152,21 @@ def check_html_template():
                 found.append(desc)
             else:
                 missing.append(desc)
-        
+
         if missing:
-            print(f"   ⚠️  缺少以下代码:")
+            print("   ⚠️  缺少以下代码:")
             for m in missing:
                 print(f"      - {m}")
-        
+
         print(f"   ✅ 找到 {len(found)} 个关键代码")
         for f in found:
             print(f"      - {f}")
-        
+
         return len(missing) == 0
     except Exception as e:
         print(f"   ❌ 检查失败: {e}")
         return False
+
 
 def check_health_endpoint():
     """检查健康检查端点"""
@@ -169,7 +177,7 @@ def check_health_endpoint():
         if resp.status_code == 200:
             data = resp.json()
             if "status" in data and data.get("status") == "ok":
-                print(f"   ✅ 服务正常")
+                print("   ✅ 服务正常")
                 return True
         print(f"   ❌ 状态码: {resp.status_code}")
         return False
@@ -177,11 +185,12 @@ def check_health_endpoint():
         print(f"   ❌ 请求失败: {e}")
         return False
 
+
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("🚀 UI 优化冒烟验证开始...")
     print("=" * 60)
-    
+
     results = []
     health_ok = check_health_endpoint()
     results.append(("健康检查", health_ok))
@@ -196,15 +205,15 @@ if __name__ == "__main__":
         results.append(("人工用例 API", False))
 
     results.append(("前端模板", check_html_template()))
-    
+
     print("\n" + "=" * 60)
     print("📊 验证结果汇总:")
     print("=" * 60)
-    
+
     for name, result in results:
         status = "✅ 通过" if result else "❌ 失败"
         print(f"{name:20} {status}")
-    
+
     all_passed = all(r for _, r in results)
     print("=" * 60)
     if all_passed:

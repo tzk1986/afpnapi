@@ -35,9 +35,11 @@ def register(name: str) -> Callable[[VariableFunc], VariableFunc]:
         def _my_func(arg: str = "") -> str:
             return arg.upper()
     """
+
     def decorator(fn: VariableFunc) -> VariableFunc:
         _BUILT_IN_FUNCTIONS[name] = fn
         return fn
+
     return decorator
 
 
@@ -55,7 +57,11 @@ def evaluate_function(name: str, args_str: str) -> str:
     fn = _BUILT_IN_FUNCTIONS.get(name)
     if fn is None:
         return None  # type: ignore[return-value]
-    args = [a.strip() for a in args_str.split(",") if a.strip()] if args_str.strip() else []
+    args = (
+        [a.strip() for a in args_str.split(",") if a.strip()]
+        if args_str.strip()
+        else []
+    )
     try:
         return fn(*args)
     except (TypeError, ValueError):
@@ -63,6 +69,7 @@ def evaluate_function(name: str, args_str: str) -> str:
 
 
 # ── 内置函数 ────────────────────────────────────────────────────────────────
+
 
 @register("timestamp")
 def _timestamp() -> str:
@@ -105,7 +112,9 @@ def _hmac_sha256(data: str = "", key: str = "") -> str:
     """HMAC-SHA256 签名，返回十六进制字符串。"""
     if not data or not key:
         return ""
-    return hmac.new(key.encode("utf-8"), data.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        key.encode("utf-8"), data.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 @register("md5")
@@ -245,11 +254,13 @@ def get_function_metadata() -> list[dict[str, str]]:
     result: list[dict[str, str]] = []
     for name in _BUILT_IN_FUNCTIONS:
         meta = _FUNCTION_META.get(name, {})
-        result.append({
-            "name": name,
-            "syntax": meta.get("syntax", "{{" + name + "()}}"),
-            "params": meta.get("params", ""),
-            "description": meta.get("description", ""),
-            "example": meta.get("example", ""),
-        })
+        result.append(
+            {
+                "name": name,
+                "syntax": meta.get("syntax", "{{" + name + "()}}"),
+                "params": meta.get("params", ""),
+                "description": meta.get("description", ""),
+                "example": meta.get("example", ""),
+            }
+        )
     return result

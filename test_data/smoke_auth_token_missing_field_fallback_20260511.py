@@ -69,7 +69,12 @@ def main() -> None:
             _FakeResponse(200, {"data": {"token": "fallback-token-xyz"}}),
         ]
     )
-    token = get_auth_token(_build_login_apis(), "http://example.local", session=fake, request_timeout=(8, 18))
+    token = get_auth_token(
+        _build_login_apis(),
+        "http://example.local",
+        session=fake,
+        request_timeout=(8, 18),
+    )
     assert token == "fallback-token-xyz", token
     assert len(fake.calls) == 2, fake.calls
     assert fake.calls[0]["kwargs"].get("timeout") == (8, 18)
@@ -84,7 +89,12 @@ def main() -> None:
             "params": {},
         }
     ]
-    token_none = get_auth_token(no_login_apis, "http://example.local", session=_FakeSession([]), request_timeout=(8, 18))
+    token_none = get_auth_token(
+        no_login_apis,
+        "http://example.local",
+        session=_FakeSession([]),
+        request_timeout=(8, 18),
+    )
     assert token_none is None, token_none
 
     print("auth-token-missing-field-fallback-ok")

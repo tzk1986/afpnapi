@@ -38,7 +38,9 @@ def _safe_run_job(
             set_run_job(job_id, status="error", message=f"任务异常退出: {exc}")
 
 
-def _build_progress_message(total: int, completed: int, percent: int, current_name: str) -> str:
+def _build_progress_message(
+    total: int, completed: int, percent: int, current_name: str
+) -> str:
     """构建进度消息文本。"""
     if total <= 0:
         return "任务正在执行中..."
@@ -53,6 +55,7 @@ def _create_progress_callback(
     set_run_job: Callable[..., None],
 ) -> Callable[[Dict[str, Any]], None]:
     """创建进度回调函数，用于更新任务状态和记录日志。"""
+
     def on_progress(progress: Dict[str, Any]) -> None:
         total = int(progress.get("total") or 0)
         completed = int(progress.get("completed") or 0)
@@ -150,8 +153,12 @@ def run_postman_job(
             job_id,
             status="success",
             message="执行完成，正在刷新报告索引。",
-            report_name=Path(report.generated_report_file).name if report.generated_report_file else "",
-            report_meta_name=Path(report.generated_meta_file).name if report.generated_meta_file else "",
+            report_name=Path(report.generated_report_file).name
+            if report.generated_report_file
+            else "",
+            report_meta_name=Path(report.generated_meta_file).name
+            if report.generated_meta_file
+            else "",
         )
         logger.info(
             "job completed",
@@ -203,7 +210,12 @@ def enqueue_retry_job(
 
     worker = threading.Thread(
         target=_safe_run_job,
-        args=(run_postman_job_fn, tuple(job_plan["worker_args"]), str(job_plan["job_id"]), set_run_job),
+        args=(
+            run_postman_job_fn,
+            tuple(job_plan["worker_args"]),
+            str(job_plan["job_id"]),
+            set_run_job,
+        ),
         daemon=True,
     )
     worker.start()
@@ -331,4 +343,3 @@ def enqueue_job_with_worker(
         daemon=True,
     )
     worker.start()
-

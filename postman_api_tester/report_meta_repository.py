@@ -49,7 +49,8 @@ def report_meta_files() -> List[Path]:
     if not _REPORTS_DIR.exists():
         return []
     return [
-        path for path in sorted(_REPORTS_DIR.rglob("*_meta.json"), reverse=True)
+        path
+        for path in sorted(_REPORTS_DIR.rglob("*_meta.json"), reverse=True)
         if is_total_report_file(path) and not _is_excluded(path)
     ]
 
@@ -74,8 +75,17 @@ def _load_report_meta_summary(meta_path: Path) -> ReportRecord:
     summary: SummaryRecord = {}
     in_summary = False
     summary_keys = {
-        "total", "passed", "failed", "error", "success_rate", "duration", "start_time", "end_time",
-        "avg_response_ms", "max_response_ms", "p95_response_ms",
+        "total",
+        "passed",
+        "failed",
+        "error",
+        "success_rate",
+        "duration",
+        "start_time",
+        "end_time",
+        "avg_response_ms",
+        "max_response_ms",
+        "p95_response_ms",
     }
 
     with meta_path.open("r", encoding="utf-8") as file:
@@ -108,11 +118,30 @@ def _load_report_meta_summary(meta_path: Path) -> ReportRecord:
                     summary[key] = value
                 continue
 
-            if key in {"report_name", "generated_at", "host_name", "collection_name", "source_file", "source_original_file", "details_file", "base_url", "execution_mode", "interrupted", "interrupt_reason", "assertion_strict_mode"}:
+            if key in {
+                "report_name",
+                "generated_at",
+                "host_name",
+                "collection_name",
+                "source_file",
+                "source_original_file",
+                "details_file",
+                "base_url",
+                "execution_mode",
+                "interrupted",
+                "interrupt_reason",
+                "assertion_strict_mode",
+            }:
                 data[key] = value
 
     if not summary:
-        summary = {"total": 0, "passed": 0, "failed": 0, "error": 0, "success_rate": "0%"}
+        summary = {
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "error": 0,
+            "success_rate": "0%",
+        }
     data["summary"] = summary
     return data
 
@@ -143,7 +172,8 @@ def legacy_postman_html_files() -> List[Path]:
     if not _REPORTS_DIR.exists():
         return []
     return [
-        path for path in sorted(_REPORTS_DIR.rglob("*.html"), reverse=True)
+        path
+        for path in sorted(_REPORTS_DIR.rglob("*.html"), reverse=True)
         if is_total_report_file(path) and not _is_excluded(path)
     ]
 
@@ -164,12 +194,14 @@ def load_legacy_postman_report(report_path: Path) -> ReportRecord:
         raw_results = []
     results = [
         {
-            "key": " | ".join([
-                item.get("folder", "") or "-",
-                item.get("name", "") or "-",
-                item.get("method", "") or "-",
-                item.get("url", "") or "-",
-            ]),
+            "key": " | ".join(
+                [
+                    item.get("folder", "") or "-",
+                    item.get("name", "") or "-",
+                    item.get("method", "") or "-",
+                    item.get("url", "") or "-",
+                ]
+            ),
             "name": item.get("name", ""),
             "folder": item.get("folder", ""),
             "method": item.get("method", ""),
@@ -194,15 +226,23 @@ def load_legacy_postman_report(report_path: Path) -> ReportRecord:
         "source_file": str(report_path),
         "summary": {
             "total": int(total_match.group(1)) if total_match else len(results),
-            "passed": int(passed_match.group(1)) if passed_match else len([item for item in results if item.get("status") == "PASSED"]),
-            "failed": int(failed_match.group(1)) if failed_match else len([item for item in results if item.get("status") == "FAILED"]),
-            "error": int(error_match.group(1)) if error_match else len([item for item in results if item.get("status") == "ERROR"]),
+            "passed": int(passed_match.group(1))
+            if passed_match
+            else len([item for item in results if item.get("status") == "PASSED"]),
+            "failed": int(failed_match.group(1))
+            if failed_match
+            else len([item for item in results if item.get("status") == "FAILED"]),
+            "error": int(error_match.group(1))
+            if error_match
+            else len([item for item in results if item.get("status") == "ERROR"]),
             "success_rate": rate_match.group(1).strip() if rate_match else "0.00%",
             "duration": duration_match.group(1).strip() if duration_match else "",
             "start_time": time_match.group(1).strip() if time_match else "",
             "end_time": time_match.group(2).strip() if time_match else "",
         },
-        "details_file": str(details_file_path.relative_to(_REPORTS_DIR)) if details_file_path.exists() else details_file_name,
+        "details_file": str(details_file_path.relative_to(_REPORTS_DIR))
+        if details_file_path.exists()
+        else details_file_name,
         "results": results,
         "meta_file": "",
         "legacy": True,

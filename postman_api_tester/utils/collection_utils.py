@@ -31,7 +31,9 @@ from postman_api_tester.utils.request_builder import (
 logger = logging.getLogger(__name__)
 
 
-def item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optional[Dict[str, Any]]:
+def item_by_path(
+    collection_data: Dict[str, Any], item_path: List[int]
+) -> Optional[Dict[str, Any]]:
     if not isinstance(item_path, list) or not item_path:
         return None
 
@@ -56,7 +58,9 @@ def item_by_path(collection_data: Dict[str, Any], item_path: List[int]) -> Optio
     return current
 
 
-def iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[Dict[str, Any]]:
+def iter_request_items(
+    items: List[Dict[str, Any]], folder: str = ""
+) -> List[Dict[str, Any]]:
     flattened: List[Dict[str, Any]] = []
     for item in items:
         if not isinstance(item, dict):
@@ -79,7 +83,9 @@ def iter_request_items(items: List[Dict[str, Any]], folder: str = "") -> List[Di
     return flattened
 
 
-def find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def find_item_fallback(
+    collection_data: Dict[str, Any], result: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     items = collection_data.get("item")
     if not isinstance(items, list):
         return None
@@ -97,7 +103,9 @@ def find_item_fallback(collection_data: Dict[str, Any], result: Dict[str, Any]) 
     if len(exact) == 1:
         return cast(Optional[Dict[str, Any]], exact[0]["item"])
 
-    loose = [row for row in candidates if row["name"] == name and row["method"] == method]
+    loose = [
+        row for row in candidates if row["name"] == name and row["method"] == method
+    ]
     if len(loose) == 1:
         return cast(Optional[Dict[str, Any]], loose[0]["item"])
     return None
@@ -107,12 +115,18 @@ def collect_report_item_paths(report: Dict[str, Any]) -> Set[Tuple[int, ...]]:
     path_set: Set[Tuple[int, ...]] = set()
     for result in report.get("results", []):
         path = result.get("item_path")
-        if isinstance(path, list) and path and all(isinstance(i, int) and i >= 0 for i in path):
+        if (
+            isinstance(path, list)
+            and path
+            and all(isinstance(i, int) and i >= 0 for i in path)
+        ):
             path_set.add(tuple(path))
     return path_set
 
 
-def prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: Set[Tuple[int, ...]]) -> Dict[str, Any]:
+def prune_collection_to_paths(
+    collection_data: Dict[str, Any], selected_paths: Set[Tuple[int, ...]]
+) -> Dict[str, Any]:
     root_items = collection_data.get("item")
     if not isinstance(root_items, list):
         return copy.deepcopy(collection_data)
@@ -142,7 +156,9 @@ def prune_collection_to_paths(collection_data: Dict[str, Any], selected_paths: S
     return copied_collection
 
 
-def remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: List[str]) -> int:
+def remove_excluded_items(
+    collection_data: Dict[str, Any], manual_exclusions: List[str]
+) -> int:
     excluded = set(normalize_manual_exclusions(manual_exclusions))
     if not excluded:
         return 0
@@ -157,7 +173,9 @@ def remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: Li
                 continue
 
             name = str(item.get("name") or "")
-            request = item.get("request") if isinstance(item.get("request"), dict) else None
+            request = (
+                item.get("request") if isinstance(item.get("request"), dict) else None
+            )
             children = item.get("item") if isinstance(item.get("item"), list) else None
 
             if request is not None:
@@ -165,7 +183,9 @@ def remove_excluded_items(collection_data: Dict[str, Any], manual_exclusions: Li
                     parent_folder,
                     name,
                     request.get("method", ""),
-                    (request.get("url") or {}).get("raw", "") if isinstance(request.get("url"), dict) else request.get("url", ""),
+                    (request.get("url") or {}).get("raw", "")
+                    if isinstance(request.get("url"), dict)
+                    else request.get("url", ""),
                 )
                 if key in excluded:
                     removed += 1
@@ -236,7 +256,9 @@ def append_manual_cases_to_collection(
         url = str(case.get("url") or "").strip()
         case_name = str(case.get("name") or "").strip()
         raw_request_info = case.get("request_info")
-        request_info: Dict[str, Any] = raw_request_info if isinstance(raw_request_info, dict) else {}
+        request_info: Dict[str, Any] = (
+            raw_request_info if isinstance(raw_request_info, dict) else {}
+        )
         raw_headers = request_info.get("headers")
         headers: Dict[str, Any] = raw_headers if isinstance(raw_headers, dict) else {}
         if not include_auth:
@@ -262,9 +284,11 @@ def append_manual_cases_to_collection(
 
     return appended
 
+
 # ---------------------------------------------------------------------------
 # Collection 预览项提取
 # ---------------------------------------------------------------------------
+
 
 def _build_preview_url(url_obj: Any) -> str:
     if isinstance(url_obj, str):
@@ -351,6 +375,7 @@ def extract_collection_preview_items(
 # ---------------------------------------------------------------------------
 # Ad-hoc 用例归一化
 # ---------------------------------------------------------------------------
+
 
 def _parse_json_text(value: Any, default: Any) -> Any:
     if value is None:
@@ -458,19 +483,29 @@ def _parse_adhoc_judgment_fields(raw: Dict[str, Any]) -> Dict[str, Any]:
 
     x_enable_err_code = raw.get("x_enable_err_code_judgment")
     if x_enable_err_code is not None and not isinstance(x_enable_err_code, bool):
-        fields["x_enable_err_code_judgment"] = str(x_enable_err_code).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+        fields["x_enable_err_code_judgment"] = str(
+            x_enable_err_code
+        ).strip().lower() in {"1", "true", "yes", "y", "on"}
     elif isinstance(x_enable_err_code, bool):
         fields["x_enable_err_code_judgment"] = x_enable_err_code
 
     x_enable_message = raw.get("x_enable_message_judgment")
     if x_enable_message is not None and not isinstance(x_enable_message, bool):
-        fields["x_enable_message_judgment"] = str(x_enable_message).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+        fields["x_enable_message_judgment"] = str(x_enable_message).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "y",
+            "on",
+        }
     elif isinstance(x_enable_message, bool):
         fields["x_enable_message_judgment"] = x_enable_message
 
     x_extract_raw = raw.get("x_extract")
     if isinstance(x_extract_raw, dict) and x_extract_raw:
-        x_extract = {str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)}
+        x_extract = {
+            str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)
+        }
         if x_extract:
             fields["x_extract"] = x_extract
 
@@ -485,9 +520,9 @@ def _derive_case_name(raw_name: Any, method: str, url: str, index: int) -> str:
     raw_url = str(url or "").strip()
     if raw_url:
         if raw_url.startswith("{{baseUrl}}"):
-            raw_url = raw_url[len("{{baseUrl}}"):] or "/"
+            raw_url = raw_url[len("{{baseUrl}}") :] or "/"
         elif raw_url.startswith("{{base_url}}"):
-            raw_url = raw_url[len("{{base_url}}"):] or "/"
+            raw_url = raw_url[len("{{base_url}}") :] or "/"
 
         parsed = urlsplit(raw_url)
         if parsed.scheme and parsed.netloc:
@@ -599,7 +634,9 @@ def build_adhoc_collection(
         if case.get("x_success_messages") is not None:
             request_obj["x_success_messages"] = case["x_success_messages"]
         if case.get("x_enable_err_code_judgment") is not None:
-            request_obj["x_enable_err_code_judgment"] = case["x_enable_err_code_judgment"]
+            request_obj["x_enable_err_code_judgment"] = case[
+                "x_enable_err_code_judgment"
+            ]
         if case.get("x_enable_message_judgment") is not None:
             request_obj["x_enable_message_judgment"] = case["x_enable_message_judgment"]
         if case.get("x_extract") is not None:
@@ -645,4 +682,3 @@ __all__ = [
     "normalize_adhoc_case",
     "build_adhoc_collection",
 ]
-

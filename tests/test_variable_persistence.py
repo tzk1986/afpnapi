@@ -3,17 +3,13 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from postman_api_tester.core.variable_context import VariableContext
 
 
 class TestSaveToFile:
-
     def test_save_creates_file(self, tmp_path: Path) -> None:
         ctx = VariableContext({"a": "1", "b": "2"})
         path = str(tmp_path / "vars.json")
@@ -61,7 +57,6 @@ class TestSaveToFile:
 
 
 class TestLoadFromFile:
-
     def test_load_existing_file(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         data = {
@@ -89,10 +84,17 @@ class TestLoadFromFile:
 
     def test_load_with_initial_variables_priority(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
-        data = {"version": 2, "updated_at": "", "shared": {"a": "from_file", "b": "from_file"}, "environments": {}}
+        data = {
+            "version": 2,
+            "updated_at": "",
+            "shared": {"a": "from_file", "b": "from_file"},
+            "environments": {},
+        }
         Path(path).write_text(json.dumps(data), encoding="utf-8")
 
-        ctx = VariableContext.load_from_file(path, initial_variables={"a": "override", "c": "new"})
+        ctx = VariableContext.load_from_file(
+            path, initial_variables={"a": "override", "c": "new"}
+        )
         assert ctx.get("a") == "override"
         assert ctx.get("b") == "from_file"
         assert ctx.get("c") == "new"
@@ -138,7 +140,6 @@ class TestLoadFromFile:
 
 
 class TestRoundTrip:
-
     def test_save_then_load(self, tmp_path: Path) -> None:
         path = str(tmp_path / "vars.json")
         original = VariableContext({"token": "xyz", "count": "42"})

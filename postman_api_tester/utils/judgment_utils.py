@@ -19,10 +19,7 @@ def parse_success_list(config_value: str) -> FrozenSet[str]:
     """
     if not config_value or not config_value.strip():
         return frozenset()
-    return frozenset(
-        item.strip().lower()
-        for item in config_value.split(",")
-    )
+    return frozenset(item.strip().lower() for item in config_value.split(","))
 
 
 def evaluate_result_judgment(
@@ -47,9 +44,7 @@ def evaluate_result_judgment(
 
     status_code_ok = status_code == expected_status
     if not status_code_ok:
-        fail_reasons.append(
-            f"期望状态码: {expected_status}, 实际: {status_code}"
-        )
+        fail_reasons.append(f"期望状态码: {expected_status}, 实际: {status_code}")
 
     err_code_ok = True
     if enable_err_code_judgment:
@@ -64,7 +59,11 @@ def evaluate_result_judgment(
 
     message_ok = True
     if enable_message_judgment:
-        msgs = success_messages if success_messages is not None else _DEFAULT_SUCCESS_MESSAGES
+        msgs = (
+            success_messages
+            if success_messages is not None
+            else _DEFAULT_SUCCESS_MESSAGES
+        )
         normalized_msg = str(response_message or "").strip().lower()
         message_ok = (normalized_msg == "") or (normalized_msg in msgs)
         if not message_ok:

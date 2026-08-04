@@ -23,7 +23,9 @@ def main() -> None:
                 data2 = resp2.json()
                 print(f"返回项数: {len(data2.get('items', []))}")
                 if data2.get("items"):
-                    print(f"第一项有 exclusion_key: {'exclusion_key' in data2['items'][0]}")
+                    print(
+                        f"第一项有 exclusion_key: {'exclusion_key' in data2['items'][0]}"
+                    )
         else:
             print("无报告")
     else:

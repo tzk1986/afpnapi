@@ -15,7 +15,9 @@ from postman_api_tester.runtime_utils import (
 )
 
 
-def set_request_url(request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]) -> None:
+def set_request_url(
+    request_obj: Dict[str, Any], raw_url: str, params: Dict[str, Any]
+) -> None:
     merged_url = _merge_url_with_params(raw_url, params)
     url_obj = request_obj.get("url")
     if isinstance(url_obj, dict):
@@ -74,7 +76,11 @@ def normalize_formdata_rows(data: Any) -> List[Dict[str, Any]]:
         key = str(row.get("key") or "").strip()
         if not key:
             continue
-        row_type = "file" if str(row.get("type") or "text").strip().lower() == "file" else "text"
+        row_type = (
+            "file"
+            if str(row.get("type") or "text").strip().lower() == "file"
+            else "text"
+        )
         item: Dict[str, Any] = {"key": key, "type": row_type}
         if row_type == "file":
             file_name = str(row.get("file_name") or row.get("src") or "").strip()
@@ -113,12 +119,17 @@ def infer_body_mode_from_stored_body(body: Any) -> Dict[str, Any] | None:
             "mode": "raw",
             "data": {
                 "raw_language": str(body.get("raw_language") or "json"),
-                "raw_content_type": str(body.get("raw_content_type") or "application/json"),
+                "raw_content_type": str(
+                    body.get("raw_content_type") or "application/json"
+                ),
                 "raw_content": str(body.get("raw_content") or ""),
             },
         }
     if manual_mode == "urlencoded":
-        return {"mode": "urlencoded", "data": {"urlencoded": body.get("urlencoded") or []}}
+        return {
+            "mode": "urlencoded",
+            "data": {"urlencoded": body.get("urlencoded") or []},
+        }
     if manual_mode == "formdata":
         return {"mode": "formdata", "data": {"formdata": body.get("formdata") or []}}
     if manual_mode == "graphql":
@@ -139,7 +150,12 @@ def infer_body_mode_from_stored_body(body: Any) -> Dict[str, Any] | None:
     return None
 
 
-def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | None = None, body_data: Any = None) -> None:
+def set_request_body(
+    request_obj: Dict[str, Any],
+    body: Any,
+    body_mode: str | None = None,
+    body_data: Any = None,
+) -> None:
     """将前端/历史结构统一映射到 Postman request.body 语义。"""
     mode = str(body_mode or "legacy").strip().lower()
     data = body_data
@@ -157,7 +173,9 @@ def set_request_body(request_obj: Dict[str, Any], body: Any, body_mode: str | No
     if mode == "raw":
         if isinstance(data, dict):
             raw_content = str(data.get("raw_content") or "")
-            raw_language = str(data.get("raw_language") or "text").strip().lower() or "text"
+            raw_language = (
+                str(data.get("raw_language") or "text").strip().lower() or "text"
+            )
         else:
             raw_content = "" if data is None else str(data)
             raw_language = "text"
@@ -240,12 +258,27 @@ def _build_multipart_request(
                 upload_key = str(row.get("upload_key") or "").strip()
                 if not upload_key:
                     upload_key = "upload_0"
-                file_obj = files_source.get(upload_key) if files_source is not None else None
+                file_obj = (
+                    files_source.get(upload_key) if files_source is not None else None
+                )
                 if file_obj and str(file_obj.filename or "").strip():
-                    file_rows.append((key, (file_obj.filename, file_obj.stream, file_obj.mimetype or "application/octet-stream")))
-                    row["file_name"] = str(file_obj.filename or row.get("file_name") or "")
+                    file_rows.append(
+                        (
+                            key,
+                            (
+                                file_obj.filename,
+                                file_obj.stream,
+                                file_obj.mimetype or "application/octet-stream",
+                            ),
+                        )
+                    )
+                    row["file_name"] = str(
+                        file_obj.filename or row.get("file_name") or ""
+                    )
             else:
-                data_rows.append((key, "" if row.get("value") is None else str(row.get("value"))))
+                data_rows.append(
+                    (key, "" if row.get("value") is None else str(row.get("value")))
+                )
         headers_to_send.pop("Content-Type", None)
         request_kwargs["data"] = data_rows
         request_kwargs["files"] = file_rows
@@ -254,13 +287,17 @@ def _build_multipart_request(
     elif normalized_mode == "binary":
         upload_key = "upload_0"
         if isinstance(body_data, dict):
-            upload_key = str(body_data.get("upload_key") or upload_key).strip() or "upload_0"
+            upload_key = (
+                str(body_data.get("upload_key") or upload_key).strip() or "upload_0"
+            )
         file_obj = files_source.get(upload_key) if files_source is not None else None
         if not file_obj:
             raise ValueError("binary 模式缺少上传文件")
         payload_bytes = file_obj.read()
         request_kwargs["data"] = payload_bytes
-        headers_to_send.setdefault("Content-Type", file_obj.mimetype or "application/octet-stream")
+        headers_to_send.setdefault(
+            "Content-Type", file_obj.mimetype or "application/octet-stream"
+        )
         normalized_data = {"file_name": str(file_obj.filename or "")}
         stored_body = normalized_data
     else:
@@ -290,7 +327,9 @@ def _build_non_multipart_request(
         raw_ct = ""
         if isinstance(body_data, dict):
             raw_content = str(body_data.get("raw_content") or "")
-            raw_language = str(body_data.get("raw_language") or "text").strip().lower() or "text"
+            raw_language = (
+                str(body_data.get("raw_language") or "text").strip().lower() or "text"
+            )
             raw_ct = str(body_data.get("raw_content_type") or "").strip()
         if raw_ct:
             headers_to_send.setdefault("Content-Type", raw_ct)
@@ -358,6 +397,7 @@ def build_request_kwargs(
         "stored_body_mode": normalized_mode,
         "stored_body_data": normalized_data,
     }
+
 
 __all__ = [
     "set_request_url",

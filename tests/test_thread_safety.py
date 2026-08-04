@@ -16,7 +16,6 @@ from postman_api_tester.postman_api_tester import PostmanTestReport
 
 
 class TestPostmanTestReportThreadSafety:
-
     def test_concurrent_add_result_no_data_loss(self) -> None:
         report = PostmanTestReport()
         num_threads = 20
@@ -24,28 +23,32 @@ class TestPostmanTestReportThreadSafety:
 
         def add_items(thread_id: int) -> None:
             for i in range(items_per_thread):
-                report.add_result({
-                    'name': f'req_{thread_id}_{i}',
-                    'status': 'PASSED',
-                    'method': 'GET',
-                    'url': 'http://example.com',
-                    'actual_request_url': 'http://example.com',
-                    'item_path': [thread_id, i],
-                    'expected_status': 200,
-                    'message': '',
-                    'err_code': '',
-                    'status_code': 200,
-                    'folder': '',
-                    'response_time_ms': 10,
-                    'request_info': {'headers': {}, 'params': {}, 'body': None},
-                    'response_info': {'headers': {}, 'body': ''},
-                    'assertion_results': [],
-                    'assertion_engine_error': '',
-                    'data_index': 0,
-                    'extracted_variables': {},
-                })
+                report.add_result(
+                    {
+                        "name": f"req_{thread_id}_{i}",
+                        "status": "PASSED",
+                        "method": "GET",
+                        "url": "http://example.com",
+                        "actual_request_url": "http://example.com",
+                        "item_path": [thread_id, i],
+                        "expected_status": 200,
+                        "message": "",
+                        "err_code": "",
+                        "status_code": 200,
+                        "folder": "",
+                        "response_time_ms": 10,
+                        "request_info": {"headers": {}, "params": {}, "body": None},
+                        "response_info": {"headers": {}, "body": ""},
+                        "assertion_results": [],
+                        "assertion_engine_error": "",
+                        "data_index": 0,
+                        "extracted_variables": {},
+                    }
+                )
 
-        threads = [threading.Thread(target=add_items, args=(t,)) for t in range(num_threads)]
+        threads = [
+            threading.Thread(target=add_items, args=(t,)) for t in range(num_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -58,29 +61,34 @@ class TestPostmanTestReportThreadSafety:
         num_threads = 10
 
         def add_batch(thread_id: int) -> None:
-            batch = [{
-                'name': f'req_{thread_id}_{i}',
-                'status': 'PASSED',
-                'method': 'GET',
-                'url': '',
-                'actual_request_url': '',
-                'item_path': [],
-                'expected_status': 200,
-                'message': '',
-                'err_code': '',
-                'status_code': 200,
-                'folder': '',
-                'response_time_ms': 0,
-                'request_info': {'headers': {}, 'params': {}, 'body': None},
-                'response_info': {'headers': {}, 'body': ''},
-                'assertion_results': [],
-                'assertion_engine_error': '',
-                'data_index': 0,
-                'extracted_variables': {},
-            } for i in range(20)]
+            batch = [
+                {
+                    "name": f"req_{thread_id}_{i}",
+                    "status": "PASSED",
+                    "method": "GET",
+                    "url": "",
+                    "actual_request_url": "",
+                    "item_path": [],
+                    "expected_status": 200,
+                    "message": "",
+                    "err_code": "",
+                    "status_code": 200,
+                    "folder": "",
+                    "response_time_ms": 0,
+                    "request_info": {"headers": {}, "params": {}, "body": None},
+                    "response_info": {"headers": {}, "body": ""},
+                    "assertion_results": [],
+                    "assertion_engine_error": "",
+                    "data_index": 0,
+                    "extracted_variables": {},
+                }
+                for i in range(20)
+            ]
             report.add_results(batch)
 
-        threads = [threading.Thread(target=add_batch, args=(t,)) for t in range(num_threads)]
+        threads = [
+            threading.Thread(target=add_batch, args=(t,)) for t in range(num_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -90,7 +98,6 @@ class TestPostmanTestReportThreadSafety:
 
 
 class TestVariableContextThreadSafety:
-
     def test_concurrent_set_and_get(self) -> None:
         ctx = VariableContext()
         num_threads = 20
@@ -99,7 +106,9 @@ class TestVariableContextThreadSafety:
             for i in range(50):
                 ctx.set(f"var_{thread_id}_{i}", f"value_{thread_id}_{i}")
 
-        threads = [threading.Thread(target=set_vars, args=(t,)) for t in range(num_threads)]
+        threads = [
+            threading.Thread(target=set_vars, args=(t,)) for t in range(num_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -120,7 +129,9 @@ class TestVariableContextThreadSafety:
             response_data = {"token": f"t{thread_id}", "id": f"i{thread_id}"}
             ctx.update_from_extract(extract_config, response_data, {})
 
-        threads = [threading.Thread(target=extract_vars, args=(t,)) for t in range(num_threads)]
+        threads = [
+            threading.Thread(target=extract_vars, args=(t,)) for t in range(num_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -139,7 +150,6 @@ class TestVariableContextThreadSafety:
 
 
 class TestConcurrentProgressTracker:
-
     def test_concurrent_progress_counting(self) -> None:
         events: List[Dict[str, Any]] = []
         lock = threading.Lock()
@@ -155,7 +165,9 @@ class TestConcurrentProgressTracker:
             for i in range(10):
                 tracker.on_item_done(f"req_{thread_id}_{i}", "GET", "/api", "PASSED")
 
-        threads = [threading.Thread(target=report_done, args=(t,)) for t in range(num_threads)]
+        threads = [
+            threading.Thread(target=report_done, args=(t,)) for t in range(num_threads)
+        ]
         for t in threads:
             t.start()
         for t in threads:
@@ -177,7 +189,6 @@ class TestConcurrentProgressTracker:
 
 
 class TestExecuteBatchConcurrently:
-
     def test_basic_parallel_execution(self) -> None:
         results = execute_batch_concurrently(
             [1, 2, 3, 4, 5],
@@ -188,6 +199,7 @@ class TestExecuteBatchConcurrently:
 
     def test_preserves_order(self) -> None:
         import time
+
         def slow_fn(x: int) -> int:
             time.sleep(0.01 * (5 - x))
             return x
@@ -241,5 +253,6 @@ class TestExecuteBatchConcurrently:
         )
         assert results[0] == 1
         from postman_api_tester.core.concurrent_executor import _FailedResult
+
         assert isinstance(results[1], _FailedResult)
         assert results[2] == 3

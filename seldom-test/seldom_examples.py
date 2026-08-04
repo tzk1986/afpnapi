@@ -63,14 +63,14 @@ def example_manual_test():
 
     # 手动创建API配置
     api_config = {
-        'name': '测试API',
-        'method': 'GET',
-        'url': '/get',
-        'full_url': 'https://httpbin.org/get',
-        'headers': {},
-        'body': None,
-        'params': {},
-        'expected_status': 200
+        "name": "测试API",
+        "method": "GET",
+        "url": "/get",
+        "full_url": "https://httpbin.org/get",
+        "headers": {},
+        "body": None,
+        "params": {},
+        "expected_status": 200,
     }
 
     # 创建测试实例
@@ -82,13 +82,14 @@ def example_manual_test():
     print(f"完整URL: {test_instance.api_config['full_url']}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("基于 Seldom 框架的 Postman API 测试 - 使用示例")
     print("=" * 60)
 
     # 检查是否安装了 seldom
     try:
         import seldom
+
         print("✓ Seldom 已安装")
     except ImportError:
         print("✗ Seldom 未安装，请运行: pip install seldom")

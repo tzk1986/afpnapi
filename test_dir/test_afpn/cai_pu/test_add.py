@@ -35,24 +35,19 @@ import pandas as pd
 
 url_spec = "http://10.50.11.120:9301/api/recipe/spec/addSpec"
 
-spec_payload_template =  {
-  "recipeId": "",  # 待替换
-  "name": "标准",
-  "yieldWeight": 2000,
-  "yieldPercent": 100,
-  "enableFlag": 1,
-  "releaseStatus": 3,
-  "productionMethod": 1,
-  "itemList": [
-    {
-      "ingredientId": "40cad324f765969b690e7b00218c60e9",
-      "weight": 2000
-    }
-  ]
+spec_payload_template = {
+    "recipeId": "",  # 待替换
+    "name": "标准",
+    "yieldWeight": 2000,
+    "yieldPercent": 100,
+    "enableFlag": 1,
+    "releaseStatus": 3,
+    "productionMethod": 1,
+    "itemList": [{"ingredientId": "40cad324f765969b690e7b00218c60e9", "weight": 2000}],
 }
 headers = {
-  "content-type": "application/json",
-  "token": "RENDQTMyNUMwMTRBMjY3MkEyQTBBNzVCQjE4OTUxNjQ=.Njc0NjVCNDJCMEEzNzU2MkJDNzJEMzkyQTIwRDA0NTg="
+    "content-type": "application/json",
+    "token": "RENDQTMyNUMwMTRBMjY3MkEyQTBBNzVCQjE4OTUxNjQ=.Njc0NjVCNDJCMEEzNzU2MkJDNzJEMzkyQTIwRDA0NTg=",
 }
 
 excel_path = r"D:\tangzk\20250722\guige1.xlsx"  # 请替换为你的Excel文件路径

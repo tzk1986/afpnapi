@@ -36,7 +36,7 @@ def api_export_junit(report_name: str) -> ResponseReturnValue:
         logger.exception("JUnit XML 生成失败: %s", exc)
         return _json_error("JUnit XML 生成失败", 500, "COL_JUNIT_003")
 
-    safe_stem = re.sub(r'[^\w一-鿿\-.]', '_', Path(report_name).stem)[:80]
+    safe_stem = re.sub(r"[^\w一-鿿\-.]", "_", Path(report_name).stem)[:80]
     filename = f"{safe_stem}_junit.xml"
     resp = make_response(xml_content)
     resp.headers["Content-Type"] = "application/xml; charset=utf-8"

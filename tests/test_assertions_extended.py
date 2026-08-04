@@ -13,7 +13,6 @@ from postman_api_tester.assertions import (
 
 
 class TestRegexOp:
-
     def test_regex_match_success(self) -> None:
         passed, msg = _compare("13800138000", "regex", r"^1[3-9]\d{9}$")
         assert passed is True
@@ -34,7 +33,6 @@ class TestRegexOp:
 
 
 class TestLengthEqOp:
-
     def test_array_length_match(self) -> None:
         passed, msg = _compare([1, 2, 3], "length_eq", 3)
         assert passed is True
@@ -62,7 +60,6 @@ class TestLengthEqOp:
 
 
 class TestTypeOp:
-
     def test_type_string(self) -> None:
         passed, msg = _compare("hello", "type", "string")
         assert passed is True
@@ -111,7 +108,6 @@ class TestTypeOp:
 
 
 class TestCheckType:
-
     def test_string_pass(self) -> None:
         assert _check_type("abc", "string") == (True, "")
 
@@ -124,9 +120,12 @@ class TestCheckType:
 
 
 class TestSchemaOp:
-
     def test_schema_valid(self) -> None:
-        schema = {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}}
+        schema = {
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "integer"}},
+        }
         passed, msg = _compare({"id": 42, "name": "test"}, "schema", schema)
         assert passed is True
 
@@ -145,11 +144,11 @@ class TestSchemaOp:
 
     def test_schema_available_flag(self) -> None:
         from postman_api_tester.assertions import _JSONSCHEMA_AVAILABLE
+
         assert isinstance(_JSONSCHEMA_AVAILABLE, bool)
 
 
 class TestEvaluateAssertionsWithNewOps:
-
     def test_regex_in_evaluate(self) -> None:
         body = {"phone": "13800138000"}
         assertions = [{"path": "$.phone", "op": "regex", "expected": r"^1[3-9]\d{9}$"}]
@@ -172,17 +171,18 @@ class TestEvaluateAssertionsWithNewOps:
     def test_schema_in_evaluate(self) -> None:
         pytest.importorskip("jsonschema")
         body = {"data": {"id": 1, "name": "test"}}
-        assertions = [{
-            "path": "$.data",
-            "op": "schema",
-            "expected": {"type": "object", "required": ["id", "name"]},
-        }]
+        assertions = [
+            {
+                "path": "$.data",
+                "op": "schema",
+                "expected": {"type": "object", "required": ["id", "name"]},
+            }
+        ]
         results = evaluate_assertions(body, assertions)
         assert results[0]["passed"] is True
 
 
 class TestSupportedOpsUpdated:
-
     def test_new_ops_in_supported(self) -> None:
         assert "regex" in SUPPORTED_OPS
         assert "length_eq" in SUPPORTED_OPS

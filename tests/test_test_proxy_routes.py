@@ -11,8 +11,6 @@ from postman_api_tester.handlers.test_proxy_routes import (
     _build_request_response_info,
     _evaluate_and_build_result,
     _check_proxy_host_allowed,
-    re_request_api,
-    api_proxy_request,
 )
 
 
@@ -45,6 +43,7 @@ class TestTestToken:
             mock_request.get_json = MagicMock(return_value={"token": "abc123"})
             result = _test_token_handler()
             from flask import Response
+
             assert isinstance(result, Response)
             assert result.status_code == 200
 
@@ -116,7 +115,9 @@ class TestEvaluateAndBuildResult:
     """_evaluate_and_build_result 辅助函数测试。"""
 
     @patch("postman_api_tester.handlers.test_proxy_routes._evaluate_result_judgment")
-    @patch("postman_api_tester.handlers.test_proxy_routes._resolve_judgment_params_for_proxy")
+    @patch(
+        "postman_api_tester.handlers.test_proxy_routes._resolve_judgment_params_for_proxy"
+    )
     @patch("postman_api_tester.handlers.test_proxy_routes._utils_extract_msg_errcode")
     def test_passed_judgment(
         self,
@@ -154,7 +155,9 @@ class TestEvaluateAndBuildResult:
         assert result_fields["item_path"] == [0, 1]
 
     @patch("postman_api_tester.handlers.test_proxy_routes._evaluate_result_judgment")
-    @patch("postman_api_tester.handlers.test_proxy_routes._resolve_judgment_params_for_proxy")
+    @patch(
+        "postman_api_tester.handlers.test_proxy_routes._resolve_judgment_params_for_proxy"
+    )
     @patch("postman_api_tester.handlers.test_proxy_routes._utils_extract_msg_errcode")
     def test_failed_judgment(
         self,
@@ -199,13 +202,17 @@ class TestCheckProxyHostAllowed:
         result = _check_proxy_host_allowed("http://any-domain.com/api")
         assert result is None
 
-    @patch("postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS", {"allowed.com"})
+    @patch(
+        "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS", {"allowed.com"}
+    )
     def test_whitelist_allows_matching_host(self) -> None:
         """白名单匹配时允许。"""
         result = _check_proxy_host_allowed("http://allowed.com/api")
         assert result is None
 
-    @patch("postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS", {"allowed.com"})
+    @patch(
+        "postman_api_tester.report_server_config.PROXY_ALLOWED_HOSTS", {"allowed.com"}
+    )
     def test_whitelist_blocks_non_matching_host(self, app_context: None) -> None:
         """白名单不匹配时阻止。"""
         result = _check_proxy_host_allowed("http://blocked.com/api")

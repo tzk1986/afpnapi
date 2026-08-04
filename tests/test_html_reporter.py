@@ -1,8 +1,6 @@
 """Tests for HtmlReporter class in core/html_reporter.py."""
 
 import json
-import os
-import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
@@ -67,7 +65,10 @@ def _make_result(
         "expected_status": 200,
         "actual_request_url": url,
         "request_info": {
-            "headers": {"Authorization": "Bearer secret", "Content-Type": "application/json"},
+            "headers": {
+                "Authorization": "Bearer secret",
+                "Content-Type": "application/json",
+            },
             "params": {"key": "value"},
             "body": {"data": "test"},
         },
@@ -179,7 +180,7 @@ class TestRenderPageSizeOptions:
     def test_selected_option_has_selected_attribute(self) -> None:
         report = _make_mock_report([])
         html = HtmlReporter._render_page_size_options(report, 30)
-        assert 'selected' in html
+        assert "selected" in html
         assert '<option value="30" selected>' in html
 
     def test_non_selected_options_no_selected_attribute(self) -> None:
@@ -276,7 +277,9 @@ class TestBuildReportMetadata:
         assert len(meta["results"]) == 1
 
     def test_result_key_uses_pipe_separator(self) -> None:
-        result = _make_result(folder="f1", name="api1", method="GET", url="http://x.com")
+        result = _make_result(
+            folder="f1", name="api1", method="GET", url="http://x.com"
+        )
         report = _make_mock_report([result])
         summary = report.generate_summary()
         meta = HtmlReporter._build_report_metadata(
@@ -306,9 +309,15 @@ class TestGenerateHtmlReport:
         report = _make_mock_report(results)
         output_path = str(tmp_path / "report.html")
 
-        with patch.object(HtmlReporter, '_generate_index_html', return_value="<html></html>"):
-            with patch.object(HtmlReporter, '_generate_page_html', return_value="<html></html>"):
-                HtmlReporter.generate_html_report(report, output_path, results_per_page=30)
+        with patch.object(
+            HtmlReporter, "_generate_index_html", return_value="<html></html>"
+        ):
+            with patch.object(
+                HtmlReporter, "_generate_page_html", return_value="<html></html>"
+            ):
+                HtmlReporter.generate_html_report(
+                    report, output_path, results_per_page=30
+                )
 
         assert (tmp_path / "report.html").exists()
         assert (tmp_path / "report_details.json").exists()
@@ -319,9 +328,15 @@ class TestGenerateHtmlReport:
         report = _make_mock_report([result])
         output_path = str(tmp_path / "report.html")
 
-        with patch.object(HtmlReporter, '_generate_index_html', return_value="<html></html>"):
-            with patch.object(HtmlReporter, '_generate_page_html', return_value="<html></html>"):
-                HtmlReporter.generate_html_report(report, output_path, results_per_page=30)
+        with patch.object(
+            HtmlReporter, "_generate_index_html", return_value="<html></html>"
+        ):
+            with patch.object(
+                HtmlReporter, "_generate_page_html", return_value="<html></html>"
+            ):
+                HtmlReporter.generate_html_report(
+                    report, output_path, results_per_page=30
+                )
 
         details_file = tmp_path / "report_details.json"
         with details_file.open("r", encoding="utf-8") as f:
@@ -335,9 +350,15 @@ class TestGenerateHtmlReport:
         output_dir = tmp_path / "subdir" / "nested"
         output_path = str(output_dir / "report.html")
 
-        with patch.object(HtmlReporter, '_generate_index_html', return_value="<html></html>"):
-            with patch.object(HtmlReporter, '_generate_page_html', return_value="<html></html>"):
-                HtmlReporter.generate_html_report(report, output_path, results_per_page=30)
+        with patch.object(
+            HtmlReporter, "_generate_index_html", return_value="<html></html>"
+        ):
+            with patch.object(
+                HtmlReporter, "_generate_page_html", return_value="<html></html>"
+            ):
+                HtmlReporter.generate_html_report(
+                    report, output_path, results_per_page=30
+                )
 
         assert output_dir.exists()
 
@@ -346,8 +367,14 @@ class TestGenerateHtmlReport:
         report = _make_mock_report(results)
         output_path = str(tmp_path / "report.html")
 
-        with patch.object(HtmlReporter, '_generate_index_html', return_value="<html></html>") as mock_idx:
-            with patch.object(HtmlReporter, '_generate_page_html', return_value="<html></html>") as mock_page:
-                HtmlReporter.generate_html_report(report, output_path, results_per_page=20)
+        with patch.object(
+            HtmlReporter, "_generate_index_html", return_value="<html></html>"
+        ) as mock_idx:
+            with patch.object(
+                HtmlReporter, "_generate_page_html", return_value="<html></html>"
+            ) as mock_page:
+                HtmlReporter.generate_html_report(
+                    report, output_path, results_per_page=20
+                )
 
                 assert mock_page.call_count == 3

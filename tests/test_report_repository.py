@@ -150,7 +150,9 @@ class TestResolveArtifactDir:
         artifacts = collect_report_artifacts(report)
         assert artifacts == []
 
-    def test_source_file_outside_reports_dir_ignored(self, reports_dir: Path, tmp_path: Path):
+    def test_source_file_outside_reports_dir_ignored(
+        self, reports_dir: Path, tmp_path: Path
+    ):
         """source_file 在 reports 目录外时被忽略，回退到根目录。"""
         outside = tmp_path / "outside" / "report.html"
         _write(outside)

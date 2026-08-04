@@ -53,9 +53,13 @@ class TestIndex:
 
     def test_index_renders_template(self, app_context: None) -> None:
         """index 应渲染 index.html 模板。"""
-        with patch("postman_api_tester.handlers.page_routes._repo_list_reports") as mock_list:
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
             mock_list.return_value = []
-            with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+            with patch(
+                "postman_api_tester.handlers.page_routes.render_template"
+            ) as mock_render:
                 mock_render.return_value = "<html>index</html>"
                 result = index()
 
@@ -68,9 +72,13 @@ class TestIndex:
 
     def test_index_passes_reports_json(self, app_context: None) -> None:
         """index 应传递 reports_json。"""
-        with patch("postman_api_tester.handlers.page_routes._repo_list_reports") as mock_list:
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
             mock_list.return_value = [{"report_name": "test"}]
-            with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+            with patch(
+                "postman_api_tester.handlers.page_routes.render_template"
+            ) as mock_render:
                 mock_render.return_value = "<html></html>"
                 index()
 
@@ -81,11 +89,18 @@ class TestIndex:
 
     def test_index_passes_environments_json(self, app_context: None) -> None:
         """index 应传递 environments_json。"""
-        with patch("postman_api_tester.handlers.page_routes._repo_list_reports") as mock_list:
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
             mock_list.return_value = []
-            with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+            with patch(
+                "postman_api_tester.handlers.page_routes.render_template"
+            ) as mock_render:
                 mock_render.return_value = ""
-                with patch("postman_api_tester.handlers.page_routes.ENVIRONMENTS", {"dev": {}, "prod": {}}):
+                with patch(
+                    "postman_api_tester.handlers.page_routes.ENVIRONMENTS",
+                    {"dev": {}, "prod": {}},
+                ):
                     index()
                     call_kwargs = mock_render.call_args[1]
                     envs = json.loads(call_kwargs["environments_json"])
@@ -105,7 +120,9 @@ class TestAdhocRunPage:
     def test_adhoc_page_renders_when_enabled(self, app_context: None) -> None:
         """ENABLE_ADHOC_RUN=true 时应渲染模板。"""
         with patch("postman_api_tester.handlers.page_routes.ENABLE_ADHOC_RUN", True):
-            with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+            with patch(
+                "postman_api_tester.handlers.page_routes.render_template"
+            ) as mock_render:
                 mock_render.return_value = "<html>adhoc</html>"
                 result = adhoc_run_page()
 
@@ -119,7 +136,9 @@ class TestAdhocRunPage:
         """adhoc 页面应传递配置值。"""
         with patch("postman_api_tester.handlers.page_routes.ENABLE_ADHOC_RUN", True):
             with patch("postman_api_tester.handlers.page_routes.ADHOC_MAX_ITEMS", 50):
-                with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+                with patch(
+                    "postman_api_tester.handlers.page_routes.render_template"
+                ) as mock_render:
                     mock_render.return_value = ""
                     adhoc_run_page()
                     call_kwargs = mock_render.call_args[1]
@@ -131,7 +150,9 @@ class TestCollectionEditorPage:
 
     def test_renders_collection_editor_template(self, app_context: None) -> None:
         """应渲染 collection_editor.html。"""
-        with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+        with patch(
+            "postman_api_tester.handlers.page_routes.render_template"
+        ) as mock_render:
             mock_render.return_value = "<html>editor</html>"
             result = collection_editor_page()
 
@@ -144,16 +165,22 @@ class TestReportView:
 
     def test_redirects_to_first_report_when_no_name(self, app_context: None) -> None:
         """无 name 参数时应重定向到第一个报告。"""
-        with patch("postman_api_tester.handlers.page_routes._repo_list_reports") as mock_list:
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
             mock_list.return_value = [{"report_name": "first_report"}]
             result = report_view()
             assert result.status_code == 302
 
     def test_redirects_to_index_when_no_reports(self, app_context: None) -> None:
         """无报告时重定向到首页。"""
-        with patch("postman_api_tester.handlers.page_routes._repo_list_reports") as mock_list:
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
             mock_list.return_value = []
-            with patch("postman_api_tester.handlers.page_routes.request") as mock_request:
+            with patch(
+                "postman_api_tester.handlers.page_routes.request"
+            ) as mock_request:
                 mock_request.args = {"name": ""}
                 result = report_view()
                 assert result.status_code == 302
@@ -162,9 +189,13 @@ class TestReportView:
         """报告不存在时返回 404。"""
         with patch("postman_api_tester.handlers.page_routes.request") as mock_request:
             mock_request.args = {"name": "nonexistent"}
-            with patch("postman_api_tester.handlers.page_routes._repo_find_report") as mock_find:
+            with patch(
+                "postman_api_tester.handlers.page_routes._repo_find_report"
+            ) as mock_find:
                 mock_find.side_effect = FileNotFoundError("not found")
-                with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+                with patch(
+                    "postman_api_tester.handlers.page_routes.render_template"
+                ) as mock_render:
                     mock_render.return_value = "<html>not found</html>"
                     result = report_view()
                     assert result[1] == 404
@@ -173,7 +204,9 @@ class TestReportView:
         """应渲染 report_view.html。"""
         with patch("postman_api_tester.handlers.page_routes.request") as mock_request:
             mock_request.args = {"name": "my_report"}
-            with patch("postman_api_tester.handlers.page_routes._repo_find_report") as mock_find:
+            with patch(
+                "postman_api_tester.handlers.page_routes._repo_find_report"
+            ) as mock_find:
                 mock_find.return_value = {
                     "report_name": "my_report",
                     "collection_name": "Test Collection",
@@ -181,9 +214,13 @@ class TestReportView:
                     "generated_at": "2026-06-25 20:30:00",
                     "summary": {"total": 10, "passed": 8},
                 }
-                with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+                with patch(
+                    "postman_api_tester.handlers.page_routes.render_template"
+                ) as mock_render:
                     mock_render.return_value = "<html>report</html>"
-                    with patch("postman_api_tester.handlers.page_routes.make_response") as mock_response:
+                    with patch(
+                        "postman_api_tester.handlers.page_routes.make_response"
+                    ) as mock_response:
                         mock_resp = MagicMock()
                         mock_resp.headers = {}
                         mock_response.return_value = mock_resp
@@ -198,7 +235,9 @@ class TestReportView:
         """报告详情页应设置 no-cache 头。"""
         with patch("postman_api_tester.handlers.page_routes.request") as mock_request:
             mock_request.args = {"name": "test_report"}
-            with patch("postman_api_tester.handlers.page_routes._repo_find_report") as mock_find:
+            with patch(
+                "postman_api_tester.handlers.page_routes._repo_find_report"
+            ) as mock_find:
                 mock_find.return_value = {
                     "report_name": "test_report",
                     "collection_name": "",
@@ -206,9 +245,13 @@ class TestReportView:
                     "generated_at": "",
                     "summary": {},
                 }
-                with patch("postman_api_tester.handlers.page_routes.render_template") as mock_render:
+                with patch(
+                    "postman_api_tester.handlers.page_routes.render_template"
+                ) as mock_render:
                     mock_render.return_value = "<html></html>"
-                    with patch("postman_api_tester.handlers.page_routes.make_response") as mock_response:
+                    with patch(
+                        "postman_api_tester.handlers.page_routes.make_response"
+                    ) as mock_response:
                         mock_resp = MagicMock()
                         mock_resp.headers = {}
                         mock_response.return_value = mock_resp

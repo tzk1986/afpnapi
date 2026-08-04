@@ -133,7 +133,9 @@ def main() -> None:
     assert payload["distributions"]["status"]["FAILED"] == 2, payload["distributions"]
     assert payload["diagnostics"]["category_summary"], payload["diagnostics"]
     assert payload["quality_score"]["total_score"] <= 100, payload["quality_score"]
-    assert payload["coverage"]["source_total"] >= payload["coverage"]["executed_total"], payload["coverage"]
+    assert (
+        payload["coverage"]["source_total"] >= payload["coverage"]["executed_total"]
+    ), payload["coverage"]
     assert len(payload["trend"]["success_rate"]) >= 1, payload["trend"]
 
     print("report-analytics-ok")

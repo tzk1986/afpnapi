@@ -78,7 +78,9 @@ class ReportEngine:
             if isinstance(r.get("response_time_ms"), (int, float))
         ]
 
-        avg_time = int(sum(response_times) / len(response_times)) if response_times else 0
+        avg_time = (
+            int(sum(response_times) / len(response_times)) if response_times else 0
+        )
         max_time = max(response_times) if response_times else 0
         p95_time = ReportEngine._calculate_p95(response_times)
 

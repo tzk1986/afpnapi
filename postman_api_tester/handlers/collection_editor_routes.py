@@ -30,11 +30,17 @@ def api_collection_parse() -> ResponseReturnValue:
         else:
             body = request.get_json(force=True, silent=True)
             if not body or "collection_json" not in body:
-                return _json_error("请求体缺少 collection_json 字段", 400, "CE_PARSE_001")
+                return _json_error(
+                    "请求体缺少 collection_json 字段", 400, "CE_PARSE_001"
+                )
             collection_data = body["collection_json"]
 
         if not isinstance(collection_data, dict):
-            return _json_error("Collection JSON 格式无效，请确认是 Postman Collection v2.1", 400, "CE_PARSE_002")
+            return _json_error(
+                "Collection JSON 格式无效，请确认是 Postman Collection v2.1",
+                400,
+                "CE_PARSE_002",
+            )
 
         from postman_api_tester.services.collection_editor_service import (
             parse_collection_to_flat as _svc_parse_collection_to_flat,
@@ -47,7 +53,9 @@ def api_collection_parse() -> ResponseReturnValue:
         return _json_error(f"JSON 语法错误：{e}", 400, "CE_PARSE_003")
     except Exception as e:
         logger.exception("parse_collection error")
-        return _json_error(f"解析异常：{type(e).__name__}，请检查 Collection 结构", 500, "CE_PARSE_004")
+        return _json_error(
+            f"解析异常：{type(e).__name__}，请检查 Collection 结构", 500, "CE_PARSE_004"
+        )
 
 
 def api_collection_save() -> ResponseReturnValue:
@@ -131,16 +139,22 @@ def api_collection_send() -> ResponseReturnValue:
         if not result.get("success"):
             status = result.get("status_code", 502)
             err_msg = result.get("error_message", "请求失败")
-            return _json_error(f"目标接口返回 {status}：{err_msg}", status, "CE_SEND_004")
+            return _json_error(
+                f"目标接口返回 {status}：{err_msg}", status, "CE_SEND_004"
+            )
 
-        return jsonify({
-            "status_code": result["status_code"],
-            "elapsed_ms": result["elapsed_ms"],
-            "response_headers": result["response_headers"],
-            "response_body": result["response_body"],
-            "actual_request_url": result.get("actual_request_url", ""),
-        })
+        return jsonify(
+            {
+                "status_code": result["status_code"],
+                "elapsed_ms": result["elapsed_ms"],
+                "response_headers": result["response_headers"],
+                "response_body": result["response_body"],
+                "actual_request_url": result.get("actual_request_url", ""),
+            }
+        )
 
     except Exception as e:
         logger.exception("send_request error")
-        return _json_error(f"发送异常：{type(e).__name__}，请检查 URL 和变量配置", 500, "CE_SEND_005")
+        return _json_error(
+            f"发送异常：{type(e).__name__}，请检查 URL 和变量配置", 500, "CE_SEND_005"
+        )

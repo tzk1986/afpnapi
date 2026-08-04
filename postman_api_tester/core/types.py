@@ -27,15 +27,15 @@ ProgressCallback = Callable[[ProgressPayload], None]
 
 def copy_summary(summary: SummaryData) -> SummaryData:
     return {
-        'total': summary['total'],
-        'passed': summary['passed'],
-        'failed': summary['failed'],
-        'error': summary['error'],
-        'success_rate': summary['success_rate'],
-        'duration': summary['duration'],
-        'start_time': summary['start_time'],
-        'end_time': summary['end_time'],
-        'avg_response_ms': summary['avg_response_ms'],
-        'max_response_ms': summary['max_response_ms'],
-        'p95_response_ms': summary['p95_response_ms'],
+        "total": summary["total"],
+        "passed": summary["passed"],
+        "failed": summary["failed"],
+        "error": summary["error"],
+        "success_rate": summary["success_rate"],
+        "duration": summary["duration"],
+        "start_time": summary["start_time"],
+        "end_time": summary["end_time"],
+        "avg_response_ms": summary["avg_response_ms"],
+        "max_response_ms": summary["max_response_ms"],
+        "p95_response_ms": summary["p95_response_ms"],
     }

@@ -50,9 +50,7 @@ class TestApiRunPostman:
 
     def test_no_file(self, app_context: None) -> None:
         """未上传文件返回 400。"""
-        with patch(
-            "postman_api_tester.handlers.job_routes.request"
-        ) as mock_request:
+        with patch("postman_api_tester.handlers.job_routes.request") as mock_request:
             mock_request.files = MagicMock()
             mock_request.files.get.return_value = None
             result = api_run_postman()
@@ -61,9 +59,7 @@ class TestApiRunPostman:
 
     def test_non_json_file(self, app_context: None) -> None:
         """非 JSON 文件返回 400。"""
-        with patch(
-            "postman_api_tester.handlers.job_routes.request"
-        ) as mock_request:
+        with patch("postman_api_tester.handlers.job_routes.request") as mock_request:
             mock_request.files = MagicMock()
             mock_file = MagicMock()
             mock_file.filename = "test.txt"
@@ -78,9 +74,7 @@ class TestApiRunAdHocTests:
 
     def test_disabled(self, app_context: None) -> None:
         """禁用时返回 403。"""
-        with patch(
-            "postman_api_tester.handlers.job_routes.ENABLE_ADHOC_RUN", False
-        ):
+        with patch("postman_api_tester.handlers.job_routes.ENABLE_ADHOC_RUN", False):
             result = api_run_ad_hoc_tests()
             assert isinstance(result, tuple)
             assert result[1] == 403
@@ -89,9 +83,7 @@ class TestApiRunAdHocTests:
         """空 cases 返回 400。"""
         with patch(
             "postman_api_tester.handlers.job_routes.ENABLE_ADHOC_RUN", True
-        ), patch(
-            "postman_api_tester.handlers.job_routes.request"
-        ) as mock_request:
+        ), patch("postman_api_tester.handlers.job_routes.request") as mock_request:
             mock_request.get_json = MagicMock(return_value={"cases": []})
             result = api_run_ad_hoc_tests()
             assert isinstance(result, tuple)
@@ -101,9 +93,7 @@ class TestApiRunAdHocTests:
         """cases 非数组返回 400。"""
         with patch(
             "postman_api_tester.handlers.job_routes.ENABLE_ADHOC_RUN", True
-        ), patch(
-            "postman_api_tester.handlers.job_routes.request"
-        ) as mock_request:
+        ), patch("postman_api_tester.handlers.job_routes.request") as mock_request:
             mock_request.get_json = MagicMock(return_value={"cases": "not_list"})
             result = api_run_ad_hoc_tests()
             assert isinstance(result, tuple)
@@ -115,9 +105,7 @@ class TestApiRunPostmanStatus:
 
     def test_job_not_found(self, app_context: None) -> None:
         """任务不存在返回 404。"""
-        with patch(
-            "postman_api_tester.handlers.job_routes.get_run_job"
-        ) as mock_get:
+        with patch("postman_api_tester.handlers.job_routes.get_run_job") as mock_get:
             mock_get.return_value = None
             result = api_run_postman_status("nonexistent_job")
             assert isinstance(result, tuple)
@@ -125,12 +113,11 @@ class TestApiRunPostmanStatus:
 
     def test_job_found(self, app_context: None) -> None:
         """任务存在返回任务状态。"""
-        with patch(
-            "postman_api_tester.handlers.job_routes.get_run_job"
-        ) as mock_get:
+        with patch("postman_api_tester.handlers.job_routes.get_run_job") as mock_get:
             mock_get.return_value = {"status": "running"}
             result = api_run_postman_status("existing_job")
             from flask import Response
+
             assert isinstance(result, Response)
 
 
@@ -152,13 +139,17 @@ class TestResolveOutputDir:
 
     def test_path_traversal_falls_back(self, tmp_path: Path) -> None:
         """路径遍历攻击回退至 reports_dir。"""
-        output_dir, report_name = _resolve_output_dir("../../etc", None, reports_dir=tmp_path)
+        output_dir, report_name = _resolve_output_dir(
+            "../../etc", None, reports_dir=tmp_path
+        )
         assert output_dir == str(tmp_path)
 
     def test_html_file_redirects_to_report_name(self, tmp_path: Path) -> None:
         """output_dir 误填为 .html 文件名时自动移至 report_name。"""
         output_dir, report_name = _resolve_output_dir(
-            "my_report.html", None, reports_dir=tmp_path,
+            "my_report.html",
+            None,
+            reports_dir=tmp_path,
         )
         assert output_dir == str(tmp_path)
         assert report_name == "my_report.html"
@@ -166,7 +157,9 @@ class TestResolveOutputDir:
     def test_html_file_preserves_existing_report_name(self, tmp_path: Path) -> None:
         """output_dir 误填为 .html 但 report_name 已有值时不覆盖。"""
         output_dir, report_name = _resolve_output_dir(
-            "my_report.html", "existing_name", reports_dir=tmp_path,
+            "my_report.html",
+            "existing_name",
+            reports_dir=tmp_path,
         )
         assert output_dir == str(tmp_path)
         assert report_name == "existing_name"

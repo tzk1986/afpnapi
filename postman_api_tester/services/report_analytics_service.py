@@ -62,7 +62,11 @@ def _status_distribution(results: Sequence[dict[str, Any]]) -> dict[str, int]:
         "PASSED": counter.get("PASSED", 0),
         "FAILED": counter.get("FAILED", 0),
         "ERROR": counter.get("ERROR", 0),
-        "OTHER": sum(value for key, value in counter.items() if key not in {"PASSED", "FAILED", "ERROR"}),
+        "OTHER": sum(
+            value
+            for key, value in counter.items()
+            if key not in {"PASSED", "FAILED", "ERROR"}
+        ),
     }
 
 
@@ -89,10 +93,15 @@ def _folder_top(results: Sequence[dict[str, Any]], top_n: int) -> list[dict[str,
     for item in results:
         folder = str(item.get("folder") or "(root)").strip() or "(root)"
         counter[folder] += 1
-    return [{"folder": folder, "count": count} for folder, count in safe_top_items(dict(counter), top_n)]
+    return [
+        {"folder": folder, "count": count}
+        for folder, count in safe_top_items(dict(counter), top_n)
+    ]
 
 
-def _error_category_summary(error_items: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def _error_category_summary(
+    error_items: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
     total = len(error_items)
     categories = [
         ERROR_CATEGORY_CONNECTION,
@@ -116,7 +125,9 @@ def _error_category_summary(error_items: Sequence[dict[str, Any]]) -> list[dict[
     ]
 
 
-def _error_suggestions(category_summary: Sequence[dict[str, Any]]) -> list[dict[str, str]]:
+def _error_suggestions(
+    category_summary: Sequence[dict[str, Any]],
+) -> list[dict[str, str]]:
     suggestion_map = {
         ERROR_CATEGORY_CONNECTION: "检查 base_url、网络连通性、DNS 与超时配置，必要时提升读超时。",
         ERROR_CATEGORY_AUTH: "检查 token 注入优先级与有效期，确认环境切换后认证头是否一致。",
@@ -131,11 +142,20 @@ def _error_suggestions(category_summary: Sequence[dict[str, Any]]) -> list[dict[
         count = to_int(row.get("count"), default=0)
         if count <= 0:
             continue
-        suggestions.append({"category": category, "suggestion": suggestion_map.get(category, suggestion_map[ERROR_CATEGORY_UNKNOWN])})
+        suggestions.append(
+            {
+                "category": category,
+                "suggestion": suggestion_map.get(
+                    category, suggestion_map[ERROR_CATEGORY_UNKNOWN]
+                ),
+            }
+        )
     return suggestions
 
 
-def _frequent_errors(error_items: Sequence[dict[str, Any]], top_n: int, include_samples: bool) -> list[dict[str, Any]]:
+def _frequent_errors(
+    error_items: Sequence[dict[str, Any]], top_n: int, include_samples: bool
+) -> list[dict[str, Any]]:
     grouped: dict[str, dict[str, Any]] = {}
     for item in error_items:
         normalized = normalize_error_message(item.get("message"))
@@ -166,12 +186,20 @@ def _frequent_errors(error_items: Sequence[dict[str, Any]], top_n: int, include_
                     }
                 )
 
-    rows = sorted(grouped.values(), key=lambda value: (-to_int(value.get("count"), default=0), str(value.get("message") or "")))
+    rows = sorted(
+        grouped.values(),
+        key=lambda value: (
+            -to_int(value.get("count"), default=0),
+            str(value.get("message") or ""),
+        ),
+    )
     output: list[dict[str, Any]] = []
     for row in rows[:top_n]:
         categories_raw = row.get("categories")
         if isinstance(categories_raw, list):
-            categories = distinct_list([str(item) for item in categories_raw if str(item)])
+            categories = distinct_list(
+                [str(item) for item in categories_raw if str(item)]
+            )
         else:
             categories = []
         payload: dict[str, Any] = {
@@ -195,9 +223,17 @@ def _quality_score(
     assertion_missing_penalty: int,
     assertions_enabled: bool,
 ) -> dict[str, Any]:
-    failed_count = sum(1 for item in results if str(item.get("status") or "").upper() == "FAILED")
-    error_count = sum(1 for item in results if str(item.get("status") or "").upper() == "ERROR")
-    slow_count = sum(1 for item in results if to_int(item.get("response_time_ms"), default=-1) > p95 and p95 > 0)
+    failed_count = sum(
+        1 for item in results if str(item.get("status") or "").upper() == "FAILED"
+    )
+    error_count = sum(
+        1 for item in results if str(item.get("status") or "").upper() == "ERROR"
+    )
+    slow_count = sum(
+        1
+        for item in results
+        if to_int(item.get("response_time_ms"), default=-1) > p95 and p95 > 0
+    )
     missing_assertion_count = 0
     if assertions_enabled:
         for item in results:
@@ -213,7 +249,9 @@ def _quality_score(
 
     stability_score = max(0, min(100, 100 - failed_points - error_points))
     performance_score = max(0, min(100, 100 - slow_points))
-    assertion_score = 100 if not assertions_enabled else max(0, min(100, 100 - assertion_points))
+    assertion_score = (
+        100 if not assertions_enabled else max(0, min(100, 100 - assertion_points))
+    )
     total_score = max(0, min(100, 100 - total_penalty))
 
     return {
@@ -235,7 +273,9 @@ def _quality_score(
     }
 
 
-def _coverage(report: Mapping[str, Any], results: Sequence[dict[str, Any]], top_n: int) -> dict[str, Any]:
+def _coverage(
+    report: Mapping[str, Any], results: Sequence[dict[str, Any]], top_n: int
+) -> dict[str, Any]:
     executed_total = len(results)
     source_total = _source_total(report, executed_total)
     manual_cases_total = len(_safe_manual_cases(report))
@@ -253,8 +293,14 @@ def _coverage(report: Mapping[str, Any], results: Sequence[dict[str, Any]], top_
             key = str(item.get("key") or "").strip()
             if key:
                 source_key_map[key] = item
-        executed_keys = {str(item.get("key") or "").strip() for item in results if str(item.get("key") or "").strip()}
-        missing_keys = sorted([key for key in source_key_map if key not in executed_keys])
+        executed_keys = {
+            str(item.get("key") or "").strip()
+            for item in results
+            if str(item.get("key") or "").strip()
+        }
+        missing_keys = sorted(
+            [key for key in source_key_map if key not in executed_keys]
+        )
         for key in missing_keys[:top_n]:
             src = source_key_map[key]
             uncovered_top.append(
@@ -284,20 +330,29 @@ def _trend(
     trend_limit: int,
 ) -> dict[str, list[dict[str, Any]]]:
     collection_name = str(report.get("collection_name") or "").strip()
-    source_file = str(report.get("source_original_file") or report.get("source_file") or "").strip()
+    source_file = str(
+        report.get("source_original_file") or report.get("source_file") or ""
+    ).strip()
     related: list[dict[str, Any]] = []
     for item in reports:
         if not isinstance(item, dict):
             continue
-        if collection_name and str(item.get("collection_name") or "").strip() != collection_name:
+        if (
+            collection_name
+            and str(item.get("collection_name") or "").strip() != collection_name
+        ):
             continue
         if source_file:
-            item_source = str(item.get("source_original_file") or item.get("source_file") or "").strip()
+            item_source = str(
+                item.get("source_original_file") or item.get("source_file") or ""
+            ).strip()
             if item_source and item_source != source_file:
                 continue
         related.append(item)
 
-    related = sorted(related, key=lambda row: str(row.get("generated_at") or ""), reverse=True)[:trend_limit]
+    related = sorted(
+        related, key=lambda row: str(row.get("generated_at") or ""), reverse=True
+    )[:trend_limit]
     ordered = list(reversed(related))
     success_rate: list[dict[str, Any]] = []
     avg_response_ms: list[dict[str, Any]] = []
@@ -372,7 +427,9 @@ def build_report_analytics_payload(
     category_summary = _error_category_summary(error_items)
     diagnostics = {
         "category_summary": category_summary,
-        "frequent_errors": _frequent_errors(error_items, top_n=top_n, include_samples=include_samples),
+        "frequent_errors": _frequent_errors(
+            error_items, top_n=top_n, include_samples=include_samples
+        ),
         "suggestions": _error_suggestions(category_summary),
     }
 
@@ -388,7 +445,9 @@ def build_report_analytics_payload(
     coverage = _coverage(report, results, top_n=top_n)
     trend = _trend(report=report, reports=reports, trend_limit=trend_limit)
 
-    summary_snapshot = report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    summary_snapshot = (
+        report.get("summary") if isinstance(report.get("summary"), dict) else {}
+    )
     return {
         "report_name": str(report.get("report_name") or ""),
         "summary_snapshot": summary_snapshot,
@@ -449,20 +508,38 @@ def build_report_analytics_compare_payload(
     left_quality_raw = left_snapshot.get("quality_score")
     right_quality_raw = right_snapshot.get("quality_score")
 
-    left_summary: Mapping[str, Any] = left_summary_raw if isinstance(left_summary_raw, dict) else {}
-    right_summary: Mapping[str, Any] = right_summary_raw if isinstance(right_summary_raw, dict) else {}
-    left_quality: Mapping[str, Any] = left_quality_raw if isinstance(left_quality_raw, dict) else {}
-    right_quality: Mapping[str, Any] = right_quality_raw if isinstance(right_quality_raw, dict) else {}
+    left_summary: Mapping[str, Any] = (
+        left_summary_raw if isinstance(left_summary_raw, dict) else {}
+    )
+    right_summary: Mapping[str, Any] = (
+        right_summary_raw if isinstance(right_summary_raw, dict) else {}
+    )
+    left_quality: Mapping[str, Any] = (
+        left_quality_raw if isinstance(left_quality_raw, dict) else {}
+    )
+    right_quality: Mapping[str, Any] = (
+        right_quality_raw if isinstance(right_quality_raw, dict) else {}
+    )
 
     success_rate_delta = round(
-        parse_rate_text(right_summary.get("success_rate", "0%")) - parse_rate_text(left_summary.get("success_rate", "0%")),
+        parse_rate_text(right_summary.get("success_rate", "0%"))
+        - parse_rate_text(left_summary.get("success_rate", "0%")),
         2,
     )
-    avg_response_delta_ms = to_int(right_summary.get("avg_response_ms"), default=0) - to_int(left_summary.get("avg_response_ms"), default=0)
-    failed_delta = to_int(right_summary.get("failed"), default=0) - to_int(left_summary.get("failed"), default=0)
-    error_delta = to_int(right_summary.get("error"), default=0) - to_int(left_summary.get("error"), default=0)
+    avg_response_delta_ms = to_int(
+        right_summary.get("avg_response_ms"), default=0
+    ) - to_int(left_summary.get("avg_response_ms"), default=0)
+    failed_delta = to_int(right_summary.get("failed"), default=0) - to_int(
+        left_summary.get("failed"), default=0
+    )
+    error_delta = to_int(right_summary.get("error"), default=0) - to_int(
+        left_summary.get("error"), default=0
+    )
     score_delta = round(
-        float(to_int(right_quality.get("total_score"), default=0) - to_int(left_quality.get("total_score"), default=0)),
+        float(
+            to_int(right_quality.get("total_score"), default=0)
+            - to_int(left_quality.get("total_score"), default=0)
+        ),
         2,
     )
 

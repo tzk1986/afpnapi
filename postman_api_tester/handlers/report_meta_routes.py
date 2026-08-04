@@ -120,7 +120,9 @@ def api_manual_case_add() -> ResponseReturnValue:
     if not report_name:
         return _json_error("report_name 不能为空", 400, "RPT_MANUAL_001")
     try:
-        report_name = BaseHandler.validate_string_length(report_name, "report_name", 255, 1)
+        report_name = BaseHandler.validate_string_length(
+            report_name, "report_name", 255, 1
+        )
     except ValidationError as e:
         return _json_error(str(e), 400, "RPT_MANUAL_001")
     case_payload = dict(payload.get("case") or {})
@@ -143,7 +145,9 @@ def api_manual_case_add() -> ResponseReturnValue:
     except Exception as exc:
         logger.exception("add_manual_case error")
         return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_004")
-    return jsonify(build_manual_case_upsert_payload(report_name=report_name, result=result))
+    return jsonify(
+        build_manual_case_upsert_payload(report_name=report_name, result=result)
+    )
 
 
 def api_manual_case_update() -> ResponseReturnValue:
@@ -175,7 +179,9 @@ def api_manual_case_update() -> ResponseReturnValue:
     except Exception as exc:
         logger.exception("update_manual_case error")
         return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_008")
-    return jsonify(build_manual_case_upsert_payload(report_name=report_name, result=result))
+    return jsonify(
+        build_manual_case_upsert_payload(report_name=report_name, result=result)
+    )
 
 
 def api_manual_case_delete() -> ResponseReturnValue:
@@ -205,7 +211,9 @@ def api_manual_case_delete() -> ResponseReturnValue:
     except Exception as exc:
         logger.exception("delete_manual_case error")
         return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_012")
-    return jsonify(build_manual_case_delete_payload(report_name=report_name, result=result))
+    return jsonify(
+        build_manual_case_delete_payload(report_name=report_name, result=result)
+    )
 
 
 def api_report_case_exclusion() -> ResponseReturnValue:
@@ -214,10 +222,13 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     report_name = str(payload.get("report_name") or "").strip()
     exclusion_key = str(payload.get("exclusion_key") or "").strip()
     from postman_api_tester.report_server_utils import to_bool as _to_bool
+
     excluded = _to_bool(payload.get("excluded"), default=True)
     try:
         report_name = BaseHandler.validate_non_empty_string(report_name, "report_name")
-        exclusion_key = BaseHandler.validate_non_empty_string(exclusion_key, "exclusion_key", 500)
+        exclusion_key = BaseHandler.validate_non_empty_string(
+            exclusion_key, "exclusion_key", 500
+        )
     except ValidationError as e:
         error_code = "RPT_EXCL_001" if "report_name" in str(e) else "RPT_EXCL_002"
         return _json_error(str(e), 400, error_code)
@@ -237,7 +248,11 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     except Exception as exc:
         logger.exception("set_case_exclusion error")
         return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_EXCL_004")
-    return jsonify(build_case_exclusion_payload(report_name=report_name, excluded=excluded, result=result))
+    return jsonify(
+        build_case_exclusion_payload(
+            report_name=report_name, excluded=excluded, result=result
+        )
+    )
 
 
 def api_report_result_judgement() -> ResponseReturnValue:

@@ -44,12 +44,18 @@ def filter_report_results(
     lowered_keyword = str(keyword or "").strip().lower()
     lowered_message_keyword = str(message_keyword or "").strip().lower()
     lowered_err_code_keyword = str(err_code_keyword or "").strip().lower()
-    exclusion_set = set(_normalize_manual_exclusions(report.get("manual_exclusions") or []))
+    exclusion_set = set(
+        _normalize_manual_exclusions(report.get("manual_exclusions") or [])
+    )
     details_map = load_report_details_map(report)
     filtered_items: List[Dict[str, Any]] = []
 
     for index, item in enumerate(report.get("results", [])):
-        manual_judgement = item.get("manual_judgement") if isinstance(item.get("manual_judgement"), dict) else {}
+        manual_judgement = (
+            item.get("manual_judgement")
+            if isinstance(item.get("manual_judgement"), dict)
+            else {}
+        )
         judgement_source = "manual" if manual_judgement.get("active") else "auto"
         exclusion_key = _result_exclusion_key(item)
         excluded = exclusion_key in exclusion_set
@@ -101,7 +107,9 @@ def filter_report_results(
     return filtered_items
 
 
-def paginate_items(items: List[Dict[str, Any]], page: int, page_size: int) -> Dict[str, Any]:
+def paginate_items(
+    items: List[Dict[str, Any]], page: int, page_size: int
+) -> Dict[str, Any]:
     """统一分页结构。"""
     total = len(items)
     total_pages = max(1, (total + page_size - 1) // page_size)
@@ -143,7 +151,9 @@ def compare_report_data(left: Dict[str, Any], right: Dict[str, Any]) -> Dict[str
     for key in common_keys:
         before = left_map[key]
         after = right_map[key]
-        if before.get("status") != after.get("status") or before.get("status_code") != after.get("status_code"):
+        if before.get("status") != after.get("status") or before.get(
+            "status_code"
+        ) != after.get("status_code"):
             changed.append(
                 {
                     "key": key,
@@ -184,4 +194,3 @@ __all__ = [
     "paginate_items",
     "compare_report_data",
 ]
-

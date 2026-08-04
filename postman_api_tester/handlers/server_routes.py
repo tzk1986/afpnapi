@@ -51,13 +51,12 @@ PROJECT_ROOT = MODULE_DIR.parent
 def _resolve_reports_dir() -> Path:
     """解析报告目录。"""
     env_dir = (
-        os.environ.get("POSTMAN_REPORTS_DIR")
-        or os.environ.get("REPORTS_DIR")
-        or ""
+        os.environ.get("POSTMAN_REPORTS_DIR") or os.environ.get("REPORTS_DIR") or ""
     ).strip()
     if env_dir:
         return Path(env_dir).expanduser().resolve()
     from postman_api_tester.report_server_config import REPORT_OUTPUT_DIR as _cfg_dir
+
     if _cfg_dir:
         return Path(_cfg_dir).expanduser().resolve()
     return (PROJECT_ROOT / "reports").resolve()
@@ -88,12 +87,16 @@ def api_environments() -> ResponseReturnValue:
     for env_name, env_cfg in ENVIRONMENTS.items():
         if not isinstance(env_cfg, dict):
             continue
-        env_list.append({
-            "name": str(env_name),
-            "base_url": str(env_cfg.get("base_url", "")),
-            "has_token": bool(env_cfg.get("token", "").strip()),
-        })
-    return jsonify(build_environments_payload(env_list=env_list, default_env_name=DEFAULT_ENV_NAME))
+        env_list.append(
+            {
+                "name": str(env_name),
+                "base_url": str(env_cfg.get("base_url", "")),
+                "has_token": bool(env_cfg.get("token", "").strip()),
+            }
+        )
+    return jsonify(
+        build_environments_payload(env_list=env_list, default_env_name=DEFAULT_ENV_NAME)
+    )
 
 
 def api_report_delete(report_name: str) -> ResponseReturnValue:
@@ -101,9 +104,13 @@ def api_report_delete(report_name: str) -> ResponseReturnValue:
     from postman_api_tester.services.report_delete_service import (
         delete_report_artifacts as _svc_delete,
     )
+
     logger.info(
         "handler delete report",
-        extra={"event": "handler.server.report_delete.forward", "report_name": report_name},
+        extra={
+            "event": "handler.server.report_delete.forward",
+            "report_name": report_name,
+        },
     )
     try:
         deleted_files = _svc_delete(
@@ -114,9 +121,16 @@ def api_report_delete(report_name: str) -> ResponseReturnValue:
         )
     except FileNotFoundError:
         from postman_api_tester.exceptions import ValidationError
-        return BaseHandler.error_response(ValidationError(f"报告不存在: {report_name}"), 404)
+
+        return BaseHandler.error_response(
+            ValidationError(f"报告不存在: {report_name}"), 404
+        )
     logger.info("删除报告产物成功: report=%s files=%s", report_name, deleted_files)
-    return jsonify(build_report_delete_payload(report_name=report_name, deleted_files=deleted_files))
+    return jsonify(
+        build_report_delete_payload(
+            report_name=report_name, deleted_files=deleted_files
+        )
+    )
 
 
 def latest_report() -> ResponseReturnValue:
@@ -131,7 +145,10 @@ def _safe_report_path(candidate: Path) -> bool:
     """校验路径是否安全位于 REPORTS_DIR 内，防止目录穿越攻击（CWE-22）。"""
     try:
         resolved = candidate.resolve()
-        return str(resolved).startswith(str(REPORTS_DIR.resolve()) + os.sep) or resolved == REPORTS_DIR.resolve()
+        return (
+            str(resolved).startswith(str(REPORTS_DIR.resolve()) + os.sep)
+            or resolved == REPORTS_DIR.resolve()
+        )
     except (OSError, ValueError):
         return False
 
@@ -148,7 +165,9 @@ def serve_report(filename: str) -> ResponseReturnValue:
                 meta_file = str(report.get("meta_file") or "").strip()
                 if meta_file:
                     meta_path = REPORTS_DIR / meta_file
-                    report_path = meta_path.with_name(meta_path.name.replace("_meta.json", ".html"))
+                    report_path = meta_path.with_name(
+                        meta_path.name.replace("_meta.json", ".html")
+                    )
                     if report_path.exists() and _safe_report_path(report_path):
                         return send_file(report_path)
                 # 无 meta 文件的 legacy 报告：尝试 source_file 或 details_file 推导
@@ -160,13 +179,18 @@ def serve_report(filename: str) -> ResponseReturnValue:
                 details_file = str(report.get("details_file") or "").strip()
                 if details_file:
                     details_path = REPORTS_DIR / details_file
-                    report_path = details_path.with_name(details_path.name.replace("_details.json", ".html"))
+                    report_path = details_path.with_name(
+                        details_path.name.replace("_details.json", ".html")
+                    )
                     if report_path.exists() and _safe_report_path(report_path):
                         return send_file(report_path)
     except OSError:
         pass
     from postman_api_tester.exceptions import ValidationError
-    return BaseHandler.error_response(ValidationError(f"报告文件不存在: {filename}"), 404)
+
+    return BaseHandler.error_response(
+        ValidationError(f"报告文件不存在: {filename}"), 404
+    )
 
 
 def serve_export(filename: str) -> ResponseReturnValue:

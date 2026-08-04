@@ -4,7 +4,6 @@
 
 import unittest
 import os
-import sys
 from seldom_postman_tester import PostmanApiParser, SeldomPostmanTest
 
 
@@ -15,7 +14,7 @@ class TestSeldomPostman(unittest.TestCase):
         """测试前准备"""
         # 使用示例文件路径
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.test_file = os.path.join(current_dir, '..', 'sample_api_collection.json')
+        self.test_file = os.path.join(current_dir, "..", "sample_api_collection.json")
 
     def test_parser_load_file(self):
         """测试文件加载"""
@@ -41,8 +40,8 @@ class TestSeldomPostman(unittest.TestCase):
             apis = parser.extract_apis()
             self.assertIsInstance(apis, list)
             if apis:
-                self.assertIn('name', apis[0])
-                self.assertIn('method', apis[0])
+                self.assertIn("name", apis[0])
+                self.assertIn("method", apis[0])
         else:
             self.skipTest("测试文件不存在")
 
@@ -56,10 +55,10 @@ class TestSeldomPostman(unittest.TestCase):
                 # 创建测试实例
                 test_instance = SeldomPostmanTest(apis[0])
                 self.assertIsNotNone(test_instance.api_config)
-                self.assertEqual(test_instance.api_config['name'], apis[0]['name'])
+                self.assertEqual(test_instance.api_config["name"], apis[0]["name"])
         else:
             self.skipTest("测试文件不存在")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -59,7 +59,9 @@ from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page
 logger = logging.getLogger(__name__)
 
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
-UPLOADS_DIR = (Path(__file__).resolve().parent.parent / "uploaded_collections").resolve()
+UPLOADS_DIR = (
+    Path(__file__).resolve().parent.parent / "uploaded_collections"
+).resolve()
 
 
 def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
@@ -90,9 +92,13 @@ def _parse_selected_item_paths(raw: Any) -> List[List[int]]:
         normalized.append(list(item))
     logger.info(
         "selected item paths parsed",
-        extra={"event": "handler.collection.selected_paths.parsed", "path_count": len(normalized)},
+        extra={
+            "event": "handler.collection.selected_paths.parsed",
+            "path_count": len(normalized),
+        },
     )
     return normalized
+
 
 _RUN_POSTMAN_JOB_FN = partial(
     _job_run_postman_job,
@@ -116,7 +122,9 @@ def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
     return config if config else None
 
 
-def _parse_judgment_config_from_payload(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _parse_judgment_config_from_payload(
+    payload: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
     """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
     raw_cfg = payload.get("judgment_config")
     if isinstance(raw_cfg, dict) and raw_cfg:
@@ -154,7 +162,9 @@ def _resolve_output_dir(
     return str(reports_dir), report_name
 
 
-def clamp_run_results_per_page(value: SupportsInt | str | bytes | bytearray | None) -> int:
+def clamp_run_results_per_page(
+    value: SupportsInt | str | bytes | bytearray | None,
+) -> int:
     return _clamp_page_size(
         value,
         default=RUN_RESULTS_PER_PAGE_DEFAULT,
@@ -211,8 +221,12 @@ def api_run_postman() -> ResponseReturnValue:
                 token = env_cfg["token"].strip()
     output_dir = str(request.form.get("output_dir", "")).strip()
     report_name = str(request.form.get("report_name", "")).strip() or None
-    output_dir, report_name = _resolve_output_dir(output_dir, report_name, reports_dir=REPORTS_DIR)
-    results_per_page = clamp_run_results_per_page(request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
+    output_dir, report_name = _resolve_output_dir(
+        output_dir, report_name, reports_dir=REPORTS_DIR
+    )
+    results_per_page = clamp_run_results_per_page(
+        request.form.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT)
+    )
     run_scope = str(request.form.get("run_scope", "all")).strip().lower() or "all"
     raw_selected_paths = request.form.get("selected_item_paths", "")
     selected_item_paths: List[List[int]] = []
@@ -222,7 +236,11 @@ def api_run_postman() -> ResponseReturnValue:
         except ValueError as exc:
             return _json_error(str(exc), 400, "JOB_RUN_004")
         if not selected_item_paths:
-            return _json_error("选择了仅执行已选接口，但未提供有效 selected_item_paths", 400, "JOB_RUN_005")
+            return _json_error(
+                "选择了仅执行已选接口，但未提供有效 selected_item_paths",
+                400,
+                "JOB_RUN_005",
+            )
 
     # 解析可配置结果判定（judgment_config）
     judgment_config = _parse_judgment_config_from_form(request.form)
@@ -235,7 +253,9 @@ def api_run_postman() -> ResponseReturnValue:
         if not data_filename.endswith((".csv", ".json")):
             return _json_error("数据文件仅支持 .csv 或 .json 格式", 400, "JOB_RUN_006")
         data_suffix = Path(str(data_file.filename or ".csv")).suffix or ".csv"
-        data_file_path = str(_build_saved_json_path(UPLOADS_DIR, uuid.uuid4().hex, f"_data{data_suffix}"))
+        data_file_path = str(
+            _build_saved_json_path(UPLOADS_DIR, uuid.uuid4().hex, f"_data{data_suffix}")
+        )
         data_file.save(data_file_path)
 
     # 解析预置变量（可选，JSON 字符串）
@@ -247,7 +267,9 @@ def api_run_postman() -> ResponseReturnValue:
             if isinstance(parsed_vars, dict):
                 initial_variables = {str(k): str(v) for k, v in parsed_vars.items()}
         except (json.JSONDecodeError, ValueError):
-            return _json_error("initial_variables 必须是有效的 JSON 对象", 400, "JOB_RUN_007")
+            return _json_error(
+                "initial_variables 必须是有效的 JSON 对象", 400, "JOB_RUN_007"
+            )
 
     suffix = Path(original_name).suffix or ".json"
     job_id = uuid.uuid4().hex
@@ -295,7 +317,11 @@ def api_run_postman() -> ResponseReturnValue:
         selected_item_paths=selected_item_paths if selected_item_paths else None,
     )
 
-    return jsonify(build_job_queued_payload(job_id=job_id, message="任务已创建，请轮询状态接口获取执行进度。"))
+    return jsonify(
+        build_job_queued_payload(
+            job_id=job_id, message="任务已创建，请轮询状态接口获取执行进度。"
+        )
+    )
 
 
 def api_run_ad_hoc_tests() -> ResponseReturnValue:
@@ -308,22 +334,37 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
     if not isinstance(raw_cases, list) or not raw_cases:
         return _json_error("cases 不能为空，且必须是数组。", 400, "JOB_ADHOC_002")
     if len(raw_cases) > ADHOC_MAX_ITEMS:
-        return _json_error(f"单次最多支持 {ADHOC_MAX_ITEMS} 条接口。", 400, "JOB_ADHOC_003")
+        return _json_error(
+            f"单次最多支持 {ADHOC_MAX_ITEMS} 条接口。", 400, "JOB_ADHOC_003"
+        )
 
     base_url = str(payload.get("base_url", "")).strip() or None
     if base_url is not None and not _svc_is_valid_http_url(base_url):
-        return _json_error("base_url 仅允许合法的 http/https 地址", 400, "JOB_ADHOC_004")
+        return _json_error(
+            "base_url 仅允许合法的 http/https 地址", 400, "JOB_ADHOC_004"
+        )
 
     token = str(payload.get("token", "")).strip() or None
     output_dir = str(payload.get("output_dir", "")).strip()
     report_name = str(payload.get("report_name", "")).strip() or None
-    output_dir, report_name = _resolve_output_dir(output_dir, report_name, reports_dir=REPORTS_DIR)
-    results_per_page = clamp_run_results_per_page(payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT))
-    collection_name = str(payload.get("collection_name", "")).strip() or ADHOC_DEFAULT_COLLECTION_NAME
+    output_dir, report_name = _resolve_output_dir(
+        output_dir, report_name, reports_dir=REPORTS_DIR
+    )
+    results_per_page = clamp_run_results_per_page(
+        payload.get("results_per_page", RUN_RESULTS_PER_PAGE_DEFAULT)
+    )
+    collection_name = (
+        str(payload.get("collection_name", "")).strip() or ADHOC_DEFAULT_COLLECTION_NAME
+    )
 
     try:
-        normalized_cases = [_svc_normalize_adhoc_case(item, idx, base_url) for idx, item in enumerate(raw_cases)]
-        collection_data = _svc_build_adhoc_collection(normalized_cases, collection_name, base_url)
+        normalized_cases = [
+            _svc_normalize_adhoc_case(item, idx, base_url)
+            for idx, item in enumerate(raw_cases)
+        ]
+        collection_data = _svc_build_adhoc_collection(
+            normalized_cases, collection_name, base_url
+        )
     except ValueError as exc:
         return _json_error(str(exc), 400, "JOB_ADHOC_005")
 
@@ -355,7 +396,11 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         selected_item_paths=None,
     )
 
-    return jsonify(build_job_queued_payload(job_id=job_id, message="ad-hoc 任务已创建，请轮询状态接口获取执行进度。"))
+    return jsonify(
+        build_job_queued_payload(
+            job_id=job_id, message="ad-hoc 任务已创建，请轮询状态接口获取执行进度。"
+        )
+    )
 
 
 def api_run_postman_status(job_id: str) -> ResponseReturnValue:
