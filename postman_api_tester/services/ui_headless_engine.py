@@ -233,9 +233,7 @@ class UiHeadlessEngine:
                             page.wait_for_load_state("networkidle", timeout=10000)
                             current_url = page.url
                             if not self._urls_match(current_url, actual_url):
-                                navigation_error = (
-                                    f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
-                                )
+                                navigation_error = f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
                         except Exception as e:
                             navigation_error = f"页面导航失败: {e}"
                     else:
@@ -246,9 +244,7 @@ class UiHeadlessEngine:
                                 page.wait_for_load_state("networkidle", timeout=10000)
                                 current_url = page.url
                                 if not self._urls_match(current_url, actual_url):
-                                    navigation_error = (
-                                        f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
-                                    )
+                                    navigation_error = f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
                             except Exception as e:
                                 navigation_error = f"页面导航失败: {e}"
                         else:
@@ -283,7 +279,9 @@ class UiHeadlessEngine:
                         except Exception:
                             pass
                         url_after = page.url
-                        if url_after != url_before and self._is_different_origin(url_before, url_after):
+                        if url_after != url_before and self._is_different_origin(
+                            url_before, url_after
+                        ):
                             captured_new_tab_url = url_after
                             logger.info(
                                 "headless_navigation_captured",
@@ -468,12 +466,19 @@ class UiHeadlessEngine:
             return True
         # 提取 host+path 比较（忽略 http/https 和端口差异）
         from urllib.parse import urlparse  # noqa: E402
+
         cur = urlparse(current_url)
         tgt = urlparse(target_url)
-        return cur.hostname == tgt.hostname and cur.path.rstrip("/") == tgt.path.rstrip("/")
+        return cur.hostname == tgt.hostname and cur.path.rstrip("/") == tgt.path.rstrip(
+            "/"
+        )
 
     def _resolve_new_tab_url(
-        self, step: Dict[str, Any], steps: List[Dict[str, Any]], index: int, base_url: str
+        self,
+        step: Dict[str, Any],
+        steps: List[Dict[str, Any]],
+        index: int,
+        base_url: str,
     ) -> str:
         """解析 new_tab 导航 URL，与浏览器回放引擎优先级一致。
 
@@ -744,7 +749,9 @@ class UiHeadlessEngine:
             "error": "",
         }
 
-    def _take_screenshot(self, page: "Page", job_id: str, step_index: int, suffix: str = "_fail") -> None:
+    def _take_screenshot(
+        self, page: "Page", job_id: str, step_index: int, suffix: str = "_fail"
+    ) -> None:
         """截图保存。suffix 为空时保存为 step_{i}.png，否则 step_{i}{suffix}.png。"""
         if not self._screenshots_dir:
             return

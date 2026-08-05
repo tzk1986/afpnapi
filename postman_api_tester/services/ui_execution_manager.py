@@ -109,9 +109,7 @@ class UiExecutionManager:
             str(job_dir) if options.get("take_screenshots", True) else None
         )
 
-        input_file = _worker_input_json(
-            job_id, case_data, options, screenshots_dir
-        )
+        input_file = _worker_input_json(job_id, case_data, options, screenshots_dir)
 
         cancel_event = threading.Event()
         process: Optional[subprocess.Popen[Any]] = None
@@ -161,7 +159,11 @@ class UiExecutionManager:
                 stderr_data = ""
                 if process.stderr is not None:
                     stderr_bytes = process.stderr.read()
-                    stderr_data = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
+                    stderr_data = (
+                        stderr_bytes.decode("utf-8", errors="replace")
+                        if stderr_bytes
+                        else ""
+                    )
 
                 if process.returncode != 0:
                     error_msg = stderr_data[:500] if stderr_data else "子进程异常退出"
@@ -236,7 +238,9 @@ class UiExecutionManager:
                 for sr in step_results:
                     self._store.update_step(job_id, sr)
 
-                self._store.finalize_job(job_id, summary.get("status", "failed"), summary)
+                self._store.finalize_job(
+                    job_id, summary.get("status", "failed"), summary
+                )
                 if on_complete is not None:
                     result = self._store.get_result(job_id)
                     if result:

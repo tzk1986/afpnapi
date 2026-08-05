@@ -665,11 +665,7 @@ def api_ui_testing_execution_screenshot(
     job_id: str, step_index: int
 ) -> ResponseReturnValue:
     """返回步骤截图（优先主动截图，其次失败截图）。"""
-    base = (
-        _execution_store.base_dir.resolve()
-        / f"exec_{job_id}"
-        / "screenshots"
-    )
+    base = _execution_store.base_dir.resolve() / f"exec_{job_id}" / "screenshots"
     for name in [f"step_{step_index}.png", f"step_{step_index}_fail.png"]:
         path = base / name
         if path.is_file():
