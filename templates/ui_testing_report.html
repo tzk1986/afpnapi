@@ -234,7 +234,7 @@
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
                         <td class="duration-cell">{{ step.duration_s }}s</td>
                         <td class="error-text" title="{{ step.error }}">{{ step.error }}</td>
-                        <td>{% if step.status == 'failed' %}<a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewErrorLog(this)">日志</a>{% endif %}</td>
+                        <td>{% if step.status == 'failed' or step.screenshot %}<a class="screenshot-link" data-step="{{ loop.index0 }}" data-status="{{ step.status }}" onclick="viewScreenshot(this)">截图</a>{% endif %}{% if step.status == 'failed' %} <a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewErrorLog(this)">日志</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -388,7 +388,11 @@
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
                     cells[6].title = s.error || '';
-                    cells[7].innerHTML = s.status === 'failed' ? '<a class="screenshot-link" data-step="' + i + '" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="' + i + '" onclick="viewErrorLog(this)">日志</a>' : '';
+                    var hasScreenshot = s.status === 'failed' || s.screenshot;
+                    cells[7].innerHTML = hasScreenshot
+                        ? '<a class="screenshot-link" data-step="' + i + '" data-status="' + s.status + '" onclick="viewScreenshot(this)">截图</a>' +
+                          (s.status === 'failed' ? ' <a class="screenshot-link" data-step="' + i + '" onclick="viewErrorLog(this)">日志</a>' : '')
+                        : '';
                 } else {
                     tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i));
                 }
@@ -399,8 +403,10 @@
             var sel = formatSelector(s.selector);
             var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
             var cur = isCurrentStep(s) ? ' current' : '';
-            var screenshotCell = s.status === 'failed'
-                ? '<a class="screenshot-link" data-step="' + idx + '" onclick="viewScreenshot(this)">截图</a> <a class="screenshot-link" data-step="' + idx + '" onclick="viewErrorLog(this)">日志</a>'
+            var hasScreenshot = s.status === 'failed' || s.screenshot;
+            var screenshotCell = hasScreenshot
+                ? '<a class="screenshot-link" data-step="' + idx + '" data-status="' + s.status + '" onclick="viewScreenshot(this)">截图</a>' +
+                  (s.status === 'failed' ? ' <a class="screenshot-link" data-step="' + idx + '" onclick="viewErrorLog(this)">日志</a>' : '')
                 : '';
             return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
@@ -492,7 +498,8 @@
             var modal = document.getElementById('screenshotModal');
             var imgEl = document.getElementById('screenshotImg');
             var titleEl = document.getElementById('screenshotTitle');
-            titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 失败截图';
+            var stepStatus = el.getAttribute('data-status') || 'failed';
+            titleEl.textContent = '步骤 ' + (stepIdx + 1) + (stepStatus === 'failed' ? ' 失败截图' : ' 截图');
             imgEl.src = '/api/ui-testing/execution/' + jobId + '/screenshot/' + stepIdx;
             imgEl.style.display = 'block';
             imgEl.onerror = function() {

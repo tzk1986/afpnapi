@@ -474,6 +474,7 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
                 "status_label": step_status_labels.get(step_status, step_status),
                 "duration_s": f"{duration_ms / 1000:.2f}",
                 "error": s.get("error", ""),
+                "screenshot": s.get("screenshot", False),
             }
         )
 
@@ -663,16 +664,17 @@ def ui_testing_reports_page() -> ResponseReturnValue:
 def api_ui_testing_execution_screenshot(
     job_id: str, step_index: int
 ) -> ResponseReturnValue:
-    """返回失败步骤截图。"""
-    screenshot_path = (
-        _execution_store.base_dir
+    """返回步骤截图（优先主动截图，其次失败截图）。"""
+    base = (
+        _execution_store.base_dir.resolve()
         / f"exec_{job_id}"
         / "screenshots"
-        / f"step_{step_index}_fail.png"
     )
-    if not screenshot_path.is_file():
-        return json_error("截图不存在", 404, "UIT_SCREENSHOT_001")
-    return send_file(str(screenshot_path), mimetype="image/png")
+    for name in [f"step_{step_index}.png", f"step_{step_index}_fail.png"]:
+        path = base / name
+        if path.is_file():
+            return send_file(str(path), mimetype="image/png")
+    return json_error("截图不存在", 404, "UIT_SCREENSHOT_001")
 
 
 def _send_webhook(result: Dict[str, Any]) -> None:

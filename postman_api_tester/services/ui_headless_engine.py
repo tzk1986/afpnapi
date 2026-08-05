@@ -110,7 +110,7 @@ class UiHeadlessEngine:
             on_step_complete: 回调 (step_index, step_result_dict) -> None
         """
         timeout_ms = options.get("timeout", 30000)
-        delay_ms = options.get("delay_between_steps", 500)
+        delay_ms = options.get("delay_between_steps", 200)
         viewport_w = options.get("viewport_width", 1280)
         viewport_h = options.get("viewport_height", 720)
 
@@ -121,6 +121,7 @@ class UiHeadlessEngine:
 
         steps_passed = 0
         steps_failed = 0
+        _step_results: List[Dict[str, Any]] = []
         start_time = time.time()
 
         _cleanup_old_logs()
@@ -176,14 +177,109 @@ class UiHeadlessEngine:
 
             # 自动导航到 base_url（回放模式下 iframe 已指向 base_url，无头模式需要显式跳转）
             if base_url:
-                page.goto(base_url, wait_until="domcontentloaded")
+                page.goto(base_url, wait_until="load")
+                try:
+                    page.wait_for_load_state("networkidle", timeout=5000)
+                except Exception:
+                    pass
+
+            # 监听新页面/弹窗（用于 new_tab 处理）
+            popup_page: Any = None
+            captured_new_tab_url: str = ""
+
+            def _on_popup(p: Any) -> None:
+                nonlocal popup_page
+                # 忽略无效 URL 的 popup（如 null、about:blank）
+                if p.url and p.url != "about:blank" and "/null" not in p.url:
+                    popup_page = p
+                    logger.info(
+                        "headless_popup_detected",
+                        extra={"event": "headless.popup", "url": p.url},
+                    )
+
+            context.on("page", _on_popup)
 
             for i, step in enumerate(steps):
                 if cancel_flag is not None and cancel_flag.is_set():
                     break
 
                 step_start = time.time()
-                step_result = self._execute_step(page, step, base_url, timeout_ms)
+                action = step.get("action", "").lower()
+                url_before_step = page.url
+
+                # new_tab：导航到新页面（与浏览器回放引擎行为一致）
+                if action == "new_tab":
+                    # 优先级：弹窗页面 > 步骤数据解析
+                    if popup_page is not None:
+                        try:
+                            popup_page.wait_for_load_state("networkidle")
+                            actual_url = popup_page.url
+                            page.close()
+                            page = popup_page
+                            popup_page = None
+                        except Exception as e:
+                            logger.warning("headless_popup_error: %s", e)
+                            actual_url = ""
+                    elif captured_new_tab_url:
+                        actual_url = captured_new_tab_url
+                        captured_new_tab_url = ""
+                        page.goto(actual_url, wait_until="domcontentloaded")
+                        page.wait_for_load_state("networkidle")
+                        logger.info(
+                            "headless_new_tab_captured_url",
+                            extra={
+                                "event": "headless.new_tab.captured_url",
+                                "url": actual_url,
+                            },
+                        )
+                    else:
+                        actual_url = self._resolve_new_tab_url(step, steps, i, base_url)
+                        if actual_url:
+                            page.goto(actual_url, wait_until="domcontentloaded")
+                            page.wait_for_load_state("networkidle")
+
+                    step_result = {
+                        "action": "new_tab",
+                        "selector": {},
+                        "value": actual_url,
+                        "status": "passed" if actual_url else "failed",
+                        "error": "" if actual_url else "无法解析 new_tab 导航 URL",
+                    }
+                else:
+                    # 如果下一步是 new_tab，当前 click 前注入 window.open 拦截
+                    next_is_new_tab = (
+                        i + 1 < len(steps)
+                        and steps[i + 1].get("action", "").lower() == "new_tab"
+                    )
+                    if action == "click" and next_is_new_tab:
+                        url_before = page.url
+                        popup_page = None
+                        # 执行 click（不等待 popup，让 new_tab 步骤用 fallback URL 导航）
+                        step_result = self._execute_step(
+                            page, step, base_url, timeout_ms
+                        )
+                        # 短暂等待 popup 触发（_on_popup 异步回调）
+                        time.sleep(0.5)
+                        # 检测页面 URL 是否已跳转到新系统
+                        try:
+                            page.wait_for_load_state("networkidle", timeout=3000)
+                        except Exception:
+                            pass
+                        url_after = page.url
+                        if url_after != url_before and self._is_different_origin(url_before, url_after):
+                            captured_new_tab_url = url_after
+                            logger.info(
+                                "headless_navigation_captured",
+                                extra={
+                                    "event": "headless.navigation.captured",
+                                    "url_before": url_before[:80],
+                                    "url_after": url_after[:120],
+                                },
+                            )
+                    else:
+                        step_result = self._execute_step(
+                            page, step, base_url, timeout_ms
+                        )
                 step_duration_ms = int((time.time() - step_start) * 1000)
 
                 step_result["index"] = i
@@ -195,10 +291,18 @@ class UiHeadlessEngine:
                     steps_failed += 1
                     self._take_screenshot(page, job_id, i)
 
+                # 步骤勾选了截图，无论通过/失败都截图
+                if step.get("screenshot"):
+                    self._take_screenshot(page, job_id, i, suffix="")
+                    step_result["screenshot"] = True
+
                 if on_step_complete is not None:
                     on_step_complete(i, step_result)
 
-                if delay_ms > 0 and i < len(steps) - 1:
+                _step_results.append(step_result)
+
+                # 同页面操作跳过步骤间延迟，只有页面导航后才等待
+                if delay_ms > 0 and i < len(steps) - 1 and page.url != url_before_step:
                     time.sleep(delay_ms / 1000.0)
 
         except Exception as e:
@@ -223,6 +327,7 @@ class UiHeadlessEngine:
             "steps_passed": steps_passed,
             "steps_failed": steps_failed,
             "total_duration_ms": total_duration_ms,
+            "_step_results": _step_results,
         }
 
     def _execute_step(
@@ -277,26 +382,9 @@ class UiHeadlessEngine:
                 "error": str(e)[:200],
             }
 
-    def _resolve_selector(self, selector: Any) -> Tuple[str, str]:
-        """解析选择器，返回 (strategy, value)。
-
-        strategy: 'css' | 'xpath' | 'text' | 'role'
-        """
-        if isinstance(selector, dict):
-            primary = selector.get("primary", "")
-            fallback_css = selector.get("fallback_css", "")
-            fallback_xpath = selector.get("fallback_xpath", "")
-            if primary:
-                if primary.startswith(("/", "(")):
-                    return ("xpath", primary)
-                return ("css", primary)
-            if fallback_css:
-                return ("css", fallback_css)
-            if fallback_xpath:
-                return ("xpath", fallback_xpath)
-            return ("css", "")
-
-        s = str(selector) if selector else ""
+    def _classify_strategy(self, selector: str) -> Tuple[str, str]:
+        """解析单个选择器字符串，返回 (strategy, value)。"""
+        s = selector.strip()
         if not s:
             return ("css", "")
         if s.startswith(("/", "(")):
@@ -307,23 +395,110 @@ class UiHeadlessEngine:
             return ("role", s[5:])
         return ("css", s)
 
+    def _resolve_selector_chain(self, selector: Any) -> List[Tuple[str, str]]:
+        """解析选择器回退链，返回 [(strategy, value), ...] 按优先级排列。
+
+        优先级：primary → fallback_css → fallback_xpath（去重，与浏览器引擎一致）
+        """
+        if not isinstance(selector, dict):
+            s = str(selector) if selector else ""
+            return [self._classify_strategy(s)] if s else []
+
+        candidates: List[Tuple[str, str]] = []
+        seen: set = set()
+        for key in ("primary", "fallback_css", "fallback_xpath"):
+            s = (selector.get(key, "") or "").strip()
+            if not s or s in seen:
+                continue
+            seen.add(s)
+            candidates.append(self._classify_strategy(s))
+
+        return candidates
+
+    def _build_locator(self, page: "Page", strategy: str, value: str) -> Any:
+        """根据 strategy 构建 Playwright locator。
+
+        对 XPath 使用 .first 避免多元素匹配时 strict mode 报错，
+        与浏览器回放引擎 querySelector / FIRST_ORDERED_NODE_TYPE 行为一致。
+        """
+        if strategy == "xpath":
+            return page.locator(f"xpath={value}").first
+        elif strategy == "text":
+            return page.get_by_text(value)
+        elif strategy == "role":
+            return page.get_by_role(value)  # type: ignore[arg-type]
+        else:
+            return page.locator(value).first
+
+    def _resolve_selector(self, selector: Any) -> Tuple[str, str]:
+        """解析选择器（兼容旧接口），返回 (strategy, value)。"""
+        chain = self._resolve_selector_chain(selector)
+        if chain:
+            return chain[0]
+        return ("css", "")
+
+    def _resolve_new_tab_url(
+        self, step: Dict[str, Any], steps: List[Dict[str, Any]], index: int, base_url: str
+    ) -> str:
+        """解析 new_tab 导航 URL，与浏览器回放引擎优先级一致。
+
+        优先级：step.value → step.tab_url → 下一步 tab_url/page_url
+        """
+        # 1. 当前步骤的 value 或 tab_url
+        url = step.get("value", "") or step.get("tab_url", "")
+        if url:
+            return url
+
+        # 2. 下一步的 tab_url 或 page_url
+        if index + 1 < len(steps):
+            next_step = steps[index + 1]
+            url = next_step.get("tab_url", "") or next_step.get("page_url", "")
+            if url:
+                return url
+
+        return ""
+
+    @staticmethod
+    def _is_different_origin(url_a: str, url_b: str) -> bool:
+        """判断两个 URL 是否属于不同源（host:port 不同）。"""
+        try:
+            from urllib.parse import urlparse
+
+            pa = urlparse(url_a)
+            pb = urlparse(url_b)
+            return pa.netloc != pb.netloc
+        except Exception:
+            return url_a != url_b
+
     def _find_element(self, page: "Page", selector: Any, timeout_ms: int) -> Any:
-        """查找元素，支持选择器回退链。"""
-        strategy, value = self._resolve_selector(selector)
-        if not value:
+        """查找元素，支持选择器回退链（primary → fallback_css → fallback_xpath）。
+
+        与浏览器回放引擎 SelectorEngine.find 保持一致的回退策略：
+        每个候选选择器分配较短超时，最后一个用完整超时。
+        """
+        candidates = self._resolve_selector_chain(selector)
+        if not candidates:
             raise HeadlessExecutionError("选择器为空")
 
-        if strategy == "xpath":
-            locator = page.locator(f"xpath={value}")
-        elif strategy == "text":
-            locator = page.get_by_text(value)
-        elif strategy == "role":
-            locator = page.get_by_role(value)  # type: ignore[arg-type]
-        else:
-            locator = page.locator(value)
+        per_timeout = 1000
 
-        locator.wait_for(state="visible", timeout=timeout_ms)
-        return locator
+        last_error: Optional[Exception] = None
+        for i, (strategy, value) in enumerate(candidates):
+            is_last = i == len(candidates) - 1
+            wait_ms = timeout_ms if is_last else per_timeout
+
+            try:
+                locator = self._build_locator(page, strategy, value)
+                if locator.is_visible():
+                    return locator
+                locator.wait_for(state="visible", timeout=wait_ms)
+                return locator
+            except Exception as e:
+                last_error = e
+                if is_last:
+                    raise
+
+        raise last_error or HeadlessExecutionError("元素未找到")
 
     def _selector_to_dict(self, selector: Any) -> Any:
         """确保 selector 在结果中以 dict 形式返回。"""
@@ -372,7 +547,6 @@ class UiHeadlessEngine:
         except Exception as e:
             err = str(e)
             if "cannot be filled" in err:
-                # radio/checkbox — 回退为点击
                 el.click()
                 return {
                     "action": "type",
@@ -438,7 +612,6 @@ class UiHeadlessEngine:
         elif action == "uncheck":
             el.uncheck()
         else:
-            # select_radio → 点击 radio 按钮
             el.click()
         return {
             "action": action,
@@ -536,13 +709,13 @@ class UiHeadlessEngine:
             "error": "",
         }
 
-    def _take_screenshot(self, page: "Page", job_id: str, step_index: int) -> None:
-        """失败时截图保存。"""
+    def _take_screenshot(self, page: "Page", job_id: str, step_index: int, suffix: str = "_fail") -> None:
+        """截图保存。suffix 为空时保存为 step_{i}.png，否则 step_{i}{suffix}.png。"""
         if not self._screenshots_dir:
             return
         try:
             self._screenshots_dir.mkdir(parents=True, exist_ok=True)
-            path = self._screenshots_dir / f"step_{step_index}_fail.png"
+            path = self._screenshots_dir / f"step_{step_index}{suffix}.png"
             page.screenshot(path=str(path))
         except Exception as e:
             logger.warning("screenshot_failed: %s", e)

@@ -119,6 +119,7 @@
                         <th style="width:180px">值</th>
                         <th style="width:160px">描述</th>
                         <th style="width:120px">页面</th>
+                        <th style="width:50px" title="勾选后执行时截图显示在报告中">截图</th>
                         <th class="step-actions">操作</th>
                     </tr>
                 </thead>
@@ -215,6 +216,9 @@
                     '<td><input type="text" value="' + escapeHtml(step.value || '') + '" onchange="updateStep(' + i + ', \'value\', this.value)" placeholder="值" /></td>' +
                     '<td><input type="text" value="' + escapeHtml(desc) + '" onchange="updateStep(' + i + ', \'description\', this.value)" placeholder="描述" /></td>' +
                     '<td style="font-size:11px;color:#9ca3af;" title="' + escapeHtml(step.page_url || '') + '">' + escapeHtml(pageDomain) + '</td>' +
+                    '<td style="text-align:center"><input type="checkbox" ' +
+                        'onchange="updateStep(' + i + ', \'screenshot\', this.checked)" ' +
+                        (step.screenshot ? ' checked' : '') + ' title="执行时截图" /></td>' +
                     '<td class="step-actions">' +
                         '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', -1)"' + (i === 0 ? ' disabled' : '') + '>↑</button> ' +
                         '<button class="btn btn-sm btn-secondary" onclick="moveStep(' + i + ', 1)"' + (i === steps.length - 1 ? ' disabled' : '') + '>↓</button> ' +
@@ -252,7 +256,7 @@
 
         function addStep() {
             var idx = (selectedStepIndex !== null) ? selectedStepIndex : steps.length;
-            steps.splice(idx, 0, { action: 'click', selector: '', value: '', description: '', element_info: {} });
+            steps.splice(idx, 0, { action: 'click', selector: '', value: '', description: '', element_info: {}, screenshot: false });
             selectedStepIndex = idx;
             renderSteps();
             markDirty();
