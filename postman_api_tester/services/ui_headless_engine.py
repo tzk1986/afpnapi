@@ -211,10 +211,12 @@ class UiHeadlessEngine:
 
                 # new_tab：导航到新页面（与浏览器回放引擎行为一致）
                 if action == "new_tab":
+                    navigation_error = ""
                     # 优先级：弹窗页面 > 步骤数据解析
                     if popup_page is not None:
                         try:
-                            popup_page.wait_for_load_state("networkidle")
+                            popup_page.wait_for_load_state("load", timeout=10000)
+                            popup_page.wait_for_load_state("networkidle", timeout=10000)
                             actual_url = popup_page.url
                             page.close()
                             page = popup_page
@@ -222,30 +224,43 @@ class UiHeadlessEngine:
                         except Exception as e:
                             logger.warning("headless_popup_error: %s", e)
                             actual_url = ""
+                            navigation_error = f"弹窗页面加载失败: {e}"
                     elif captured_new_tab_url:
                         actual_url = captured_new_tab_url
                         captured_new_tab_url = ""
-                        page.goto(actual_url, wait_until="domcontentloaded")
-                        page.wait_for_load_state("networkidle")
-                        logger.info(
-                            "headless_new_tab_captured_url",
-                            extra={
-                                "event": "headless.new_tab.captured_url",
-                                "url": actual_url,
-                            },
-                        )
+                        try:
+                            page.goto(actual_url, wait_until="load", timeout=15000)
+                            page.wait_for_load_state("networkidle", timeout=10000)
+                            current_url = page.url
+                            if not self._urls_match(current_url, actual_url):
+                                navigation_error = (
+                                    f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
+                                )
+                        except Exception as e:
+                            navigation_error = f"页面导航失败: {e}"
                     else:
                         actual_url = self._resolve_new_tab_url(step, steps, i, base_url)
                         if actual_url:
-                            page.goto(actual_url, wait_until="domcontentloaded")
-                            page.wait_for_load_state("networkidle")
+                            try:
+                                page.goto(actual_url, wait_until="load", timeout=15000)
+                                page.wait_for_load_state("networkidle", timeout=10000)
+                                current_url = page.url
+                                if not self._urls_match(current_url, actual_url):
+                                    navigation_error = (
+                                        f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
+                                    )
+                            except Exception as e:
+                                navigation_error = f"页面导航失败: {e}"
+                        else:
+                            navigation_error = "无法解析 new_tab 导航 URL"
 
+                    new_tab_passed = bool(actual_url) and not navigation_error
                     step_result = {
                         "action": "new_tab",
                         "selector": {},
                         "value": actual_url,
-                        "status": "passed" if actual_url else "failed",
-                        "error": "" if actual_url else "无法解析 new_tab 导航 URL",
+                        "status": "passed" if new_tab_passed else "failed",
+                        "error": navigation_error if navigation_error else "",
                     }
                 else:
                     # 如果下一步是 new_tab，当前 click 前注入 window.open 拦截
@@ -264,7 +279,7 @@ class UiHeadlessEngine:
                         time.sleep(0.5)
                         # 检测页面 URL 是否已跳转到新系统
                         try:
-                            page.wait_for_load_state("networkidle", timeout=3000)
+                            page.wait_for_load_state("domcontentloaded", timeout=3000)
                         except Exception:
                             pass
                         url_after = page.url
@@ -302,6 +317,10 @@ class UiHeadlessEngine:
                     on_step_complete(i, step_result)
 
                 _step_results.append(step_result)
+
+                # new_tab 导航失败则终止测试（后续步骤依赖新页面）
+                if action == "new_tab" and step_result["status"] == "failed":
+                    break
 
                 # 同页面操作跳过步骤间延迟，只有页面导航后才等待
                 if delay_ms > 0 and i < len(steps) - 1 and page.url != url_before_step:
@@ -438,6 +457,20 @@ class UiHeadlessEngine:
         if chain:
             return chain[0]
         return ("css", "")
+
+    @staticmethod
+    def _urls_match(current_url: str, target_url: str) -> bool:
+        """检查当前 URL 是否匹配目标 URL（忽略协议和端口差异，只比较 host + path）。"""
+        if not current_url or not target_url:
+            return False
+        # 完全匹配
+        if current_url == target_url:
+            return True
+        # 提取 host+path 比较（忽略 http/https 和端口差异）
+        from urllib.parse import urlparse  # noqa: E402
+        cur = urlparse(current_url)
+        tgt = urlparse(target_url)
+        return cur.hostname == tgt.hostname and cur.path.rstrip("/") == tgt.path.rstrip("/")
 
     def _resolve_new_tab_url(
         self, step: Dict[str, Any], steps: List[Dict[str, Any]], index: int, base_url: str
