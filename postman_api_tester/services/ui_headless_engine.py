@@ -98,6 +98,7 @@ class UiHeadlessEngine:
         job_id: str,
         cancel_flag: Optional[Any] = None,
         on_step_complete: Optional[Any] = None,
+        on_browser_ready: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """执行所有步骤，返回摘要。
 
@@ -108,6 +109,7 @@ class UiHeadlessEngine:
             job_id: 任务 ID（用于截图命名）
             cancel_flag: threading.Event，被 set 时中止执行
             on_step_complete: 回调 (step_index, step_result_dict) -> None
+            on_browser_ready: 浏览器启动完成回调 () -> None
         """
         timeout_ms = options.get("timeout", 30000)
         delay_ms = options.get("delay_between_steps", 200)
@@ -122,7 +124,6 @@ class UiHeadlessEngine:
         steps_passed = 0
         steps_failed = 0
         _step_results: List[Dict[str, Any]] = []
-        start_time = time.time()
 
         _cleanup_old_logs()
 
@@ -178,10 +179,11 @@ class UiHeadlessEngine:
             # 自动导航到 base_url（回放模式下 iframe 已指向 base_url，无头模式需要显式跳转）
             if base_url:
                 page.goto(base_url, wait_until="load")
-                try:
-                    page.wait_for_load_state("networkidle", timeout=5000)
-                except Exception:
-                    pass
+
+            # 浏览器启动完成，开始计时
+            start_time = time.time()
+            if on_browser_ready is not None:
+                on_browser_ready()
 
             # 监听新页面/弹窗（用于 new_tab 处理）
             popup_page: Any = None

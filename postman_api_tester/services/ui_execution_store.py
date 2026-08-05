@@ -90,6 +90,15 @@ class UiExecutionStore:
         )
         return job_id
 
+    def update_status(self, job_id: str, status: str) -> None:
+        """更新任务状态（如 ready → starting → running）。"""
+        with self._lock:
+            record = self._read_result(job_id)
+            if record is None:
+                return
+            record["status"] = status
+            self._write_result(job_id, record)
+
     def update_step(self, job_id: str, step_result: Dict[str, Any]) -> None:
         """追加单个步骤结果（幂等：同一 index 不重复追加）。"""
         with self._lock:

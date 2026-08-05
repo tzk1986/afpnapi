@@ -17,9 +17,15 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 
 def _write_output(data: Dict[str, Any]) -> None:
-    """以 UTF-8 编码向 stdout 写入 JSON 输出（避免 Windows GBK 编码问题）。"""
+    """以 UTF-8 编码向 stdout 写入一行 JSON 输出（避免 Windows GBK 编码问题）。"""
     json_str = json.dumps(data, ensure_ascii=False, default=str)
-    sys.stdout.buffer.write(json_str.encode("utf-8"))
+    sys.stdout.buffer.write(json_str.encode("utf-8") + b"\n")
+    sys.stdout.buffer.flush()
+
+
+def _write_line(text: str) -> None:
+    """以 UTF-8 编码向 stdout 写入一行纯文本。"""
+    sys.stdout.buffer.write(text.encode("utf-8") + b"\n")
     sys.stdout.buffer.flush()
 
 
@@ -58,6 +64,7 @@ def main() -> None:
             base_url=base_url,
             options=options,
             job_id=job_id,
+            on_browser_ready=lambda: _write_line("BROWSER_READY"),
         )
 
         step_results: List[Dict[str, Any]] = summary.pop("_step_results", [])

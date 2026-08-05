@@ -22,6 +22,7 @@
         .status-badge.passed { background: #d1fae5; color: #065f46; }
         .status-badge.failed { background: #fef2f2; color: #991b1b; }
         .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
+        .status-badge.starting { background: #fef3c7; color: #92400e; animation: pulse 2s infinite; }
         .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -279,7 +280,7 @@
 
         function updatePage(data) {
             var status = data.status || 'running';
-            var statusLabels = {'passed': '通过', 'failed': '失败', 'running': '执行中', 'cancelled': '已取消', 'ready': '就绪'};
+            var statusLabels = {'passed': '通过', 'failed': '失败', 'running': '执行中', 'cancelled': '已取消', 'ready': '就绪', 'starting': '启动中'};
 
             // 状态徽章
             var badge = document.getElementById('statusBadge');
@@ -320,7 +321,7 @@
                 progressContainer.classList.remove('complete');
                 document.getElementById('progressFill').style.width = pct + '%';
                 document.getElementById('progressText').textContent = Math.round(pct) + '% (' + completed + ' / ' + sTotal + ' 步骤)';
-                var label = status === 'ready' ? '等待执行开始...' : '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败';
+                var label = status === 'ready' ? '等待执行开始...' : (status === 'starting' ? '浏览器启动中……' : '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败');
                 document.getElementById('progressLabel').textContent = label;
             } else {
                 // 终态：显示 100% 完成进度

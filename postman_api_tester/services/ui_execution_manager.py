@@ -122,6 +122,9 @@ class UiExecutionManager:
                 "process": None,
             }
 
+        # 标记为浏览器启动中
+        self._store.update_status(job_id, "starting")
+
         def run() -> None:
             nonlocal process
             try:
@@ -138,9 +141,27 @@ class UiExecutionManager:
                     if job_id in _active_jobs:
                         _active_jobs[job_id]["process"] = process
 
-                stdout_bytes, stderr_bytes = process.communicate(timeout=300)
-                stdout_data = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
-                stderr_data = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
+                # 逐行读取 stdout：首行是 BROWSER_READY 信号
+                stdout_data = ""
+                if process.stdout is not None:
+                    first_line = process.stdout.readline()
+                    if first_line:
+                        line_str = first_line.decode("utf-8", errors="replace").strip()
+                        if line_str == "BROWSER_READY":
+                            self._store.update_status(job_id, "running")
+                        else:
+                            stdout_data = line_str
+                    # 读取剩余输出
+                    rest = process.stdout.read()
+                    if rest:
+                        stdout_data += rest.decode("utf-8", errors="replace")
+
+                # 等待进程结束并收集 stderr
+                process.wait(timeout=300)
+                stderr_data = ""
+                if process.stderr is not None:
+                    stderr_bytes = process.stderr.read()
+                    stderr_data = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
 
                 if process.returncode != 0:
                     error_msg = stderr_data[:500] if stderr_data else "子进程异常退出"

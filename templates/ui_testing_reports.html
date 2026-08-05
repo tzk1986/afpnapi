@@ -63,6 +63,7 @@
         .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
         .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
         .status-badge.ready { background: #fef3c7; color: #92400e; }
+        .status-badge.starting { background: #fef3c7; color: #92400e; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         .mode-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
@@ -223,7 +224,7 @@
         }
 
         function renderRow(item) {
-            var statusLabels = { passed: '通过', failed: '失败', running: '执行中', cancelled: '已取消', ready: '就绪' };
+            var statusLabels = { passed: '通过', failed: '失败', running: '执行中', cancelled: '已取消', ready: '就绪', starting: '启动中' };
             var modeLabels = { headless: '无头浏览器', browser_replay: '浏览器回放' };
             var modeClass = item.mode === 'headless' ? 'headless' : 'browser_replay';
 
@@ -238,7 +239,7 @@
             startedAt = startedAt.replace('T', ' ');
 
             var actionsHtml = '<div class="actions-cell">';
-            if (item.status === 'running' || item.status === 'ready') {
+            if (item.status === 'running' || item.status === 'ready' || item.status === 'starting') {
                 actionsHtml += '<button class="btn btn-sm btn-warning" onclick="cancelJob(\'' + item.job_id + '\')">停止</button>';
             }
             actionsHtml += '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">查看</a>' +
