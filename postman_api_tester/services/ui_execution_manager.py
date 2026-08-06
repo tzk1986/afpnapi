@@ -212,7 +212,9 @@ class UiExecutionManager:
                     return
 
                 if final_result_data is None:
-                    logger.error("headless_worker_no_output: no valid JSON output from worker")
+                    logger.error(
+                        "headless_worker_no_output: no valid JSON output from worker"
+                    )
                     self._store.finalize_job(
                         job_id,
                         "failed",

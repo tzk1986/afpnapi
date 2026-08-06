@@ -224,18 +224,14 @@ class UiHeadlessEngine:
                 tgt = _up(target)
                 # 跨域检测
                 if cur.hostname and tgt.hostname and cur.hostname != tgt.hostname:
-                    _redirect_detected = (
-                        f"页面被重定向到其他域名: 当前={new_url[:120]}, 期望={target[:120]}"
-                    )
+                    _redirect_detected = f"页面被重定向到其他域名: 当前={new_url[:120]}, 期望={target[:120]}"
                     return
                 # 重定向模式检测（仅同域内）
                 cur_path = cur.path.lower()
                 tgt_path = tgt.path.lower()
                 for pattern in ["/login", "/error", "/404", "/502", "/403", "/500"]:
                     if pattern in cur_path and pattern not in tgt_path:
-                        _redirect_detected = (
-                            f"页面被重定向到 {pattern}（会话可能已过期）: {new_url[:120]}"
-                        )
+                        _redirect_detected = f"页面被重定向到 {pattern}（会话可能已过期）: {new_url[:120]}"
                         return
 
             for i, step in enumerate(steps):
@@ -255,6 +251,51 @@ class UiHeadlessEngine:
                     _pending_new_tab_url = ""
                     _redirect_detected = ""
                     navigation_error = ""
+                    # 诊断信息收集
+                    _diag: Dict[str, Any] = {
+                        "stage": "new_tab_start",
+                        "current_url": page.url[:200],
+                    }
+                    try:
+                        diag_cookies = page.context.cookies()
+                        _diag["cookie_count"] = len(diag_cookies)
+                        _diag["cookie_names"] = [c["name"] for c in diag_cookies]
+                        _diag["session_cookies"] = [
+                            {
+                                "name": c["name"],
+                                "domain": c["domain"],
+                                "path": c.get("path", ""),
+                            }
+                            for c in diag_cookies
+                            if any(
+                                kw in c["name"].lower()
+                                for kw in [
+                                    "session",
+                                    "token",
+                                    "auth",
+                                    "sso",
+                                    "jsessionid",
+                                ]
+                            )
+                        ]
+                    except Exception as e:
+                        _diag["cookie_error"] = str(e)
+                    # 检查 localStorage 和 sessionStorage 中的 token
+                    try:
+                        storage_info = page.evaluate("""() => {
+                            var keys = [];
+                            try { for (var i = 0; i < localStorage.length; i++) keys.push('L:' + localStorage.key(i)); } catch(e) {}
+                            try { for (var i = 0; i < sessionStorage.length; i++) keys.push('S:' + sessionStorage.key(i)); } catch(e) {}
+                            return {
+                                localStorage_keys: keys.filter(function(k) { return k.indexOf('L:') === 0; }),
+                                sessionStorage_keys: keys.filter(function(k) { return k.indexOf('S:') === 0; }),
+                                token_in_localStorage: localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '',
+                                token_in_sessionStorage: sessionStorage.getItem('token') || sessionStorage.getItem('access_token') || sessionStorage.getItem('auth_token') || '',
+                            };
+                        }""")
+                        _diag["storage"] = storage_info
+                    except Exception as e:
+                        _diag["storage_error"] = str(e)
                     # 优先级：弹窗页面 > 步骤数据解析
                     if popup_page is not None:
                         try:
@@ -262,8 +303,12 @@ class UiHeadlessEngine:
                             popup_page.wait_for_load_state("networkidle", timeout=10000)
                             actual_url = popup_page.url
                             # 验证弹窗 URL 是否到达预期页面
-                            resolved_url = self._resolve_new_tab_url(step, steps, i, base_url)
-                            if resolved_url and not self._urls_match(actual_url, resolved_url):
+                            resolved_url = self._resolve_new_tab_url(
+                                step, steps, i, base_url
+                            )
+                            if resolved_url and not self._urls_match(
+                                actual_url, resolved_url
+                            ):
                                 navigation_error = f"弹窗页面 URL 不匹配: 当前={actual_url[:120]}, 目标={resolved_url[:120]}"
                             else:
                                 page.close()
@@ -276,33 +321,73 @@ class UiHeadlessEngine:
                     elif captured_new_tab_url:
                         actual_url = captured_new_tab_url
                         captured_new_tab_url = ""
+                        _diag["branch"] = "captured_url"
+                        _diag["captured_url"] = actual_url[:200]
                         try:
+                            _diag["goto_start"] = page.url[:200]
                             page.goto(actual_url, wait_until="load", timeout=15000)
+                            _diag["after_load"] = page.url[:200]
                             page.wait_for_load_state("networkidle", timeout=10000)
+                            _diag["after_idle1"] = page.url[:200]
                             if not self._urls_match(page.url, actual_url):
                                 navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
+                            else:
+                                time.sleep(0.5)
+                                try:
+                                    page.wait_for_load_state(
+                                        "networkidle", timeout=5000
+                                    )
+                                except Exception:
+                                    pass
+                                _diag["after_idle2"] = page.url[:200]
+                                if not self._urls_match(page.url, actual_url):
+                                    navigation_error = (
+                                        f"页面认证后重定向（会话可能已过期）: "
+                                        f"当前={page.url[:120]}, 目标={actual_url[:120]}"
+                                    )
                         except Exception as e:
                             navigation_error = f"页面导航失败: {e}"
                     else:
                         actual_url = self._resolve_new_tab_url(step, steps, i, base_url)
+                        _diag["branch"] = "resolved_url"
+                        _diag["resolved_url"] = actual_url[:200] if actual_url else ""
                         if actual_url:
                             try:
+                                _diag["goto_start"] = page.url[:200]
                                 page.goto(actual_url, wait_until="load", timeout=15000)
+                                _diag["after_load"] = page.url[:200]
                                 page.wait_for_load_state("networkidle", timeout=10000)
+                                _diag["after_idle1"] = page.url[:200]
                                 if not self._urls_match(page.url, actual_url):
                                     navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
+                                else:
+                                    time.sleep(0.5)
+                                    try:
+                                        page.wait_for_load_state(
+                                            "networkidle", timeout=5000
+                                        )
+                                    except Exception:
+                                        pass
+                                    _diag["after_idle2"] = page.url[:200]
+                                    if not self._urls_match(page.url, actual_url):
+                                        navigation_error = (
+                                            f"页面认证后重定向（会话可能已过期）: "
+                                            f"当前={page.url[:120]}, 目标={actual_url[:120]}"
+                                        )
                             except Exception as e:
                                 navigation_error = f"页面导航失败: {e}"
                         else:
                             navigation_error = "无法解析 new_tab 导航 URL"
 
                     new_tab_passed = bool(actual_url) and not navigation_error
+                    _diag["navigation_error"] = navigation_error
                     step_result = {
                         "action": "new_tab",
                         "selector": {},
                         "value": actual_url,
                         "status": "passed" if new_tab_passed else "failed",
                         "error": navigation_error if navigation_error else "",
+                        "_diag": _diag,
                     }
                     # new_tab 通过后，记录目标 URL 供下一步校验，并注册 framenavigated 实时监听
                     if new_tab_passed and actual_url:
@@ -357,13 +442,15 @@ class UiHeadlessEngine:
                         # 2. 检查 URL 是否已变更（步骤尚未执行，任何 URL 变更都是重定向）
                         url_mismatch = ""
                         if not self._urls_match(page.url, _pending_new_tab_url):
-                            url_mismatch = (
-                                f"页面 URL 已变更: 当前={page.url[:120]}, 期望={_pending_new_tab_url[:120]}"
-                            )
+                            url_mismatch = f"页面 URL 已变更: 当前={page.url[:120]}, 期望={_pending_new_tab_url[:120]}"
                         # 3. 组合检测结果
                         redirect_error = (
                             url_mismatch
-                            or (f"SPA 检测到页面重定向: {spa_redirect[:120]}" if spa_redirect else "")
+                            or (
+                                f"SPA 检测到页面重定向: {spa_redirect[:120]}"
+                                if spa_redirect
+                                else ""
+                            )
                             or _redirect_detected
                             or self._check_page_redirect(page, _pending_new_tab_url)
                         )
@@ -375,15 +462,24 @@ class UiHeadlessEngine:
                             _pending_new_tab_url = ""
                             _terminated = True
                             # 回写 new_tab 步骤为失败
-                            if _pending_new_tab_index >= 0 and _pending_new_tab_index < len(_step_results):
-                                _step_results[_pending_new_tab_index]["status"] = "failed"
-                                _step_results[_pending_new_tab_index]["error"] = redirect_error
+                            if (
+                                _pending_new_tab_index >= 0
+                                and _pending_new_tab_index < len(_step_results)
+                            ):
+                                _step_results[_pending_new_tab_index]["status"] = (
+                                    "failed"
+                                )
+                                _step_results[_pending_new_tab_index]["error"] = (
+                                    redirect_error
+                                )
                                 steps_passed -= 1
                                 steps_failed += 1
                             # 当前步骤标记为失败并终止
                             step_result = {
                                 "action": action,
-                                "selector": self._selector_to_dict(step.get("selector", "")),
+                                "selector": self._selector_to_dict(
+                                    step.get("selector", "")
+                                ),
                                 "value": step.get("value", ""),
                                 "status": "failed",
                                 "error": f"new_tab 页面验证失败: {redirect_error}",
@@ -402,6 +498,9 @@ class UiHeadlessEngine:
                     if action == "click" and next_is_new_tab:
                         url_before = page.url
                         popup_page = None
+                        _pre_newtab_diag: Dict[str, Any] = {
+                            "url_before_click": url_before[:200],
+                        }
                         # 执行 click（不等待 popup，让 new_tab 步骤用 fallback URL 导航）
                         step_result = self._execute_step(
                             page, step, base_url, timeout_ms
@@ -414,9 +513,16 @@ class UiHeadlessEngine:
                         except Exception:
                             pass
                         url_after = page.url
-                        if url_after != url_before and self._is_different_origin(
+                        different_origin = self._is_different_origin(
                             url_before, url_after
-                        ):
+                        )
+                        _pre_newtab_diag["url_after_click"] = url_after[:200]
+                        _pre_newtab_diag["different_origin"] = different_origin
+                        _pre_newtab_diag["captured"] = (
+                            url_after != url_before and different_origin
+                        )
+                        step_result["_pre_newtab_diag"] = _pre_newtab_diag
+                        if url_after != url_before and different_origin:
                             captured_new_tab_url = url_after
                             logger.info(
                                 "headless_navigation_captured",
@@ -470,7 +576,11 @@ class UiHeadlessEngine:
                     except Exception:
                         pass
                     post_error = (
-                        (f"SPA 检测到页面重定向: {spa_redirect[:120]}" if spa_redirect else "")
+                        (
+                            f"SPA 检测到页面重定向: {spa_redirect[:120]}"
+                            if spa_redirect
+                            else ""
+                        )
                         or _redirect_detected
                         or self._check_page_redirect(page, _pending_new_tab_url)
                     )
@@ -488,10 +598,19 @@ class UiHeadlessEngine:
                     if post_error:
                         _terminated = True
                         # 回写 new_tab 步骤为失败
-                        if _pending_new_tab_index >= 0 and _pending_new_tab_index < len(_step_results):
-                            if _step_results[_pending_new_tab_index]["status"] == "passed":
-                                _step_results[_pending_new_tab_index]["status"] = "failed"
-                                _step_results[_pending_new_tab_index]["error"] = post_error
+                        if _pending_new_tab_index >= 0 and _pending_new_tab_index < len(
+                            _step_results
+                        ):
+                            if (
+                                _step_results[_pending_new_tab_index]["status"]
+                                == "passed"
+                            ):
+                                _step_results[_pending_new_tab_index]["status"] = (
+                                    "failed"
+                                )
+                                _step_results[_pending_new_tab_index]["error"] = (
+                                    post_error
+                                )
                                 steps_passed -= 1
                                 steps_failed += 1
                         # 如果当前步骤通过了，也标记为失败
@@ -505,6 +624,20 @@ class UiHeadlessEngine:
                 # new_tab 导航失败则终止测试（后续步骤依赖新页面）
                 if action == "new_tab" and step_result["status"] == "failed":
                     break
+
+                # 登录后等待页面跳转完成，确保 home 页面 JS 初始化完毕
+                # （否则下一步 click 可能不触发 popup，导致 new_tab 丢失 SSO 上下文）
+                if action == "click" and step_result["status"] == "passed":
+                    sel = step.get("selector", "")
+                    sel_str = (
+                        sel.get("primary", "") if isinstance(sel, dict) else str(sel)
+                    )
+                    if "登" in sel_str and "录" in sel_str:
+                        try:
+                            page.wait_for_load_state("networkidle", timeout=10000)
+                        except Exception:
+                            pass
+                        time.sleep(0.5)
 
                 # 同页面操作跳过步骤间延迟，只有页面导航后才等待
                 if delay_ms > 0 and i < len(steps) - 1 and page.url != url_before_step:
@@ -527,15 +660,19 @@ class UiHeadlessEngine:
             status = "terminated"
             # 标记剩余未执行步骤
             for remaining_i in range(len(_step_results), len(steps)):
-                _step_results.append({
-                    "index": remaining_i,
-                    "action": steps[remaining_i].get("action", ""),
-                    "selector": self._selector_to_dict(steps[remaining_i].get("selector", "")),
-                    "value": steps[remaining_i].get("value", ""),
-                    "status": "not_executed",
-                    "error": "new_tab 页面重定向，执行终止",
-                    "duration_ms": 0,
-                })
+                _step_results.append(
+                    {
+                        "index": remaining_i,
+                        "action": steps[remaining_i].get("action", ""),
+                        "selector": self._selector_to_dict(
+                            steps[remaining_i].get("selector", "")
+                        ),
+                        "value": steps[remaining_i].get("value", ""),
+                        "status": "not_executed",
+                        "error": "new_tab 页面重定向，执行终止",
+                        "duration_ms": 0,
+                    }
+                )
         if cancel_flag is not None and cancel_flag.is_set():
             status = "cancelled"
 
@@ -751,9 +888,7 @@ class UiHeadlessEngine:
 
         # 跨域重定向检测
         if cur.hostname and tgt.hostname and cur.hostname != tgt.hostname:
-            return (
-                f"页面被重定向到其他域名: 当前={current_url[:120]}, 期望={target_url[:120]}"
-            )
+            return f"页面被重定向到其他域名: 当前={current_url[:120]}, 期望={target_url[:120]}"
 
         # 检查是否被重定向到已知错误/登录页面（仅在同域内检测）
         cur_path = cur.path.lower()

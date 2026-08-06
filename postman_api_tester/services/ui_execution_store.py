@@ -119,14 +119,22 @@ class UiExecutionStore:
                         if old_status != new_status:
                             # 回退旧状态的计数
                             if old_status == "passed":
-                                record["steps_passed"] = max(0, record.get("steps_passed", 0) - 1)
+                                record["steps_passed"] = max(
+                                    0, record.get("steps_passed", 0) - 1
+                                )
                             elif old_status in ("failed", "error"):
-                                record["steps_failed"] = max(0, record.get("steps_failed", 0) - 1)
+                                record["steps_failed"] = max(
+                                    0, record.get("steps_failed", 0) - 1
+                                )
                             # 累加新状态的计数
                             if new_status == "passed":
-                                record["steps_passed"] = record.get("steps_passed", 0) + 1
+                                record["steps_passed"] = (
+                                    record.get("steps_passed", 0) + 1
+                                )
                             elif new_status in ("failed", "error"):
-                                record["steps_failed"] = record.get("steps_failed", 0) + 1
+                                record["steps_failed"] = (
+                                    record.get("steps_failed", 0) + 1
+                                )
                             existing["status"] = new_status
                         # 更新错误信息和耗时
                         if step_result.get("error"):
