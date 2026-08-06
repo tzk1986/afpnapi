@@ -321,7 +321,7 @@
                 progressContainer.classList.remove('complete');
                 document.getElementById('progressFill').style.width = pct + '%';
                 document.getElementById('progressText').textContent = Math.round(pct) + '% (' + completed + ' / ' + sTotal + ' 步骤)';
-                var label = status === 'ready' ? '等待执行开始...' : (status === 'starting' || completed === 0 ? '浏览器启动中……' : '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败');
+                var label = status === 'ready' ? '等待执行开始...' : (status === 'starting' ? '浏览器启动中……' : (completed === 0 ? '执行中... 等待第一个步骤' : '执行中... ' + sPassed + ' 通过, ' + sFailed + ' 失败'));
                 document.getElementById('progressLabel').textContent = label;
             } else {
                 // 终态：显示 100% 完成进度

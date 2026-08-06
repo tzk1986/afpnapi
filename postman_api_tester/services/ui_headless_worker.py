@@ -65,6 +65,9 @@ def main() -> None:
             options=options,
             job_id=job_id,
             on_browser_ready=lambda: _write_line("BROWSER_READY"),
+            on_step_complete=lambda _idx, step_result: _write_output(
+                {"step": step_result}
+            ),
         )
 
         step_results: List[Dict[str, Any]] = summary.pop("_step_results", [])

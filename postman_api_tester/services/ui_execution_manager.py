@@ -66,6 +66,14 @@ class UiExecutionManager:
     def __init__(self, store: UiExecutionStore) -> None:
         self._store = store
 
+    @staticmethod
+    def _parse_line(line_str: str) -> Dict[str, Any] | None:
+        """解析一行 JSON 输出，失败返回 None。"""
+        try:
+            return json.loads(line_str)
+        except json.JSONDecodeError:
+            return None
+
     def can_start(self) -> bool:
         """是否还能启动新任务。"""
         with _lock:
@@ -139,8 +147,8 @@ class UiExecutionManager:
                     if job_id in _active_jobs:
                         _active_jobs[job_id]["process"] = process
 
-                # 逐行读取 stdout：首行是 BROWSER_READY 信号
-                stdout_data = ""
+                # 逐行读取 stdout：实时处理步骤结果和最终摘要
+                final_result_data: Dict[str, Any] | None = None
                 if process.stdout is not None:
                     first_line = process.stdout.readline()
                     if first_line:
@@ -148,11 +156,26 @@ class UiExecutionManager:
                         if line_str == "BROWSER_READY":
                             self._store.update_status(job_id, "running")
                         else:
-                            stdout_data = line_str
-                    # 读取剩余输出
-                    rest = process.stdout.read()
-                    if rest:
-                        stdout_data += rest.decode("utf-8", errors="replace")
+                            # 不是 BROWSER_READY，尝试作为 JSON 处理
+                            parsed = self._parse_line(line_str)
+                            if parsed is not None:
+                                if "summary" in parsed or "success" in parsed:
+                                    final_result_data = parsed
+                                elif "step" in parsed:
+                                    self._store.update_step(job_id, parsed["step"])
+
+                    # 逐行读取后续输出（步骤结果 + 最终摘要）
+                    for line in process.stdout:
+                        line_str = line.decode("utf-8", errors="replace").strip()
+                        if not line_str:
+                            continue
+                        parsed = self._parse_line(line_str)
+                        if parsed is None:
+                            continue
+                        if "summary" in parsed or "success" in parsed:
+                            final_result_data = parsed
+                        elif "step" in parsed:
+                            self._store.update_step(job_id, parsed["step"])
 
                 # 等待进程结束并收集 stderr
                 process.wait(timeout=300)
@@ -188,14 +211,8 @@ class UiExecutionManager:
                             on_complete(result)
                     return
 
-                try:
-                    result_data = json.loads(stdout_data)
-                except json.JSONDecodeError as e:
-                    logger.error(
-                        "headless_worker_json_parse_error: %s, stdout=%s",
-                        e,
-                        stdout_data[:500] if stdout_data else "",
-                    )
+                if final_result_data is None:
+                    logger.error("headless_worker_no_output: no valid JSON output from worker")
                     self._store.finalize_job(
                         job_id,
                         "failed",
@@ -212,8 +229,8 @@ class UiExecutionManager:
                             on_complete(result)
                     return
 
-                if not result_data.get("success"):
-                    error_msg = result_data.get("error", "未知错误")
+                if not final_result_data.get("success"):
+                    error_msg = final_result_data.get("error", "未知错误")
                     logger.error("headless_worker_error: %s", error_msg)
                     self._store.finalize_job(
                         job_id,
@@ -231,10 +248,10 @@ class UiExecutionManager:
                             on_complete(result)
                     return
 
-                summary = result_data.get("summary", {})
-                step_results = result_data.get("step_results", [])
+                summary = final_result_data.get("summary", {})
+                step_results = final_result_data.get("step_results", [])
 
-                # 回填步骤结果到 store
+                # 回填步骤结果到 store（实时更新可能已覆盖，此处兜底）
                 for sr in step_results:
                     self._store.update_step(job_id, sr)
 
