@@ -100,25 +100,42 @@ class UiExecutionStore:
             self._write_result(job_id, record)
 
     def update_step(self, job_id: str, step_result: Dict[str, Any]) -> None:
-        """追加单个步骤结果（幂等：同一 index 不重复追加）。"""
+        """追加或更新单个步骤结果。
+
+        幂等规则：同一 index 的步骤如果已存在，更新其状态/错误信息（支持 post-check 回写）。
+        """
         with self._lock:
             record = self._read_result(job_id)
             if record is None:
                 return
 
-            # 幂等检查：同一 index 的步骤结果不重复追加
             step_index = step_result.get("index")
             if step_index is not None:
                 for existing in record.get("steps", []):
                     if existing.get("index") == step_index:
-                        logger.debug(
-                            "ui_execution_step_duplicate",
-                            extra={
-                                "event": "ui.execution.step.duplicate",
-                                "job_id": job_id,
-                                "step_index": step_index,
-                            },
-                        )
+                        # 更新已有步骤的状态（支持 post-check 回写失败状态）
+                        old_status = existing.get("status", "passed")
+                        new_status = step_result.get("status", "passed")
+                        if old_status != new_status:
+                            # 回退旧状态的计数
+                            if old_status == "passed":
+                                record["steps_passed"] = max(0, record.get("steps_passed", 0) - 1)
+                            elif old_status in ("failed", "error"):
+                                record["steps_failed"] = max(0, record.get("steps_failed", 0) - 1)
+                            # 累加新状态的计数
+                            if new_status == "passed":
+                                record["steps_passed"] = record.get("steps_passed", 0) + 1
+                            elif new_status in ("failed", "error"):
+                                record["steps_failed"] = record.get("steps_failed", 0) + 1
+                            existing["status"] = new_status
+                        # 更新错误信息和耗时
+                        if step_result.get("error"):
+                            existing["error"] = step_result["error"]
+                        if step_result.get("duration_ms"):
+                            existing["duration_ms"] = step_result["duration_ms"]
+                        if "screenshot" in step_result:
+                            existing["screenshot"] = step_result["screenshot"]
+                        self._write_result(job_id, record)
                         return
 
             record["steps"].append(step_result)

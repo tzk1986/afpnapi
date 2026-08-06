@@ -24,6 +24,8 @@
         .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
         .status-badge.starting { background: #fef3c7; color: #92400e; animation: pulse 2s infinite; }
         .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
+        .status-badge.terminated { background: #fff7ed; color: #9a3412; }
+        .status-badge.not_executed { background: #f9fafb; color: #9ca3af; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -280,7 +282,7 @@
 
         function updatePage(data) {
             var status = data.status || 'running';
-            var statusLabels = {'passed': '通过', 'failed': '失败', 'running': '执行中', 'cancelled': '已取消', 'ready': '就绪', 'starting': '启动中'};
+            var statusLabels = {'passed': '通过', 'failed': '失败', 'running': '执行中', 'cancelled': '已取消', 'terminated': '执行终止', 'ready': '就绪', 'starting': '启动中', 'not_executed': '未执行'};
 
             // 状态徽章
             var badge = document.getElementById('statusBadge');
@@ -313,7 +315,7 @@
             var progressContainer = document.getElementById('progressContainer');
             var completed = sPassed + sFailed;
             var pct = sTotal > 0 ? (completed / sTotal * 100) : 0;
-            var isTerminal = (status === 'passed' || status === 'failed' || status === 'cancelled');
+            var isTerminal = (status === 'passed' || status === 'failed' || status === 'cancelled' || status === 'terminated');
 
             if (!isTerminal) {
                 // ready / running / 未知状态：始终显示进度条
@@ -329,7 +331,7 @@
                 progressContainer.classList.add('complete');
                 document.getElementById('progressFill').style.width = '100%';
                 document.getElementById('progressText').textContent = '100% (' + completed + ' / ' + sTotal + ' 步骤)';
-                var doneLabel = status === 'cancelled' ? '已取消' : (status === 'failed' ? '执行失败' : '执行完成');
+                var doneLabel = status === 'cancelled' ? '已取消' : (status === 'terminated' ? '执行终止' : (status === 'failed' ? '执行失败' : '执行完成'));
                 document.getElementById('progressLabel').textContent = doneLabel + ' — ' + sPassed + ' 通过, ' + sFailed + ' 失败';
             }
 
@@ -384,7 +386,7 @@
                     cells[2].textContent = sel;
                     cells[2].title = sel;
                     cells[3].textContent = (s.value || '').toString().substring(0, 60);
-                    var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
+                    var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误', 'not_executed': '未执行'};
                     cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status);
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
@@ -402,7 +404,7 @@
 
         function renderStepRow(s, idx) {
             var sel = formatSelector(s.selector);
-            var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误'};
+            var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误', 'not_executed': '未执行'};
             var cur = isCurrentStep(s) ? ' current' : '';
             var hasScreenshot = s.status === 'failed' || s.screenshot;
             var screenshotCell = hasScreenshot

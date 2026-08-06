@@ -201,6 +201,43 @@ class UiHeadlessEngine:
 
             context.on("page", _on_popup)
 
+            _pending_new_tab_url = ""
+            _pending_new_tab_index = -1
+            _redirect_detected = ""
+            _navigate_listener_active = False
+            _terminated = False
+
+            def _on_navigate(frame: Any) -> None:
+                """framenavigated 监听：实时检测 SPA 重定向到登录/错误页。"""
+                nonlocal _redirect_detected
+                if _redirect_detected:
+                    return
+                if frame != page.main_frame:
+                    return
+                new_url = frame.url
+                target = _pending_new_tab_url
+                if not target or not new_url:
+                    return
+                from urllib.parse import urlparse as _up
+
+                cur = _up(new_url)
+                tgt = _up(target)
+                # 跨域检测
+                if cur.hostname and tgt.hostname and cur.hostname != tgt.hostname:
+                    _redirect_detected = (
+                        f"页面被重定向到其他域名: 当前={new_url[:120]}, 期望={target[:120]}"
+                    )
+                    return
+                # 重定向模式检测（仅同域内）
+                cur_path = cur.path.lower()
+                tgt_path = tgt.path.lower()
+                for pattern in ["/login", "/error", "/404", "/502", "/403", "/500"]:
+                    if pattern in cur_path and pattern not in tgt_path:
+                        _redirect_detected = (
+                            f"页面被重定向到 {pattern}（会话可能已过期）: {new_url[:120]}"
+                        )
+                        return
+
             for i, step in enumerate(steps):
                 if cancel_flag is not None and cancel_flag.is_set():
                     break
@@ -211,6 +248,12 @@ class UiHeadlessEngine:
 
                 # new_tab：导航到新页面（与浏览器回放引擎行为一致）
                 if action == "new_tab":
+                    # 清理上一个 new_tab 的 framenavigated 监听（如果有）
+                    if _navigate_listener_active:
+                        page.remove_listener("framenavigated", _on_navigate)
+                        _navigate_listener_active = False
+                    _pending_new_tab_url = ""
+                    _redirect_detected = ""
                     navigation_error = ""
                     # 优先级：弹窗页面 > 步骤数据解析
                     if popup_page is not None:
@@ -218,9 +261,14 @@ class UiHeadlessEngine:
                             popup_page.wait_for_load_state("load", timeout=10000)
                             popup_page.wait_for_load_state("networkidle", timeout=10000)
                             actual_url = popup_page.url
-                            page.close()
-                            page = popup_page
-                            popup_page = None
+                            # 验证弹窗 URL 是否到达预期页面
+                            resolved_url = self._resolve_new_tab_url(step, steps, i, base_url)
+                            if resolved_url and not self._urls_match(actual_url, resolved_url):
+                                navigation_error = f"弹窗页面 URL 不匹配: 当前={actual_url[:120]}, 目标={resolved_url[:120]}"
+                            else:
+                                page.close()
+                                page = popup_page
+                                popup_page = None
                         except Exception as e:
                             logger.warning("headless_popup_error: %s", e)
                             actual_url = ""
@@ -231,9 +279,8 @@ class UiHeadlessEngine:
                         try:
                             page.goto(actual_url, wait_until="load", timeout=15000)
                             page.wait_for_load_state("networkidle", timeout=10000)
-                            current_url = page.url
-                            if not self._urls_match(current_url, actual_url):
-                                navigation_error = f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
+                            if not self._urls_match(page.url, actual_url):
+                                navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
                         except Exception as e:
                             navigation_error = f"页面导航失败: {e}"
                     else:
@@ -242,9 +289,8 @@ class UiHeadlessEngine:
                             try:
                                 page.goto(actual_url, wait_until="load", timeout=15000)
                                 page.wait_for_load_state("networkidle", timeout=10000)
-                                current_url = page.url
-                                if not self._urls_match(current_url, actual_url):
-                                    navigation_error = f"页面跳转未到达目标 URL: 当前={current_url[:120]}, 目标={actual_url[:120]}"
+                                if not self._urls_match(page.url, actual_url):
+                                    navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
                             except Exception as e:
                                 navigation_error = f"页面导航失败: {e}"
                         else:
@@ -258,7 +304,96 @@ class UiHeadlessEngine:
                         "status": "passed" if new_tab_passed else "failed",
                         "error": navigation_error if navigation_error else "",
                     }
+                    # new_tab 通过后，记录目标 URL 供下一步校验，并注册 framenavigated 实时监听
+                    if new_tab_passed and actual_url:
+                        _pending_new_tab_url = actual_url
+                        _pending_new_tab_index = i
+                        _redirect_detected = ""
+                        if not _navigate_listener_active:
+                            page.on("framenavigated", _on_navigate)
+                            _navigate_listener_active = True
+                        # 注入 SPA history API 拦截脚本，检测 pushState/replaceState 重定向
+                        try:
+                            page.evaluate("""() => {
+                                if (window.__headless_spa_hooked) return;
+                                window.__headless_spa_hooked = true;
+                                window.__headless_redirect_url = null;
+                                const _check = () => {
+                                    const p = window.location.pathname.toLowerCase();
+                                    const patterns = ['/login', '/error', '/404', '/502', '/403', '/500'];
+                                    for (let i = 0; i < patterns.length; i++) {
+                                        if (p.includes(patterns[i])) {
+                                            window.__headless_redirect_url = window.location.href;
+                                            return;
+                                        }
+                                    }
+                                };
+                                _check();
+                                const _origPush = history.pushState;
+                                history.pushState = function() {
+                                    _origPush.apply(this, arguments);
+                                    setTimeout(_check, 50);
+                                };
+                                const _origReplace = history.replaceState;
+                                history.replaceState = function() {
+                                    _origReplace.apply(this, arguments);
+                                    setTimeout(_check, 50);
+                                };
+                                window.addEventListener('popstate', () => setTimeout(_check, 50));
+                            }""")
+                        except Exception:
+                            pass
                 else:
+                    # new_tab 下一步 pre-check（framenavigated + SPA history hook + 当前 URL 对比）
+                    if _pending_new_tab_url:
+                        # 1. 检查 SPA history hook 是否捕获到重定向
+                        spa_redirect = ""
+                        try:
+                            spa_redirect = page.evaluate(
+                                "() => window.__headless_redirect_url || ''"
+                            )
+                        except Exception:
+                            pass
+                        # 2. 检查 URL 是否已变更（步骤尚未执行，任何 URL 变更都是重定向）
+                        url_mismatch = ""
+                        if not self._urls_match(page.url, _pending_new_tab_url):
+                            url_mismatch = (
+                                f"页面 URL 已变更: 当前={page.url[:120]}, 期望={_pending_new_tab_url[:120]}"
+                            )
+                        # 3. 组合检测结果
+                        redirect_error = (
+                            url_mismatch
+                            or (f"SPA 检测到页面重定向: {spa_redirect[:120]}" if spa_redirect else "")
+                            or _redirect_detected
+                            or self._check_page_redirect(page, _pending_new_tab_url)
+                        )
+                        if redirect_error:
+                            # 清理 framenavigated 监听
+                            if _navigate_listener_active:
+                                page.remove_listener("framenavigated", _on_navigate)
+                                _navigate_listener_active = False
+                            _pending_new_tab_url = ""
+                            _terminated = True
+                            # 回写 new_tab 步骤为失败
+                            if _pending_new_tab_index >= 0 and _pending_new_tab_index < len(_step_results):
+                                _step_results[_pending_new_tab_index]["status"] = "failed"
+                                _step_results[_pending_new_tab_index]["error"] = redirect_error
+                                steps_passed -= 1
+                                steps_failed += 1
+                            # 当前步骤标记为失败并终止
+                            step_result = {
+                                "action": action,
+                                "selector": self._selector_to_dict(step.get("selector", "")),
+                                "value": step.get("value", ""),
+                                "status": "failed",
+                                "error": f"new_tab 页面验证失败: {redirect_error}",
+                            }
+                            step_result["index"] = i
+                            step_result["duration_ms"] = 0
+                            steps_failed += 1
+                            _step_results.append(step_result)
+                            break
+
                     # 如果下一步是 new_tab，当前 click 前注入 window.open 拦截
                     next_is_new_tab = (
                         i + 1 < len(steps)
@@ -292,9 +427,15 @@ class UiHeadlessEngine:
                                 },
                             )
                     else:
-                        step_result = self._execute_step(
-                            page, step, base_url, timeout_ms
-                        )
+                        # new_tab 后第一步：使用 URL 监控执行，实时检测重定向
+                        if _pending_new_tab_url:
+                            step_result = self._execute_step_monitored(
+                                page, step, base_url, timeout_ms, _pending_new_tab_url
+                            )
+                        else:
+                            step_result = self._execute_step(
+                                page, step, base_url, timeout_ms
+                            )
                 step_duration_ms = int((time.time() - step_start) * 1000)
 
                 step_result["index"] = i
@@ -315,6 +456,51 @@ class UiHeadlessEngine:
                     on_step_complete(i, step_result)
 
                 _step_results.append(step_result)
+
+                # new_tab 下一步 post-check：步骤执行后再次确认页面未被重定向
+                # （SPA 可能在步骤执行期间重定向到登录/错误页）
+                # 注意：仅对非 new_tab 步骤执行，否则 new_tab 自身刚加载完页面会误通过
+                if _pending_new_tab_url and action != "new_tab":
+                    # 检查 SPA history hook 是否捕获到重定向
+                    spa_redirect = ""
+                    try:
+                        spa_redirect = page.evaluate(
+                            "() => window.__headless_redirect_url || ''"
+                        )
+                    except Exception:
+                        pass
+                    post_error = (
+                        (f"SPA 检测到页面重定向: {spa_redirect[:120]}" if spa_redirect else "")
+                        or _redirect_detected
+                        or self._check_page_redirect(page, _pending_new_tab_url)
+                    )
+                    # 如果步骤失败且 URL 已变更，可能是重定向到首页等非标准错误页
+                    if not post_error and step_result.get("status") != "passed":
+                        if not self._urls_match(page.url, _pending_new_tab_url):
+                            post_error = (
+                                f"页面 URL 已变更（步骤失败）: 当前={page.url[:120]}, "
+                                f"期望={_pending_new_tab_url[:120]}"
+                            )
+                    if _navigate_listener_active:
+                        page.remove_listener("framenavigated", _on_navigate)
+                        _navigate_listener_active = False
+                    _pending_new_tab_url = ""
+                    if post_error:
+                        _terminated = True
+                        # 回写 new_tab 步骤为失败
+                        if _pending_new_tab_index >= 0 and _pending_new_tab_index < len(_step_results):
+                            if _step_results[_pending_new_tab_index]["status"] == "passed":
+                                _step_results[_pending_new_tab_index]["status"] = "failed"
+                                _step_results[_pending_new_tab_index]["error"] = post_error
+                                steps_passed -= 1
+                                steps_failed += 1
+                        # 如果当前步骤通过了，也标记为失败
+                        if step_result["status"] == "passed":
+                            step_result["status"] = "failed"
+                            step_result["error"] = f"new_tab 页面验证失败: {post_error}"
+                            steps_passed -= 1
+                            steps_failed += 1
+                        break
 
                 # new_tab 导航失败则终止测试（后续步骤依赖新页面）
                 if action == "new_tab" and step_result["status"] == "failed":
@@ -337,6 +523,19 @@ class UiHeadlessEngine:
 
         total_duration_ms = int((time.time() - start_time) * 1000)
         status = "passed" if steps_failed == 0 else "failed"
+        if _terminated:
+            status = "terminated"
+            # 标记剩余未执行步骤
+            for remaining_i in range(len(_step_results), len(steps)):
+                _step_results.append({
+                    "index": remaining_i,
+                    "action": steps[remaining_i].get("action", ""),
+                    "selector": self._selector_to_dict(steps[remaining_i].get("selector", "")),
+                    "value": steps[remaining_i].get("value", ""),
+                    "status": "not_executed",
+                    "error": "new_tab 页面重定向，执行终止",
+                    "duration_ms": 0,
+                })
         if cancel_flag is not None and cancel_flag.is_set():
             status = "cancelled"
 
@@ -401,6 +600,69 @@ class UiHeadlessEngine:
                 "error": str(e)[:200],
             }
 
+    def _execute_step_monitored(
+        self,
+        page: "Page",
+        step: Dict[str, Any],
+        base_url: str,
+        timeout_ms: int,
+        expected_url: str,
+    ) -> Dict[str, Any]:
+        """执行步骤并轮询监控 URL 变化。
+
+        用于 new_tab 后的第一个步骤：每 2 秒重试一次，每次重试前检查 URL
+        是否已变更。如果 URL 变更，立即返回失败（不等待完整超时）。
+        """
+        action = step.get("action", "").lower()
+        selector = step.get("selector", "")
+        value = step.get("value", "")
+        deadline = time.time() + timeout_ms / 1000.0
+        poll_ms = 2000
+
+        while time.time() < deadline:
+            # 检查 URL 是否已变更
+            current_url = page.url
+            if not self._urls_match(current_url, expected_url):
+                return {
+                    "action": action,
+                    "selector": self._selector_to_dict(selector),
+                    "value": value,
+                    "status": "failed",
+                    "error": (
+                        f"页面 URL 已变更: 当前={current_url[:120]}, "
+                        f"期望={expected_url[:120]}"
+                    ),
+                }
+
+            # 检查 SPA history hook
+            try:
+                spa = page.evaluate("() => window.__headless_redirect_url || ''")
+                if spa:
+                    return {
+                        "action": action,
+                        "selector": self._selector_to_dict(selector),
+                        "value": value,
+                        "status": "failed",
+                        "error": f"SPA 检测到页面重定向: {spa[:120]}",
+                    }
+            except Exception:
+                pass
+
+            # 尝试执行步骤（短超时）
+            remaining = int((deadline - time.time()) * 1000)
+            attempt_timeout = min(poll_ms, max(remaining, 500))
+            result = self._execute_step(page, step, base_url, attempt_timeout)
+            if result["status"] == "passed":
+                return result
+
+        return {
+            "action": action,
+            "selector": self._selector_to_dict(selector),
+            "value": value,
+            "status": "failed",
+            "error": f"Locator.wait_for: Timeout {timeout_ms}ms exceeded.",
+        }
+
     def _classify_strategy(self, selector: str) -> Tuple[str, str]:
         """解析单个选择器字符串，返回 (strategy, value)。"""
         s = selector.strip()
@@ -458,20 +720,53 @@ class UiHeadlessEngine:
 
     @staticmethod
     def _urls_match(current_url: str, target_url: str) -> bool:
-        """检查当前 URL 是否匹配目标 URL（忽略协议和端口差异，只比较 host + path）。"""
+        """检查当前 URL 是否匹配目标 URL（比较 hostname + port + path）。"""
         if not current_url or not target_url:
             return False
-        # 完全匹配
         if current_url == target_url:
             return True
-        # 提取 host+path 比较（忽略 http/https 和端口差异）
         from urllib.parse import urlparse  # noqa: E402
 
         cur = urlparse(current_url)
         tgt = urlparse(target_url)
-        return cur.hostname == tgt.hostname and cur.path.rstrip("/") == tgt.path.rstrip(
-            "/"
+        return (
+            cur.hostname == tgt.hostname
+            and cur.port == tgt.port
+            and cur.path.rstrip("/") == tgt.path.rstrip("/")
         )
+
+    @staticmethod
+    def _check_page_redirect(page: "Page", target_url: str) -> str:
+        """检查页面是否被重定向到登录/错误页面。
+
+        仅检测重定向模式（login/error/404等）和跨域跳转。
+        同站内合法路径变更（如点击菜单跳转）不视为重定向。
+        返回空字符串表示正常，否则返回错误描述。
+        """
+        current_url = page.url
+        from urllib.parse import urlparse  # noqa: E402
+
+        cur = urlparse(current_url)
+        tgt = urlparse(target_url)
+
+        # 跨域重定向检测
+        if cur.hostname and tgt.hostname and cur.hostname != tgt.hostname:
+            return (
+                f"页面被重定向到其他域名: 当前={current_url[:120]}, 期望={target_url[:120]}"
+            )
+
+        # 检查是否被重定向到已知错误/登录页面（仅在同域内检测）
+        cur_path = cur.path.lower()
+        tgt_path = tgt.path.lower()
+
+        redirect_patterns = ["/login", "/error", "/404", "/502", "/403", "/500"]
+        for pattern in redirect_patterns:
+            if pattern in cur_path and pattern not in tgt_path:
+                return (
+                    f"页面被重定向到 {pattern}（会话可能已过期）: {current_url[:120]}"
+                )
+
+        return ""
 
     def _resolve_new_tab_url(
         self,
