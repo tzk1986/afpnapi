@@ -49,9 +49,9 @@ class TestResolveArtifactDir:
         """非 legacy 报告在子目录中，通过 meta_file 定位正确目录。"""
         sub = reports_dir / "子目录"
         sub.mkdir()
-        html = _write(sub / "my_report.html")
-        meta = _write(sub / "my_report_meta.json")
-        details = _write(sub / "my_report_details.json")
+        _html = _write(sub / "my_report.html")
+        _meta = _write(sub / "my_report_meta.json")
+        _details = _write(sub / "my_report_details.json")
 
         report = {
             "report_name": "my_report.html",
@@ -68,8 +68,8 @@ class TestResolveArtifactDir:
 
     def test_root_level_report(self, reports_dir: Path):
         """根目录下的报告正常工作。"""
-        html = _write(reports_dir / "root_report.html")
-        meta = _write(reports_dir / "root_report_meta.json")
+        _html = _write(reports_dir / "root_report.html")
+        _meta = _write(reports_dir / "root_report_meta.json")
 
         report = {
             "report_name": "root_report.html",

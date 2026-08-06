@@ -76,7 +76,7 @@ class TestApiEnvironments:
             mock_build.return_value = {
                 "envs": [{"name": "prod", "base_url": "http://x", "has_token": True}]
             }
-            result = api_environments()
+            _result = api_environments()
             payload = mock_build.call_args[1]
             env_list = payload["env_list"]
             assert env_list[0]["has_token"] is True

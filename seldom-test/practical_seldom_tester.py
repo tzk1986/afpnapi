@@ -102,7 +102,7 @@ class PostmanApiParser:
             if body_data.get("mode") == "raw":
                 try:
                     body = json.loads(body_data.get("raw", "{}"))
-                except:
+                except Exception:
                     body = body_data.get("raw", "")
             elif body_data.get("mode") == "formdata":
                 body = {}

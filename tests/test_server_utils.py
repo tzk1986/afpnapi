@@ -33,7 +33,7 @@ class TestGetLocalIP:
         """Socket must always be closed regardless of path taken."""
         import socket
 
-        original_connect = socket.socket.connect
+        _original_connect = socket.socket.connect
         call_count = [0]
 
         class CountingSocket(socket.socket):

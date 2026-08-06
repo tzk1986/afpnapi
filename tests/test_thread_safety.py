@@ -137,7 +137,7 @@ class TestVariableContextThreadSafety:
         for t in threads:
             t.join()
 
-        all_vars = ctx.variables
+        _all_vars = ctx.variables
         for t in range(num_threads):
             assert ctx.get(f"token_{t}") == f"t{t}"
             assert ctx.get(f"id_{t}") == f"i{t}"

@@ -224,7 +224,7 @@ class TestReportView:
                         mock_resp = MagicMock()
                         mock_resp.headers = {}
                         mock_response.return_value = mock_resp
-                        result = report_view()
+                        _result = report_view()
 
                         mock_render.assert_called_once()
                         call_kwargs = mock_render.call_args[1]

@@ -457,7 +457,7 @@ class TestBuildRequestKwargs(unittest.TestCase):
 def _make_file_mock(filename: str, content: bytes, mimetype: str) -> Any:
     import io
 
-    mock: Dict[str, Any] = {
+    _mock: Dict[str, Any] = {
         "filename": filename,
         "stream": io.BytesIO(content),
         "mimetype": mimetype,

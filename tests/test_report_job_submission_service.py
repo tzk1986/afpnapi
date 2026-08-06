@@ -296,7 +296,7 @@ class TestBuildSavedJsonPath:
     def test_creates_directory(self, tmp_path: Path) -> None:
         """测试自动创建目录."""
         new_dir = tmp_path / "new" / "nested" / "dir"
-        result = build_saved_json_path(new_dir, "job-100")
+        _result = build_saved_json_path(new_dir, "job-100")
         assert new_dir.exists()
         assert new_dir.is_dir()
 
@@ -335,7 +335,7 @@ class TestBuildSavedJsonPath:
     def test_path_exists_on_disk(self, tmp_path: Path) -> None:
         """测试返回的路径对应的目录存在于磁盘上."""
         target = tmp_path / "disk_test"
-        result = build_saved_json_path(target, "j-disk")
+        _result = build_saved_json_path(target, "j-disk")
         assert target.exists()
 
     def test_different_job_ids_get_different_paths(self, tmp_path: Path) -> None:

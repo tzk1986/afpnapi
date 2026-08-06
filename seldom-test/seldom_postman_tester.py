@@ -135,7 +135,7 @@ class PostmanApiParser:
             if body_data.get("mode") == "raw":
                 try:
                     body = json.loads(body_data.get("raw", "{}"))
-                except:
+                except Exception:
                     body = body_data.get("raw", "")
             elif body_data.get("mode") == "formdata":
                 body = {}
@@ -261,7 +261,7 @@ class SeldomPostmanTest(seldom.TestCase):
 
             try:
                 self.api_response_data = self.api_response.json()
-            except:
+            except Exception:
                 self.api_response_data = self.api_response.text
 
             # 验证响应状态码
@@ -571,7 +571,7 @@ def run_seldom_postman_tests(
 
     # 生成报告
     print("\n生成测试报告...")
-    summary = report.generate_summary()
+    _summary = report.generate_summary()
 
     # 保存HTML报告
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

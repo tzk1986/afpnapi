@@ -52,15 +52,19 @@ def make_deps(
         "details_file": details_file or "",
     }
     if compute_func is None:
-        compute_func = lambda rs: {
-            "total": len(rs),
-            "passed": sum(1 for r in rs if r["status"] == "PASSED"),
-            "failed": sum(1 for r in rs if r["status"] == "FAILED"),
-            "error": sum(1 for r in rs if r["status"] == "ERROR"),
-            "success_rate": round(
-                sum(1 for r in rs if r["status"] == "PASSED") / max(len(rs), 1), 2
-            ),
-        }
+
+        def _default_summary(rs):
+            return {
+                "total": len(rs),
+                "passed": sum(1 for r in rs if r["status"] == "PASSED"),
+                "failed": sum(1 for r in rs if r["status"] == "FAILED"),
+                "error": sum(1 for r in rs if r["status"] == "ERROR"),
+                "success_rate": round(
+                    sum(1 for r in rs if r["status"] == "PASSED") / max(len(rs), 1), 2
+                ),
+            }
+
+        compute_func = _default_summary
     deps.compute_summary.side_effect = compute_func
     deps.invalidate_reports_cache.reset_mock()
     return deps, compute_func

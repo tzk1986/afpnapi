@@ -444,7 +444,7 @@ class TestPercentile:
     def test_interpolation(self):
         values = [10, 20, 30, 40, 50]
         p95 = percentile(values, 0.95)
-        rank = 0.95 * 4  # 3.8
+        _rank = 0.95 * 4  # 3.8
         expected = round(40 + (50 - 40) * 0.8)  # 48
         assert p95 == expected
 

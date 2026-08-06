@@ -369,7 +369,7 @@ class TestGenerateHtmlReport:
 
         with patch.object(
             HtmlReporter, "_generate_index_html", return_value="<html></html>"
-        ) as mock_idx:
+        ) as _mock_idx:
             with patch.object(
                 HtmlReporter, "_generate_page_html", return_value="<html></html>"
             ) as mock_page:

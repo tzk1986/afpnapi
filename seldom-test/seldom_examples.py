@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     # 检查是否安装了 seldom
     try:
-        import seldom
+        import seldom  # noqa: F401
 
         print("✓ Seldom 已安装")
     except ImportError:

@@ -114,7 +114,7 @@ class TestDeleteNormal:
         collect_mock = Mock(return_value=artifacts)
         invalidation_mock = Mock()
 
-        result = delete_report_artifacts(
+        _result = delete_report_artifacts(
             report_name="my-report",
             find_report=find_mock,
             collect_report_artifacts=collect_mock,

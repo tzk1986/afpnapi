@@ -101,7 +101,7 @@ class PostmanApiParser:
             if body_data.get("mode") == "raw":
                 try:
                     body = json.loads(body_data.get("raw", "{}"))
-                except:
+                except Exception:
                     body = body_data.get("raw", "")
             elif body_data.get("mode") == "formdata":
                 body = {}
@@ -208,7 +208,7 @@ class PostmanAPITest(seldom.TestCase):
 
             try:
                 self.api_response_data = self.response.json()
-            except:
+            except Exception:
                 self.api_response_data = self.response.text
 
             # 验证响应状态码

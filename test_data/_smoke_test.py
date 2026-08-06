@@ -355,12 +355,12 @@ def test_original_name_sanitize():
         ("a b-c_d.json", "a b-c_d.json"),
     ]
 
-    all_ok = True
+    _all_ok = True
     for raw, expected in cases:
         got = sanitize(raw)
         ok = got == expected
         if not ok:
-            all_ok = False
+            _all_ok = False
         _check(f"清洗 {raw!r}", ok, f"期望 {expected!r}，得到 {got!r}")
 
 

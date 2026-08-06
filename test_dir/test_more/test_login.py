@@ -12,8 +12,8 @@ sys.path.append(base_dir)
 
 print(sys.path)
 
-import seldom
-from api_object.user_api import UserApiObject
+import seldom  # noqa: E402
+from api_object.user_api import UserApiObject  # noqa: E402
 
 
 class TestRequest(seldom.TestCase):
