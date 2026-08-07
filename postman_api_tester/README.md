@@ -1,8 +1,14 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.31.6
-发布日期：2026-08-06
+版本：v1.31.8
+发布日期：2026-08-07
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.31.8）：
+- **new_tab SSO token 注入**：降级路径导航到跨域子系统时，自动从父系统 localStorage 读取 esp-web:user token 并注入到目标页面，解决 SPA 异步认证检查导致重定向回登录页的问题
+
+本版新增重点（v1.31.7）：
+- **new_tab 诊断增强**：new_tab 步骤增加 localStorage/sessionStorage 诊断数据收集，支持 esp-web:user token 读取
 
 本版新增重点（v1.31.6）：
 - **new_tab 重定向检测与执行终止**：new_tab 后页面被重定向到登录/错误页时，立即检测并终止执行（不再等待 30 秒超时）。SPA history hook 注入 + framenavigated 监听 + pre-check/post-check 三层检测，支持跨域、跨端口、首页重定向。报告状态新增"执行终止"和"未执行"。

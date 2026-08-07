@@ -286,11 +286,14 @@ class UiHeadlessEngine:
                             var keys = [];
                             try { for (var i = 0; i < localStorage.length; i++) keys.push('L:' + localStorage.key(i)); } catch(e) {}
                             try { for (var i = 0; i < sessionStorage.length; i++) keys.push('S:' + sessionStorage.key(i)); } catch(e) {}
+                            var espUser = '';
+                            try { espUser = localStorage.getItem('esp-web:user') || ''; } catch(e) {}
                             return {
                                 localStorage_keys: keys.filter(function(k) { return k.indexOf('L:') === 0; }),
                                 sessionStorage_keys: keys.filter(function(k) { return k.indexOf('S:') === 0; }),
                                 token_in_localStorage: localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('auth_token') || '',
                                 token_in_sessionStorage: sessionStorage.getItem('token') || sessionStorage.getItem('access_token') || sessionStorage.getItem('auth_token') || '',
+                                esp_web_user: espUser.substring(0, 500),
                             };
                         }""")
                         _diag["storage"] = storage_info
@@ -353,27 +356,87 @@ class UiHeadlessEngine:
                         _diag["resolved_url"] = actual_url[:200] if actual_url else ""
                         if actual_url:
                             try:
-                                _diag["goto_start"] = page.url[:200]
-                                page.goto(actual_url, wait_until="load", timeout=15000)
-                                _diag["after_load"] = page.url[:200]
-                                page.wait_for_load_state("networkidle", timeout=10000)
-                                _diag["after_idle1"] = page.url[:200]
-                                if not self._urls_match(page.url, actual_url):
-                                    navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
-                                else:
-                                    time.sleep(0.5)
+                                # 读取 9101 页面的 SSO token
+                                esp_web_user = page.evaluate(
+                                    "localStorage.getItem('esp-web:user') || ''"
+                                )
+                                _diag["esp_web_user_found"] = bool(esp_web_user)
+
+                                # 用 window.open 触发弹窗，模拟成功路径的 popup 机制
+                                _diag["popup_trigger"] = "window_open"
+                                page.evaluate(f"window.open('{actual_url}', '_blank')")
+                                time.sleep(0.5)
+                                # 等待 _on_popup 捕获弹窗
+                                for _ in range(20):
+                                    if popup_page is not None:
+                                        break
+                                    time.sleep(0.2)
+                                if popup_page is not None:
                                     try:
-                                        page.wait_for_load_state(
-                                            "networkidle", timeout=5000
+                                        popup_page.wait_for_load_state(
+                                            "load", timeout=10000
                                         )
-                                    except Exception:
-                                        pass
-                                    _diag["after_idle2"] = page.url[:200]
+                                        popup_page.wait_for_load_state(
+                                            "networkidle", timeout=10000
+                                        )
+                                        actual_url = popup_page.url
+                                        _diag["popup_captured"] = True
+                                        _diag["popup_url"] = actual_url[:200]
+                                        page.close()
+                                        page = popup_page
+                                        popup_page = None
+                                        # 注入 SSO token 到 9301 页面
+                                        if esp_web_user:
+                                            page.evaluate(
+                                                f"localStorage.setItem('esp-web:user', {json.dumps(esp_web_user)})"
+                                            )
+                                            page.reload(wait_until="load")
+                                            page.wait_for_load_state(
+                                                "networkidle", timeout=10000
+                                            )
+                                            _diag["token_injected"] = True
+                                    except Exception as e:
+                                        logger.warning("headless_popup_error: %s", e)
+                                        navigation_error = f"弹窗页面加载失败: {e}"
+                                else:
+                                    # 降级：window.open 未触发弹窗，page.goto + token 注入
+                                    _diag["popup_captured"] = False
+                                    _diag["goto_start"] = page.url[:200]
+                                    page.goto(
+                                        actual_url, wait_until="load", timeout=15000
+                                    )
+                                    _diag["after_load"] = page.url[:200]
+                                    # 注入 SSO token 到 9301 的 localStorage
+                                    if esp_web_user:
+                                        page.evaluate(
+                                            f"localStorage.setItem('esp-web:user', {json.dumps(esp_web_user)})"
+                                        )
+                                        _diag["token_injected"] = True
+                                        page.reload(wait_until="load")
+                                        _diag["after_token_inject"] = page.url[:200]
+                                    page.wait_for_load_state(
+                                        "networkidle", timeout=10000
+                                    )
+                                    _diag["after_idle1"] = page.url[:200]
                                     if not self._urls_match(page.url, actual_url):
                                         navigation_error = (
-                                            f"页面认证后重定向（会话可能已过期）: "
+                                            f"页面跳转未到达目标 URL: "
                                             f"当前={page.url[:120]}, 目标={actual_url[:120]}"
                                         )
+                                    else:
+                                        time.sleep(0.5)
+                                        try:
+                                            page.wait_for_load_state(
+                                                "networkidle", timeout=5000
+                                            )
+                                        except Exception:
+                                            pass
+                                        _diag["after_idle2"] = page.url[:200]
+                                        if not self._urls_match(page.url, actual_url):
+                                            navigation_error = (
+                                                f"页面认证后重定向（会话可能已过期）: "
+                                                f"当前={page.url[:120]}, 目标={actual_url[:120]}"
+                                            )
                             except Exception as e:
                                 navigation_error = f"页面导航失败: {e}"
                         else:
