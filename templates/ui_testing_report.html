@@ -76,6 +76,12 @@
         .pagination button:hover:not(:disabled) { background: #f3f4f6; }
         .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        .steps-pagination-bottom { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: #6b7280; }
+        .steps-pagination-bottom select { padding: 3px 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; }
+        .steps-pagination-bottom button { padding: 3px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #d1d5db; background: #fff; }
+        .steps-pagination-bottom button:hover:not(:disabled) { background: #f3f4f6; }
+        .steps-pagination-bottom button:disabled { opacity: 0.4; cursor: not-allowed; }
+
         /* 截图链接 */
         .screenshot-link { color: #3b82f6; font-size: 11px; text-decoration: none; cursor: pointer; }
         .screenshot-link:hover { text-decoration: underline; }
@@ -207,18 +213,6 @@
                     <button class="filter-btn" data-filter="passed" onclick="setFilter('passed')">通过</button>
                     <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">失败</button>
                 </div>
-                <div class="pagination">
-                    <span>每页</span>
-                    <select id="pageSizeSelect" onchange="setPageSize(this.value)">
-                        <option value="10">10</option>
-                        <option value="20" selected>20</option>
-                        <option value="50">50</option>
-                        <option value="999">全部</option>
-                    </select>
-                    <span id="pageInfo">1 / 1</span>
-                    <button id="prevPage" onclick="prevPage()" disabled>&laquo;</button>
-                    <button id="nextPage" onclick="nextPage()" disabled>&raquo;</button>
-                </div>
             </div>
             <div id="stepsContainer">
             {% if steps %}
@@ -253,6 +247,18 @@
             {% else %}
             <div class="empty-state" id="emptyState">暂无步骤数据</div>
             {% endif %}
+            </div>
+            <div class="steps-pagination-bottom" id="stepsPaginationBottom" style="display:none;">
+                <span>每页</span>
+                <select id="pageSizeSelect" onchange="setPageSize(this.value)">
+                    <option value="10">10</option>
+                    <option value="20" selected>20</option>
+                    <option value="50">50</option>
+                    <option value="999">全部</option>
+                </select>
+                <span id="pageInfo">1 / 1</span>
+                <button id="prevPage" onclick="prevPage()" disabled>&laquo;</button>
+                <button id="nextPage" onclick="nextPage()" disabled>&raquo;</button>
             </div>
         </div>
 
@@ -377,12 +383,14 @@
             html += '</tbody></table>';
             container.innerHTML = html;
             document.getElementById('stepsToolbar').style.display = 'flex';
+            document.getElementById('stepsPaginationBottom').style.display = 'flex';
         }
 
         function updateStepsTable(steps) {
             var tbody = document.getElementById('stepsBody');
             if (!tbody) return;
             document.getElementById('stepsToolbar').style.display = 'flex';
+            document.getElementById('stepsPaginationBottom').style.display = 'flex';
             var cascadeFrom = detectCascadeFrom(steps);
             for (var i = 0; i < steps.length; i++) {
                 var existing = tbody.querySelector('[data-step-index="' + i + '"]');
