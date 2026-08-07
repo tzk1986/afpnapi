@@ -62,6 +62,8 @@
         .status-badge.failed { background: #fef2f2; color: #991b1b; }
         .status-badge.running { background: #dbeafe; color: #1e40af; animation: pulse 2s infinite; }
         .status-badge.cancelled { background: #f3f4f6; color: #4b5563; }
+        .status-badge.terminated { background: #fef2f2; color: #7f1d1d; border: 1px solid #fca5a5; }
+        .status-badge.not_executed { background: #f3f4f6; color: #9ca3af; }
         .status-badge.ready { background: #fef3c7; color: #92400e; }
         .status-badge.starting { background: #fef3c7; color: #92400e; animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -70,7 +72,7 @@
         .mode-badge.headless { background: #ede9fe; color: #6d28d9; }
         .mode-badge.browser_replay { background: #e0f2fe; color: #0369a1; }
 
-        .case-name { font-weight: 500; color: #1f2937; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .case-name { font-weight: 500; color: #1f2937; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .step-stats { font-size: 12px; color: #6b7280; font-family: monospace; }
         .step-stats .pass { color: #10b981; }
         .step-stats .fail { color: #ef4444; }
@@ -130,6 +132,7 @@
                     <button class="filter-btn" data-filter="failed" onclick="setFilter('failed')">失败</button>
                     <button class="filter-btn" data-filter="running" onclick="setFilter('running')">执行中</button>
                     <button class="filter-btn" data-filter="cancelled" onclick="setFilter('cancelled')">已取消</button>
+                    <button class="filter-btn" data-filter="terminated" onclick="setFilter('terminated')">执行终止</button>
                 </div>
                 <div class="pagination">
                     <span>每页</span>
@@ -224,15 +227,16 @@
         }
 
         function renderRow(item) {
-            var statusLabels = { passed: '通过', failed: '失败', running: '执行中', cancelled: '已取消', ready: '就绪', starting: '启动中' };
+            var statusLabels = { passed: '通过', failed: '失败', running: '执行中', cancelled: '已取消', terminated: '执行终止', not_executed: '未执行', ready: '就绪', starting: '启动中' };
             var modeLabels = { headless: '无头浏览器', browser_replay: '浏览器回放' };
             var modeClass = item.mode === 'headless' ? 'headless' : 'browser_replay';
 
-            var stepsHtml = '<span class="step-stats"><span class="pass">' + (item.steps_passed || 0) + '</span> / ' +
-                '<span class="fail">' + (item.steps_failed || 0) + '</span> / ' +
-                (item.steps_total || 0) + '</span>';
+            var stepsHtml = '<span class="step-stats"><span class="pass">' + (item.steps_passed || 0) + '通过</span> / ' +
+                '<span class="fail">' + (item.steps_failed || 0) + '失败</span> / ' +
+                (item.steps_total || 0) + '总计</span>';
 
-            var durationS = ((item.total_duration_ms || 0) / 1000).toFixed(2);
+            var durationMs = item.total_duration_ms || 0;
+            var durationS = durationMs < 1000 ? (durationMs + 'ms') : (durationMs / 1000).toFixed(2) + 's';
 
             var startedAt = item.started_at || '';
             if (startedAt.length > 19) startedAt = startedAt.substring(0, 19);
@@ -242,7 +246,7 @@
             if (item.status === 'running' || item.status === 'ready' || item.status === 'starting') {
                 actionsHtml += '<button class="btn btn-sm btn-warning" onclick="cancelJob(\'' + item.job_id + '\')">停止</button>';
             }
-            actionsHtml += '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">查看</a>' +
+            actionsHtml += '<a href="/ui-testing/execution/' + item.job_id + '/report" class="btn btn-sm btn-secondary" target="_blank">报告</a>' +
                 '<button class="btn btn-sm btn-danger" onclick="deleteReport(\'' + item.job_id + '\', \'' + escapeHtml(item.case_name) + '\')">删除</button>' +
                 '</div>';
 
@@ -251,7 +255,7 @@
                 '<td><span class="status-badge ' + (item.status || '') + '">' + (statusLabels[item.status] || item.status) + '</span></td>' +
                 '<td><span class="mode-badge ' + modeClass + '">' + (modeLabels[item.mode] || item.mode) + '</span></td>' +
                 '<td>' + stepsHtml + '</td>' +
-                '<td class="duration">' + durationS + 's</td>' +
+                '<td class="duration">' + durationS + '</td>' +
                 '<td class="date-text">' + startedAt + '</td>' +
                 '<td>' + actionsHtml + '</td>' +
                 '</tr>';

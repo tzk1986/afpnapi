@@ -53,12 +53,15 @@
         .meta-grid dt { color: #6b7280; }
         .meta-grid dd { color: #1f2937; font-weight: 500; }
 
-        .steps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .steps-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
         .steps-table th { text-align: left; padding: 10px 12px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 500; color: #6b7280; font-size: 12px; position: sticky; top: 0; }
         .steps-table td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
         .steps-table tr:hover td { background: #f8fafc; }
         .steps-table tr.failed td { background: #fef2f2; }
         .steps-table tr.failed:hover td { background: #fee2e2; }
+        .steps-table tr.cascade td { background: #f9fafb; color: #9ca3af; }
+        .steps-table tr.cascade td .status-dot.failed { background: #d1d5db; }
+        .steps-table tr.cascade td .error-text { color: #9ca3af; }
         .steps-table tr.current td { background: #eff6ff; }
 
         /* 筛选和分页 */
@@ -104,11 +107,16 @@
         .status-dot.failed { background: #ef4444; }
         .status-dot.skipped { background: #d1d5db; }
 
-        .error-text { color: #ef4444; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .error-text { color: #ef4444; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .error-text:hover { text-decoration: underline; }
 
         .duration-cell { font-family: monospace; color: #6b7280; font-size: 12px; }
 
-        .selector-cell { font-family: monospace; font-size: 11px; color: #4b5563; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .selector-cell { font-family: monospace; font-size: 11px; color: #4b5563; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .selector-cell:hover { text-decoration: underline; }
+
+        .value-cell { font-size: 12px; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+        .value-cell:hover { text-decoration: underline; }
 
         .footer { text-align: center; padding: 16px; color: #9ca3af; font-size: 12px; }
 
@@ -218,13 +226,13 @@
                 <thead>
                     <tr>
                         <th style="width:36px">#</th>
-                        <th style="width:90px">操作</th>
-                        <th>选择器</th>
+                        <th style="width:80px">操作</th>
+                        <th style="width:100px">选择器</th>
                         <th style="width:100px">值</th>
-                        <th style="width:60px">状态</th>
-                        <th style="width:70px">耗时</th>
-                        <th>错误信息</th>
-                        <th style="width:50px">截图</th>
+                        <th style="width:84px">状态</th>
+                        <th style="width:62px">耗时</th>
+                        <th style="width:210px">错误信息</th>
+                        <th style="width:100px">截图/日志</th>
                     </tr>
                 </thead>
                 <tbody id="stepsBody">
@@ -232,11 +240,11 @@
                     <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}" data-status="{{ step.status }}">
                         <td>{{ loop.index }}</td>
                         <td><span class="action-badge action-{{ step.action }}">{{ step.action }}</span></td>
-                        <td class="selector-cell" title="{{ step.selector_display }}">{{ step.selector_display }}</td>
-                        <td style="font-size:12px;color:#6b7280;">{{ step.value_display }}</td>
+                        <td class="selector-cell" title="{{ step.selector_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'selector')">{{ step.selector_display }}</td>
+                        <td class="value-cell" title="{{ step.value_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'value')">{{ step.value_display }}</td>
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
                         <td class="duration-cell">{{ step.duration_s }}s</td>
-                        <td class="error-text" title="{{ step.error }}">{{ step.error }}</td>
+                        <td class="error-text" title="{{ step.error }}" onclick="viewTextDetail({{ loop.index0 }}, 'error')">{{ step.error }}</td>
                         <td>{% if step.status == 'failed' or step.screenshot %}<a class="screenshot-link" data-step="{{ loop.index0 }}" data-status="{{ step.status }}" onclick="viewScreenshot(this)">截图</a>{% endif %}{% if step.status == 'failed' %} <a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewErrorLog(this)">日志</a>{% endif %}</td>
                     </tr>
                     {% endfor %}
@@ -304,8 +312,8 @@
 
             // 基本信息
             document.getElementById('modeLabel').textContent = data.mode === 'headless' ? '无头浏览器' : '浏览器回放';
-            document.getElementById('startedAt').textContent = data.started_at || '';
-            document.getElementById('endedAt').textContent = data.ended_at || '-';
+            document.getElementById('startedAt').textContent = formatTime(data.started_at || '');
+            document.getElementById('endedAt').textContent = formatTime(data.ended_at || '');
 
             // 更新时间
             var now = new Date();
@@ -357,13 +365,14 @@
 
         function buildStepsTable(steps) {
             var container = document.getElementById('stepsContainer');
+            var cascadeFrom = detectCascadeFrom(steps);
             var html = '<table class="steps-table"><thead><tr>' +
-                '<th style="width:36px">#</th><th style="width:90px">操作</th><th>选择器</th>' +
-                '<th style="width:100px">值</th><th style="width:60px">状态</th>' +
-                '<th style="width:70px">耗时</th><th>错误信息</th><th style="width:50px">截图</th>' +
+                '<th style="width:36px">#</th><th style="width:80px">操作</th><th style="width:100px">选择器</th>' +
+                '<th style="width:100px">值</th><th style="width:84px">状态</th>' +
+                '<th style="width:62px">耗时</th><th style="width:210px">错误信息</th><th style="width:100px">截图/日志</th>' +
                 '</tr></thead><tbody id="stepsBody">';
             for (var i = 0; i < steps.length; i++) {
-                html += renderStepRow(steps[i], i);
+                html += renderStepRow(steps[i], i, cascadeFrom);
             }
             html += '</tbody></table>';
             container.innerHTML = html;
@@ -374,51 +383,62 @@
             var tbody = document.getElementById('stepsBody');
             if (!tbody) return;
             document.getElementById('stepsToolbar').style.display = 'flex';
+            var cascadeFrom = detectCascadeFrom(steps);
             for (var i = 0; i < steps.length; i++) {
                 var existing = tbody.querySelector('[data-step-index="' + i + '"]');
                 if (existing) {
                     var cells = existing.querySelectorAll('td');
                     var s = steps[i];
-                    existing.className = s.status + (isCurrentStep(s) ? ' current' : '');
+                    var isCascade = cascadeFrom[i] === true;
+                    var rowClass = s.status + (isCurrentStep(s) ? ' current' : '') + (isCascade ? ' cascade' : '');
+                    existing.className = rowClass;
                     cells[0].textContent = i + 1;
                     cells[1].innerHTML = '<span class="action-badge action-' + s.action + '">' + s.action + '</span>';
                     var sel = formatSelector(s.selector);
                     cells[2].textContent = sel;
                     cells[2].title = sel;
+                    cells[2].onclick = function() { viewTextDetail(i, 'selector'); };
+                    cells[3].className = 'value-cell';
                     cells[3].textContent = (s.value || '').toString().substring(0, 60);
+                    cells[3].title = s.value || '';
+                    cells[3].onclick = function() { viewTextDetail(i, 'value'); };
                     var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误', 'not_executed': '未执行'};
-                    cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status);
+                    cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (isCascade ? '级联失败' : (sLabels[s.status] || s.status));
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
                     cells[6].title = s.error || '';
+                    cells[6].onclick = function() { viewTextDetail(i, 'error'); };
                     var hasScreenshot = s.status === 'failed' || s.screenshot;
                     cells[7].innerHTML = hasScreenshot
                         ? '<a class="screenshot-link" data-step="' + i + '" data-status="' + s.status + '" onclick="viewScreenshot(this)">截图</a>' +
                           (s.status === 'failed' ? ' <a class="screenshot-link" data-step="' + i + '" onclick="viewErrorLog(this)">日志</a>' : '')
                         : '';
                 } else {
-                    tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i));
+                    tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i, cascadeFrom));
                 }
             }
         }
 
-        function renderStepRow(s, idx) {
+        function renderStepRow(s, idx, cascadeFrom) {
             var sel = formatSelector(s.selector);
             var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误', 'not_executed': '未执行'};
             var cur = isCurrentStep(s) ? ' current' : '';
+            var isCascade = cascadeFrom && cascadeFrom[idx] === true;
+            var cascadeClass = isCascade ? ' cascade' : '';
+            var statusLabel = isCascade ? '级联失败' : (sLabels[s.status] || s.status);
             var hasScreenshot = s.status === 'failed' || s.screenshot;
             var screenshotCell = hasScreenshot
                 ? '<a class="screenshot-link" data-step="' + idx + '" data-status="' + s.status + '" onclick="viewScreenshot(this)">截图</a>' +
                   (s.status === 'failed' ? ' <a class="screenshot-link" data-step="' + idx + '" onclick="viewErrorLog(this)">日志</a>' : '')
                 : '';
-            return '<tr class="' + s.status + cur + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
+            return '<tr class="' + s.status + cur + cascadeClass + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
                 '<td><span class="action-badge action-' + s.action + '">' + s.action + '</span></td>' +
-                '<td class="selector-cell" title="' + escapeHtml(sel) + '">' + escapeHtml(sel) + '</td>' +
-                '<td style="font-size:12px;color:#6b7280;">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
-                '<td><span class="status-dot ' + s.status + '"></span>' + (sLabels[s.status] || s.status) + '</td>' +
+                '<td class="selector-cell" title="' + escapeHtml(sel) + '" onclick="viewTextDetail(' + idx + ', \'selector\')">' + escapeHtml(sel) + '</td>' +
+                '<td class="value-cell" title="' + escapeHtml(s.value || '') + '" onclick="viewTextDetail(' + idx + ', \'value\')">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
+                '<td><span class="status-dot ' + s.status + '"></span>' + statusLabel + '</td>' +
                 '<td class="duration-cell">' + ((s.duration_ms || 0) / 1000).toFixed(2) + 's</td>' +
-                '<td class="error-text" title="' + escapeHtml(s.error || '') + '">' + escapeHtml((s.error || '').substring(0, 200)) + '</td>' +
+                '<td class="error-text" title="' + escapeHtml(s.error || '') + '" onclick="viewTextDetail(' + idx + ', \'error\')">' + escapeHtml((s.error || '').substring(0, 200)) + '</td>' +
                 '<td>' + screenshotCell + '</td>' +
                 '</tr>';
         }
@@ -426,6 +446,13 @@
         function escapeHtml(str) {
             if (!str) return '';
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function formatTime(isoStr) {
+            if (!isoStr) return '';
+            var t = isoStr.replace('T', ' ');
+            var dot = t.indexOf('.');
+            return dot > -1 ? t.substring(0, dot) : t;
         }
 
         function formatSelector(sel) {
@@ -436,6 +463,22 @@
 
         function isCurrentStep(s) {
             return s.status === 'running' || s.status === 'pending';
+        }
+
+        // 检测级联失败：失败步骤之后的第一个失败步骤标记为级联
+        function detectCascadeFrom(steps) {
+            var result = {};
+            var firstFailed = -1;
+            for (var i = 0; i < steps.length; i++) {
+                if (steps[i].status === 'failed') {
+                    if (firstFailed === -1) {
+                        firstFailed = i;
+                    } else {
+                        result[i] = true;
+                    }
+                }
+            }
+            return result;
         }
 
         // ---- 筛选 & 分页 ----
@@ -471,6 +514,7 @@
 
         function renderPaginatedSteps() {
             var filtered = [];
+            var cascadeFrom = detectCascadeFrom(allSteps);
             for (var i = 0; i < allSteps.length; i++) {
                 if (currentFilter === 'all' || allSteps[i].status === currentFilter) {
                     filtered.push({step: allSteps[i], originalIndex: i});
@@ -486,7 +530,7 @@
             if (!tbody) return;
             var html = '';
             for (var j = 0; j < pageItems.length; j++) {
-                html += renderStepRow(pageItems[j].step, pageItems[j].originalIndex);
+                html += renderStepRow(pageItems[j].step, pageItems[j].originalIndex, cascadeFrom);
             }
             tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:20px;">无匹配步骤</td></tr>';
 
@@ -538,12 +582,56 @@
             if (step.value) parts.push('输入值:\n' + step.value);
             parts.push('操作: ' + step.action);
             parts.push('耗时: ' + ((step.duration_ms || 0) / 1000).toFixed(2) + 's');
+            // 诊断数据
+            if (step._diag) {
+                var diagParts = [];
+                if (step._diag.branch) diagParts.push('导航分支: ' + step._diag.branch);
+                if (step._diag.popup_captured !== undefined) diagParts.push('弹窗捕获: ' + step._diag.popup_captured);
+                if (step._diag.popup_url) diagParts.push('弹窗 URL: ' + step._diag.popup_url);
+                if (step._diag.esp_web_user_found !== undefined) diagParts.push('SSO Token: ' + (step._diag.esp_web_user_found ? '已找到' : '未找到'));
+                if (step._diag.token_injected !== undefined) diagParts.push('Token 注入: ' + (step._diag.token_injected ? '成功' : '失败'));
+                if (step._diag.cookie_count !== undefined) diagParts.push('Cookie 数量: ' + step._diag.cookie_count);
+                if (step._diag.navigation_error) diagParts.push('导航错误: ' + step._diag.navigation_error);
+                if (diagParts.length > 0) parts.push('诊断信息:\n' + diagParts.join('\n'));
+            }
+            if (step._pre_newtab_diag) {
+                var pre = step._pre_newtab_diag;
+                var preParts = [];
+                if (pre.url_before_click) preParts.push('点击前 URL: ' + pre.url_before_click);
+                if (pre.url_after_click) preParts.push('点击后 URL: ' + pre.url_after_click);
+                if (pre.captured !== undefined) preParts.push('弹窗触发: ' + pre.captured);
+                if (preParts.length > 0) parts.push('点击上下文:\n' + preParts.join('\n'));
+            }
             contentEl.textContent = parts.join('\n\n') || '无详细日志';
             modal.classList.add('show');
         }
 
         function closeErrorLogModal() {
             document.getElementById('errorLogModal').classList.remove('show');
+        }
+
+        // ---- 文本详情查看（值 / 错误信息） ----
+        function viewTextDetail(stepIdx, type) {
+            var step = allSteps[stepIdx];
+            if (!step) return;
+            var modal = document.getElementById('textDetailModal');
+            var titleEl = document.getElementById('textDetailTitle');
+            var contentEl = document.getElementById('textDetailContent');
+            if (type === 'value') {
+                titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 值';
+                contentEl.textContent = step.value || '(空)';
+            } else if (type === 'selector') {
+                titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 选择器';
+                contentEl.textContent = formatSelector(step.selector) || '(无)';
+            } else {
+                titleEl.textContent = '步骤 ' + (stepIdx + 1) + ' 错误信息';
+                contentEl.textContent = step.error || '(无)';
+            }
+            modal.classList.add('show');
+        }
+
+        function closeTextDetailModal() {
+            document.getElementById('textDetailModal').classList.remove('show');
         }
 
         function exportPDF() {
@@ -598,6 +686,15 @@
             <button class="modal-close" onclick="closeErrorLogModal()">&times;</button>
             <h3 id="errorLogTitle">步骤错误日志</h3>
             <div class="log-content" id="errorLogContent"></div>
+        </div>
+    </div>
+
+    <!-- 文本详情 Modal（值 / 错误信息） -->
+    <div class="modal-overlay log-modal" id="textDetailModal" onclick="if(event.target===this)closeTextDetailModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeTextDetailModal()">&times;</button>
+            <h3 id="textDetailTitle">详情</h3>
+            <div class="log-content" id="textDetailContent"></div>
         </div>
     </div>
 </body>

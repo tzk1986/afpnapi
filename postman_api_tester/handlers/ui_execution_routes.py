@@ -408,6 +408,16 @@ def ui_testing_replay_page(job_id: str) -> ResponseReturnValue:
     return resp
 
 
+def _format_iso_time(iso_str: str) -> str:
+    """将 ISO 时间戳格式化为可读格式: 2026-08-06T17:11:25 → 2026-08-06 17:11:25"""
+    if not iso_str:
+        return ""
+    try:
+        return iso_str.replace("T", " ").split(".")[0]
+    except Exception:
+        return iso_str
+
+
 def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
     """渲染 HTML 执行报告页面。"""
     result = _execution_store.get_result(job_id)
@@ -436,7 +446,10 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
         "failed": "失败",
         "running": "执行中",
         "cancelled": "已取消",
+        "terminated": "执行终止",
+        "not_executed": "未执行",
         "ready": "就绪",
+        "starting": "启动中",
     }
     mode_labels = {"browser_replay": "浏览器回放", "headless": "无头浏览器"}
 
@@ -462,6 +475,7 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
             "failed": "失败",
             "skipped": "跳过",
             "error": "错误",
+            "not_executed": "未执行",
         }
 
         duration_ms = s.get("duration_ms", 0)
@@ -472,9 +486,12 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
                 "selector_display": selector_display,
                 "value_display": value_display,
                 "status_label": step_status_labels.get(step_status, step_status),
+                "duration_ms": duration_ms,
                 "duration_s": f"{duration_ms / 1000:.2f}",
                 "error": s.get("error", ""),
                 "screenshot": s.get("screenshot", False),
+                "_diag": s.get("_diag", {}),
+                "_pre_newtab_diag": s.get("_pre_newtab_diag", {}),
             }
         )
 
@@ -489,8 +506,8 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
             status=status,
             status_label=status_labels.get(status, status),
             mode_label=mode_labels.get(result.get("mode", ""), result.get("mode", "")),
-            started_at=result.get("started_at", ""),
-            ended_at=result.get("ended_at", "") or "",
+            started_at=_format_iso_time(result.get("started_at", "")),
+            ended_at=_format_iso_time(result.get("ended_at", "")) or "-",
             steps_total=result.get("steps_total", len(raw_steps)),
             steps_passed=result.get("steps_passed", 0),
             steps_failed=result.get("steps_failed", 0),
