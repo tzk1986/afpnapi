@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 
 from postman_api_tester.report_repository import load_report_details_map
 from postman_api_tester.report_server_utils import (
@@ -272,3 +272,16 @@ def export_collection_with_latest_params(
         },
         "warnings": warnings,
     }
+
+
+_EXPORT_CHUNK_SIZE = 64 * 1024
+
+
+def iter_export_chunks(file_path: Path) -> Iterator[bytes]:
+    """以 64KB 分块读取导出文件，供流式下载。"""
+    with file_path.open("rb") as f:
+        while True:
+            chunk = f.read(_EXPORT_CHUNK_SIZE)
+            if not chunk:
+                break
+            yield chunk

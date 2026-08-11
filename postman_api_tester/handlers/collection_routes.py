@@ -3,8 +3,6 @@
 import json
 import logging
 from pathlib import Path
-from typing import Iterator
-
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
@@ -26,6 +24,9 @@ from postman_api_tester.report_server_config import (
 from postman_api_tester.report_server_utils import to_bool as _to_bool
 from postman_api_tester.services.report_export_service import (
     export_collection_with_latest_params as _svc_export_collection_with_latest_params,
+)
+from postman_api_tester.services.report_export_service import (
+    iter_export_chunks as _svc_iter_export_chunks,
 )
 from postman_api_tester.services.report_results_service import (
     build_collection_preview_payload,
@@ -170,16 +171,9 @@ def api_export_collection_stream() -> ResponseReturnValue:
     if not export_path.exists():
         return _json_error("导出文件不存在，无法进行流式下载", 500, "COL_EXPORT_004")
 
-    def generate_chunks() -> Iterator[bytes]:
-        with export_path.open("rb") as file:
-            while True:
-                chunk = file.read(64 * 1024)
-                if not chunk:
-                    break
-                yield chunk
-
     response = Response(
-        stream_with_context(generate_chunks()), mimetype="application/json"
+        stream_with_context(_svc_iter_export_chunks(export_path)),
+        mimetype="application/json",
     )
     response.headers["Content-Disposition"] = (
         f"attachment; filename={exported['file_name']}"

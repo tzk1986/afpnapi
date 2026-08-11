@@ -120,17 +120,16 @@ def _check_ui_proxy_host_allowed(url: str) -> Optional[ResponseReturnValue]:
     返回 None 表示通过，否则返回 403 错误响应。
     """
     from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
+    from postman_api_tester.utils.security import check_proxy_host_allowed
 
-    if not PROXY_ALLOWED_HOSTS:
-        return None
-    parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    if host and host not in PROXY_ALLOWED_HOSTS:
+    result = check_proxy_host_allowed(url, PROXY_ALLOWED_HOSTS, "UIT_PROXY_005")
+    if result:
+        msg, status, code = result
         logger.warning(
             "ui_proxy_host_blocked",
-            extra={"event": "ui.proxy.host_blocked", "url": url, "host": host},
+            extra={"event": "ui.proxy.host_blocked", "url": url, "host": urlparse(url).hostname},
         )
-        return json_error(f"proxy 域名不在白名单内：{host}", 403, "UIT_PROXY_005")
+        return json_error(msg, status, code)
     return None
 
 

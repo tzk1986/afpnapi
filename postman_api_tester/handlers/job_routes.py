@@ -42,6 +42,9 @@ from postman_api_tester.services.report_job_submission_service import (
     build_saved_json_path as _build_saved_json_path,
 )
 from postman_api_tester.services.report_job_submission_service import (
+    save_collection_json as _svc_save_collection_json,
+)
+from postman_api_tester.services.report_job_submission_service import (
     sanitize_uploaded_name as _sanitize_uploaded_name,
 )
 from postman_api_tester.services.report_request_service import (
@@ -370,8 +373,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
 
     job_id = uuid.uuid4().hex
     saved_file = _build_saved_json_path(UPLOADS_DIR, job_id)
-    with saved_file.open("w", encoding="utf-8") as f:
-        json.dump(collection_data, f, indent=2, ensure_ascii=False)
+    _svc_save_collection_json(saved_file, collection_data)
 
     source_original_file = _sanitize_uploaded_name(f"{collection_name}.json")
     # 解析可配置结果判定（judgment_config）

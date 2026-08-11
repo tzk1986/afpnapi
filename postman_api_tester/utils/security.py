@@ -117,6 +117,23 @@ def is_safe_url(url: str) -> bool:
         return False
 
 
+def check_proxy_host_allowed(
+    url: str, allowed_hosts: "Iterable[str]", error_code: str = "HTTP_PROXY_001"
+) -> tuple[str, int, str] | None:
+    """校验 URL 域名是否在白名单内。
+
+    Returns:
+        None 表示放行；否则返回 (message, status_code, error_code)。
+    """
+    if not allowed_hosts:
+        return None
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host and host not in allowed_hosts:
+        return (f"proxy 域名不在白名单内：{host}", 403, error_code)
+    return None
+
+
 def sanitize_cookies(cookies: Dict[str, Any]) -> Dict[str, Any]:
     """对 Cookie 字典脱敏：仅保留名称和值长度。
 
@@ -130,5 +147,6 @@ __all__ = [
     "strip_sensitive_headers",
     "strip_auth_headers",
     "is_safe_url",
+    "check_proxy_host_allowed",
     "sanitize_cookies",
 ]

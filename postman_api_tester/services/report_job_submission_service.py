@@ -4,6 +4,7 @@
 - 目标：统一入队参数结构，降低路由层重复拼装风险。
 """
 
+import json
 import logging
 import re
 from pathlib import Path
@@ -130,3 +131,10 @@ def build_saved_json_path(base_dir: Path, job_id: str, suffix: str = ".json") ->
         },
     )
     return saved_path
+
+
+def save_collection_json(path: Path, data: Any) -> None:
+    """将 Collection 数据序列化为 JSON 写入磁盘。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)

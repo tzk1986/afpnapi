@@ -1,7 +1,6 @@
 """测试 token、重新请求与代理请求路由处理函数。"""
 
 from typing import Any, Dict
-from urllib.parse import urlparse
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -73,13 +72,12 @@ def _check_proxy_host_allowed(url: str) -> ResponseReturnValue | None:
     错误码：HTTP_PROXY_001
     """
     from postman_api_tester.report_server_config import PROXY_ALLOWED_HOSTS
+    from postman_api_tester.utils.security import check_proxy_host_allowed
 
-    if not PROXY_ALLOWED_HOSTS:
-        return None
-    parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    if host and host not in PROXY_ALLOWED_HOSTS:
-        return _json_error(f"proxy 域名不在白名单内：{host}", 403, "HTTP_PROXY_001")
+    result = check_proxy_host_allowed(url, PROXY_ALLOWED_HOSTS, "HTTP_PROXY_001")
+    if result:
+        msg, status, code = result
+        return _json_error(msg, status, code)
     return None
 
 
