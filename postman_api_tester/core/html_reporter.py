@@ -29,7 +29,7 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 
 
 def _get_jinja_env() -> Environment:
-    return Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=False)
+    return Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=True)
 
 
 class HtmlReporter:
