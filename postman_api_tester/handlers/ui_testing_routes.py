@@ -7,14 +7,16 @@ import logging
 import time
 import uuid
 from typing import Optional
-from urllib.parse import unquote, urlparse
+from typing import Union
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
-from flask import make_response, redirect, render_template, request, url_for
+from flask import abort, make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
 from postman_api_tester.services.ui_proxy_service import UiProxyService
+from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 from postman_api_tester.services.ui_recording_store import RecordingSessionStore
 from postman_api_tester.utils.security import sanitize_cookies
 
@@ -894,6 +896,217 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
         "Set-Cookie",
         f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
     )
+    return resp
+
+
+def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
+    """SPA 资源/API 兜底：拦截所有未被其他路由处理的请求，转发到目标服务器。
+
+    从 ``report_server.py`` 迁移，覆盖早期脚本 fetch 拦截器未覆盖的情况。
+    """
+    _ext = resource_path.rsplit(".", 1)[-1].lower() if "." in resource_path else ""
+    _resource_exts = {
+        "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp",
+        "woff", "woff2", "ttf", "eot", "otf", "css", "js",
+    }
+    _skip_prefixes = {"ui-testing/", "ui-recorder/", "favicon.ico"}
+    for prefix in _skip_prefixes:
+        if resource_path.startswith(prefix):
+            abort(404)
+    _proxy_api_prefixes = {"api/ui-testing/", "api/ui-recorder/", "api/postman/", "api/report/"}
+    for prefix in _proxy_api_prefixes:
+        if resource_path.startswith(prefix):
+            abort(404)
+
+    if request.method == "OPTIONS":
+        resp = make_response("", 204)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        return resp
+
+    is_resource = _ext in _resource_exts
+    _req_accept = request.headers.get("Accept", "")
+    _req_content_type = request.headers.get("Content-Type", "")
+    _req_xhr = request.headers.get("X-Requested-With", "")
+    _is_api_by_header = (
+        "application/json" in _req_accept
+        or "application/json" in _req_content_type
+        or _req_xhr.lower() == "xmlhttprequest"
+    )
+    _is_api_by_path = "/api/" in resource_path or resource_path.startswith("api/")
+    is_api = _is_api_by_header or _is_api_by_path
+    is_page = not is_resource and not is_api
+
+    params = parse_qs(request.query_string.decode("utf-8", errors="replace"))
+    target_url = params.get("_proxy_url", [""])[0] or params.get("url", [""])[0]
+
+    referer = request.headers.get("Referer", "")
+    if not target_url and referer:
+        try:
+            parsed_ref = urlparse(referer)
+            ref_params = parse_qs(parsed_ref.query)
+            target_url = (
+                ref_params.get("_proxy_url", [""])[0] or ref_params.get("url", [""])[0]
+            )
+        except Exception:
+            pass
+
+    _diag_headers = {
+        k: v
+        for k, v in request.headers
+        if k.lower() in (
+            "referer", "origin", "cookie", "accept", "content-type",
+            "user-agent", "sec-fetch-site", "sec-fetch-mode", "sec-fetch-dest",
+        )
+    }
+    logger.warning(
+        "spa_fallback_request",
+        extra={
+            "event": "ui.proxy.fallback_request",
+            "method": request.method,
+            "path": resource_path,
+            "is_page": is_page,
+            "referer": referer if referer else "(none)",
+            "diag_headers": _diag_headers,
+            "diag_cookies": sanitize_cookies(dict(request.cookies)),
+            "diag_query_string": request.query_string.decode("utf-8", errors="replace")[:200],
+        },
+    )
+
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
+    if not target_url:
+        session_id_cookie = request.cookies.get("_proxy_session")
+        if session_id_cookie:
+            target_url = _proxy_session_store.get_base_url(session_id_cookie) or ""
+
+    if not target_url:
+        with _proxy_session_store._lock:
+            all_sessions = list(_proxy_session_store._sessions.items())
+        if all_sessions:
+            latest_sid = max(
+                all_sessions, key=lambda item: item[1].get("last_active", 0)
+            )[0]
+            target_url = _proxy_session_store.get_base_url(latest_sid) or ""
+
+    if not target_url:
+        abort(404)
+
+    target_url = unquote(target_url)
+    parsed_target = urlparse(target_url)
+    full_url = f"{parsed_target.scheme}://{parsed_target.netloc}/{resource_path}"
+
+    _proxy_params = {"_proxy_url", "url", "replay", "recording"}
+    _forward_params = {k: v[0] for k, v in params.items() if k not in _proxy_params}
+    if _forward_params:
+        full_url += "?" + urlencode(_forward_params)
+        logger.info(
+            "spa_fallback_forward_params",
+            extra={
+                "event": "ui.proxy.fallback.forward_params",
+                "params": list(_forward_params.keys()),
+            },
+        )
+
+    base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
+    replay_mode = params.get("replay", [""])[0] == "1"
+    recording_mode = params.get("recording", [""])[0] == "1"
+
+    if recording_mode:
+        old_sid = request.cookies.get("_proxy_session")
+        if old_sid:
+            _proxy_session_store.delete_session(old_sid)
+            logger.info(
+                "spa_fallback_recording_clear_session",
+                extra={
+                    "event": "ui.proxy.fallback.recording_clear",
+                    "old_session_id": old_sid[:8],
+                },
+            )
+        session_id = _proxy_session_store.create_session(base_url)
+        logger.info(
+            "spa_fallback_recording_new_session",
+            extra={
+                "event": "ui.proxy.fallback.recording_new",
+                "session_id": session_id[:8],
+                "base_url": base_url,
+            },
+        )
+    else:
+        session_id = _get_proxy_session_id(base_url)
+
+    try:
+        body: Union[str, bytes]
+        if is_page:
+            replay_engine_js = ""
+            if replay_mode:
+                origin = f"{parsed_target.scheme}://{parsed_target.netloc}"
+                replay_engine_js = get_replayer_js(origin)
+            body, status_code, headers = UiProxyService.fetch_and_rewrite(
+                full_url,
+                session_id if session_id else None,
+                method=request.method,
+                req_headers=dict(request.headers),
+                req_body=request.get_data() if request.method != "GET" else None,
+                replay_mode=replay_mode,
+                recording_mode=recording_mode,
+                replay_engine_js=replay_engine_js,
+            )
+        else:
+            body, status_code, headers = UiProxyService.fetch_resource(
+                full_url,
+                method=request.method,
+                req_headers=dict(request.headers),
+                req_body=request.get_data() if request.method not in ("GET", "HEAD") else None,
+                session_id=session_id if session_id else None,
+            )
+    except Exception:
+        return make_response(b"", 404)
+
+    if is_resource:
+        content_type = headers.get("Content-Type", "")
+        _binary_exts = {
+            "png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "bmp",
+            "woff", "woff2", "ttf", "eot", "otf",
+        }
+        if _ext in _binary_exts and content_type.startswith("text/"):
+            return make_response(b"", 404)
+
+    if is_page and "Location" in headers and "_proxy_url" not in headers["Location"]:
+        from urllib.parse import quote as _quote2
+
+        loc = headers["Location"]
+        if loc.startswith(("http://", "https://")):
+            loc_parsed = urlparse(loc)
+            loc_path = (
+                loc_parsed.pathname
+                + ("?" + loc_parsed.query if loc_parsed.query else "")
+                + ("#" + loc_parsed.fragment if loc_parsed.fragment else "")
+            )
+            sep = "&" if "?" in loc_path else "?"
+            headers["Location"] = loc_path + sep + "_proxy_url=" + _quote2(loc, safe="")
+        elif loc.startswith("/"):
+            full_loc = base_url + loc
+            loc_path = loc
+            sep = "&" if "?" in loc_path else "?"
+            headers["Location"] = loc_path + sep + "_proxy_url=" + _quote2(full_loc, safe="")
+
+    resp = make_response(body, status_code)
+    for key, value in headers.items():
+        if key == "_set_cookies":
+            for cookie_str in value:
+                resp.headers.add("Set-Cookie", cookie_str)
+        else:
+            resp.headers[key] = value
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    if session_id:
+        resp.headers.add(
+            "Set-Cookie",
+            f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+        )
     return resp
 
 
