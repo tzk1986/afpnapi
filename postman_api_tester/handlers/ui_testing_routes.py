@@ -350,8 +350,12 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     return _create_new_session_with_inheritance(base_url)
 
 
-def ui_testing_proxy() -> ResponseReturnValue:
-    """反向代理端点：获取外部 URL 并改写 HTML。"""
+def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnValue":
+    """解析 URL 参数、解包嵌套代理、检测模式。
+
+    Returns:
+        (target_url, base_url, recording_mode, replay_mode) 或错误响应。
+    """
     target_url = request.args.get("url", "")
     logger.info(
         "proxy_request_incoming",
@@ -372,20 +376,13 @@ def ui_testing_proxy() -> ResponseReturnValue:
     target_url = unquote(target_url)
     logger.info(
         "proxy_url_decoded",
-        extra={
-            "event": "ui.proxy.url_decoded",
-            "decoded_url": target_url[:200],
-        },
+        extra={"event": "ui.proxy.url_decoded", "decoded_url": target_url[:200]},
     )
 
-    # 自动解包嵌套代理 URL：当 target_url 本身也是代理 URL 时，提取真实目标
     _max_unwrap = 5
     for _ in range(_max_unwrap):
-        from urllib.parse import urlparse as _up2
-
-        _parsed = _up2(target_url)
+        _parsed = urlparse(target_url)
         if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
-            # 任何指向代理自身的路径，都尝试提取 url 参数
             from urllib.parse import parse_qs as _pqs
 
             _qs = _pqs(_parsed.query)
@@ -402,12 +399,8 @@ def ui_testing_proxy() -> ResponseReturnValue:
     if not target_url.startswith(("http://", "https://")):
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
 
-    # 检测循环引用：目标地址不能是代理服务器自身
-    parsed_target = _up2(target_url)
-    if (
-        parsed_target.hostname in ("127.0.0.1", "localhost")
-        and parsed_target.port == 5000
-    ):
+    parsed_target = urlparse(target_url)
+    if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
         return json_error(
             f"目标地址不能是代理服务器自身: {target_url[:100]}", 400, "UIT_PROXY_005"
         )
@@ -416,7 +409,6 @@ def ui_testing_proxy() -> ResponseReturnValue:
     if host_error is not None:
         return host_error
 
-    # 提取基础 URL（scheme + netloc）作为会话的 base_url
     base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
     recording_mode = request.args.get("recording", "") == "1"
     replay_mode = request.args.get("replay", "") == "1"
@@ -431,8 +423,11 @@ def ui_testing_proxy() -> ResponseReturnValue:
             "target_path": parsed_target.path,
         },
     )
+    return target_url, base_url, recording_mode, replay_mode
 
-    # 录制模式：清除旧的代理会话 cookie，创建新会话（确保从干净状态开始录制）
+
+def _get_or_create_proxy_session(base_url: str, recording_mode: bool) -> str:
+    """获取或创建代理会话，录制模式下清除旧会话。"""
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     if recording_mode:
@@ -446,7 +441,6 @@ def ui_testing_proxy() -> ResponseReturnValue:
                     "old_session_id": old_sid[:8],
                 },
             )
-        # 创建新会话（不带之前的 cookie）
         session_id = _proxy_session_store.create_session(base_url)
         logger.info(
             "recording_new_session_created",
@@ -459,7 +453,6 @@ def ui_testing_proxy() -> ResponseReturnValue:
     else:
         session_id = _get_proxy_session_id(base_url)
 
-    # 详细记录 session 中的 cookie 信息（用于诊断 new_tab 跳转问题）
     session_cookie_jar = _proxy_session_store.get_cookie_jar(session_id)
     session_cookies_detail = {}
     if session_cookie_jar:
@@ -475,7 +468,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             extra={
                 "event": "ui.proxy.session.jar_none",
                 "session_id": session_id[:8],
-                "target_url": target_url[:100],
+                "target_url": request.args.get("url", "")[:100],
             },
         )
 
@@ -484,14 +477,24 @@ def ui_testing_proxy() -> ResponseReturnValue:
         extra={
             "event": "ui.proxy.session_ready",
             "session_id": session_id[:8],
-            "target_url": target_url[:200],
+            "target_url": request.args.get("url", "")[:200],
             "base_url": base_url,
             "session_cookies": session_cookies_detail,
             "browser_cookies": sanitize_cookies(dict(request.cookies)),
             "_proxy_session_store_id": id(_proxy_session_store),
         },
     )
+    return session_id
 
+
+def _execute_proxy_fetch(
+    target_url: str,
+    session_id: str,
+    base_url: str,
+    replay_mode: bool,
+    recording_mode: bool,
+) -> "tuple[str | bytes, int, dict] | ResponseReturnValue":
+    """执行 fetch_and_rewrite，返回 (body, status_code, headers) 或错误响应。"""
     started_at = time.perf_counter()
     logger.info(
         "proxy_fetch_start",
@@ -559,8 +562,18 @@ def ui_testing_proxy() -> ResponseReturnValue:
             "duration_ms": duration_ms,
         },
     )
+    return body, status_code, headers
 
-    # 重写 Location 响应头：将目标服务器的重定向 URL 改为代理 URL
+
+def _build_proxy_response(
+    body: "str | bytes",
+    status_code: int,
+    headers: dict,
+    session_id: str,
+    target_url: str,
+    base_url: str,
+) -> ResponseReturnValue:
+    """重写 Location、构建响应、设置 Cookie。"""
     if "Location" in headers:
         loc = headers["Location"]
         from urllib.parse import quote as _quote2
@@ -583,7 +596,6 @@ def ui_testing_proxy() -> ResponseReturnValue:
     resp.headers.pop("X-Frame-Options", None)
     resp.headers.pop("Content-Security-Policy", None)
     resp.headers["Access-Control-Allow-Origin"] = "*"
-    # 设置代理会话 Cookie（手动设置 header，避免 set_cookie 可能被覆盖）
     resp.headers.add(
         "Set-Cookie",
         f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
@@ -601,6 +613,27 @@ def ui_testing_proxy() -> ResponseReturnValue:
         },
     )
     return resp
+
+
+def ui_testing_proxy() -> ResponseReturnValue:
+    """反向代理端点：获取外部 URL 并改写 HTML。"""
+    ctx = _prepare_proxy_context()
+    if len(ctx) != 4:
+        return ctx  # type: ignore[return-value]
+    target_url, base_url, recording_mode, replay_mode = ctx
+
+    session_id = _get_or_create_proxy_session(base_url, recording_mode)
+
+    fetch_result = _execute_proxy_fetch(
+        target_url, session_id, base_url, replay_mode, recording_mode
+    )
+    if len(fetch_result) != 3:
+        return fetch_result  # type: ignore[return-value]
+    body, status_code, headers = fetch_result
+
+    return _build_proxy_response(
+        body, status_code, headers, session_id, target_url, base_url
+    )
 
 
 def ui_testing_proxy_resource() -> ResponseReturnValue:
