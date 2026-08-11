@@ -1501,14 +1501,8 @@ _REPLAYER_JS = r"""
       // 确保保存的状态包含 new_tab 步骤结果，否则跨页面恢复后 _finishAll 会少计数
       if (action === 'new_tab') {
 
-        // 在页面上显示调试信息并发送到后端
-        var _debugDiv = document.createElement('div');
-        _debugDiv.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(255,0,0,0.9);color:white;padding:10px;z-index:99999;font-size:12px;max-height:200px;overflow:auto;';
-        _debugDiv.id = '_new_tab_debug';
-        document.body.appendChild(_debugDiv);
         var _debugMessages = [];
         function _debug(msg) {
-          _debugDiv.innerHTML += '<div>' + msg + '</div>';
           _debugMessages.push(msg);
           console.log('[ReplayEngine] new_tab DEBUG:', msg);
           // 直接发送到后端
