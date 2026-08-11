@@ -17,6 +17,7 @@ from flask.typing import ResponseReturnValue
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
 from postman_api_tester.services.ui_proxy_service import UiProxyService
+from postman_api_tester.utils.security import sanitize_cookies
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
             extra={
                 "event": "ui.proxy.session.missing",
                 "session_id": sid[:8],
-                "browser_cookies": dict(request.cookies),
+                "browser_cookies": sanitize_cookies(dict(request.cookies)),
             },
         )
 
@@ -322,7 +323,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         extra={
             "event": "ui.proxy.session.creating_new",
             "base_url": base_url,
-            "browser_cookies": dict(request.cookies),
+            "browser_cookies": sanitize_cookies(dict(request.cookies)),
             "referer": request.headers.get("Referer", "")[:100],
             "origin": request.headers.get("Origin", ""),
             "request_path": request.path,
@@ -411,7 +412,7 @@ def _get_proxy_session_id(base_url: str = "") -> str:
             "event": "ui.proxy.session.new",
             "session_id": new_sid[:8],
             "base_url": base_url,
-            "browser_cookies": dict(request.cookies),
+            "browser_cookies": sanitize_cookies(dict(request.cookies)),
         },
     )
     return new_sid
@@ -429,7 +430,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             "method": request.method,
             "recording": request.args.get("recording", ""),
             "replay": request.args.get("replay", ""),
-            "cookies": dict(request.cookies),
+            "cookies": sanitize_cookies(dict(request.cookies)),
         },
     )
 
@@ -554,7 +555,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             "target_url": target_url[:200],
             "base_url": base_url,
             "session_cookies": session_cookies_detail,
-            "browser_cookies": dict(request.cookies),
+            "browser_cookies": sanitize_cookies(dict(request.cookies)),
             "_proxy_session_store_id": id(_proxy_session_store),
         },
     )
@@ -663,7 +664,7 @@ def ui_testing_proxy() -> ResponseReturnValue:
             "session_id": session_id[:8],
             "url": target_url,
             "status_code": status_code,
-            "browser_sent_cookies": dict(request.cookies),
+            "browser_sent_cookies": sanitize_cookies(dict(request.cookies)),
             "set_cookies_returned": set_cookies_sent,
         },
     )
@@ -843,7 +844,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
                 "url": target_url,
                 "method": request.method,
                 "status_code": status_code,
-                "browser_sent_cookies": dict(request.cookies),
+                "browser_sent_cookies": sanitize_cookies(dict(request.cookies)),
                 "set_cookies_returned": set_cookies_sent,
             },
         )

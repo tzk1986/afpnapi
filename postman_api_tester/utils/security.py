@@ -117,9 +117,18 @@ def is_safe_url(url: str) -> bool:
         return False
 
 
+def sanitize_cookies(cookies: Dict[str, Any]) -> Dict[str, Any]:
+    """对 Cookie 字典脱敏：仅保留名称和值长度。
+
+    符合项目日志规范：禁止记录 Cookie 明文值。
+    """
+    return {name: "***" for name in (cookies or {})}
+
+
 __all__ = [
     "sanitize_headers",
     "strip_sensitive_headers",
     "strip_auth_headers",
     "is_safe_url",
+    "sanitize_cookies",
 ]

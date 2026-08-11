@@ -311,6 +311,7 @@ from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import _cfg_int
 from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 from postman_api_tester.utils.logging_utils import configure_logging_from_config
+from postman_api_tester.utils.security import sanitize_cookies
 
 configure_logging_from_config(service_name="report_server")
 logger = logging.getLogger(__name__)
@@ -814,7 +815,7 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
             "is_page": is_page,
             "referer": referer if referer else "(none)",
             "diag_headers": _diag_headers,
-            "diag_cookies": dict(request.cookies),
+            "diag_cookies": sanitize_cookies(dict(request.cookies)),
             "diag_query_string": request.query_string.decode("utf-8", errors="replace")[
                 :200
             ],
