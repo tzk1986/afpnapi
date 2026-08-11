@@ -4,6 +4,7 @@
 """
 
 import logging
+import threading
 import time
 from datetime import datetime
 from typing import Any, Dict
@@ -34,6 +35,7 @@ _settings_store = UiSettingsStore()
 
 # 当前活跃任务计数（浏览器回放模式，简易并发控制）
 _active_jobs: Dict[str, Dict[str, Any]] = {}
+_active_jobs_lock = threading.Lock()
 
 # 僵尸任务超时时间（30 分钟）
 _STALE_JOB_TIMEOUT_SECONDS = 30 * 60
@@ -47,17 +49,18 @@ def _cleanup_stale_jobs() -> None:
     此函数清理创建时间超过 30 分钟的任务。
     """
     now = time.time()
-    stale_jobs = [
-        job_id
-        for job_id, info in _active_jobs.items()
-        if now - info.get("created_at", 0) > _STALE_JOB_TIMEOUT_SECONDS
-    ]
-    for job_id in stale_jobs:
-        _active_jobs.pop(job_id, None)
-        logger.info(
-            "ui_execution_stale_cleanup",
-            extra={"event": "ui.execution.stale_cleanup", "job_id": job_id},
-        )
+    with _active_jobs_lock:
+        stale_jobs = [
+            job_id
+            for job_id, info in _active_jobs.items()
+            if now - info.get("created_at", 0) > _STALE_JOB_TIMEOUT_SECONDS
+        ]
+        for job_id in stale_jobs:
+            _active_jobs.pop(job_id, None)
+            logger.info(
+                "ui_execution_stale_cleanup",
+                extra={"event": "ui.execution.stale_cleanup", "job_id": job_id},
+            )
 
 
 def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
@@ -94,16 +97,18 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     # 清理僵尸任务
     _cleanup_stale_jobs()
 
-    if len(_active_jobs) >= UI_EXECUTION_MAX_CONCURRENT:
-        logger.warning(
-            "ui_execution_concurrent_limit",
-            extra={
-                "event": "ui.execution.concurrent_limit",
-                "current_count": len(_active_jobs),
-                "max_concurrent": UI_EXECUTION_MAX_CONCURRENT,
-            },
-        )
-        return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
+    with _active_jobs_lock:
+        current_count = len(_active_jobs)
+        if current_count >= UI_EXECUTION_MAX_CONCURRENT:
+            logger.warning(
+                "ui_execution_concurrent_limit",
+                extra={
+                    "event": "ui.execution.concurrent_limit",
+                    "current_count": current_count,
+                    "max_concurrent": UI_EXECUTION_MAX_CONCURRENT,
+                },
+            )
+            return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
 
     case_data = _case_store.get_case(case_id)
     if not case_data:
@@ -165,13 +170,24 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
             "Created",
         )
 
-    _active_jobs[job_id] = {
-        "case_id": case_id,
-        "case_data": case_data,
-        "mode": mode,
-        "options": options,
-        "created_at": time.time(),
-    }
+    with _active_jobs_lock:
+        if len(_active_jobs) >= UI_EXECUTION_MAX_CONCURRENT:
+            logger.warning(
+                "ui_execution_concurrent_limit",
+                extra={
+                    "event": "ui.execution.concurrent_limit",
+                    "current_count": len(_active_jobs),
+                    "max_concurrent": UI_EXECUTION_MAX_CONCURRENT,
+                },
+            )
+            return json_error("并发任务数已达上限", 429, "UIT_EXEC_006")
+        _active_jobs[job_id] = {
+            "case_id": case_id,
+            "case_data": case_data,
+            "mode": mode,
+            "options": options,
+            "created_at": time.time(),
+        }
 
     replay_url = f"/ui-testing/replay/{job_id}"
 
@@ -225,7 +241,8 @@ def api_ui_testing_execution_cancel(job_id: str) -> ResponseReturnValue:
     if mode == "headless":
         _execution_manager.cancel(job_id)
     else:
-        _active_jobs.pop(job_id, None)
+        with _active_jobs_lock:
+            _active_jobs.pop(job_id, None)
 
     summary = {
         "steps_total": len(result.get("steps", [])),
@@ -262,7 +279,8 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
     summary = payload.get("summary", {})
 
     _execution_store.finalize_job(job_id, status, summary)
-    _active_jobs.pop(job_id, None)
+    with _active_jobs_lock:
+        _active_jobs.pop(job_id, None)
 
     result = _execution_store.get_result(job_id)
     if result:
@@ -330,7 +348,8 @@ def api_ui_testing_execution_init(job_id: str) -> ResponseReturnValue:
     """返回回放引擎初始化数据（steps + options）。"""
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
-    job_data = _active_jobs.get(job_id)
+    with _active_jobs_lock:
+        job_data = _active_jobs.get(job_id)
     if not job_data:
         result = _execution_store.get_result(job_id)
         if not result:
