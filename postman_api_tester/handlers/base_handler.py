@@ -5,7 +5,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 from flask import jsonify
 from flask.typing import ResponseReturnValue
@@ -192,7 +192,7 @@ def get_report_or_error(
     report_name: str,
     error_code: str,
     find_report: Optional[Callable[[str], Dict[str, Any]]] = None,
-) -> Any:
+) -> Union[Dict[str, Any], ResponseReturnValue]:
     """查找报告，不存在时返回 JSON 错误响应。
 
     消除各路由文件中重复的 ``_repo_find_report + FileNotFoundError`` 模式。
