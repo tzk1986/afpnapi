@@ -74,142 +74,102 @@ def _check_ui_proxy_host_allowed(url: str) -> Optional[ResponseReturnValue]:
     return None
 
 
-def _get_proxy_session_id(base_url: str = "") -> str:
-    """从 Cookie 或新创建的代理会话中获取 session ID。
+def _extract_origin(url: str) -> str:
+    """从 URL 提取 origin（scheme://netloc）。"""
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else url
 
-    Args:
-        base_url: 目标基础 URL（创建新会话时保存）
-    """
+
+def _handle_cross_origin_session(
+    sid: str,
+    target_origin: str,
+    session_origin: str,
+) -> str:
+    """跨域 Token 继承：查找或创建目标 origin 的 session，传递 Token。"""
     from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
-    # 提取目标 origin 用于跨系统 session 匹配
-    _target_origin = ""
-    if base_url:
-        from urllib.parse import urlparse as _up
+    logger.info(
+        "proxy_session_origin_mismatch",
+        extra={
+            "event": "ui.proxy.session.origin_mismatch",
+            "cookie_session_id": sid[:8],
+            "cookie_session_origin": session_origin,
+            "target_origin": target_origin,
+        },
+    )
 
-        _parsed = _up(base_url)
-        _target_origin = (
-            f"{_parsed.scheme}://{_parsed.netloc}" if _parsed.netloc else base_url
+    existing_sid = _proxy_session_store.find_session_by_base_url(target_origin)
+    _subsystem_token = _proxy_session_store.get_subsystem_token(sid)
+
+    if existing_sid:
+        existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
+        _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
+        if _cross_token:
+            target_token = _proxy_session_store.get_token(existing_sid)
+            if not target_token or (_subsystem_token and target_token != _subsystem_token):
+                _proxy_session_store.set_token(existing_sid, _cross_token)
+                if _subsystem_token:
+                    _proxy_session_store.set_subsystem_token(existing_sid, _subsystem_token)
+                logger.info(
+                    "proxy_session_shared_token_cross_origin",
+                    extra={
+                        "event": "ui.proxy.session.shared_token",
+                        "source_session_id": sid[:8],
+                        "target_session_id": existing_sid[:8],
+                        "target_origin": target_origin,
+                        "token_source": "subsystem" if _subsystem_token else "platform",
+                    },
+                )
+        logger.info(
+            "proxy_session_reuse_cross_origin",
+            extra={
+                "event": "ui.proxy.session.reuse_cross_origin",
+                "session_id": existing_sid[:8],
+                "base_url": target_origin,
+                "cookies_in_jar": [c.name for c in existing_jar] if existing_jar else [],
+            },
         )
+        return existing_sid
+
+    new_sid = _proxy_session_store.create_session(target_origin)
+    _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
+    if _cross_token:
+        _proxy_session_store.set_token(new_sid, _cross_token)
+        if _subsystem_token:
+            _proxy_session_store.set_subsystem_token(new_sid, _subsystem_token)
+        logger.info(
+            "proxy_session_shared_token_new_cross_origin",
+            extra={
+                "event": "ui.proxy.session.shared_token_new",
+                "source_session_id": sid[:8],
+                "new_session_id": new_sid[:8],
+                "target_origin": target_origin,
+                "token_source": "subsystem" if _subsystem_token else "platform",
+            },
+        )
+    logger.info(
+        "proxy_session_created_cross_origin",
+        extra={
+            "event": "ui.proxy.session.new_cross_origin",
+            "session_id": new_sid[:8],
+            "base_url": target_origin,
+        },
+    )
+    return new_sid
+
+
+def _find_session_by_cookie(base_url: str, target_origin: str) -> "str | None":
+    """从 Cookie 查找 session，处理 origin 匹配和跨域继承。"""
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     sid = request.cookies.get("_proxy_session")
-    if sid:
-        jar = _proxy_session_store.get_cookie_jar(sid)
-        if jar is not None:
-            # 检查 session 的 base_url 是否与目标 origin 匹配
-            _session_base_url = _proxy_session_store.get_base_url(sid)
-            _session_origin = ""
-            if _session_base_url:
-                from urllib.parse import urlparse as _up
+    if not sid:
+        return None
 
-                _parsed = _up(_session_base_url)
-                _session_origin = (
-                    f"{_parsed.scheme}://{_parsed.netloc}"
-                    if _parsed.netloc
-                    else _session_base_url
-                )
-
-            # 如果传入了 base_url 且 origin 不匹配，查找或创建对应 origin 的 session
-            if _target_origin and _session_origin and _target_origin != _session_origin:
-                logger.info(
-                    "proxy_session_origin_mismatch",
-                    extra={
-                        "event": "ui.proxy.session.origin_mismatch",
-                        "cookie_session_id": sid[:8],
-                        "cookie_session_origin": _session_origin,
-                        "target_origin": _target_origin,
-                    },
-                )
-                # 查找目标 origin 的已有 session
-                existing_sid = _proxy_session_store.find_session_by_base_url(
-                    _target_origin
-                )
-                # 优先使用 loginOtherSystem 返回的子系统 Token，其次使用平台 Token
-                _subsystem_token = _proxy_session_store.get_subsystem_token(sid)
-                if existing_sid:
-                    existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
-                    # 跨域 session Token 传递：优先子系统 Token
-                    _cross_token = _subsystem_token or _proxy_session_store.get_token(
-                        sid
-                    )
-                    if _cross_token:
-                        target_token = _proxy_session_store.get_token(existing_sid)
-                        if not target_token or (
-                            _subsystem_token and target_token != _subsystem_token
-                        ):
-                            _proxy_session_store.set_token(existing_sid, _cross_token)
-                            if _subsystem_token:
-                                _proxy_session_store.set_subsystem_token(
-                                    existing_sid, _subsystem_token
-                                )
-                            logger.info(
-                                "proxy_session_shared_token_cross_origin",
-                                extra={
-                                    "event": "ui.proxy.session.shared_token",
-                                    "source_session_id": sid[:8],
-                                    "target_session_id": existing_sid[:8],
-                                    "target_origin": _target_origin,
-                                    "token_source": "subsystem"
-                                    if _subsystem_token
-                                    else "platform",
-                                },
-                            )
-                    logger.info(
-                        "proxy_session_reuse_cross_origin",
-                        extra={
-                            "event": "ui.proxy.session.reuse_cross_origin",
-                            "session_id": existing_sid[:8],
-                            "base_url": _target_origin,
-                            "cookies_in_jar": [c.name for c in existing_jar]
-                            if existing_jar
-                            else [],
-                        },
-                    )
-                    return existing_sid
-                # 创建新 session
-                new_sid = _proxy_session_store.create_session(_target_origin)
-                # 跨域 session Token 传递：优先子系统 Token
-                _cross_token = _subsystem_token or _proxy_session_store.get_token(sid)
-                if _cross_token:
-                    _proxy_session_store.set_token(new_sid, _cross_token)
-                    if _subsystem_token:
-                        _proxy_session_store.set_subsystem_token(
-                            new_sid, _subsystem_token
-                        )
-                    logger.info(
-                        "proxy_session_shared_token_new_cross_origin",
-                        extra={
-                            "event": "ui.proxy.session.shared_token_new",
-                            "source_session_id": sid[:8],
-                            "new_session_id": new_sid[:8],
-                            "target_origin": _target_origin,
-                            "token_source": "subsystem"
-                            if _subsystem_token
-                            else "platform",
-                        },
-                    )
-                logger.info(
-                    "proxy_session_created_cross_origin",
-                    extra={
-                        "event": "ui.proxy.session.new_cross_origin",
-                        "session_id": new_sid[:8],
-                        "base_url": _target_origin,
-                    },
-                )
-                return new_sid
-
-            if base_url:
-                _proxy_session_store.set_base_url(sid, base_url)
-            logger.info(
-                "proxy_session_reuse",
-                extra={
-                    "event": "ui.proxy.session.reuse",
-                    "session_id": sid[:8],
-                    "base_url": base_url or _proxy_session_store.get_base_url(sid),
-                    "cookies_in_jar": [c.name for c in jar],
-                },
-            )
-            return sid
+    jar = _proxy_session_store.get_cookie_jar(sid)
+    if jar is None:
         logger.warning(
             "proxy_session_cookie_but_not_found",
             extra={
@@ -218,46 +178,72 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                 "browser_cookies": sanitize_cookies(dict(request.cookies)),
             },
         )
+        return None
 
-    # Cookie 尚未存储时，从 Referer 提取目标 URL 以复用 session
+    session_base_url = _proxy_session_store.get_base_url(sid)
+    session_origin = _extract_origin(session_base_url) if session_base_url else ""
+
+    if target_origin and session_origin and target_origin != session_origin:
+        return _handle_cross_origin_session(sid, target_origin, session_origin)
+
+    if base_url:
+        _proxy_session_store.set_base_url(sid, base_url)
+    logger.info(
+        "proxy_session_reuse",
+        extra={
+            "event": "ui.proxy.session.reuse",
+            "session_id": sid[:8],
+            "base_url": base_url or _proxy_session_store.get_base_url(sid),
+            "cookies_in_jar": [c.name for c in jar],
+        },
+    )
+    return sid
+
+
+def _find_session_by_referer() -> "str | None":
+    """从 Referer 提取目标 URL 以复用 session。"""
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
     referer = request.headers.get("Referer", "")
-    if referer and "/ui-testing/proxy?url=" in referer:
-        try:
-            ref_qs = referer.split("/ui-testing/proxy?url=", 1)[1].split("&")[0]
-            from urllib.parse import unquote as _uq2
+    if not referer or "/ui-testing/proxy?url=" not in referer:
+        return None
 
-            ref_base_url = _uq2(ref_qs)
-            # 查找已有该 base_url 的 session
-            existing_sid = _proxy_session_store.find_session_by_base_url(ref_base_url)
-            if existing_sid:
-                existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
-                logger.info(
-                    "proxy_session_reuse_via_referer",
-                    extra={
-                        "event": "ui.proxy.session.reuse_referer",
-                        "session_id": existing_sid[:8],
-                        "base_url": ref_base_url,
-                        "cookies_in_jar": [c.name for c in existing_jar]
-                        if existing_jar
-                        else [],
-                    },
-                )
-                return existing_sid
-            # 没有则创建并关联 base_url
-            new_sid = _proxy_session_store.create_session(ref_base_url)
+    try:
+        ref_qs = referer.split("/ui-testing/proxy?url=", 1)[1].split("&")[0]
+        ref_base_url = unquote(ref_qs)
+        existing_sid = _proxy_session_store.find_session_by_base_url(ref_base_url)
+        if existing_sid:
+            existing_jar = _proxy_session_store.get_cookie_jar(existing_sid)
             logger.info(
-                "proxy_session_created_via_referer",
+                "proxy_session_reuse_via_referer",
                 extra={
-                    "event": "ui.proxy.session.new_referer",
-                    "session_id": new_sid[:8],
+                    "event": "ui.proxy.session.reuse_referer",
+                    "session_id": existing_sid[:8],
                     "base_url": ref_base_url,
+                    "cookies_in_jar": [c.name for c in existing_jar] if existing_jar else [],
                 },
             )
-            return new_sid
-        except Exception:
-            pass
+            return existing_sid
+        new_sid = _proxy_session_store.create_session(ref_base_url)
+        logger.info(
+            "proxy_session_created_via_referer",
+            extra={
+                "event": "ui.proxy.session.new_referer",
+                "session_id": new_sid[:8],
+                "base_url": ref_base_url,
+            },
+        )
+        return new_sid
+    except Exception:
+        return None
 
-    # 创建新会话并保存 base_url
+
+def _create_new_session_with_inheritance(base_url: str) -> str:
+    """创建新 session，继承同 origin Token 并加载浏览器 JSESSIONID。"""
+    from http.cookiejar import Cookie as _Cookie
+
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
     logger.warning(
         "proxy_session_creating_new",
         extra={
@@ -271,13 +257,9 @@ def _get_proxy_session_id(base_url: str = "") -> str:
     )
     new_sid = _proxy_session_store.create_session(base_url)
 
-    # Token 继承：如果同 origin 已有带 Token 的 session，自动继承（解决 cookie 丢失场景）
     if base_url:
-        _existing_sid = _proxy_session_store.find_session_by_base_url(
-            f"{_up(base_url).scheme}://{_up(base_url).netloc}"
-            if _up(base_url).netloc
-            else base_url
-        )
+        origin = _extract_origin(base_url)
+        _existing_sid = _proxy_session_store.find_session_by_base_url(origin)
         if _existing_sid and _existing_sid != new_sid:
             _inherited_token = _proxy_session_store.get_token(_existing_sid)
             if _inherited_token:
@@ -292,22 +274,14 @@ def _get_proxy_session_id(base_url: str = "") -> str:
                     },
                 )
 
-    # 加载浏览器原始 JSESSIONID 到代理 session jar，确保后续请求使用浏览器的已认证 session
     browser_jsessionid = request.cookies.get("JSESSIONID")
     if browser_jsessionid:
-        from http.cookiejar import Cookie as _Cookie
-
-        # 构造 cookie 对象并加载到 proxy session jar
         cookie_jar = _proxy_session_store.get_cookie_jar(new_sid)
         if cookie_jar is not None:
             try:
-                # 解析 base_url 获取 domain 和 path
-                from urllib.parse import urlparse
-
                 parsed = urlparse(base_url or "")
                 domain = parsed.netloc if parsed.netloc else ""
                 path = parsed.path if parsed.path else "/"
-                # 创建新的 cookie 并添加到 jar
                 c = _Cookie(
                     version=0,
                     name="JSESSIONID",
@@ -356,6 +330,24 @@ def _get_proxy_session_id(base_url: str = "") -> str:
         },
     )
     return new_sid
+
+
+def _get_proxy_session_id(base_url: str = "") -> str:
+    """从 Cookie 或新创建的代理会话中获取 session ID。
+
+    查找顺序：Cookie -> Referer -> 新建。跨域时自动继承 Token。
+    """
+    target_origin = _extract_origin(base_url)
+
+    result = _find_session_by_cookie(base_url, target_origin)
+    if result:
+        return result
+
+    result = _find_session_by_referer()
+    if result:
+        return result
+
+    return _create_new_session_with_inheritance(base_url)
 
 
 def ui_testing_proxy() -> ResponseReturnValue:
