@@ -5,7 +5,8 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, Optional, Union
+from functools import wraps
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
 
 from flask import jsonify
 from flask.typing import ResponseReturnValue
@@ -213,5 +214,47 @@ def get_report_or_error(
         finder = _default_finder
     try:
         return finder(report_name)
-    except FileNotFoundError:
-        return json_error(f"报告不存在：{report_name}", 404, error_code)
+    except FileNotFoundError as exc:
+        return json_error(str(exc), 404, error_code)
+
+
+_ErrorMap = Dict[Type[Exception], Tuple[int, str]]
+
+
+def handle_api_errors(error_map: _ErrorMap) -> Callable:
+    """路由函数异常统一捕获装饰器。
+
+    消除 handler 中重复的 ``try / except FileNotFoundError / except ValueError /
+    except Exception`` 模式。每种异常映射到 (HTTP 状态码, 错误码)。
+
+    Args:
+        error_map: 异常类型到 (status_code, error_code) 的映射。
+            未列出的异常类型不会被捕获。
+
+    Example::
+
+        @handle_api_errors({
+            FileNotFoundError: (404, "RPT_MANUAL_003"),
+            ValueError:        (400, "RPT_MANUAL_004"),
+            Exception:         (500, "RPT_MANUAL_004"),
+        })
+        def api_manual_case_add():
+            ...
+    """
+
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> ResponseReturnValue:
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                for exc_type, (status, code) in error_map.items():
+                    if isinstance(exc, exc_type):
+                        if status >= 500:
+                            logger.exception("%s error", func.__name__)
+                        return json_error(str(exc), status, code)
+                raise
+
+        return wrapper
+
+    return decorator

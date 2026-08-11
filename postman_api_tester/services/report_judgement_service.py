@@ -158,7 +158,7 @@ def set_report_result_judgement(
 
         results: List[Dict[str, Any]] = meta.get("results", [])
         if result_index < 0 or result_index >= len(results):
-            raise IndexError(result_index)
+            raise IndexError(f"结果索引不存在：{result_index}")
 
         now_text = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         old_result = dict(results[result_index])

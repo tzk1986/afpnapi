@@ -1,6 +1,5 @@
 """报告元数据、手动用例与结果判定路由处理函数。"""
 
-import logging
 import uuid
 from functools import partial
 
@@ -11,6 +10,7 @@ from postman_api_tester.exceptions import ValidationError
 from postman_api_tester.handlers.base_handler import (
     BaseHandler,
     get_report_or_error,
+    handle_api_errors,
 )
 from postman_api_tester.handlers.base_handler import (
     json_error as _json_error,
@@ -72,8 +72,6 @@ from postman_api_tester.utils.report_utils import (
     compute_summary as _utils_compute_summary,
 )
 
-logger = logging.getLogger(__name__)
-
 REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 
 _UPDATE_REPORT_META_FN = partial(
@@ -113,6 +111,11 @@ def api_manual_cases(report_name: str) -> ResponseReturnValue:
     return jsonify(payload)
 
 
+@handle_api_errors({
+    FileNotFoundError: (404, "RPT_MANUAL_003"),
+    ValueError: (400, "RPT_MANUAL_004"),
+    Exception: (500, "RPT_MANUAL_004"),
+})
 def api_manual_case_add() -> ResponseReturnValue:
     """新增人工用例 API。错误码：RPT_MANUAL_001-004"""
     payload = request.get_json(silent=True) or {}
@@ -128,28 +131,25 @@ def api_manual_case_add() -> ResponseReturnValue:
     case_payload = dict(payload.get("case") or {})
     if not case_payload:
         return _json_error("case 不能为空", 400, "RPT_MANUAL_002")
-    try:
-        result = _svc_add_manual_case(
-            report_name=report_name,
-            payload=case_payload,
-            enable_manual_cases=ENABLE_MANUAL_CASES,
-            default_folder_name=MANUAL_CASE_FOLDER_NAME,
-            normalize_manual_case=_normalize_manual_case,
-            update_report_meta=_UPDATE_REPORT_META_FN,
-            create_id=lambda: uuid.uuid4().hex,
-        )
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_MANUAL_003")
-    except ValueError as exc:
-        return _json_error(str(exc), 400, "RPT_MANUAL_004")
-    except Exception as exc:
-        logger.exception("add_manual_case error")
-        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_004")
+    result = _svc_add_manual_case(
+        report_name=report_name,
+        payload=case_payload,
+        enable_manual_cases=ENABLE_MANUAL_CASES,
+        default_folder_name=MANUAL_CASE_FOLDER_NAME,
+        normalize_manual_case=_normalize_manual_case,
+        update_report_meta=_UPDATE_REPORT_META_FN,
+        create_id=lambda: uuid.uuid4().hex,
+    )
     return jsonify(
         build_manual_case_upsert_payload(report_name=report_name, result=result)
     )
 
 
+@handle_api_errors({
+    FileNotFoundError: (404, "RPT_MANUAL_007"),
+    ValueError: (400, "RPT_MANUAL_008"),
+    Exception: (500, "RPT_MANUAL_008"),
+})
 def api_manual_case_update() -> ResponseReturnValue:
     """更新人工用例 API。错误码：RPT_MANUAL_005-008"""
     payload = request.get_json(silent=True) or {}
@@ -162,28 +162,25 @@ def api_manual_case_update() -> ResponseReturnValue:
     except ValidationError as e:
         error_code = "RPT_MANUAL_005" if "report_name" in str(e) else "RPT_MANUAL_006"
         return _json_error(str(e), 400, error_code)
-    try:
-        result = _svc_update_manual_case(
-            report_name=report_name,
-            case_id=case_id,
-            payload=case_payload,
-            enable_manual_cases=ENABLE_MANUAL_CASES,
-            default_folder_name=MANUAL_CASE_FOLDER_NAME,
-            normalize_manual_case=_normalize_manual_case,
-            update_report_meta=_UPDATE_REPORT_META_FN,
-        )
-    except FileNotFoundError as exc:
-        return _json_error(str(exc), 404, "RPT_MANUAL_007")
-    except ValueError as exc:
-        return _json_error(str(exc), 400, "RPT_MANUAL_008")
-    except Exception as exc:
-        logger.exception("update_manual_case error")
-        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_008")
+    result = _svc_update_manual_case(
+        report_name=report_name,
+        case_id=case_id,
+        payload=case_payload,
+        enable_manual_cases=ENABLE_MANUAL_CASES,
+        default_folder_name=MANUAL_CASE_FOLDER_NAME,
+        normalize_manual_case=_normalize_manual_case,
+        update_report_meta=_UPDATE_REPORT_META_FN,
+    )
     return jsonify(
         build_manual_case_upsert_payload(report_name=report_name, result=result)
     )
 
 
+@handle_api_errors({
+    FileNotFoundError: (404, "RPT_MANUAL_011"),
+    ValueError: (400, "RPT_MANUAL_012"),
+    Exception: (500, "RPT_MANUAL_012"),
+})
 def api_manual_case_delete() -> ResponseReturnValue:
     """删除人工用例 API。错误码：RPT_MANUAL_009-012"""
     payload = request.get_json(silent=True) or {}
@@ -195,27 +192,24 @@ def api_manual_case_delete() -> ResponseReturnValue:
     except ValidationError as e:
         error_code = "RPT_MANUAL_009" if "report_name" in str(e) else "RPT_MANUAL_010"
         return _json_error(str(e), 400, error_code)
-    try:
-        result = _svc_delete_manual_case(
-            report_name=report_name,
-            case_id=case_id,
-            enable_manual_cases=ENABLE_MANUAL_CASES,
-            manual_case_exclusion_key=_manual_case_exclusion_key,
-            normalize_manual_exclusions=_normalize_manual_exclusions,
-            update_report_meta=_UPDATE_REPORT_META_FN,
-        )
-    except FileNotFoundError as exc:
-        return _json_error(str(exc), 404, "RPT_MANUAL_011")
-    except ValueError as exc:
-        return _json_error(str(exc), 400, "RPT_MANUAL_012")
-    except Exception as exc:
-        logger.exception("delete_manual_case error")
-        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_MANUAL_012")
+    result = _svc_delete_manual_case(
+        report_name=report_name,
+        case_id=case_id,
+        enable_manual_cases=ENABLE_MANUAL_CASES,
+        manual_case_exclusion_key=_manual_case_exclusion_key,
+        normalize_manual_exclusions=_normalize_manual_exclusions,
+        update_report_meta=_UPDATE_REPORT_META_FN,
+    )
     return jsonify(
         build_manual_case_delete_payload(report_name=report_name, result=result)
     )
 
 
+@handle_api_errors({
+    FileNotFoundError: (404, "RPT_EXCL_003"),
+    ValueError: (400, "RPT_EXCL_004"),
+    Exception: (500, "RPT_EXCL_004"),
+})
 def api_report_case_exclusion() -> ResponseReturnValue:
     """用例排除标记 API。错误码：RPT_EXCL_001-004"""
     payload = request.get_json(silent=True) or {}
@@ -232,22 +226,14 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     except ValidationError as e:
         error_code = "RPT_EXCL_001" if "report_name" in str(e) else "RPT_EXCL_002"
         return _json_error(str(e), 400, error_code)
-    try:
-        result = _svc_set_case_exclusion(
-            report_name=report_name,
-            exclusion_key=exclusion_key,
-            excluded=excluded,
-            normalize_exclusion_key=_normalize_exclusion_key,
-            normalize_manual_exclusions=_normalize_manual_exclusions,
-            update_report_meta=_UPDATE_REPORT_META_FN,
-        )
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_EXCL_003")
-    except ValueError as exc:
-        return _json_error(str(exc), 400, "RPT_EXCL_004")
-    except Exception as exc:
-        logger.exception("set_case_exclusion error")
-        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_EXCL_004")
+    result = _svc_set_case_exclusion(
+        report_name=report_name,
+        exclusion_key=exclusion_key,
+        excluded=excluded,
+        normalize_exclusion_key=_normalize_exclusion_key,
+        normalize_manual_exclusions=_normalize_manual_exclusions,
+        update_report_meta=_UPDATE_REPORT_META_FN,
+    )
     return jsonify(
         build_case_exclusion_payload(
             report_name=report_name, excluded=excluded, result=result
@@ -255,6 +241,12 @@ def api_report_case_exclusion() -> ResponseReturnValue:
     )
 
 
+@handle_api_errors({
+    FileNotFoundError: (404, "RPT_JUDGE_003"),
+    IndexError: (404, "RPT_JUDGE_004"),
+    ValueError: (400, "RPT_JUDGE_005"),
+    Exception: (500, "RPT_JUDGE_005"),
+})
 def api_report_result_judgement() -> ResponseReturnValue:
     """结果人工判定 API。错误码：RPT_JUDGE_001-005"""
     payload = request.get_json(silent=True) or {}
@@ -276,28 +268,18 @@ def api_report_result_judgement() -> ResponseReturnValue:
     target_status = str(payload.get("target_status") or "").strip().upper() or None
     reason = str(payload.get("reason") or "").strip()
 
-    try:
-        result = _svc_set_report_result_judgement(
-            report_name=report_name,
-            result_index=result_index,
-            action=action,
-            target_status=target_status,
-            reason=reason,
-            reports_dir=REPORTS_DIR,
-            get_report_write_lock=get_report_write_lock,
-            find_report=_repo_find_report,
-            compute_summary=_utils_compute_summary,
-            invalidate_reports_cache=_repo_invalidate_reports_cache,
-        )
-    except FileNotFoundError:
-        return _json_error(f"报告不存在：{report_name}", 404, "RPT_JUDGE_003")
-    except IndexError:
-        return _json_error(f"结果索引不存在：{result_index}", 404, "RPT_JUDGE_004")
-    except ValueError as exc:
-        return _json_error(str(exc), 400, "RPT_JUDGE_005")
-    except Exception as exc:
-        logger.exception("set_result_judgement error")
-        return _json_error(f"操作异常：{type(exc).__name__}", 500, "RPT_JUDGE_005")
+    result = _svc_set_report_result_judgement(
+        report_name=report_name,
+        result_index=result_index,
+        action=action,
+        target_status=target_status,
+        reason=reason,
+        reports_dir=REPORTS_DIR,
+        get_report_write_lock=get_report_write_lock,
+        find_report=_repo_find_report,
+        compute_summary=_utils_compute_summary,
+        invalidate_reports_cache=_repo_invalidate_reports_cache,
+    )
 
     return jsonify(
         build_result_judgement_payload(

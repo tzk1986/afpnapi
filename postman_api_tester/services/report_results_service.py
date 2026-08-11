@@ -67,7 +67,7 @@ def build_result_detail_payload(
     # 详情载荷遵循"结果摘要 + details_map 按需补充"的轻量策略。
     results = report.get("results", [])
     if result_index < 0 or result_index >= len(results):
-        raise IndexError(result_index)
+        raise IndexError(f"结果索引不存在：{result_index}")
 
     result = dict(results[result_index])
     exclusion_key = result_exclusion_key(result)

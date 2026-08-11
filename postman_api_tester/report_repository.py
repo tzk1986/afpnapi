@@ -248,7 +248,7 @@ def find_report(report_name: str) -> ReportRecord:
         if bool(report.get("_summary_only")):
             meta_file = str(report.get("meta_file") or "").strip()
             if not meta_file:
-                raise FileNotFoundError(report_name)
+                raise FileNotFoundError(f"报告不存在：{report_name}")
             meta_path = _REPORTS_DIR / meta_file
             full_report = load_report_meta(meta_path, include_results=True)
             full_report["meta_file"] = meta_file
@@ -268,7 +268,7 @@ def find_report(report_name: str) -> ReportRecord:
             return full_report
         _fix_details_file_path(report)
         return report
-    raise FileNotFoundError(report_name)
+    raise FileNotFoundError(f"报告不存在：{report_name}")
 
 
 def _resolve_artifact_dir(report: ReportRecord) -> Path:
