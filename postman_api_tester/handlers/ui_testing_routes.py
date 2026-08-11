@@ -4,11 +4,9 @@
 """
 
 import logging
-import threading
 import time
 import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Optional
 from urllib.parse import unquote, urlparse
 
 from flask import make_response, redirect, render_template, request, url_for
@@ -17,73 +15,14 @@ from flask.typing import ResponseReturnValue
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
 from postman_api_tester.services.ui_proxy_service import UiProxyService
+from postman_api_tester.services.ui_recording_store import RecordingSessionStore
 from postman_api_tester.utils.security import sanitize_cookies
 
 logger = logging.getLogger(__name__)
 
 # 全局实例
 _case_store = UiCaseStore()
-
-
-class _RecordingSession:
-    """录制会话内存管理。"""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._sessions: Dict[str, Dict[str, Any]] = {}
-
-    def start(self, session_id: str, base_url: str) -> Dict[str, Any]:
-        session: Dict[str, Any] = {
-            "session_id": session_id,
-            "base_url": base_url,
-            "steps": [],
-            "status": "recording",
-            "started_at": datetime.now().isoformat(),
-            "ended_at": None,
-        }
-        with self._lock:
-            self._sessions[session_id] = session
-        return session
-
-    def add_step(self, session_id: str, step: Dict[str, Any]) -> Optional[int]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return None
-            session["steps"].append(step)
-            return len(session["steps"])
-
-    def stop(self, session_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return None
-            session["status"] = "completed"
-            session["ended_at"] = datetime.now().isoformat()
-            return dict(session)
-
-    def get(self, session_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if session:
-                return dict(session)
-            return None
-
-    def list_sessions(self) -> List[Dict[str, Any]]:
-        with self._lock:
-            return [
-                {
-                    "session_id": s["session_id"],
-                    "base_url": s["base_url"],
-                    "status": s["status"],
-                    "step_count": len(s["steps"]),
-                    "started_at": s["started_at"],
-                }
-                for s in self._sessions.values()
-            ]
-
-
-_recording = _RecordingSession()
+_recording = RecordingSessionStore()
 
 
 # ── 页面路由 ──

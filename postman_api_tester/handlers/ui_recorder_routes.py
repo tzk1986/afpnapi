@@ -5,14 +5,14 @@
 """
 
 import logging
-import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from flask import jsonify, make_response, render_template, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import BaseHandler
+from postman_api_tester.services.ui_recording_store import RecordingSessionStore
 
 logger = logging.getLogger(__name__)
 
@@ -32,83 +32,7 @@ def _add_cors_headers(resp: Any) -> Any:
     return wrapped
 
 
-class _RecordingSessionStore:
-    """录制会话内存存储（线程安全）。"""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._sessions: Dict[str, Dict[str, Any]] = {}
-
-    def create_session(self, session_id: str) -> Dict[str, Any]:
-        session: Dict[str, Any] = {
-            "session_id": session_id,
-            "steps": [],
-            "navigations": [],
-            "started_at": datetime.now().isoformat(),
-            "ended_at": None,
-            "status": "recording",
-            "total_steps": 0,
-        }
-        with self._lock:
-            self._sessions[session_id] = session
-        return session
-
-    def add_event(
-        self, session_id: str, event_type: str, data: Dict[str, Any]
-    ) -> Optional[int]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return None
-
-            if event_type == "step":
-                session["steps"].append(data)
-                session["total_steps"] = len(session["steps"])
-                return session["total_steps"]
-            elif event_type == "navigation":
-                session["navigations"].append(data)
-                return len(session["navigations"])
-            return 0
-
-    def end_session(self, session_id: str, total_steps: int = 0) -> bool:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if not session:
-                return False
-            session["status"] = "completed"
-            session["ended_at"] = datetime.now().isoformat()
-            if total_steps:
-                session["total_steps"] = total_steps
-            return True
-
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            session = self._sessions.get(session_id)
-            if session:
-                return dict(session)
-            return None
-
-    def list_sessions(self) -> List[Dict[str, Any]]:
-        with self._lock:
-            result = [
-                {
-                    "session_id": s["session_id"],
-                    "status": s["status"],
-                    "total_steps": s["total_steps"],
-                    "started_at": s["started_at"],
-                    "ended_at": s["ended_at"],
-                }
-                for s in self._sessions.values()
-            ]
-            result.sort(key=lambda x: x["started_at"], reverse=True)
-            return result
-
-    def delete_session(self, session_id: str) -> bool:
-        with self._lock:
-            return self._sessions.pop(session_id, None) is not None
-
-
-_store = _RecordingSessionStore()
+_store = RecordingSessionStore()
 
 
 # ── API 端点 ──

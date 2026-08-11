@@ -6,12 +6,14 @@ import pytest
 from flask import Flask
 
 from postman_api_tester.handlers.ui_recorder_routes import (
-    _RecordingSessionStore,
     api_ui_recorder_event,
     api_ui_recorder_session_delete,
     api_ui_recorder_session_detail,
     api_ui_recorder_session_export,
     api_ui_recorder_sessions,
+)
+from postman_api_tester.services.ui_recording_store import (
+    RecordingSessionStore as _RecordingSessionStore,
 )
 
 
