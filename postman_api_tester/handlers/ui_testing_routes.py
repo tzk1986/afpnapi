@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 _case_store = UiCaseStore()
 _recording = RecordingSessionStore()
 
+# 命名常量
+MAX_PROXY_UNWRAP_DEPTH = 5
+PROXY_COOKIE_MAX_AGE = 3600
+
 
 # ── 页面路由 ──
 
@@ -379,7 +383,7 @@ def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnVal
         extra={"event": "ui.proxy.url_decoded", "decoded_url": target_url[:200]},
     )
 
-    _max_unwrap = 5
+    _max_unwrap = MAX_PROXY_UNWRAP_DEPTH
     for _ in range(_max_unwrap):
         _parsed = urlparse(target_url)
         if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
@@ -598,7 +602,7 @@ def _build_proxy_response(
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers.add(
         "Set-Cookie",
-        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age={PROXY_COOKIE_MAX_AGE}; Path=/",
     )
 
     logger.info(
@@ -796,7 +800,7 @@ def ui_testing_proxy_resource() -> ResponseReturnValue:
     # 设置代理会话 Cookie
     resp.headers.add(
         "Set-Cookie",
-        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age={PROXY_COOKIE_MAX_AGE}; Path=/",
     )
 
     # 仅对 API 请求记录 cookie 详情（跳过静态资源）
@@ -919,7 +923,7 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers.add(
         "Set-Cookie",
-        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+        f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age={PROXY_COOKIE_MAX_AGE}; Path=/",
     )
     return resp
 
@@ -1130,7 +1134,7 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     if session_id:
         resp.headers.add(
             "Set-Cookie",
-            f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age=3600; Path=/",
+            f"_proxy_session={session_id}; HttpOnly; SameSite=Lax; Max-Age={PROXY_COOKIE_MAX_AGE}; Path=/",
         )
     return resp
 

@@ -40,6 +40,9 @@ _active_jobs_lock = threading.Lock()
 # 僵尸任务超时时间（30 分钟）
 _STALE_JOB_TIMEOUT_SECONDS = 30 * 60
 
+# Webhook 请求超时时间（秒）
+WEBHOOK_TIMEOUT = 10
+
 
 def _cleanup_stale_jobs() -> None:
     """清理超时的僵尸任务。
@@ -743,7 +746,7 @@ def _send_webhook(result: Dict[str, Any]) -> None:
     }
 
     try:
-        resp = req.post(webhook_url, json=payload, timeout=10)
+        resp = req.post(webhook_url, json=payload, timeout=WEBHOOK_TIMEOUT)
         logger.info(
             "ui_settings_webhook_sent",
             extra={
