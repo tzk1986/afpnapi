@@ -78,7 +78,7 @@ class VariableContext:
         - 最多保存 ``max_count`` 个变量，超出则截断（按插入顺序）。
         - 写入失败时记录警告，不抛出异常。
         """
-        from postman_api_tester.services.global_variables_service import (
+        from postman_api_tester.utils.variable_store_utils import (
             _read_store,
             _write_store,
         )
@@ -113,7 +113,7 @@ class VariableContext:
         合并优先级（高→低）：initial_variables > environments[env_name] > shared。
         文件不存在或解析失败时返回空上下文（仅含 initial_variables）。
         """
-        from postman_api_tester.services.global_variables_service import (
+        from postman_api_tester.utils.variable_store_utils import (
             merge_variables_for_env,
         )
 
