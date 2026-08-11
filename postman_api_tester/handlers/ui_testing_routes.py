@@ -1250,7 +1250,7 @@ def api_ui_testing_recording_start() -> ResponseReturnValue:
 
 
 def api_ui_testing_recording_step() -> ResponseReturnValue:
-    """添加录制步骤。"""
+    """添加录制步骤或回填响应数据。"""
     payload = request.get_json(silent=True)
     if not payload:
         return json_error("无效的 JSON 数据", 400, "UIT_REC_001")
@@ -1260,6 +1260,14 @@ def api_ui_testing_recording_step() -> ResponseReturnValue:
 
     if not session_id:
         return json_error("缺少 session_id", 400, "UIT_REC_002")
+
+    if payload.get("is_response_update"):
+        net_id = step.get("_net_id")
+        if net_id is not None:
+            _recording.update_step_response(
+                session_id, int(net_id), step.get("network_response", {})
+            )
+        return BaseHandler.json_response({"ok": True})
 
     idx = _recording.add_step(session_id, step)
     if idx is None:

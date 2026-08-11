@@ -101,6 +101,22 @@ class RecordingSessionStore:
             result.sort(key=lambda x: x["started_at"], reverse=True)
             return result
 
+    def update_step_response(
+        self, session_id: str, net_id: int, network_response: Dict[str, Any]
+    ) -> bool:
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if not session:
+                return False
+            for step in reversed(session["steps"]):
+                if (
+                    step.get("action") == "api_call"
+                    and step.get("_net_id") == net_id
+                ):
+                    step["network_response"] = network_response
+                    return True
+            return False
+
     def delete_session(self, session_id: str) -> bool:
         with self._lock:
             return self._sessions.pop(session_id, None) is not None

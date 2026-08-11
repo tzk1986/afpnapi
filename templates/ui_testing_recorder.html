@@ -292,6 +292,29 @@
                 console.log('[RecorderParent] ui-recorder-event, recording=', recording, 'step=', e.data.data);
                 if (!recording) return;
                 var step = e.data.data;
+
+                // api_response: 回填响应数据到对应的 api_call 步骤，不新增步骤
+                if (step.action === 'api_response' && step._net_id) {
+                    var netId = step._net_id;
+                    for (var i = steps.length - 1; i >= 0; i--) {
+                        if (steps[i].action === 'api_call' && steps[i]._net_id === netId) {
+                            steps[i].network_response = step.network_response;
+                            break;
+                        }
+                    }
+                    if (sessionId) {
+                        fetch('/api/ui-testing/recording/step', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                session_id: sessionId, step: step,
+                                is_response_update: true
+                            })
+                        });
+                    }
+                    return;
+                }
+
                 steps.push(step);
 
                 // Send to server

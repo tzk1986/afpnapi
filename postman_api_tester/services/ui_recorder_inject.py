@@ -831,26 +831,94 @@ _RECORDER_JS = r"""
     return '/ui-testing/proxy-resource?url=' + encodeURIComponent(url);
   }
 
-  // 拦截 fetch：重定向原始服务器 API 调用 + 录制
+  // 网络请求捕获辅助函数
+  var _netIdCounter = 0;
+
+  function _extractReqHeaders(opts) {
+    var h = {};
+    if (!opts || !opts.headers) return h;
+    try {
+      if (typeof opts.headers.forEach === 'function') {
+        opts.headers.forEach(function(v, k) { h[k] = v; });
+      } else if (typeof opts.headers === 'object') {
+        for (var k in opts.headers) { if (opts.headers.hasOwnProperty(k)) h[k] = opts.headers[k]; }
+      }
+    } catch(e) {}
+    return h;
+  }
+
+  function _truncateBody(body) {
+    if (!body) return '';
+    try {
+      var s = typeof body === 'string' ? body : JSON.stringify(body);
+      if (s.length > 4096) return s.substring(0, 4096) + '...(truncated)';
+      return s;
+    } catch(e) { return ''; }
+  }
+
+  function _extractUrlPath(url) {
+    try { return new URL(url, location.href).pathname; } catch(e) { return ''; }
+  }
+
+  function _sendResponseUpdate(netId, status, body) {
+    if (!recording) return;
+    var respBody = body || '';
+    if (respBody.length > 4096) respBody = respBody.substring(0, 4096) + '...(truncated)';
+    sendEvent({
+      action: 'api_response',
+      _net_id: netId,
+      network_response: { status: status, body: respBody }
+    });
+  }
+
+  // 拦截 fetch：重定向原始服务器 API 调用 + 录制（含请求头/体/响应）
   var origFetch = window.fetch;
   window.fetch = function(url, opts) {
-    if (_shouldProxy(url)) {
-      arguments[0] = _toProxyUrl(typeof url === 'string' ? url : String(url));
+    var origUrl = typeof url === 'string' ? url : (url && url.href ? url.href : String(url));
+    if (_shouldProxy(origUrl)) {
+      arguments[0] = _toProxyUrl(origUrl);
     }
-    if (recording && url && typeof url === 'string') {
+    if (recording && origUrl) {
+      var netId = ++_netIdCounter;
+      var method = (opts && opts.method) || 'GET';
+      var reqHeaders = _extractReqHeaders(opts);
+      var reqBody = _truncateBody(opts && opts.body);
+      var urlPath = _extractUrlPath(origUrl);
+
       sendEvent({
         action: 'api_call',
         selector: null,
-        value: url,
-        element_info: { tag: 'fetch', method: (opts && opts.method) || 'GET' },
+        value: origUrl,
+        element_info: { tag: 'fetch', method: method },
         page_url: location.href,
-        page_title: document.title
+        page_title: document.title,
+        _net_id: netId,
+        network_request: {
+          url: origUrl, url_path: urlPath, method: method,
+          headers: reqHeaders, body: reqBody
+        }
       });
+
+      var result = origFetch.apply(this, arguments);
+      result.then(function(resp) {
+        try {
+          var ct = resp.headers.get('content-type') || '';
+          if (ct.indexOf('json') >= 0 || ct.indexOf('text') >= 0 || ct.indexOf('xml') >= 0) {
+            resp.clone().text().then(function(text) {
+              _sendResponseUpdate(netId, resp.status, text);
+            }).catch(function() {});
+          } else {
+            _sendResponseUpdate(netId, resp.status, '');
+          }
+        } catch(e) {}
+        return resp;
+      }).catch(function() {});
+      return result;
     }
     return origFetch.apply(this, arguments);
   };
 
-  // 拦截 XMLHttpRequest：重定向原始服务器 API 调用
+  // 拦截 XMLHttpRequest：重定向 + 录制（含请求体/响应）
   var _OrigXHR = window.XMLHttpRequest;
   var origOpen = _OrigXHR.prototype.open;
   var origSend = _OrigXHR.prototype.send;
@@ -859,11 +927,39 @@ _RECORDER_JS = r"""
     this._uiRecorderUrl = url;
     return origOpen.apply(this, arguments);
   };
-  _OrigXHR.prototype.send = function() {
+  _OrigXHR.prototype.send = function(body) {
     var url = this._uiRecorderUrl;
+    var method = this._uiRecorderMethod || 'GET';
     if (_shouldProxy(url)) {
       var proxyUrl = _toProxyUrl(typeof url === 'string' ? url : String(url));
-      origOpen.call(this, this._uiRecorderMethod || 'GET', proxyUrl);
+      origOpen.call(this, method, proxyUrl);
+    }
+    if (recording && url && typeof url === 'string') {
+      var xhr = this;
+      var netId = ++_netIdCounter;
+      var urlPath = _extractUrlPath(url);
+      var reqBody = _truncateBody(body);
+
+      sendEvent({
+        action: 'api_call',
+        selector: null,
+        value: url,
+        element_info: { tag: 'xhr', method: method },
+        page_url: location.href,
+        page_title: document.title,
+        _net_id: netId,
+        network_request: {
+          url: url, url_path: urlPath, method: method,
+          headers: {}, body: reqBody
+        }
+      });
+
+      xhr.addEventListener('loadend', function() {
+        try {
+          var respBody = xhr.responseText || '';
+          _sendResponseUpdate(netId, xhr.status, respBody);
+        } catch(e) {}
+      });
     }
     return origSend.apply(this, arguments);
   };
@@ -1209,7 +1305,14 @@ _REPLAYER_JS = r"""
 
     _getPath: function(url) {
       try {
-        var u = new URL(url, location.href);
+        var actualUrl = url;
+        if (url.indexOf('/ui-testing/proxy-resource') !== -1) {
+          var qIdx = url.indexOf('?url=');
+          if (qIdx !== -1) {
+            actualUrl = decodeURIComponent(url.substring(qIdx + 5));
+          }
+        }
+        var u = new URL(actualUrl, location.href);
         return u.pathname;
       } catch(e) {
         return url;
