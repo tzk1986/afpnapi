@@ -41,7 +41,7 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        with open(input_file, "r", encoding="utf-8") as f:
+        with open(input_file, encoding="utf-8") as f:
             input_data = json.load(f)
 
         case_data: Dict[str, Any] = input_data["case_data"]

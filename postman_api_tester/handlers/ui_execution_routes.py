@@ -3,6 +3,8 @@
 提供执行任务创建、状态查询、报告获取、执行历史和回放页面渲染。
 """
 
+from __future__ import annotations
+
 import logging
 import threading
 import time

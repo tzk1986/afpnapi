@@ -7,6 +7,8 @@
 - 对外建议调用 run_postman_tests；其余函数主要用于流程拆分与可测试性。
 """
 
+from __future__ import annotations
+
 import logging
 import sys
 import threading
@@ -196,7 +198,7 @@ def run_postman_tests(
         data_columns = get_data_columns(rows)
         logger.info("数据驱动已加载: %s（%d 行，格式 %s）", data_file, len(rows), _fmt)
 
-    variable_context: Optional["VariableContext"] = None
+    variable_context: Optional[VariableContext] = None
     global_variables_file = str(getattr(_cfg, "GLOBAL_VARIABLES_FILE", ""))
     global_variables_max_count = int(getattr(_cfg, "GLOBAL_VARIABLES_MAX_COUNT", 1000))
     if getattr(_cfg, "ENABLE_VARIABLE_EXTRACTION", False):
