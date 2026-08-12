@@ -122,6 +122,16 @@
 
         // 加载执行任务数据
         function loadJobData() {
+            savedReplayState = null;
+            replayStarted = false;
+            replayFinished = false;
+            currentStepIndex = -1;
+            results = [];
+            lastWindowOpenUrl = '';
+            lastNewTabProxyUrl = '';
+            lastNewTabTime = 0;
+            totalPausedMs = 0;
+            pausedAt = 0;
             return fetch('/api/ui-testing/execution/' + jobId + '/init')
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
@@ -137,6 +147,9 @@
                     document.getElementById('execTitle').textContent = data.case_name || '用例回放';
                     document.title = '回放 - ' + (data.case_name || '');
                     renderStepsList();
+
+                    // 清除回放引擎残留的 sessionStorage 状态，防止上次回放的状态污染本次执行
+                    try { sessionStorage.removeItem('_ui_replay_state'); } catch(e) {}
 
                     // 加载目标页面到 iframe
                     var baseUrl = data.base_url || '';
