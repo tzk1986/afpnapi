@@ -703,12 +703,17 @@ def ui_testing_reports_page() -> ResponseReturnValue:
 def api_ui_testing_execution_screenshot(
     job_id: str, step_index: int
 ) -> ResponseReturnValue:
-    """返回步骤截图（优先主动截图，其次失败截图）。"""
+    """返回步骤截图（优先主动截图，其次失败截图；支持 PNG 和 HTML 格式）。"""
     base = _execution_store.base_dir.resolve() / f"exec_{job_id}" / "screenshots"
-    for name in [f"step_{step_index}.png", f"step_{step_index}_fail.png"]:
+    for name, mime in [
+        (f"step_{step_index}.png", "image/png"),
+        (f"step_{step_index}_fail.png", "image/png"),
+        (f"step_{step_index}.html", "text/html; charset=utf-8"),
+        (f"step_{step_index}_fail.html", "text/html; charset=utf-8"),
+    ]:
         path = base / name
         if path.is_file():
-            return send_file(str(path), mimetype="image/png")
+            return send_file(str(path), mimetype=mime)
     return json_error("截图不存在", 404, "UIT_SCREENSHOT_001")
 
 

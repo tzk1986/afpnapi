@@ -552,19 +552,28 @@
             var stepIdx = parseInt(el.getAttribute('data-step'));
             var modal = document.getElementById('screenshotModal');
             var imgEl = document.getElementById('screenshotImg');
+            var frameEl = document.getElementById('screenshotFrame');
             var titleEl = document.getElementById('screenshotTitle');
             var stepStatus = el.getAttribute('data-status') || 'failed';
             titleEl.textContent = '步骤 ' + (stepIdx + 1) + (stepStatus === 'failed' ? ' 失败截图' : ' 截图');
-            imgEl.src = '/api/ui-testing/execution/' + jobId + '/screenshot/' + stepIdx;
-            imgEl.style.display = 'block';
-            imgEl.onerror = function() {
-                imgEl.style.display = 'none';
-                document.getElementById('screenshotNoImg').style.display = 'block';
-            };
-            imgEl.onload = function() {
-                document.getElementById('screenshotNoImg').style.display = 'none';
-            };
+            imgEl.style.display = 'none';
+            frameEl.style.display = 'none';
             document.getElementById('screenshotNoImg').style.display = 'none';
+            var url = '/api/ui-testing/execution/' + jobId + '/screenshot/' + stepIdx;
+            fetch(url, { method: 'HEAD' }).then(function(resp) {
+                var ct = resp.headers.get('Content-Type') || '';
+                if (ct.indexOf('text/html') >= 0) {
+                    frameEl.src = url;
+                    frameEl.style.display = 'block';
+                } else if (resp.ok) {
+                    imgEl.src = url;
+                    imgEl.style.display = 'block';
+                } else {
+                    document.getElementById('screenshotNoImg').style.display = 'block';
+                }
+            }).catch(function() {
+                document.getElementById('screenshotNoImg').style.display = 'block';
+            });
             modal.classList.add('show');
         }
 
@@ -684,6 +693,7 @@
             <button class="modal-close" onclick="closeScreenshotModal()">&times;</button>
             <h3 id="screenshotTitle">失败截图</h3>
             <img id="screenshotImg" src="" alt="截图">
+            <iframe id="screenshotFrame" src="" style="display:none;width:100%;height:70vh;border:none;border-radius:8px;"></iframe>
             <div class="modal-no-img" id="screenshotNoImg" style="display:none">暂无截图</div>
         </div>
     </div>
