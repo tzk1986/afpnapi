@@ -192,6 +192,7 @@
 
         function buildStepDetail(step) {
             if (step.action === 'navigate') return truncate(step.value || '', 60);
+            if (step.action === 'switch_tab') return truncate(step.page_title || step.page_url || step.tab_url || '', 60);
             if (step.action === 'wait') return (step.value || '1000') + 'ms';
             var sel = '';
             if (step.selector) {
@@ -488,8 +489,9 @@
         function onNavigate(navData) {
             var url = (typeof navData === 'string') ? navData : (navData.url || '');
             var isNewTab = (typeof navData === 'object' && navData.new_tab) || false;
+            var isSwitchTab = (typeof navData === 'object' && navData.switch_tab) || false;
             if (!url) return;
-            console.log('[onNavigate] url=', url, 'new_tab=', isNewTab);
+            console.log('[onNavigate] url=', url, 'new_tab=', isNewTab, 'switch_tab=', isSwitchTab);
             // 诊断日志：记录导航详情
             console.log('[onNavigate] navData type:', typeof navData, 'navData:', JSON.stringify(navData));
 
@@ -564,8 +566,8 @@
             // 判断3：完整URL — 区分同origin SPA路由 vs 真正跨origin导航
             else if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
                 var navOrigin = urlObj.protocol + '//' + urlObj.host;
-                if (isNewTab) {
-                    // new_tab 走 SPA fallback 格式，让 iframe 的 location.pathname 等于目标路径
+                if (isNewTab || isSwitchTab) {
+                    // new_tab / switch_tab 走 SPA fallback 格式，让 iframe 的 location.pathname 等于目标路径
                     // 这样 Vue Router 等 SPA 框架可以正确匹配路由
                     shouldNavigate = true;
                     var targetPath = urlObj.pathname + urlObj.search + urlObj.hash;
@@ -609,8 +611,8 @@
                 }
             }
 
-            // new_tab 兜底：如果以上条件都没匹配到，强制走 SPA fallback 格式
-            if (isNewTab && !shouldNavigate && !proxyUrl) {
+            // new_tab / switch_tab 兜底：如果以上条件都没匹配到，强制走 SPA fallback 格式
+            if ((isNewTab || isSwitchTab) && !shouldNavigate && !proxyUrl) {
                 shouldNavigate = true;
                 var fallbackPath = urlObj.pathname + urlObj.search + urlObj.hash;
                 var effectiveUrl = (url.indexOf('http') === 0) ? url : (initialTargetOrigin + url);
@@ -626,7 +628,7 @@
                 document.getElementById('iframeLoading').textContent = '正在导航到: ' + url;
                 document.getElementById('replayFrame').src = proxyUrl;
                 replayStarted = false;
-                if (isNewTab) {
+                if (isNewTab || isSwitchTab) {
                     lastNewTabProxyUrl = proxyUrl;
                     lastNewTabTime = Date.now();
                 }

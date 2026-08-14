@@ -491,6 +491,55 @@ class UiHeadlessEngine:
                             }""")
                         except Exception:
                             pass
+                elif action == "switch_tab":
+                    # switch_tab：切换到另一个标签页（方案A：复用当前 page，导航到新 URL）
+                    switch_url = (
+                        step.get("page_url", "")
+                        or step.get("tab_url", "")
+                        or step.get("value", "")
+                    )
+                    logger.info(
+                        "headless_switch_tab",
+                        extra={
+                            "event": "headless.switch_tab",
+                            "url": switch_url[:200] if switch_url else "",
+                            "tab_id": step.get("tab_id", ""),
+                            "page_title": step.get("page_title", ""),
+                        },
+                    )
+                    navigation_error = ""
+                    actual_url = ""
+                    if switch_url:
+                        try:
+                            page.goto(switch_url, wait_until="load", timeout=15000)
+                            page.wait_for_load_state("networkidle", timeout=10000)
+                            actual_url = page.url
+                            if not self._urls_match(page.url, switch_url):
+                                navigation_error = (
+                                    f"switch_tab 页面未到达目标 URL: "
+                                    f"当前={page.url[:120]}, 目标={switch_url[:120]}"
+                                )
+                            else:
+                                time.sleep(0.5)
+                                try:
+                                    page.wait_for_load_state(
+                                        "networkidle", timeout=5000
+                                    )
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            navigation_error = f"switch_tab 页面导航失败: {e}"
+                    else:
+                        navigation_error = "switch_tab 无可用 URL"
+
+                    switch_passed = bool(actual_url) and not navigation_error
+                    step_result = {
+                        "action": "switch_tab",
+                        "selector": {},
+                        "value": actual_url or switch_url,
+                        "status": "passed" if switch_passed else "failed",
+                        "error": navigation_error if navigation_error else "",
+                    }
                 else:
                     # new_tab 下一步 pre-check（framenavigated + SPA history hook + 当前 URL 对比）
                     if _pending_new_tab_url:

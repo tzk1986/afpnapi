@@ -1739,6 +1739,31 @@ _REPLAYER_JS = r"""
         return;
       }
 
+      // switch_tab 动作：切换到另一个标签页（方案A：复用单 iframe，切换 _proxy_url）
+      if (action === 'switch_tab') {
+        // URL 来源优先级：page_url（真实目标 URL）> tab_url（代理 URL）> value
+        var switchUrl = step.page_url || step.tab_url || step.value || '';
+        console.log('[ReplayEngine] switch_tab: url=', (switchUrl || '').substring(0, 120),
+          'tab_id=', step.tab_id, 'page_title=', step.page_title || '');
+        result.duration_ms = Date.now() - stepStart;
+        if (switchUrl) {
+          // 通知父页面切换 iframe URL（与 new_tab 类似，但标记为 switch_tab）
+          self._notifyParent('navigate', { url: switchUrl, switch_tab: true });
+          if (typeof self._sendLog === 'function') {
+            try { self._sendLog('switch_tab', '切换到标签页: ' + (step.page_title || switchUrl.substring(0, 60)), { url: switchUrl, tab_id: step.tab_id }); } catch(e) {}
+          }
+        } else {
+          console.warn('[ReplayEngine] switch_tab: no URL available in step data');
+          if (typeof self._sendLog === 'function') {
+            try { self._sendLog('switch_tab_no_url', 'switch_tab 步骤无可用 URL，跳过切换', {}, 'warn'); } catch(e) {}
+          }
+        }
+        self.results.push(result);
+        self._saveStateToParent();
+        self._notifyParent('step_complete', result);
+        return;
+      }
+
       // date_select 动作：处理日期选择器
       if (action === 'date_select') {
         // 等待日期输入框出现

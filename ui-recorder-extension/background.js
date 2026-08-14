@@ -283,6 +283,47 @@ chrome.tabs.onCreated.addListener(async (tab) => {
   });
 });
 
+// tab 切换时，记录 switch_tab 动作（方案A：单 iframe 复用）
+let _lastActiveTabId = null;
+let _tabUrlMap = new Map(); // tabId -> URL 映射
+
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  if (!recordingState.active) return;
+  // 跳过切换回上一个 tab 的情况（防止循环切换事件）
+  if (_lastActiveTabId === activeInfo.tabId) return;
+
+  try {
+    const tab = await chrome.tabs.get(activeInfo.tabId);
+    // 跳过 chrome:// 等内部页面
+    if (!tab.url || (!tab.url.startsWith('http://') && !tab.url.startsWith('https://'))) return;
+
+    _tabUrlMap.set(activeInfo.tabId, tab.url);
+
+    // 记录 switch_tab 步骤
+    recordingState.stepCount++;
+    _persistState();
+    postEventToServer('step', {
+      action: 'switch_tab',
+      tab_id: activeInfo.tabId,
+      tab_url: tab.url || '',
+      page_url: _extractTargetUrl(tab.url) || '',
+      page_title: tab.title || '',
+      step_index: recordingState.stepCount,
+    });
+
+    _lastActiveTabId = activeInfo.tabId;
+  } catch (e) {
+    console.warn('[Background] onActivated error:', e.message);
+  }
+});
+
+// tab URL 更新时，同步映射
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url) {
+    _tabUrlMap.set(tabId, changeInfo.url);
+  }
+});
+
 // tab 导航完成时，确保 content script 存在并启动录制
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!recordingState.active) return;

@@ -476,3 +476,92 @@ class TestFullRecordingFlow:
         # 8. 确认已删除
         resp = client.get(f"/api/ui-recorder/session/{session_id}")
         assert resp.status_code == 404
+
+
+class TestSwitchTabRecording:
+    """switch_tab 步骤录制与存储测试。"""
+
+    def test_switch_tab_step_stored_with_tab_fields(self, client) -> None:
+        """switch_tab 步骤应完整存储 tab_id、tab_url、page_url、page_title 字段。"""
+        session_id = "rec_switch_tab"
+        client.post(
+            "/api/ui-recorder/event",
+            json={
+                "session_id": session_id,
+                "event_type": "session_start",
+                "data": {},
+            },
+        )
+        # 先发送一个普通步骤
+        client.post(
+            "/api/ui-recorder/event",
+            json={
+                "session_id": session_id,
+                "event_type": "step",
+                "data": {
+                    "action": "click",
+                    "selector": {"primary": "#btn"},
+                    "page_url": "http://example.com/page1",
+                },
+            },
+        )
+        # 发送 switch_tab 步骤
+        resp = client.post(
+            "/api/ui-recorder/event",
+            json={
+                "session_id": session_id,
+                "event_type": "step",
+                "data": {
+                    "action": "switch_tab",
+                    "tab_id": 42,
+                    "tab_url": "http://proxy:9001/ui-testing/proxy?url=http%3A%2F%2Fexample.com%2Fpage2",
+                    "page_url": "http://example.com/page2",
+                    "page_title": "Page Two",
+                    "step_index": 2,
+                },
+            },
+        )
+        assert resp.status_code == 200
+
+        # 验证会话详情中 switch_tab 步骤字段完整
+        resp = client.get(f"/api/ui-recorder/session/{session_id}")
+        assert resp.status_code == 200
+        session = resp.get_json()["data"]
+        assert len(session["steps"]) == 2
+        switch_step = session["steps"][1]
+        assert switch_step["action"] == "switch_tab"
+        assert switch_step["tab_id"] == 42
+        assert switch_step["page_url"] == "http://example.com/page2"
+        assert switch_step["page_title"] == "Page Two"
+        assert "tab_url" in switch_step
+
+    def test_export_includes_switch_tab(self, client) -> None:
+        """导出录制会话时应包含 switch_tab 步骤。"""
+        session_id = "rec_export_switch"
+        client.post(
+            "/api/ui-recorder/event",
+            json={
+                "session_id": session_id,
+                "event_type": "session_start",
+                "data": {},
+            },
+        )
+        client.post(
+            "/api/ui-recorder/event",
+            json={
+                "session_id": session_id,
+                "event_type": "step",
+                "data": {
+                    "action": "switch_tab",
+                    "tab_id": 10,
+                    "page_url": "http://example.com/other",
+                    "page_title": "Other Page",
+                },
+            },
+        )
+        resp = client.get(f"/api/ui-recorder/session/{session_id}/export")
+        assert resp.status_code == 200
+        exported = resp.get_json()
+        assert len(exported["steps"]) == 1
+        assert exported["steps"][0]["action"] == "switch_tab"
+        assert exported["steps"][0]["page_url"] == "http://example.com/other"

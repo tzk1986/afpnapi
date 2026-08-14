@@ -1,6 +1,6 @@
 """UI 录制器注入脚本生成器单元测试。"""
 
-from postman_api_tester.services.ui_recorder_inject import get_recorder_js
+from postman_api_tester.services.ui_recorder_inject import get_recorder_js, get_replayer_js
 
 
 class TestGetRecorderJs:
@@ -42,3 +42,35 @@ class TestGetRecorderJs:
         assert "handleInput" in code
         assert "handleSubmit" in code
         assert "handleKeydown" in code
+
+
+class TestGetReplayerJs:
+    """get_replayer_js() 回放引擎脚本生成测试。"""
+
+    def test_replayer_contains_basic_actions(self) -> None:
+        code = get_replayer_js()
+        assert "ReplayEngine" in code
+        assert "_executeStep" in code
+        assert "click" in code
+
+    def test_replayer_handles_new_tab(self) -> None:
+        code = get_replayer_js()
+        assert "new_tab" in code
+        assert "_notifyParent" in code
+
+    def test_replayer_handles_switch_tab(self) -> None:
+        """回放引擎必须包含 switch_tab 动作处理。"""
+        code = get_replayer_js()
+        assert "switch_tab" in code
+        # 验证 switch_tab 使用 page_url / tab_url 作为 URL 来源
+        assert "step.page_url" in code
+        assert "step.tab_url" in code
+        # 验证 switch_tab 通知父页面切换 iframe
+        assert "switch_tab: true" in code
+
+    def test_replayer_switch_tab_notifies_parent(self) -> None:
+        """switch_tab 应通过 notifyParent 发送 navigate 消息。"""
+        code = get_replayer_js()
+        # 验证 switch_tab 块中有 navigate 通知
+        assert "'navigate'" in code
+        assert "switch_tab" in code
