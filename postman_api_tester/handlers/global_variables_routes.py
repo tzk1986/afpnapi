@@ -11,7 +11,9 @@
 
 from __future__ import annotations
 
+import functools
 import logging
+from typing import Any, Callable
 
 from flask import request
 from flask.typing import ResponseReturnValue
@@ -51,13 +53,29 @@ def _check_enabled() -> str:
     return file_path
 
 
+def require_global_variables_enabled(func: Callable[..., ResponseReturnValue]) -> Callable[..., ResponseReturnValue]:
+    """装饰器：检查全局变量功能是否启用。
+
+    如果 GLOBAL_VARIABLES_FILE 为空，返回 403 错误。
+    用于消除重复的 _check_enabled() 检查代码。
+
+    注意：api_env_list_get() 有降级行为（返回默认环境列表），不使用此装饰器。
+    """
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> ResponseReturnValue:
+        file_path = _check_enabled()
+        if not file_path:
+            return json_error(
+                "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
+            )
+        return func(*args, **kwargs)
+    return wrapper
+
+
+@require_global_variables_enabled
 def api_global_variables_get() -> ResponseReturnValue:
     """GET /api/global-variables?scope=shared&env_name=X&masked=true — 读取变量列表（默认脱敏）。"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     scope = request.args.get("scope", "shared").strip()
     env_name = request.args.get("env_name", "").strip()
@@ -87,13 +105,10 @@ def api_global_variables_get() -> ResponseReturnValue:
     )
 
 
+@require_global_variables_enabled
 def api_global_variables_all() -> ResponseReturnValue:
     """GET /api/global-variables/all?masked=true — 读取全部（shared + 所有 env），默认脱敏。"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     do_mask = request.args.get("masked", "true").strip().lower() in {"1", "true", "yes"}
     data = read_all(file_path, _get_max_count())
@@ -132,13 +147,10 @@ def api_global_variables_all() -> ResponseReturnValue:
     )
 
 
+@require_global_variables_enabled
 def api_global_variables_set() -> ResponseReturnValue:
     """POST /api/global-variables — 设置变量。body: {scope, key, value, env_name?}"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     body = request.get_json(silent=True) or {}
     scope = str(body.get("scope", "shared")).strip()
@@ -160,13 +172,10 @@ def api_global_variables_set() -> ResponseReturnValue:
     )
 
 
+@require_global_variables_enabled
 def api_global_variables_delete(key: str = "") -> ResponseReturnValue:
     """DELETE /api/global-variables/<key>?scope=shared&env_name=X — 删除单个变量。"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     if not key:
         return json_error("缺少 key 参数", 400, "GV_DEL_001")
@@ -182,13 +191,10 @@ def api_global_variables_delete(key: str = "") -> ResponseReturnValue:
     return BaseHandler.json_response({"deleted": True, "key": key})
 
 
+@require_global_variables_enabled
 def api_global_variables_clear() -> ResponseReturnValue:
     """DELETE /api/global-variables?scope=shared&env_name=X — 清空指定作用域。"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     scope = request.args.get("scope", "shared").strip()
     env_name = request.args.get("env_name", "").strip()
@@ -218,13 +224,10 @@ def api_env_list_get() -> ResponseReturnValue:
     return BaseHandler.json_response({"env_list": env_list})
 
 
+@require_global_variables_enabled
 def api_env_add() -> ResponseReturnValue:
     """POST /api/environments — 添加新环境。body: {name}"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     body = request.get_json(silent=True) or {}
     name = str(body.get("name", "")).strip()
@@ -239,13 +242,10 @@ def api_env_add() -> ResponseReturnValue:
     return BaseHandler.json_response({"env_list": result["env_list"]})
 
 
+@require_global_variables_enabled
 def api_env_remove(env_name: str) -> ResponseReturnValue:
     """DELETE /api/environments/<env_name> — 删除环境。"""
-    file_path = _check_enabled()
-    if not file_path:
-        return json_error(
-            "全局变量持久化未启用（GLOBAL_VARIABLES_FILE 为空）", 403, "GV_DISABLED_001"
-        )
+    file_path = _get_file_path()
 
     result = remove_env(file_path, env_name)
     if "error" in result:
