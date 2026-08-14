@@ -1,11 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.33.6
+版本：v1.33.7
 发布日期：2026-08-13
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
 
-本版新增重点（v1.33.6）：
-- **装饰器模式优化**：全局变量路由使用 `@require_global_variables_enabled` 装饰器，消除 6 处重复检查代码
+本版新增重点（v1.33.7）：
+- **switch_tab 标签页切换录制与回放**：Chrome 扩展录制时通过 `chrome.tabs.onActivated` 自动捕获标签页切换动作，回放引擎 (`ui_recorder_inject.py`) 和无头引擎 (`ui_headless_engine.py`) 均支持 `switch_tab` 动作（方案A：单 iframe 复用，切换时修改 iframe `_proxy_url`）；编辑器新增 `switch_tab` 动作选项和紫色样式；Chrome 插件版本升级到 1.4.5
+- **装饰器模式优化** (v1.33.6)：全局变量路由使用 `@require_global_variables_enabled` 装饰器，消除 6 处重复检查代码
 
 本版新增重点（v1.33.5）：
 - **代码质量改进**：添加 `from __future__ import annotations`、修复冗余 open 参数和引号类型注解
