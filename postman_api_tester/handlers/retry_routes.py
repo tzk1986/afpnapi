@@ -1,7 +1,7 @@
 """重试失败用例与全量重试路由处理函数。"""
 
 from functools import partial
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple, cast
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -81,10 +81,11 @@ def _dispatch_retry(retry_mode: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, _RETRY_REPORT_ERROR_CODE[retry_mode])
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     paths, source_runtime_ctx, source_runtime_error = _job_prepare_retry_job_context(
         payload=payload,
-        report=report,
+        report=report_dict,
         retry_mode=retry_mode,
         output_dir=str(REPORTS_DIR),
         default_results_per_page=RUN_RESULTS_PER_PAGE_DEFAULT,

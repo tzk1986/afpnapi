@@ -6,8 +6,7 @@
 import logging
 import time
 import uuid
-from typing import Optional
-from typing import Union
+from typing import Any, Dict, Optional, Union, cast
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from flask import abort, make_response, redirect, render_template, request, url_for
@@ -622,8 +621,8 @@ def _build_proxy_response(
 def ui_testing_proxy() -> ResponseReturnValue:
     """反向代理端点：获取外部 URL 并改写 HTML。"""
     ctx = _prepare_proxy_context()
-    if len(ctx) != 4:
-        return ctx  # type: ignore[return-value]
+    if not isinstance(ctx, tuple) or len(ctx) != 4:
+        return ctx
     target_url, base_url, recording_mode, replay_mode = ctx
 
     session_id = _get_or_create_proxy_session(base_url, recording_mode)
@@ -631,12 +630,13 @@ def ui_testing_proxy() -> ResponseReturnValue:
     fetch_result = _execute_proxy_fetch(
         target_url, session_id, base_url, replay_mode, recording_mode
     )
-    if len(fetch_result) != 3:
-        return fetch_result  # type: ignore[return-value]
+    if not isinstance(fetch_result, tuple) or len(fetch_result) != 3:
+        return fetch_result
     body, status_code, headers = fetch_result
 
     return _build_proxy_response(
-        body, status_code, headers, session_id, target_url, base_url
+        cast("str | bytes", body), status_code, cast(dict, headers),
+        session_id, target_url, base_url
     )
 
 

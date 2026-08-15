@@ -1,8 +1,11 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.33.7
-发布日期：2026-08-13
+版本：v1.33.9
+发布日期：2026-08-15
 文档定位：新人入口，总览目录、安装、配置、首次执行与报告查看。
+
+本版新增重点（v1.33.9）：
+- **mypy 类型错误清零**：修复 9 个文件共 42 处类型错误，使用 isinstance + cast 模式统一处理 tuple 解包和 get_report_or_error 返回类型收窄
 
 本版新增重点（v1.33.7）：
 - **switch_tab 标签页切换录制与回放**：Chrome 扩展录制时通过 `chrome.tabs.onActivated` 自动捕获标签页切换动作，回放引擎 (`ui_recorder_inject.py`) 和无头引擎 (`ui_headless_engine.py`) 均支持 `switch_tab` 动作（方案A：单 iframe 复用，切换时修改 iframe `_proxy_url`）；编辑器新增 `switch_tab` 动作选项和紫色样式；Chrome 插件版本升级到 1.4.5

@@ -3,6 +3,8 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any, Dict, cast
+
 from flask import Response, jsonify, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
@@ -101,10 +103,11 @@ def api_export_collection() -> ResponseReturnValue:
     report = get_report_or_error(report_name, "COL_EXPORT_002")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     try:
         exported = _svc_export_collection_with_latest_params(
-            report,
+            report_dict,
             exports_dir=EXPORTS_DIR,
             collection_preview_max_items=COLLECTION_PREVIEW_MAX_ITEMS,
             enable_manual_cases=ENABLE_MANUAL_CASES,
@@ -149,10 +152,11 @@ def api_export_collection_stream() -> ResponseReturnValue:
     report = get_report_or_error(report_name, "COL_EXPORT_002")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     try:
         exported = _svc_export_collection_with_latest_params(
-            report,
+            report_dict,
             exports_dir=EXPORTS_DIR,
             collection_preview_max_items=COLLECTION_PREVIEW_MAX_ITEMS,
             enable_manual_cases=ENABLE_MANUAL_CASES,

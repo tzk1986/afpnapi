@@ -455,9 +455,9 @@ class PostmanTestExecutor:
                 "body": body,
             }
             response_info: ResponseInfo = {
-                "headers": dict(response.headers),
+                "headers": dict(response.headers),  # type: ignore[attr-defined]
                 "body": response_data,
-            }  # type: ignore[attr-defined]
+            }
 
             # 结果判定
             judgment_passed, judgment_fail_reason = self._evaluate_judgment(

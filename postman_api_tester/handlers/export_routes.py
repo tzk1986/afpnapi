@@ -3,6 +3,7 @@
 import logging
 import re
 from pathlib import Path
+from typing import Any, Dict, cast
 
 from flask import make_response
 from flask.typing import ResponseReturnValue
@@ -29,9 +30,10 @@ def api_export_junit(report_name: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, "COL_JUNIT_002")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     try:
-        xml_content = _svc_build_junit_xml(report)
+        xml_content = _svc_build_junit_xml(report_dict)
     except Exception as exc:
         logger.exception("JUnit XML 生成失败: %s", exc)
         return _json_error("JUnit XML 生成失败", 500, "COL_JUNIT_003")
