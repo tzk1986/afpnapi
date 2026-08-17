@@ -2,6 +2,7 @@
 
 import uuid
 from functools import partial
+from typing import Any, Dict, cast
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -93,7 +94,8 @@ def api_report_detail(report_name: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, "RPT_META_001")
     if isinstance(report, tuple):
         return report
-    return jsonify(build_report_meta_payload(report))
+    report_dict = cast(Dict[str, Any], report)
+    return jsonify(build_report_meta_payload(report_dict))
 
 
 def api_manual_cases(report_name: str) -> ResponseReturnValue:
@@ -101,10 +103,11 @@ def api_manual_cases(report_name: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, "RPT_META_002")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     payload = build_manual_cases_payload(
         report_name=report_name,
-        report=report,
+        report=report_dict,
         default_folder=MANUAL_CASE_FOLDER_NAME,
         enabled=ENABLE_MANUAL_CASES,
     )

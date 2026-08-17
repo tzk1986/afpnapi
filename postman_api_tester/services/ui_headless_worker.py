@@ -80,12 +80,12 @@ def main() -> None:
         _write_output(output)
 
     except Exception as e:
-        error_output: Dict[str, Any] = {
+        exception_output: Dict[str, Any] = {
             "success": False,
             "error": str(e)[:500],
             "traceback": traceback.format_exc()[-2000:],
         }
-        _write_output(error_output)
+        _write_output(exception_output)
         sys.exit(1)
 
 

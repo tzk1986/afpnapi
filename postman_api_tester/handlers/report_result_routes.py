@@ -1,5 +1,7 @@
 """报告结果与分析路由处理函数。"""
 
+from typing import Any, Dict, cast
+
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
@@ -56,6 +58,7 @@ def api_report_results(report_name: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, "")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     page = _clamp_page(request.args.get("page", 1))
     page_size = _clamp_page_size(
@@ -70,7 +73,7 @@ def api_report_results(report_name: str) -> ResponseReturnValue:
     status_filter = _normalize_status_filter(request.args.get("status", "all"))
     include_excluded = _to_bool(request.args.get("include_excluded"), default=True)
     payload = _build_report_results_payload(
-        report=report,
+        report=report_dict,
         page=page,
         page_size=page_size,
         keyword=keyword,
@@ -94,6 +97,7 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
     report = get_report_or_error(report_name, "")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -106,7 +110,7 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
         include_samples_default=REPORT_ANALYTICS_ENABLE_SAMPLES,
     )
     payload = _build_analytics_payload(
-        report=report,
+        report=report_dict,
         reports=_repo_list_reports(),
         top_n=int(params["top_n"]),
         trend_limit=int(params["trend_limit"]),
@@ -142,9 +146,11 @@ def api_report_analytics_compare() -> ResponseReturnValue:
     left_report = get_report_or_error(left_name, "")
     if isinstance(left_report, tuple):
         return left_report
+    left_report_dict = cast(Dict[str, Any], left_report)
     right_report = get_report_or_error(right_name, "")
     if isinstance(right_report, tuple):
         return right_report
+    right_report_dict = cast(Dict[str, Any], right_report)
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -157,8 +163,8 @@ def api_report_analytics_compare() -> ResponseReturnValue:
         include_samples_default=REPORT_ANALYTICS_ENABLE_SAMPLES,
     )
     payload = _build_analytics_compare_payload(
-        left_report=left_report,
-        right_report=right_report,
+        left_report=left_report_dict,
+        right_report=right_report_dict,
         reports=_repo_list_reports(),
         top_n=int(params["top_n"]),
         trend_limit=int(params["trend_limit"]),
@@ -180,9 +186,10 @@ def api_report_result_detail(
     report = get_report_or_error(report_name, "")
     if isinstance(report, tuple):
         return report
+    report_dict = cast(Dict[str, Any], report)
 
     try:
-        return jsonify(build_result_detail_payload(report, result_index))
+        return jsonify(build_result_detail_payload(report_dict, result_index))
     except IndexError:
         from postman_api_tester.exceptions import ValidationError
 
@@ -204,7 +211,9 @@ def api_compare() -> ResponseReturnValue:
     left = get_report_or_error(left_name, "")
     if isinstance(left, tuple):
         return left
+    left_dict = cast(Dict[str, Any], left)
     right = get_report_or_error(right_name, "")
     if isinstance(right, tuple):
         return right
-    return jsonify(build_compare_payload(left, right))
+    right_dict = cast(Dict[str, Any], right)
+    return jsonify(build_compare_payload(left_dict, right_dict))

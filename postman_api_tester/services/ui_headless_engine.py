@@ -10,7 +10,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +170,7 @@ class UiHeadlessEngine:
                 viewport={"width": viewport_w, "height": viewport_h}
             )
             page = context.new_page()
+            assert page is not None
             page.set_default_timeout(timeout_ms)
 
             # 监听网络请求
@@ -212,7 +213,7 @@ class UiHeadlessEngine:
                 nonlocal _redirect_detected
                 if _redirect_detected:
                     return
-                if frame != page.main_frame:
+                if frame != cast(Any, page).main_frame:
                     return
                 new_url = frame.url
                 target = _pending_new_tab_url
