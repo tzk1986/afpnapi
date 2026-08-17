@@ -117,16 +117,17 @@ def _execute_with_signal_timeout(
     def _handler(signum: int, frame: object) -> None:
         raise _TimeoutError("pre-request expression timeout")
 
-    old_handler = signal.signal(signal.SIGALRM, _handler)  # type: ignore[attr-defined]
-    signal.setitimer(signal.ITIMER_REAL, timeout)  # type: ignore[attr-defined]
+    # signal.SIGALRM/setitimer 仅在 Unix 上可用，此函数只在非 Windows 平台调用
+    old_handler = signal.signal(signal.SIGALRM, _handler)  # type: ignore[attr-defined,unused-ignore]
+    signal.setitimer(signal.ITIMER_REAL, timeout)  # type: ignore[attr-defined,unused-ignore]
     try:
         return _execute_expression(expression, sandbox_globals)
     except _TimeoutError:
         logger.warning("pre-request expression timeout (%.1fs)", timeout)
         return ""
     finally:
-        signal.setitimer(signal.ITIMER_REAL, 0)  # type: ignore[attr-defined]
-        signal.signal(signal.SIGALRM, old_handler)  # type: ignore[attr-defined]
+        signal.setitimer(signal.ITIMER_REAL, 0)  # type: ignore[attr-defined,unused-ignore]
+        signal.signal(signal.SIGALRM, old_handler)  # type: ignore[attr-defined,unused-ignore]
 
 
 def _execute_with_timeout(expression: str, sandbox_globals: dict[str, object]) -> str:

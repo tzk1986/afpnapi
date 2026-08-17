@@ -957,7 +957,8 @@ class UiHeadlessEngine:
         elif strategy == "text":
             return page.get_by_text(value)
         elif strategy == "role":
-            return page.get_by_role(value)  # type: ignore[arg-type]
+            # Playwright 的 ARIA role 类型在不同版本中定义可能不同
+            return page.get_by_role(cast("Any", value))  # type: ignore[arg-type,unused-ignore]
         else:
             return page.locator(value).first
 
