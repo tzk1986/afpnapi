@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 _HEADLESS_LOG_DIR = Path("logs/headless")
 _HEADLESS_LOG_RETENTION_DAYS = 10
 
+# 超时常量（毫秒）
+DEFAULT_TIMEOUT_MS = 30000
+NAVIGATION_TIMEOUT_MS = 15000
+PAGE_LOAD_TIMEOUT_MS = 10000
+QUICK_LOAD_TIMEOUT_MS = 5000
+DOM_CONTENT_TIMEOUT_MS = 3000
+
 
 def _cleanup_old_logs() -> None:
     """清理超过保留天数的无头执行日志。"""
@@ -111,7 +118,7 @@ class UiHeadlessEngine:
             on_step_complete: 回调 (step_index, step_result_dict) -> None
             on_browser_ready: 浏览器启动完成回调 () -> None
         """
-        timeout_ms = options.get("timeout", 30000)
+        timeout_ms = options.get("timeout", DEFAULT_TIMEOUT_MS)
         delay_ms = options.get("delay_between_steps", 200)
         viewport_w = options.get("viewport_width", 1280)
         viewport_h = options.get("viewport_height", 720)
@@ -303,8 +310,8 @@ class UiHeadlessEngine:
                     # 优先级：弹窗页面 > 步骤数据解析
                     if popup_page is not None:
                         try:
-                            popup_page.wait_for_load_state("load", timeout=10000)
-                            popup_page.wait_for_load_state("networkidle", timeout=10000)
+                            popup_page.wait_for_load_state("load", timeout=PAGE_LOAD_TIMEOUT_MS)
+                            popup_page.wait_for_load_state("networkidle", timeout=PAGE_LOAD_TIMEOUT_MS)
                             actual_url = popup_page.url
                             # 验证弹窗 URL 是否到达预期页面
                             resolved_url = self._resolve_new_tab_url(
@@ -329,9 +336,9 @@ class UiHeadlessEngine:
                         _diag["captured_url"] = actual_url[:200]
                         try:
                             _diag["goto_start"] = page.url[:200]
-                            page.goto(actual_url, wait_until="load", timeout=15000)
+                            page.goto(actual_url, wait_until="load", timeout=NAVIGATION_TIMEOUT_MS)
                             _diag["after_load"] = page.url[:200]
-                            page.wait_for_load_state("networkidle", timeout=10000)
+                            page.wait_for_load_state("networkidle", timeout=PAGE_LOAD_TIMEOUT_MS)
                             _diag["after_idle1"] = page.url[:200]
                             if not self._urls_match(page.url, actual_url):
                                 navigation_error = f"页面跳转未到达目标 URL: 当前={page.url[:120]}, 目标={actual_url[:120]}"
@@ -339,7 +346,7 @@ class UiHeadlessEngine:
                                 time.sleep(0.5)
                                 try:
                                     page.wait_for_load_state(
-                                        "networkidle", timeout=5000
+                                        "networkidle", timeout=QUICK_LOAD_TIMEOUT_MS
                                     )
                                 except Exception:
                                     pass
@@ -375,10 +382,10 @@ class UiHeadlessEngine:
                                 if popup_page is not None:
                                     try:
                                         popup_page.wait_for_load_state(
-                                            "load", timeout=10000
+                                            "load", timeout=PAGE_LOAD_TIMEOUT_MS
                                         )
                                         popup_page.wait_for_load_state(
-                                            "networkidle", timeout=10000
+                                            "networkidle", timeout=PAGE_LOAD_TIMEOUT_MS
                                         )
                                         actual_url = popup_page.url
                                         _diag["popup_captured"] = True
@@ -393,7 +400,7 @@ class UiHeadlessEngine:
                                             )
                                             page.reload(wait_until="load")
                                             page.wait_for_load_state(
-                                                "networkidle", timeout=10000
+                                                "networkidle", timeout=PAGE_LOAD_TIMEOUT_MS
                                             )
                                             _diag["token_injected"] = True
                                     except Exception as e:
@@ -404,7 +411,7 @@ class UiHeadlessEngine:
                                     _diag["popup_captured"] = False
                                     _diag["goto_start"] = page.url[:200]
                                     page.goto(
-                                        actual_url, wait_until="load", timeout=15000
+                                        actual_url, wait_until="load", timeout=NAVIGATION_TIMEOUT_MS
                                     )
                                     _diag["after_load"] = page.url[:200]
                                     # 注入 SSO token 到 9301 的 localStorage
@@ -416,7 +423,7 @@ class UiHeadlessEngine:
                                         page.reload(wait_until="load")
                                         _diag["after_token_inject"] = page.url[:200]
                                     page.wait_for_load_state(
-                                        "networkidle", timeout=10000
+                                        "networkidle", timeout=PAGE_LOAD_TIMEOUT_MS
                                     )
                                     _diag["after_idle1"] = page.url[:200]
                                     if not self._urls_match(page.url, actual_url):
@@ -428,7 +435,7 @@ class UiHeadlessEngine:
                                         time.sleep(0.5)
                                         try:
                                             page.wait_for_load_state(
-                                                "networkidle", timeout=5000
+                                                "networkidle", timeout=QUICK_LOAD_TIMEOUT_MS
                                             )
                                         except Exception:
                                             pass
@@ -512,8 +519,8 @@ class UiHeadlessEngine:
                     actual_url = ""
                     if switch_url:
                         try:
-                            page.goto(switch_url, wait_until="load", timeout=15000)
-                            page.wait_for_load_state("networkidle", timeout=10000)
+                            page.goto(switch_url, wait_until="load", timeout=NAVIGATION_TIMEOUT_MS)
+                            page.wait_for_load_state("networkidle", timeout=PAGE_LOAD_TIMEOUT_MS)
                             actual_url = page.url
                             if not self._urls_match(page.url, switch_url):
                                 navigation_error = (
@@ -524,7 +531,7 @@ class UiHeadlessEngine:
                                 time.sleep(0.5)
                                 try:
                                     page.wait_for_load_state(
-                                        "networkidle", timeout=5000
+                                        "networkidle", timeout=QUICK_LOAD_TIMEOUT_MS
                                     )
                                 except Exception:
                                     pass
@@ -622,7 +629,7 @@ class UiHeadlessEngine:
                         time.sleep(0.5)
                         # 检测页面 URL 是否已跳转到新系统
                         try:
-                            page.wait_for_load_state("domcontentloaded", timeout=3000)
+                            page.wait_for_load_state("domcontentloaded", timeout=DOM_CONTENT_TIMEOUT_MS)
                         except Exception:
                             pass
                         url_after = page.url
@@ -747,7 +754,7 @@ class UiHeadlessEngine:
                     )
                     if "登" in sel_str and "录" in sel_str:
                         try:
-                            page.wait_for_load_state("networkidle", timeout=10000)
+                            page.wait_for_load_state("networkidle", timeout=PAGE_LOAD_TIMEOUT_MS)
                         except Exception:
                             pass
                         time.sleep(0.5)
