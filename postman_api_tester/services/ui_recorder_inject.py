@@ -1896,13 +1896,6 @@ _REPLAYER_JS = r"""
             // 元素未找到时记录错误并继续执行后续步骤
             self._executeNext();
           }, 'failed');
-            result.screenshot = screenshotData || null;
-            self.results.push(result);
-            self._notifyParent('step_complete', result);
-            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout, navigation_hint: _navHint }, 'warn'); } catch(e) {}
-            // 元素未找到时记录错误并继续执行后续步骤
-            self._executeNext();
-          });
           return;
         }
 
