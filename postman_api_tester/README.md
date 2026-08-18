@@ -1,7 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.33.10
+版本：v1.33.11
 发布日期：2026-08-17
+
+本版新增重点（v1.33.11）：
+- **代码可读性提升**：提取无头引擎超时魔法数字为命名常量（DEFAULT_TIMEOUT_MS、NAVIGATION_TIMEOUT_MS、PAGE_LOAD_TIMEOUT_MS 等），提高维护性
 
 本版新增重点（v1.33.10）：
 - **mypy 跨平台修复**：修复 5 处 type: ignore 在 Windows 与 Linux 上的差异，使用 attr-defined + unused-ignore 组合注释
