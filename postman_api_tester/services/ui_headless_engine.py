@@ -846,6 +846,10 @@ class UiHeadlessEngine:
                 return self._action_assert_disabled(page, selector, timeout_ms)
             elif action == "assert_not_visible":
                 return self._action_assert_not_visible(page, selector, timeout_ms)
+            elif action == "assert_attribute":
+                return self._action_assert_attribute(page, selector, value, timeout_ms)
+            elif action == "assert_toast":
+                return self._action_assert_toast(page, value, timeout_ms)
             elif action == "scroll":
                 return self._action_scroll(page, value)
             elif action in ("select_radio", "check", "uncheck"):
@@ -1492,6 +1496,105 @@ class UiHeadlessEngine:
             "value": "",
             "status": "failed",
             "error": "断言失败: 元素可见",
+        }
+
+    def _action_assert_attribute(
+        self, page: "Page", selector: Any, value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言元素属性值等于期望值。
+
+        value 格式: "attribute=expected_value"，例如 "data-status=active" 或 "href=/home"
+        """
+        if "=" not in value:
+            return {
+                "action": "assert_attribute",
+                "selector": self._selector_to_dict(selector),
+                "value": value,
+                "status": "failed",
+                "error": f"值格式错误，应为 'attribute=expected'，实际 '{value}'",
+            }
+
+        attr_name, expected = value.split("=", 1)
+        attr_name = attr_name.strip()
+        expected = expected.strip()
+
+        el = self._find_element(page, selector, timeout_ms)
+        actual = el.get_attribute(attr_name) or ""
+
+        if actual == expected:
+            return {
+                "action": "assert_attribute",
+                "selector": self._selector_to_dict(selector),
+                "value": value,
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_attribute",
+            "selector": self._selector_to_dict(selector),
+            "value": value,
+            "status": "failed",
+            "error": f"断言失败: 期望属性 '{attr_name}' 为 '{expected}', 实际 '{actual[:80]}'",
+        }
+
+    def _action_assert_toast(
+        self, page: "Page", value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言 toast/通知消息包含指定内容。
+
+        自动检测常见 toast 容器（.toast, .notification, .el-message, .ant-message 等）。
+        value 为期望的消息文本。
+        """
+        # 常见 toast 选择器
+        toast_selectors = [
+            ".toast",
+            ".notification",
+            ".el-message",
+            ".ant-message",
+            ".ant-notification",
+            "[role='alert']",
+            ".message",
+            ".snackbar",
+            ".toast-message",
+            ".notification-message",
+        ]
+
+        for toast_selector in toast_selectors:
+            try:
+                locator = page.locator(toast_selector).first
+                locator.wait_for(state="visible", timeout=min(timeout_ms, 3000))
+                actual = (locator.inner_text() or "").strip()
+                if value in actual:
+                    return {
+                        "action": "assert_toast",
+                        "selector": {"css": toast_selector},
+                        "value": value,
+                        "status": "passed",
+                        "error": "",
+                    }
+            except Exception:
+                continue
+
+        # 如果所有常见选择器都未匹配，尝试查找包含目标文本的元素
+        try:
+            text_locator = page.get_by_text(value)
+            text_locator.first.wait_for(state="visible", timeout=min(timeout_ms, 3000))
+            return {
+                "action": "assert_toast",
+                "selector": {"text": value},
+                "value": value,
+                "status": "passed",
+                "error": "",
+            }
+        except Exception:
+            pass
+
+        return {
+            "action": "assert_toast",
+            "selector": {},
+            "value": value,
+            "status": "failed",
+            "error": f"断言失败: 未找到包含 '{value}' 的 toast 消息",
         }
 
     def _action_scroll(self, page: "Page", value: str) -> Dict[str, Any]:

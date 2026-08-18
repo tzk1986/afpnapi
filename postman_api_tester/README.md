@@ -1,10 +1,13 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.33.12
+版本：v1.33.13
 发布日期：2026-08-18
 
+本版新增重点（v1.33.13）：
+- **UI 断言增强（第二批）**：新增 2 种断言动作 — `assert_attribute`（元素属性值）、`assert_toast`（toast/通知消息内容）
+
 本版新增重点（v1.33.12）：
-- **UI 断言增强**：新增 6 种断言动作 — `assert_title`（页面标题）、`assert_count`（元素数量）、`assert_value`（输入框值）、`assert_enabled`/`assert_disabled`（元素启用/禁用状态）、`assert_not_visible`（元素不可见）
+- **UI 断言增强（第一批）**：新增 6 种断言动作 — `assert_title`（页面标题）、`assert_count`（元素数量）、`assert_value`（输入框值）、`assert_enabled`/`assert_disabled`（元素启用/禁用状态）、`assert_not_visible`（元素不可见）
 
 本版新增重点（v1.33.11）：
 - **代码可读性提升**：提取无头引擎超时魔法数字为命名常量（DEFAULT_TIMEOUT_MS、NAVIGATION_TIMEOUT_MS、PAGE_LOAD_TIMEOUT_MS 等），提高维护性
