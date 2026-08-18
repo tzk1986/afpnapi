@@ -137,7 +137,7 @@
         var selectedStepIndex = null;
         var draggedStepIndex = null;
 
-        var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'new_tab', 'switch_tab', 'date_select', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title'];
+        var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'new_tab', 'switch_tab', 'date_select', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled', 'assert_disabled', 'assert_not_visible'];
 
         function loadCase() {
             fetch('/api/ui-testing/cases/' + caseId)
@@ -234,7 +234,8 @@
                         navigate: 'action-navigate', new_tab: 'action-new_tab', switch_tab: 'action-switch_tab', date_select: 'action-date_select',
                         select: 'action-select', check: 'action-select', uncheck: 'action-select',
                         submit: 'action-submit', wait: 'action-wait', wait_for: 'action-wait',
-                        assert_visible: 'action-assert', assert_text: 'action-assert', assert_url: 'action-assert', assert_title: 'action-assert' };
+                        assert_visible: 'action-assert', assert_text: 'action-assert', assert_url: 'action-assert', assert_title: 'action-assert',
+                        assert_count: 'action-assert', assert_value: 'action-assert', assert_enabled: 'action-assert', assert_disabled: 'action-assert', assert_not_visible: 'action-assert' };
             return map[action] || 'action-default';
         }
 

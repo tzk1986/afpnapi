@@ -834,6 +834,18 @@ class UiHeadlessEngine:
                 return self._action_assert_visible(page, selector, timeout_ms)
             elif action == "assert_url":
                 return self._action_assert_url(page, value)
+            elif action == "assert_title":
+                return self._action_assert_title(page, value)
+            elif action == "assert_count":
+                return self._action_assert_count(page, selector, value, timeout_ms)
+            elif action == "assert_value":
+                return self._action_assert_value(page, selector, value, timeout_ms)
+            elif action == "assert_enabled":
+                return self._action_assert_enabled(page, selector, timeout_ms)
+            elif action == "assert_disabled":
+                return self._action_assert_disabled(page, selector, timeout_ms)
+            elif action == "assert_not_visible":
+                return self._action_assert_not_visible(page, selector, timeout_ms)
             elif action == "scroll":
                 return self._action_scroll(page, value)
             elif action in ("select_radio", "check", "uncheck"):
@@ -1275,6 +1287,211 @@ class UiHeadlessEngine:
             "value": expected,
             "status": "failed",
             "error": f"断言失败: 期望 URL 包含 '{expected}', 实际 '{actual}'",
+        }
+
+    def _action_assert_title(self, page: "Page", expected: str) -> Dict[str, Any]:
+        actual = page.title()
+        if expected in actual:
+            return {
+                "action": "assert_title",
+                "selector": {},
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_title",
+            "selector": {},
+            "value": expected,
+            "status": "failed",
+            "error": f"断言失败: 期望标题包含 '{expected}', 实际 '{actual}'",
+        }
+
+    def _action_assert_count(
+        self, page: "Page", selector: Any, expected: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言匹配选择器的元素数量等于期望值。"""
+        try:
+            expected_count = int(expected) if expected else 0
+        except (ValueError, TypeError):
+            return {
+                "action": "assert_count",
+                "selector": self._selector_to_dict(selector),
+                "value": expected,
+                "status": "failed",
+                "error": f"期望数量必须是整数，实际 '{expected}'",
+            }
+
+        candidates = self._resolve_selector_chain(selector)
+        if not candidates:
+            return {
+                "action": "assert_count",
+                "selector": self._selector_to_dict(selector),
+                "value": expected,
+                "status": "failed",
+                "error": "选择器为空",
+            }
+
+        # 使用第一个选择器候选
+        strategy, value = candidates[0]
+
+        # 对于 count，需要使用不带 .first 的 locator 来统计所有匹配元素
+        if strategy == "xpath":
+            locator = page.locator(f"xpath={value}")
+        elif strategy == "text":
+            locator = page.get_by_text(value)
+        elif strategy == "role":
+            locator = page.get_by_role(cast("Any", value))  # type: ignore[arg-type,unused-ignore]
+        else:
+            locator = page.locator(value)
+
+        try:
+            locator.first.wait_for(state="attached", timeout=timeout_ms)
+        except Exception:
+            pass
+
+        actual_count = locator.count()
+
+        if actual_count == expected_count:
+            return {
+                "action": "assert_count",
+                "selector": self._selector_to_dict(selector),
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_count",
+            "selector": self._selector_to_dict(selector),
+            "value": expected,
+            "status": "failed",
+            "error": f"断言失败: 期望 {expected_count} 个元素, 实际 {actual_count} 个",
+        }
+
+    def _action_assert_value(
+        self, page: "Page", selector: Any, expected: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言输入框的值等于期望值。"""
+        el = self._find_element(page, selector, timeout_ms)
+        actual = el.input_value() if el.input_value else ""
+
+        if actual == expected:
+            return {
+                "action": "assert_value",
+                "selector": self._selector_to_dict(selector),
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_value",
+            "selector": self._selector_to_dict(selector),
+            "value": expected,
+            "status": "failed",
+            "error": f"断言失败: 期望值 '{expected}', 实际 '{actual[:80]}'",
+        }
+
+    def _action_assert_enabled(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言元素处于启用状态（可交互）。"""
+        el = self._find_element(page, selector, timeout_ms)
+        is_enabled = el.is_enabled()
+
+        if is_enabled:
+            return {
+                "action": "assert_enabled",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_enabled",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "failed",
+            "error": "断言失败: 元素处于禁用状态",
+        }
+
+    def _action_assert_disabled(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言元素处于禁用状态。"""
+        el = self._find_element(page, selector, timeout_ms)
+        is_enabled = el.is_enabled()
+
+        if not is_enabled:
+            return {
+                "action": "assert_disabled",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_disabled",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "failed",
+            "error": "断言失败: 元素处于启用状态",
+        }
+
+    def _action_assert_not_visible(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言元素不可见或不存在。"""
+        candidates = self._resolve_selector_chain(selector)
+        if not candidates:
+            return {
+                "action": "assert_not_visible",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+
+        # 使用第一个选择器候选
+        strategy, value = candidates[0]
+
+        # 构建 locator（不带 .first，因为我们要检查是否存在）
+        if strategy == "xpath":
+            locator = page.locator(f"xpath={value}").first
+        elif strategy == "text":
+            locator = page.get_by_text(value)
+        elif strategy == "role":
+            locator = page.get_by_role(cast("Any", value))  # type: ignore[arg-type,unused-ignore]
+        else:
+            locator = page.locator(value).first
+
+        # 等待元素隐藏或不存在
+        try:
+            locator.wait_for(state="hidden", timeout=min(timeout_ms, 2000))
+            return {
+                "action": "assert_not_visible",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+        except Exception:
+            pass
+
+        # 检查元素是否可见
+        if locator.count() == 0 or not locator.is_visible():
+            return {
+                "action": "assert_not_visible",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_not_visible",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "failed",
+            "error": "断言失败: 元素可见",
         }
 
     def _action_scroll(self, page: "Page", value: str) -> Dict[str, Any]:
