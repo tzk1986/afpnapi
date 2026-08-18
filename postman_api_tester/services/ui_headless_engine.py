@@ -850,6 +850,14 @@ class UiHeadlessEngine:
                 return self._action_assert_attribute(page, selector, value, timeout_ms)
             elif action == "assert_toast":
                 return self._action_assert_toast(page, value, timeout_ms)
+            elif action == "assert_css":
+                return self._action_assert_css(page, selector, value, timeout_ms)
+            elif action == "assert_checked":
+                return self._action_assert_checked(page, selector, timeout_ms)
+            elif action == "assert_dialog":
+                return self._action_assert_dialog(page, value, timeout_ms)
+            elif action == "assert_cookie":
+                return self._action_assert_cookie(page, value)
             elif action == "scroll":
                 return self._action_scroll(page, value)
             elif action in ("select_radio", "check", "uncheck"):
@@ -1596,6 +1604,193 @@ class UiHeadlessEngine:
             "status": "failed",
             "error": f"断言失败: 未找到包含 '{value}' 的 toast 消息",
         }
+
+    def _action_assert_css(
+        self, page: "Page", selector: Any, value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言元素 CSS 属性值等于期望值。
+
+        value 格式: "property=expected_value"，例如 "color=red" 或 "font-size=16px"
+        """
+        if "=" not in value:
+            return {
+                "action": "assert_css",
+                "selector": self._selector_to_dict(selector),
+                "value": value,
+                "status": "failed",
+                "error": f"值格式错误，应为 'property=expected'，实际 '{value}'",
+            }
+
+        css_property, expected = value.split("=", 1)
+        css_property = css_property.strip()
+        expected = expected.strip()
+
+        el = self._find_element(page, selector, timeout_ms)
+        actual = el.evaluate(f"el => window.getComputedStyle(el).{css_property}") or ""
+
+        # 尝试匹配（允许部分匹配，因为颜色可能返回 rgb 格式）
+        if expected.lower() in actual.lower():
+            return {
+                "action": "assert_css",
+                "selector": self._selector_to_dict(selector),
+                "value": value,
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_css",
+            "selector": self._selector_to_dict(selector),
+            "value": value,
+            "status": "failed",
+            "error": f"断言失败: 期望 CSS '{css_property}' 包含 '{expected}', 实际 '{actual[:80]}'",
+        }
+
+    def _action_assert_checked(
+        self, page: "Page", selector: Any, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言复选框或单选框处于选中状态。"""
+        el = self._find_element(page, selector, timeout_ms)
+        is_checked = el.is_checked()
+
+        if is_checked:
+            return {
+                "action": "assert_checked",
+                "selector": self._selector_to_dict(selector),
+                "value": "",
+                "status": "passed",
+                "error": "",
+            }
+        return {
+            "action": "assert_checked",
+            "selector": self._selector_to_dict(selector),
+            "value": "",
+            "status": "failed",
+            "error": "断言失败: 复选框/单选框未选中",
+        }
+
+    def _action_assert_dialog(
+        self, page: "Page", value: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言浏览器对话框（alert/confirm/prompt）包含指定文本。
+
+        注意：此断言会在页面上等待对话框出现，验证后会自动关闭对话框。
+        value 为期望的对话框文本。
+        """
+        import time
+
+        start_time = time.time()
+        timeout_sec = min(timeout_ms / 1000.0, 5.0)
+
+        dialog_handled = False
+        dialog_message = ""
+
+        def handle_dialog(dialog: Any) -> None:
+            nonlocal dialog_handled, dialog_message
+            dialog_message = dialog.message
+            dialog_handled = True
+            dialog.accept()
+
+        page.on("dialog", handle_dialog)
+
+        try:
+            while time.time() - start_time < timeout_sec:
+                if dialog_handled:
+                    break
+                page.wait_for_timeout(100)
+
+            page.remove_listener("dialog", handle_dialog)
+
+            if not dialog_handled:
+                return {
+                    "action": "assert_dialog",
+                    "selector": {},
+                    "value": value,
+                    "status": "failed",
+                    "error": f"断言失败: 等待 {timeout_sec:.1f}s 未弹出对话框",
+                }
+
+            if value in dialog_message:
+                return {
+                    "action": "assert_dialog",
+                    "selector": {},
+                    "value": value,
+                    "status": "passed",
+                    "error": "",
+                }
+            return {
+                "action": "assert_dialog",
+                "selector": {},
+                "value": value,
+                "status": "failed",
+                "error": f"断言失败: 对话框文本 '{dialog_message[:80]}' 不包含 '{value}'",
+            }
+        except Exception as e:
+            page.remove_listener("dialog", handle_dialog)
+            return {
+                "action": "assert_dialog",
+                "selector": {},
+                "value": value,
+                "status": "failed",
+                "error": f"断言异常: {str(e)[:200]}",
+            }
+
+    def _action_assert_cookie(self, page: "Page", value: str) -> Dict[str, Any]:
+        """断言 Cookie 存在且值包含期望内容。
+
+        value 格式: "name=expected_value" 或 "name"（仅检查存在）
+        """
+        context = page.context
+        cookies = context.cookies()
+
+        if "=" in value:
+            cookie_name, expected = value.split("=", 1)
+            cookie_name = cookie_name.strip()
+            expected = expected.strip()
+
+            for cookie in cookies:
+                if cookie["name"] == cookie_name:
+                    actual = cookie["value"]
+                    if expected in actual:
+                        return {
+                            "action": "assert_cookie",
+                            "selector": {},
+                            "value": value,
+                            "status": "passed",
+                            "error": "",
+                        }
+                    return {
+                        "action": "assert_cookie",
+                        "selector": {},
+                        "value": value,
+                        "status": "failed",
+                        "error": f"断言失败: Cookie '{cookie_name}' 值 '{actual[:40]}' 不包含 '{expected}'",
+                    }
+            return {
+                "action": "assert_cookie",
+                "selector": {},
+                "value": value,
+                "status": "failed",
+                "error": f"断言失败: Cookie '{cookie_name}' 不存在",
+            }
+        else:
+            # 仅检查存在
+            cookie_name = value.strip()
+            for cookie in cookies:
+                if cookie["name"] == cookie_name:
+                    return {
+                        "action": "assert_cookie",
+                        "selector": {},
+                        "value": value,
+                        "status": "passed",
+                        "error": "",
+                    }
+            return {
+                "action": "assert_cookie",
+                "selector": {},
+                "value": value,
+                "status": "failed",
+                "error": f"断言失败: Cookie '{cookie_name}' 不存在",
+            }
 
     def _action_scroll(self, page: "Page", value: str) -> Dict[str, Any]:
         try:

@@ -1,7 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.33.13
+版本：v1.33.14
 发布日期：2026-08-18
+
+本版新增重点（v1.33.14）：
+- **UI 断言增强（第三批）**：新增 4 种断言动作 — `assert_css`（CSS 属性值）、`assert_checked`（复选框/单选框选中状态）、`assert_dialog`（浏览器对话框）、`assert_cookie`（Cookie 存在/值）
 
 本版新增重点（v1.33.13）：
 - **UI 断言增强（第二批）**：新增 2 种断言动作 — `assert_attribute`（元素属性值）、`assert_toast`（toast/通知消息内容）
