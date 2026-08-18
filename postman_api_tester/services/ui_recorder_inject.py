@@ -1923,11 +1923,31 @@ _REPLAYER_JS = r"""
         }
 
         result.duration_ms = Date.now() - stepStart;
-        self.results.push(result);
-        // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
-        self._saveState();
-        self._notifyParent('step_complete', result);
-        if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
+
+        // 检查步骤是否勾选了截图，如果勾选则截图
+        if (step.screenshot) {
+          self._captureScreenshot(function(screenshotData) {
+            result.screenshot = screenshotData || null;
+            self.results.push(result);
+            // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
+            self._saveState();
+            self._notifyParent('step_complete', result);
+            if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
+            self._continueAfterStep(result, step, action, el);
+          });
+        } else {
+          self.results.push(result);
+          // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
+          self._saveState();
+          self._notifyParent('step_complete', result);
+          if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
+          self._continueAfterStep(result, step, action, el);
+        }
+      });
+    },
+
+    _continueAfterStep: function(result, step, action, el) {
+      var self = this;
 
         // SPA 导航通常是异步的（API 返回后 pushState），延迟检测 URL 变化
         if (action === 'click' || action === 'submit' || action === 'dblclick') {
@@ -1950,7 +1970,6 @@ _REPLAYER_JS = r"""
           }, _delayMs);
         }
         self._executeNext();
-      });
     },
 
     _executeAction: function(action, el, value) {
