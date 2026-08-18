@@ -1887,8 +1887,15 @@ _REPLAYER_JS = r"""
           }
           result.error = '元素未找到 (超时 ' + timeout + 'ms): ' + JSON.stringify(step.selector || '') + _navHint;
           result.duration_ms = Date.now() - stepStart;
-          // 截图当前页面状态
+          // 截图当前页面状态（失败步骤）
           self._captureScreenshot(function(screenshotData) {
+            result.screenshot = screenshotData || null;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout, navigation_hint: _navHint }, 'warn'); } catch(e) {}
+            // 元素未找到时记录错误并继续执行后续步骤
+            self._executeNext();
+          }, 'failed');
             result.screenshot = screenshotData || null;
             self.results.push(result);
             self._notifyParent('step_complete', result);
@@ -1934,7 +1941,7 @@ _REPLAYER_JS = r"""
             self._notifyParent('step_complete', result);
             if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
             self._continueAfterStep(result, step, action, el);
-          });
+          }, result.status || 'passed');
         } else {
           self.results.push(result);
           // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
@@ -2175,12 +2182,12 @@ _REPLAYER_JS = r"""
       }, 300);
     },
 
-    _captureScreenshot: function(callback) {
+    _captureScreenshot: function(callback, stepStatus) {
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({
             type: 'ui-replay-screenshot',
-            data: { step_index: this.currentIndex }
+            data: { step_index: this.currentIndex, status: stepStatus || 'passed' }
           }, '*');
         }
         if (callback) callback(null);

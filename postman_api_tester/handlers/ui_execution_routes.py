@@ -295,19 +295,24 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
 
 def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
-    """前端回放引擎上报失败步骤截图（HTML 快照）。"""
+    """前端回放引擎上报步骤截图（HTML 快照），支持成功和失败步骤。"""
     payload = request.get_json(silent=True)
     if not payload:
         return BaseHandler.json_response({"ok": True})
 
     step_index = payload.get("step_index")
     html_content = payload.get("html", "")
+    step_status = payload.get("status", "failed")  # 默认为 failed 以保持向后兼容
     if step_index is None or not html_content:
         return BaseHandler.json_response({"ok": True})
 
     screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
     screenshot_dir.mkdir(parents=True, exist_ok=True)
-    screenshot_path = screenshot_dir / f"step_{step_index}_fail.html"
+    # 根据步骤状态决定文件名：成功步骤不带 _fail 后缀
+    if step_status == "passed":
+        screenshot_path = screenshot_dir / f"step_{step_index}.html"
+    else:
+        screenshot_path = screenshot_dir / f"step_{step_index}_fail.html"
 
     try:
         screenshot_path.write_text(html_content, encoding="utf-8")
@@ -317,6 +322,7 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
                 "event": "ui.execution.screenshot_saved",
                 "job_id": job_id,
                 "step_index": step_index,
+                "status": step_status,
             },
         )
     except Exception as e:

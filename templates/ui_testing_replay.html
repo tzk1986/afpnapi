@@ -257,7 +257,7 @@
                     console.log('[Parent] Replay state saved from engine, currentIndex:', data.currentIndex);
                     break;
                 case 'ui-replay-screenshot':
-                    captureScreenshot(data.step_index);
+                    captureScreenshot(data.step_index, data.status || 'failed');
                     break;
                 case 'ui-replay-paused':
                     isPaused = true;
@@ -635,7 +635,7 @@
             }
         }
 
-        function captureScreenshot(stepIndex) {
+        function captureScreenshot(stepIndex, stepStatus) {
             var frame = document.getElementById('replayFrame');
             if (!frame || !frame.contentDocument) return;
             try {
@@ -646,7 +646,8 @@
                     body: JSON.stringify({
                         step_index: stepIndex,
                         html: html,
-                        page_url: frame.contentWindow.location.href
+                        page_url: frame.contentWindow.location.href,
+                        status: stepStatus || 'failed'
                     })
                 }).catch(function() {});
             } catch(e) {
