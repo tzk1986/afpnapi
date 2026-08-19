@@ -1851,6 +1851,57 @@ _REPLAYER_JS = r"""
         return;
       }
 
+      // assert_text_exists: 纯文本断言，无需选择器，直接在页面查找文本
+      if (action === 'assert_text_exists') {
+        var searchText = step.value || '';
+        if (!searchText) {
+          result.status = 'failed';
+          result.error = '断言失败: 未指定要查找的文本';
+          result.duration_ms = Date.now() - stepStart;
+          self.results.push(result);
+          self._notifyParent('step_complete', result);
+          self._executeNext();
+          return;
+        }
+        // 轮询查找文本，支持自动等待
+        var _textStart = Date.now();
+        var _textInterval = 200;
+        var _self = self;
+        function _checkTextExists() {
+          var bodyText = (document.body ? document.body.innerText || document.body.textContent || '' : '');
+          var found = bodyText.indexOf(searchText) >= 0;
+          if (found) {
+            result.status = 'passed';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            self._executeNext();
+            return;
+          }
+          if (Date.now() - _textStart >= timeout) {
+            result.status = 'failed';
+            result.error = '断言失败: 页面未找到文本 "' + searchText + '"，页面内容前 200 字: "' + bodyText.substring(0, 200) + '"';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            self._executeNext();
+            return;
+          }
+          if (_self.stopped || !_self.running) {
+            result.status = 'failed';
+            result.error = '断言已取消';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            self._executeNext();
+            return;
+          }
+          setTimeout(_checkTextExists, _textInterval);
+        }
+        _checkTextExists();
+        return;
+      }
+
       // 需要查找元素的 action
       // 诊断：如果是 click 且选择器包含 el-select-dropdown，记录此时 dropdown 状态
       if (action === 'click') {

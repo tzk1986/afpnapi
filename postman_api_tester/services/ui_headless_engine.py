@@ -830,6 +830,8 @@ class UiHeadlessEngine:
                 return self._action_wait(page, value)
             elif action == "assert_text":
                 return self._action_assert_text(page, selector, value, timeout_ms)
+            elif action == "assert_text_exists":
+                return self._action_assert_text_exists(page, value, timeout_ms)
             elif action == "assert_visible":
                 return self._action_assert_visible(page, selector, timeout_ms)
             elif action == "assert_url":
@@ -1270,6 +1272,43 @@ class UiHeadlessEngine:
             "status": "failed",
             "error": f"断言失败: 期望包含 '{expected}', 实际 '{actual[:80]}'",
         }
+
+    def _action_assert_text_exists(
+        self, page: "Page", expected: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """断言页面任意位置存在指定文本（无需选择器）。"""
+        if not expected:
+            return {
+                "action": "assert_text_exists",
+                "selector": {},
+                "value": "",
+                "status": "failed",
+                "error": "断言失败: 未指定要查找的文本",
+            }
+        try:
+            locator = page.get_by_text(expected, exact=False)
+            locator.first.wait_for(state="attached", timeout=timeout_ms)
+            return {
+                "action": "assert_text_exists",
+                "selector": {},
+                "value": expected,
+                "status": "passed",
+                "error": "",
+            }
+        except Exception:
+            # 截取页面文本前 200 字符用于诊断
+            body_text = ""
+            try:
+                body_text = (page.inner_text("body") or "")[:200]
+            except Exception:
+                pass
+            return {
+                "action": "assert_text_exists",
+                "selector": {},
+                "value": expected,
+                "status": "failed",
+                "error": f"断言失败: 页面未找到文本 '{expected}'，页面内容前 200 字: '{body_text}'",
+            }
 
     def _action_assert_visible(
         self, page: "Page", selector: Any, timeout_ms: int
