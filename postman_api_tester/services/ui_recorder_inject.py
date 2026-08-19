@@ -1889,10 +1889,10 @@ _REPLAYER_JS = r"""
           result.duration_ms = Date.now() - stepStart;
           // 截图当前页面状态（失败步骤）
           self._captureScreenshot(function(screenshotData) {
-            result.screenshot = screenshotData || null;
+            result.screenshot = 'saved'; // 标记截图已保存，用于报告页面显示截图链接
             self.results.push(result);
             self._notifyParent('step_complete', result);
-            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout, navigation_hint: _navHint }, 'warn'); } catch(e) {}
+            if (typeof self._sendLog === 'function') try { self._sendLog('element_not_found', '元素未找到', { selector: step.selector, timeout: timeout, navigation_hint: _navHint, screenshot: 'saved' }, 'warn'); } catch(e) {}
             // 元素未找到时记录错误并继续执行后续步骤
             self._executeNext();
           }, 'failed');
@@ -1927,12 +1927,12 @@ _REPLAYER_JS = r"""
         // 检查步骤是否勾选了截图，如果勾选则截图
         if (step.screenshot) {
           self._captureScreenshot(function(screenshotData) {
-            result.screenshot = screenshotData || null;
+            result.screenshot = 'saved'; // 标记截图已保存，用于报告页面显示截图链接
             self.results.push(result);
             // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
             self._saveState();
             self._notifyParent('step_complete', result);
-            if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
+            if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '', screenshot: 'saved' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
             self._continueAfterStep(result, step, action, el);
           }, result.status || 'passed');
         } else {
