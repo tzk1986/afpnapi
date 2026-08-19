@@ -9,6 +9,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 
 from flask import make_response, render_template, request, send_file
@@ -295,7 +296,7 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
 
 def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
-    """前端回放引擎上报步骤截图（HTML 快照），支持成功和失败步骤。"""
+    """前端回放引擎上报步骤截图（HTML 快照），后端转换为 PNG 保存。"""
     payload = request.get_json(silent=True)
     if not payload:
         return BaseHandler.json_response({"ok": True})
@@ -308,14 +309,25 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
 
     screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
     screenshot_dir.mkdir(parents=True, exist_ok=True)
-    # 根据步骤状态决定文件名：成功步骤不带 _fail 后缀
-    if step_status == "passed":
-        screenshot_path = screenshot_dir / f"step_{step_index}.html"
-    else:
-        screenshot_path = screenshot_dir / f"step_{step_index}_fail.html"
+
+    # 根据步骤状态决定文件名前缀
+    filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
+
+    # 先保存 HTML 到临时文件
+    temp_html_path = screenshot_dir / f"{filename_prefix}_temp.html"
+    png_path = screenshot_dir / f"{filename_prefix}.png"
 
     try:
-        screenshot_path.write_text(html_content, encoding="utf-8")
+        # 保存 HTML 到临时文件
+        temp_html_path.write_text(html_content, encoding="utf-8")
+
+        # 使用 Playwright 将 HTML 转换为 PNG
+        _convert_html_to_png(temp_html_path, png_path)
+
+        # 删除临时 HTML 文件
+        if temp_html_path.exists():
+            temp_html_path.unlink()
+
         logger.info(
             "ui_screenshot_saved",
             extra={
@@ -323,12 +335,43 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
                 "job_id": job_id,
                 "step_index": step_index,
                 "status": step_status,
+                "format": "png",
             },
         )
     except Exception as e:
-        logger.warning(f"Failed to save screenshot: {e}")
+        logger.warning(f"Failed to save screenshot as PNG, falling back to HTML: {e}")
+        # 如果 PNG 转换失败，回退到保存 HTML
+        html_path = screenshot_dir / f"{filename_prefix}.html"
+        try:
+            html_path.write_text(html_content, encoding="utf-8")
+            if temp_html_path.exists():
+                temp_html_path.unlink()
+        except Exception as fallback_error:
+            logger.warning(f"Failed to save fallback HTML: {fallback_error}")
 
     return BaseHandler.json_response({"ok": True})
+
+
+def _convert_html_to_png(html_path: Path, png_path: Path) -> None:
+    """使用 Playwright 将 HTML 文件转换为 PNG 图片。"""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError("Playwright is not installed")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 720})
+            # 加载 HTML 文件
+            html_url = f"file://{html_path.resolve()}"
+            page.goto(html_url, wait_until="networkidle", timeout=10000)
+            # 等待一下让页面渲染完成
+            page.wait_for_timeout(500)
+            # 截图
+            page.screenshot(path=str(png_path), full_page=False)
+        finally:
+            browser.close()
 
 
 def _extract_network_requests(steps: list) -> list:
