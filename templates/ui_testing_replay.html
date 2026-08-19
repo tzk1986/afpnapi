@@ -650,6 +650,25 @@
                         status: stepStatus || 'failed'
                     })
                 }).catch(function() {});
+
+                // 同时更新步骤结果的 screenshot 字段，确保报告页面能显示截图链接
+                // 注意：这里使用 'saved' 标记，表示截图已保存到磁盘
+                var existingStep = null;
+                for (var i = 0; i < allSteps.length; i++) {
+                    if (allSteps[i].index === stepIndex) {
+                        existingStep = allSteps[i];
+                        break;
+                    }
+                }
+                if (existingStep) {
+                    existingStep.screenshot = 'saved';
+                    // 上报步骤结果到后端，更新 screenshot 字段
+                    fetch('/api/ui-testing/execution/' + jobId + '/step', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ step_result: existingStep })
+                    }).catch(function() {});
+                }
             } catch(e) {
                 console.warn('Screenshot capture failed:', e);
             }
