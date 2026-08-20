@@ -96,7 +96,6 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
         var jobId = '{{ job_id }}';
         var steps = [];
@@ -258,7 +257,7 @@
                     console.log('[Parent] Replay state saved from engine, currentIndex:', data.currentIndex);
                     break;
                 case 'ui-replay-screenshot':
-                    captureScreenshot(data.step_index, data.status || 'failed');
+                    captureScreenshot(data.step_index, data.status || 'failed', data.base64_png);
                     break;
                 case 'ui-replay-paused':
                     isPaused = true;
@@ -636,81 +635,65 @@
             }
         }
 
-        function captureScreenshot(stepIndex, stepStatus) {
+        function captureScreenshot(stepIndex, stepStatus, base64Data) {
+            // 如果传入了 base64 PNG 数据（来自 iframe 内的 html2canvas），直接上传
+            if (base64Data) {
+                fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step_index: stepIndex,
+                        base64_png: base64Data,
+                        status: stepStatus || 'failed'
+                    })
+                }).then(function() {
+                    console.log('Screenshot saved (base64 from iframe):', stepIndex);
+                }).catch(function(e) {
+                    console.warn('Screenshot upload failed:', e);
+                });
+
+                // 更新步骤结果
+                var existingStep = null;
+                for (var i = 0; i < allSteps.length; i++) {
+                    if (allSteps[i].index === stepIndex) {
+                        existingStep = allSteps[i];
+                        break;
+                    }
+                }
+                if (existingStep) {
+                    existingStep.screenshot = 'saved';
+                    fetch('/api/ui-testing/execution/' + jobId + '/step', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ step_result: existingStep })
+                    }).catch(function() {});
+                }
+                return;
+            }
+
+            // 回退方案：如果 iframe 内截图失败，尝试在父页面截图（可能因跨域失败）
             var frame = document.getElementById('replayFrame');
             if (!frame || !frame.contentDocument) {
                 console.warn('Screenshot: iframe not ready');
                 return;
             }
 
-            // 使用 html2canvas 在前端截图（利用当前浏览器的 Cookie 和缓存）
             try {
                 var iframeDoc = frame.contentDocument.documentElement;
-
-                html2canvas(iframeDoc, {
-                    scale: 1,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: null,
-                    width: 1280,
-                    height: 720,
-                    windowWidth: 1280,
-                    windowHeight: 720,
-                    logging: false
-                }).then(function(canvas) {
-                    // 转换为 base64 PNG
-                    var dataURL = canvas.toDataURL('image/png');
-                    // 去掉 data:image/png;base64, 前缀
-                    var base64Data = dataURL.split(',')[1];
-
-                    // POST 到后端保存
-                    fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            step_index: stepIndex,
-                            base64_png: base64Data,
-                            status: stepStatus || 'failed'
-                        })
-                    }).then(function() {
-                        console.log('Screenshot saved via html2canvas:', stepIndex);
-                    }).catch(function(e) {
-                        console.warn('Screenshot upload failed:', e);
-                    });
-
-                    // 更新步骤结果
-                    var existingStep = null;
-                    for (var i = 0; i < allSteps.length; i++) {
-                        if (allSteps[i].index === stepIndex) {
-                            existingStep = allSteps[i];
-                            break;
-                        }
-                    }
-                    if (existingStep) {
-                        existingStep.screenshot = 'saved';
-                        fetch('/api/ui-testing/execution/' + jobId + '/step', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ step_result: existingStep })
-                        }).catch(function() {});
-                    }
-                }).catch(function(e) {
-                    console.warn('html2canvas failed:', e);
-                    // 回退到旧方案：保存 HTML
-                    var html = iframeDoc.outerHTML;
-                    fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            step_index: stepIndex,
-                            html: html,
-                            page_url: frame.contentWindow.location.href,
-                            status: stepStatus || 'failed'
-                        })
-                    }).catch(function() {});
-                });
+                // 保存 HTML 用于调试
+                var html = iframeDoc.outerHTML;
+                fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step_index: stepIndex,
+                        html: html,
+                        page_url: frame.contentWindow.location.href,
+                        status: stepStatus || 'failed'
+                    })
+                }).catch(function() {});
             } catch(e) {
-                console.warn('Screenshot capture failed:', e);
+                console.warn('Screenshot fallback failed:', e);
             }
         }
 

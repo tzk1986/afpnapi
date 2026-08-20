@@ -2468,14 +2468,86 @@ _REPLAYER_JS = r"""
       // 某些操作（如 click）触发异步更新，需要等待才能捕获到正确的页面状态
       setTimeout(function() {
         try {
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({
-              type: 'ui-replay-screenshot',
-              data: { step_index: self.currentIndex, status: stepStatus || 'passed' }
-            }, '*');
+          // 在 iframe 内加载 html2canvas 并截图（避免跨域问题）
+          // html2canvas 在 iframe 内运行可以访问 DOM，利用浏览器已有的 Cookie 和缓存
+          function _doScreenshot() {
+            if (typeof html2canvas !== 'function') {
+              console.warn('[ReplayEngine] html2canvas not loaded, sending fallback request');
+              // 回退：让父页面尝试截图（可能会因跨域失败）
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'ui-replay-screenshot',
+                  data: { step_index: self.currentIndex, status: stepStatus || 'passed' }
+                }, '*');
+              }
+              if (callback) callback(null);
+              return;
+            }
+            // 使用 html2canvas 截图（在 iframe 内运行，可以访问 DOM）
+            html2canvas(document.documentElement, {
+              scale: 1,
+              useCORS: true,
+              allowTaint: true,
+              backgroundColor: null,
+              width: 1280,
+              height: 720,
+              windowWidth: 1280,
+              windowHeight: 720,
+              logging: false
+            }).then(function(canvas) {
+              // 转换为 base64 PNG
+              var dataURL = canvas.toDataURL('image/png');
+              var base64Data = dataURL.split(',')[1];
+              // 发送到父页面
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'ui-replay-screenshot',
+                  data: {
+                    step_index: self.currentIndex,
+                    base64_png: base64Data,
+                    status: stepStatus || 'passed'
+                  }
+                }, '*');
+              }
+              if (callback) callback(null);
+            }).catch(function(e) {
+              console.warn('[ReplayEngine] html2canvas failed:', e);
+              // 回退：让父页面尝试截图
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'ui-replay-screenshot',
+                  data: { step_index: self.currentIndex, status: stepStatus || 'passed' }
+                }, '*');
+              }
+              if (callback) callback(null);
+            });
           }
-          if (callback) callback(null);
+
+          // 加载 html2canvas（如果尚未加载）
+          if (typeof html2canvas === 'function') {
+            _doScreenshot();
+          } else {
+            // 动态加载 html2canvas 脚本
+            var script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            script.onload = function() {
+              console.log('[ReplayEngine] html2canvas loaded successfully');
+              _doScreenshot();
+            };
+            script.onerror = function() {
+              console.warn('[ReplayEngine] html2canvas load failed, using fallback');
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'ui-replay-screenshot',
+                  data: { step_index: self.currentIndex, status: stepStatus || 'passed' }
+                }, '*');
+              }
+              if (callback) callback(null);
+            };
+            document.head.appendChild(script);
+          }
         } catch(e) {
+          console.warn('[ReplayEngine] _captureScreenshot error:', e);
           if (callback) callback(null);
         }
       }, 500);  // 等待 500ms 让页面完成渲染
