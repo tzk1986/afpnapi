@@ -1329,6 +1329,15 @@ class UiHeadlessEngine:
             match_count = self._count_text_in_all_frames(page, expected)
 
             if match_count > 0:
+                # 匹配多次时输出日志提示
+                if match_count > 1:
+                    logger.info(
+                        "assert_text_exists: 匹配到 %d 处文本 '%s'",
+                        match_count,
+                        expected,
+                        extra={"event": "assert_text_exists.multiple_matches", "match_count": match_count, "text": expected},
+                    )
+
                 return {
                     "action": "assert_text_exists",
                     "selector": {},

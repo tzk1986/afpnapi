@@ -1909,9 +1909,28 @@ _REPLAYER_JS = r"""
             result.status = 'passed';
             result.match_count = _countOccurrences(allText, searchText);
             result.duration_ms = Date.now() - stepStart;
-            self.results.push(result);
-            self._notifyParent('step_complete', result);
-            self._executeNext();
+
+            // 匹配多次时输出日志提示
+            if (result.match_count > 1) {
+              console.log('[ReplayEngine] assert_text_exists: 匹配到 ' + result.match_count + ' 处文本 "' + searchText + '"');
+              if (typeof self._sendLog === 'function') {
+                try { self._sendLog('text_matched_multiple', '匹配到 ' + result.match_count + ' 处文本', { text: searchText, match_count: result.match_count }, 'info'); } catch(e) {}
+              }
+            }
+
+            // 检查步骤是否勾选了截图，如果勾选则截图
+            if (step.screenshot) {
+              self._captureScreenshot(function(screenshotData) {
+                result.screenshot = 'saved';
+                self.results.push(result);
+                self._notifyParent('step_complete', result);
+                self._executeNext();
+              }, 'passed');
+            } else {
+              self.results.push(result);
+              self._notifyParent('step_complete', result);
+              self._executeNext();
+            }
             return;
           }
           if (Date.now() - _textStart >= timeout) {
