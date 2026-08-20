@@ -78,6 +78,45 @@ def is_playwright_available() -> bool:
     return _HAS_PLAYWRIGHT
 
 
+# 登录按钮检测：中文需要"登"和"录"同时出现（避免"登山"等误匹配），
+# 英文关键词支持完整短语
+_LOGIN_ENGLISH_KEYWORDS = ("login", "sign in", "signin", "log in")
+
+
+def _is_login_step(step: Dict[str, Any]) -> bool:
+    """判断步骤是否为登录按钮点击。
+
+    判断优先级：
+    1. 步骤元数据 is_login_step 显式标记
+    2. 选择器或 element_info 包含登录相关关键词（中英文）
+       - 中文："登"和"录"必须同时出现（避免"登山""记录"等误匹配）
+       - 英文：匹配 "login"/"sign in"/"log in" 等完整短语
+    """
+    # 优先检查显式元数据标记
+    if step.get("is_login_step"):
+        return True
+
+    # 检查选择器和 element_info 中的登录关键词
+    sel = step.get("selector", "")
+    sel_str = sel.get("primary", "") if isinstance(sel, dict) else str(sel)
+    sel_lower = sel_str.lower()
+
+    # 检查 element_info（录制时捕获的元素信息）
+    element_info = step.get("element_info", {})
+    text = ""
+    if isinstance(element_info, dict):
+        text = (element_info.get("text") or "").lower()
+
+    combined = sel_lower + " " + text
+
+    # 中文检测：登 + 录 必须同时出现
+    if "登" in combined and "录" in combined:
+        return True
+
+    # 英文检测：匹配任一登录关键词
+    return any(kw in combined for kw in _LOGIN_ENGLISH_KEYWORDS)
+
+
 class HeadlessExecutionError(Exception):
     """无头执行异常。"""
 
@@ -748,11 +787,7 @@ class UiHeadlessEngine:
                 # 登录后等待页面跳转完成，确保 home 页面 JS 初始化完毕
                 # （否则下一步 click 可能不触发 popup，导致 new_tab 丢失 SSO 上下文）
                 if action == "click" and step_result["status"] == "passed":
-                    sel = step.get("selector", "")
-                    sel_str = (
-                        sel.get("primary", "") if isinstance(sel, dict) else str(sel)
-                    )
-                    if "登" in sel_str and "录" in sel_str:
+                    if _is_login_step(step):
                         try:
                             page.wait_for_load_state("networkidle", timeout=PAGE_LOAD_TIMEOUT_MS)
                         except Exception:

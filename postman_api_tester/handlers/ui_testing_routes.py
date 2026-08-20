@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urlparse
 from flask import abort, make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.config import REPORT_SERVER_PORT
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
 from postman_api_tester.services.ui_proxy_service import UiProxyService
@@ -385,7 +386,7 @@ def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnVal
     _max_unwrap = MAX_PROXY_UNWRAP_DEPTH
     for _ in range(_max_unwrap):
         _parsed = urlparse(target_url)
-        if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == 5000:
+        if _parsed.hostname in ("127.0.0.1", "localhost") and _parsed.port == REPORT_SERVER_PORT:
             from urllib.parse import parse_qs as _pqs
 
             _qs = _pqs(_parsed.query)
@@ -403,7 +404,7 @@ def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnVal
         return json_error("url 必须是 http/https 地址", 400, "UIT_PROXY_002")
 
     parsed_target = urlparse(target_url)
-    if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == 5000:
+    if parsed_target.hostname in ("127.0.0.1", "localhost") and parsed_target.port == REPORT_SERVER_PORT:
         return json_error(
             f"目标地址不能是代理服务器自身: {target_url[:100]}", 400, "UIT_PROXY_005"
         )
