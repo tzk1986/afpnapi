@@ -1311,7 +1311,7 @@ class UiHeadlessEngine:
     def _action_assert_text_exists(
         self, page: "Page", expected: str, timeout_ms: int
     ) -> Dict[str, Any]:
-        """断言页面任意位置存在指定文本（无需选择器）。"""
+        """断言页面任意位置存在指定文本（无需选择器，包括 iframe）。"""
         if not expected:
             return {
                 "action": "assert_text_exists",
@@ -1320,13 +1320,15 @@ class UiHeadlessEngine:
                 "status": "failed",
                 "error": "断言失败: 未指定要查找的文本",
             }
-        try:
-            locator = page.get_by_text(expected, exact=False)
-            # 先检查是否有匹配
-            match_count = locator.count()
+
+        start_time = time.time()
+        timeout_sec = timeout_ms / 1000.0
+
+        while True:
+            # 在主框架和所有 iframe 中查找
+            match_count = self._count_text_in_all_frames(page, expected)
+
             if match_count > 0:
-                # 有匹配，等待第一个可见
-                locator.first.wait_for(state="visible", timeout=timeout_ms)
                 return {
                     "action": "assert_text_exists",
                     "selector": {},
@@ -1335,28 +1337,49 @@ class UiHeadlessEngine:
                     "error": "",
                     "match_count": match_count,
                 }
-            else:
-                # 无匹配，等待超时
-                locator.first.wait_for(state="attached", timeout=timeout_ms)
-                # 如果走到这里说明找到了
+
+            # 检查超时
+            elapsed = time.time() - start_time
+            if elapsed >= timeout_sec:
+                # 失败时获取详细诊断信息
+                error_detail = self._build_text_exists_error(page, expected)
                 return {
                     "action": "assert_text_exists",
                     "selector": {},
                     "value": expected,
-                    "status": "passed",
-                    "error": "",
-                    "match_count": 1,
+                    "status": "failed",
+                    "error": error_detail,
                 }
-        except Exception as e:
-            # 失败时获取详细诊断信息
-            error_detail = self._build_text_exists_error(page, expected)
-            return {
-                "action": "assert_text_exists",
-                "selector": {},
-                "value": expected,
-                "status": "failed",
-                "error": error_detail,
-            }
+
+            # 等待后重试
+            time.sleep(0.2)
+
+    def _count_text_in_all_frames(self, page: "Page", text: str) -> int:
+        """在主框架和所有 iframe 中统计文本出现次数。"""
+        total_count = 0
+
+        # 主框架
+        try:
+            locator = page.get_by_text(text, exact=False)
+            total_count += locator.count()
+        except Exception:
+            pass
+
+        # 遍历所有 frame（iframe）
+        try:
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue  # 主框架已处理
+                try:
+                    locator = frame.get_by_text(text, exact=False)
+                    total_count += locator.count()
+                except Exception:
+                    # 跨域 frame 或已销毁的 frame，忽略
+                    pass
+        except Exception:
+            pass
+
+        return total_count
 
     def _build_text_exists_error(
         self, page: "Page", expected: str
@@ -1364,26 +1387,47 @@ class UiHeadlessEngine:
         """构建 assert_text_exists 失败时的详细错误信息。"""
         parts = [f"断言失败: 页面未找到文本 '{expected}'"]
 
-        # 获取匹配数量（可能元素存在但不可见）
+        # 获取所有 frame 的文本（用于诊断）
+        all_texts = []
+        frame_count = 0
+
+        # 主框架
         try:
-            locator = page.get_by_text(expected, exact=False)
-            count = locator.count()
-            if count > 0:
-                parts.append(f"（找到 {count} 个匹配，但元素可能不可见）")
+            body_text = (page.inner_text("body") or "").strip()
+            all_texts.append(body_text)
         except Exception:
             pass
 
-        # 获取页面文本预览（用于诊断）
+        # 遍历所有 frame
         try:
-            body_text = (page.inner_text("body") or "").strip()
-            total_len = len(body_text)
-            # 显示前 500 字，并告知总长度
-            preview = body_text[:500]
+            for frame in page.frames:
+                if frame == page.main_frame:
+                    continue  # 主框架已处理
+                frame_count += 1
+                try:
+                    frame_text = (frame.inner_text("body") or "").strip()
+                    if frame_text:
+                        all_texts.append(frame_text)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 合并所有文本
+        combined_text = "\n".join(all_texts)
+        total_len = len(combined_text)
+
+        if total_len > 0:
+            preview = combined_text[:500]
             if total_len > 500:
                 preview += f"... (共 {total_len} 字)"
             parts.append(f"页面文本预览: '{preview}'")
-        except Exception:
+        else:
             parts.append("（无法获取页面文本）")
+
+        # 报告 frame 数量
+        if frame_count > 0:
+            parts.append(f"（已扫描 {frame_count + 1} 个 frame）")
 
         # 获取当前 URL
         try:

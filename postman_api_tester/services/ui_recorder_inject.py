@@ -1863,15 +1863,51 @@ _REPLAYER_JS = r"""
           self._executeNext();
           return;
         }
+        // 获取整个页面（包括 iframe）的文本
+        function _getAllText() {
+          var texts = [];
+          // 主框架文本
+          if (document.body) {
+            var mainText = document.body.innerText || document.body.textContent || '';
+            texts.push(mainText);
+          }
+          // 遍历所有 iframe
+          var iframes = document.querySelectorAll('iframe');
+          for (var i = 0; i < iframes.length; i++) {
+            try {
+              var iframeDoc = iframes[i].contentDocument || iframes[i].contentWindow.document;
+              if (iframeDoc && iframeDoc.body) {
+                var iframeText = iframeDoc.body.innerText || iframeDoc.textContent || '';
+                texts.push(iframeText);
+              }
+            } catch(e) {
+              // 跨域 iframe 无法访问，忽略
+              console.warn('[ReplayEngine] Cannot access iframe:', e.message);
+            }
+          }
+          return texts.join('\n');
+        }
+        // 计算文本出现次数
+        function _countOccurrences(text, search) {
+          if (!text || !search) return 0;
+          var count = 0;
+          var pos = text.indexOf(search);
+          while (pos !== -1) {
+            count++;
+            pos = text.indexOf(search, pos + search.length);
+          }
+          return count;
+        }
         // 轮询查找文本，支持自动等待
         var _textStart = Date.now();
         var _textInterval = 200;
         var _self = self;
         function _checkTextExists() {
-          var bodyText = (document.body ? document.body.innerText || document.body.textContent || '' : '');
-          var found = bodyText.indexOf(searchText) >= 0;
+          var allText = _getAllText();
+          var found = allText.indexOf(searchText) >= 0;
           if (found) {
             result.status = 'passed';
+            result.match_count = _countOccurrences(allText, searchText);
             result.duration_ms = Date.now() - stepStart;
             self.results.push(result);
             self._notifyParent('step_complete', result);
@@ -1880,11 +1916,24 @@ _REPLAYER_JS = r"""
           }
           if (Date.now() - _textStart >= timeout) {
             result.status = 'failed';
-            result.error = '断言失败: 页面未找到文本 "' + searchText + '"，页面内容前 200 字: "' + bodyText.substring(0, 200) + '"';
+            var totalLen = allText.length;
+            var preview = allText.substring(0, 500);
+            var errorMsg = '断言失败: 页面未找到文本 "' + searchText + '"';
+            if (totalLen > 0) {
+              errorMsg += '；页面文本预览: "' + preview + (totalLen > 500 ? '..." (共 ' + totalLen + ' 字)' : '"');
+            } else {
+              errorMsg += '；（无法获取页面文本）';
+            }
+            errorMsg += '；当前 URL: ' + (window.location.href || 'unknown');
+            result.error = errorMsg;
             result.duration_ms = Date.now() - stepStart;
             self.results.push(result);
-            self._notifyParent('step_complete', result);
-            self._executeNext();
+            // 断言失败时截图
+            self._captureScreenshot(function(screenshotData) {
+              result.screenshot = 'saved';
+              self._notifyParent('step_complete', result);
+              self._executeNext();
+            }, 'failed');
             return;
           }
           if (_self.stopped || !_self.running) {

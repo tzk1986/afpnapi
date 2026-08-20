@@ -127,13 +127,14 @@ class TestAssertTextExists(unittest.TestCase):
         self.assertEqual(result["status"], "passed")
         self.assertEqual(result["match_count"], 3)
 
-    def test_text_exists_but_invisible_fails(self):
-        """文本存在但不可见时应失败。"""
+    def test_text_exists_returns_passed_regardless_of_visibility(self):
+        """文本存在即返回 passed，不区分可见性。"""
         engine = self._make_engine()
         page = FakePage(body_text="隐藏的供应商文字", text_found=True, match_count=1, visible=False)
         result = engine._action_assert_text_exists(page, "供应商", 5000)
-        self.assertEqual(result["status"], "failed")
-        self.assertIn("不可见", result["error"])
+        # 新逻辑：只要找到就返回 passed
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["match_count"], 1)
 
 
 class TestAssertTextExistsChineseText(unittest.TestCase):
