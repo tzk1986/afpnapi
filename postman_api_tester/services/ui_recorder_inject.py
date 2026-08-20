@@ -1973,6 +1973,169 @@ _REPLAYER_JS = r"""
         return;
       }
 
+      // assert_element_exists: 语义化选择器断言（role:text 或纯文本）
+      if (action === 'assert_element_exists') {
+        var _aeSelector = (typeof step.selector === 'string') ? step.selector : (step.selector ? step.selector.primary : '');
+        if (!_aeSelector) {
+          result.status = 'failed';
+          result.error = '断言失败: 未指定选择器';
+          result.duration_ms = Date.now() - stepStart;
+          self.results.push(result);
+          self._notifyParent('step_complete', result);
+          self._executeNext();
+          return;
+        }
+        // 解析语义化选择器 role:text
+        var _AE_ROLES = ['alert','button','checkbox','combobox','dialog','gridcell','heading','label','link','listitem','menu','menuitem','menuitemcheckbox','menuitemradio','option','progressbar','radio','scrollbar','searchbox','separator','slider','spinbutton','switch','tab','tabpanel','textbox','tooltip','treeitem'];
+        function _parseSemanticSelector(sel) {
+          var colonIdx = sel.indexOf(':');
+          if (colonIdx > 0) {
+            var role = sel.substring(0, colonIdx).trim().toLowerCase();
+            var text = sel.substring(colonIdx + 1).trim();
+            if (_AE_ROLES.indexOf(role) >= 0 && text) {
+              return { role: role, text: text };
+            }
+          }
+          return { role: '', text: sel.trim() };
+        }
+        var _aeParsed = _parseSemanticSelector(_aeSelector);
+        var _aeRole = _aeParsed.role;
+        var _aeText = _aeParsed.text;
+        // 查找匹配元素（含 iframe）
+        function _findElementsSemantic() {
+          var matches = [];
+          function _searchInDoc(doc) {
+            if (!doc || !doc.body) return;
+            if (_aeRole) {
+              // 按角色查找：匹配 ARIA role 或对应 HTML 标签
+              var roleTagMap = {
+                button: ['button', '[role="button"]'],
+                link: ['a', '[role="link"]'],
+                heading: ['h1','h2','h3','h4','h5','h6','[role="heading"]'],
+                menuitem: ['[role="menuitem"]'],
+                tab: ['[role="tab"]'],
+                option: ['option', '[role="option"]'],
+                checkbox: ['input[type="checkbox"]', '[role="checkbox"]'],
+                radio: ['input[type="radio"]', '[role="radio"]'],
+                textbox: ['input[type="text"]', 'textarea', '[role="textbox"]'],
+                combobox: ['select', '[role="combobox"]'],
+                dialog: ['dialog', '[role="dialog"]'],
+                alert: ['[role="alert"]'],
+                label: ['label'],
+                listitem: ['li', '[role="listitem"]'],
+                menu: ['[role="menu"]'],
+                progressbar: ['progress', '[role="progressbar"]'],
+                separator: ['hr', '[role="separator"]'],
+                tooltip: ['[role="tooltip"]'],
+                treeitem: ['[role="treeitem"]'],
+                gridcell: ['td', 'th', '[role="gridcell"]'],
+                scrollbar: ['[role="scrollbar"]'],
+                searchbox: ['input[type="search"]', '[role="searchbox"]'],
+                slider: ['input[type="range"]', '[role="slider"]'],
+                spinbutton: ['[role="spinbutton"]'],
+                switch: ['[role="switch"]'],
+                tabpanel: ['[role="tabpanel"]'],
+                menuitemcheckbox: ['[role="menuitemcheckbox"]'],
+                menuitemradio: ['[role="menuitemradio"]']
+              };
+              var selectors = roleTagMap[_aeRole] || ['[role="' + _aeRole + '"]'];
+              for (var si = 0; si < selectors.length; si++) {
+                try {
+                  var candidates = doc.querySelectorAll(selectors[si]);
+                  for (var ci = 0; ci < candidates.length; ci++) {
+                    var cText = (candidates[ci].textContent || '').trim();
+                    if (cText.indexOf(_aeText) >= 0) {
+                      matches.push(candidates[ci]);
+                    }
+                  }
+                } catch(e) {}
+              }
+            } else {
+              // 纯文本匹配：用 XPath 查找包含文本的元素
+              try {
+                var xpath = "//*[contains(text(), '" + _aeText.replace(/'/g, "\\'") + "')]";
+                var xpathResult = doc.evaluate(xpath, doc.body, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+                for (var xi = 0; xi < xpathResult.snapshotLength; xi++) {
+                  matches.push(xpathResult.snapshotItem(xi));
+                }
+              } catch(e) {}
+            }
+          }
+          // 主框架
+          _searchInDoc(document);
+          // iframe
+          var iframes = document.querySelectorAll('iframe');
+          for (var fi = 0; fi < iframes.length; fi++) {
+            try {
+              var iframeDoc = iframes[fi].contentDocument || iframes[fi].contentWindow.document;
+              _searchInDoc(iframeDoc);
+            } catch(e) {}
+          }
+          return matches;
+        }
+        // 轮询查找
+        var _aeStart = Date.now();
+        var _aeInterval = 200;
+        function _checkElementExists() {
+          var found = _findElementsSemantic();
+          if (found.length > 0) {
+            result.status = 'passed';
+            result.match_count = found.length;
+            result.duration_ms = Date.now() - stepStart;
+            // 多匹配提示
+            if (found.length > 1) {
+              result.error = '提示: 匹配到 ' + found.length + ' 个元素 "' + _aeSelector + '"';
+              console.log('[ReplayEngine] assert_element_exists: 匹配到 ' + found.length + ' 个元素 "' + _aeSelector + '"');
+              if (typeof self._sendLog === 'function') {
+                try { self._sendLog('element_matched_multiple', '匹配到 ' + found.length + ' 个元素', { selector: _aeSelector, match_count: found.length }, 'info'); } catch(e) {}
+              }
+            }
+            // 高亮第一个匹配元素
+            try { self._highlightElement(found[0]); } catch(e) {}
+            // 截图逻辑
+            var needScreenshot = step.screenshot || result.status === 'failed';
+            if (needScreenshot) {
+              var screenshotStatus = result.status === 'failed' ? 'failed' : '';
+              self._captureScreenshot(function(screenshotData) {
+                result.screenshot = 'saved';
+                self.results.push(result);
+                self._notifyParent('step_complete', result);
+                self._executeNext();
+              }, screenshotStatus);
+            } else {
+              self.results.push(result);
+              self._notifyParent('step_complete', result);
+              self._executeNext();
+            }
+            return;
+          }
+          if (Date.now() - _aeStart >= timeout) {
+            result.status = 'failed';
+            result.error = '断言失败: 未找到元素 "' + _aeSelector + '"；当前 URL: ' + (window.location.href || 'unknown');
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._captureScreenshot(function(screenshotData) {
+              result.screenshot = 'saved';
+              self._notifyParent('step_complete', result);
+              self._executeNext();
+            }, 'failed');
+            return;
+          }
+          if (_self.stopped || !_self.running) {
+            result.status = 'failed';
+            result.error = '断言已取消';
+            result.duration_ms = Date.now() - stepStart;
+            self.results.push(result);
+            self._notifyParent('step_complete', result);
+            self._executeNext();
+            return;
+          }
+          setTimeout(_checkElementExists, _aeInterval);
+        }
+        _checkElementExists();
+        return;
+      }
+
       // 需要查找元素的 action
       // 诊断：如果是 click 且选择器包含 el-select-dropdown，记录此时 dropdown 状态
       if (action === 'click') {

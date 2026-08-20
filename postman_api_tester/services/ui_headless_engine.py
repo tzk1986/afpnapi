@@ -870,6 +870,8 @@ class UiHeadlessEngine:
                 return self._action_assert_text(page, selector, value, timeout_ms)
             elif action == "assert_text_exists":
                 return self._action_assert_text_exists(page, value, timeout_ms)
+            elif action == "assert_element_exists":
+                return self._action_assert_element_exists(page, selector, timeout_ms)
             elif action == "assert_visible":
                 return self._action_assert_visible(page, selector, timeout_ms)
             elif action == "assert_url":
@@ -1448,6 +1450,108 @@ class UiHeadlessEngine:
             pass
 
         return "；".join(parts)
+
+    # ── 支持的语义角色列表 ──────────────────────────────────────────
+    _SEMANTIC_ROLES = frozenset({
+        "alert", "button", "checkbox", "combobox", "dialog", "gridcell",
+        "heading", "label", "link", "listitem", "menu", "menuitem",
+        "menuitemcheckbox", "menuitemradio", "option", "progressbar",
+        "radio", "scrollbar", "searchbox", "separator", "slider",
+        "spinbutton", "switch", "tab", "tabpanel", "textbox", "tooltip",
+        "treeitem",
+    })
+
+    def _parse_semantic_selector(self, selector_str: str) -> Tuple[str, str]:
+        """解析语义化选择器 ``role:text``。
+
+        示例::
+
+            "button:查看订单"  -> ("button", "查看订单")
+            "link:首页"        -> ("link", "首页")
+            "查看订单"          -> ("", "查看订单")
+
+        仅当 ``:`` 前的部分在 ``_SEMANTIC_ROLES`` 中时才视为角色。
+        """
+        if not selector_str:
+            return ("", "")
+        # 只拆分第一个冒号（文字中可能含冒号）
+        colon_pos = selector_str.find(":")
+        if colon_pos > 0:
+            role = selector_str[:colon_pos].strip().lower()
+            text = selector_str[colon_pos + 1:].strip()
+            if role in self._SEMANTIC_ROLES and text:
+                return (role, text)
+        # 无有效角色前缀 → 纯文本匹配
+        return ("", selector_str.strip())
+
+    def _action_assert_element_exists(
+        self, page: "Page", selector: str, timeout_ms: int
+    ) -> Dict[str, Any]:
+        """使用语义化选择器断言元素存在。
+
+        选择器格式：``role:text``（如 ``button:查看订单``）或纯文本。
+        """
+        if not selector:
+            return {
+                "action": "assert_element_exists",
+                "selector": {},
+                "value": "",
+                "status": "failed",
+                "error": "断言失败: 未指定选择器",
+            }
+
+        role, text = self._parse_semantic_selector(selector)
+        start_time = time.time()
+        timeout_sec = timeout_ms / 1000.0
+
+        while True:
+            # 构建 locator 并统计匹配数
+            try:
+                if role:
+                    locator = page.get_by_role(role, name=text)  # type: ignore[arg-type]
+                else:
+                    locator = page.get_by_text(text, exact=False)
+                match_count = locator.count()
+            except Exception:
+                match_count = 0
+
+            if match_count > 0:
+                if match_count > 1:
+                    logger.info(
+                        "assert_element_exists: 匹配到 %d 个元素 '%s'",
+                        match_count,
+                        selector,
+                        extra={
+                            "event": "assert_element_exists.multiple_matches",
+                            "match_count": match_count,
+                            "selector": selector,
+                        },
+                    )
+                return {
+                    "action": "assert_element_exists",
+                    "selector": {"type": "semantic", "role": role, "text": text},
+                    "value": "",
+                    "status": "passed",
+                    "error": "",
+                    "match_count": match_count,
+                }
+
+            elapsed = time.time() - start_time
+            if elapsed >= timeout_sec:
+                error_msg = f"断言失败: 未找到元素 '{selector}'"
+                try:
+                    error_msg += f"；当前 URL: {page.url}"
+                except Exception:
+                    pass
+                return {
+                    "action": "assert_element_exists",
+                    "selector": {"type": "semantic", "role": role, "text": text},
+                    "value": "",
+                    "status": "failed",
+                    "error": error_msg,
+                }
+
+            time.sleep(0.2)
 
     def _action_assert_visible(
         self, page: "Page", selector: Any, timeout_ms: int
