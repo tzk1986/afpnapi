@@ -353,11 +353,9 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
 
 
 def _convert_html_to_png(html_content: str, png_path: Path, base_url: str = "") -> None:
-    """使用 Playwright 的 set_content 将 HTML 内容转换为 PNG 图片。
+    """使用 Playwright 将 HTML 内容转换为 PNG 图片。
 
-    直接设置 HTML 内容（而非通过 file:// 加载文件），这样：
-    1. 避免 file:// 协议的安全限制
-    2. 通过注入 <base> 标签，让相对路径资源（图片、CSS）能正确加载
+    方案：保存 HTML 到临时文件，通过 file:// 加载，注入 <base> 标签让资源正确加载。
 
     Args:
         html_content: HTML 内容字符串
@@ -369,43 +367,55 @@ def _convert_html_to_png(html_content: str, png_path: Path, base_url: str = "") 
     except ImportError:
         raise RuntimeError("Playwright is not installed")
 
-    # 注入 <base> 标签，让相对路径资源（图片、CSS）能正确加载
-    if base_url:
-        # 确保 base_url 以 / 结尾（用于解析相对路径）
-        if not base_url.endswith("/"):
-            base_url = base_url.rsplit("/", 1)[0] + "/" if "/" in base_url else base_url + "/"
-        # 在 <head> 标签后插入 <base> 标签
-        if "<head>" in html_content:
-            html_content = html_content.replace(
-                "<head>",
-                f'<head><base href="{base_url}">',
-                1
-            )
-        logger.debug(f"Injected <base> tag with URL: {base_url}")
+    # 保存 HTML 到临时文件
+    import tempfile
+    temp_dir = png_path.parent
+    temp_html_path = temp_dir / f"_temp_{png_path.stem}.html"
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        try:
-            page = browser.new_page(viewport={"width": 1280, "height": 720})
+    try:
+        # 注入 <base> 标签，让相对路径资源（图片、CSS）能正确加载
+        if base_url:
+            # 确保 base_url 以 / 结尾（用于解析相对路径）
+            if not base_url.endswith("/"):
+                base_url = base_url.rsplit("/", 1)[0] + "/" if "/" in base_url else base_url + "/"
+            # 在 <head> 标签后插入 <base> 标签
+            if "<head>" in html_content:
+                html_content = html_content.replace(
+                    "<head>",
+                    f'<head><base href="{base_url}">',
+                    1
+                )
 
-            # 使用 set_content 直接设置 HTML（而非 file:// 加载文件）
-            # 使用 load 而不是 domcontentloaded，等待所有资源加载完成
-            page.set_content(html_content, wait_until="load", timeout=10000)
+        temp_html_path.write_text(html_content, encoding="utf-8")
 
-            # 等待网络空闲（资源、图片、字体加载完成）
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
             try:
-                page.wait_for_load_state("networkidle", timeout=3000)
-            except Exception as e:
-                logger.debug(f"networkidle timeout (non-critical): {e}")
+                page = browser.new_page(viewport={"width": 1280, "height": 720})
+                # 通过 file:// 加载 HTML 文件
+                html_url = f"file://{temp_html_path.resolve()}"
+                page.goto(html_url, wait_until="load", timeout=10000)
 
-            # 额外等待 2 秒，确保 SPA 框架完成渲染
-            page.wait_for_timeout(2000)
+                # 等待网络空闲（资源、图片、字体加载完成）
+                try:
+                    page.wait_for_load_state("networkidle", timeout=3000)
+                except Exception:
+                    pass  # 非关键，继续截图
 
-            # 截图
-            page.screenshot(path=str(png_path), full_page=False)
-            logger.debug(f"Screenshot saved: {png_path}, size: {png_path.stat().st_size} bytes")
-        finally:
-            browser.close()
+                # 额外等待 2 秒，确保 SPA 框架完成渲染
+                page.wait_for_timeout(2000)
+
+                # 截图
+                page.screenshot(path=str(png_path), full_page=False)
+            finally:
+                browser.close()
+    finally:
+        # 清理临时 HTML 文件
+        try:
+            if temp_html_path.exists():
+                temp_html_path.unlink()
+        except Exception:
+            pass
 
 
 def _extract_network_requests(steps: list) -> list:
