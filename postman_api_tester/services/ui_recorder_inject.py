@@ -2121,7 +2121,7 @@ _REPLAYER_JS = r"""
             }, 'failed');
             return;
           }
-          if (_self.stopped || !_self.running) {
+          if (self.stopped || !self.running) {
             result.status = 'failed';
             result.error = '断言已取消';
             result.duration_ms = Date.now() - stepStart;

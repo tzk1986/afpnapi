@@ -233,7 +233,7 @@
                     {% for step in steps %}
                     <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}" data-status="{{ step.status }}">
                         <td>{{ loop.index }}</td>
-                        <td><span class="action-badge action-{{ step.action }}">{{ step.action_label }}</span></td>
+                        <td><span class="action-badge {% if step.action in ['assert_visible', 'assert_text', 'assert_text_exists', 'assert_element_exists', 'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled', 'assert_disabled', 'assert_not_visible', 'assert_attribute', 'assert_toast', 'assert_css', 'assert_checked', 'assert_dialog', 'assert_cookie'] %}action-assert{% else %}action-{{ step.action }}{% endif %}">{{ step.action_label }}</span></td>
                         <td class="selector-cell" title="{{ step.selector_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'selector')">{{ step.selector_display }}</td>
                         <td class="value-cell" title="{{ step.value_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'value')">{{ step.value_display }}</td>
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
@@ -401,7 +401,7 @@
                     var rowClass = s.status + (isCurrentStep(s) ? ' current' : '') + (isCascade ? ' cascade' : '');
                     existing.className = rowClass;
                     cells[0].textContent = i + 1;
-                    cells[1].innerHTML = '<span class="action-badge action-' + s.action + '">' + getActionLabel(s.action) + '</span>';
+                    cells[1].innerHTML = '<span class="action-badge ' + getActionClass(s.action) + '">' + getActionLabel(s.action) + '</span>';
                     var sel = formatSelector(s.selector);
                     cells[2].textContent = sel;
                     cells[2].title = sel;
@@ -441,7 +441,7 @@
                 : '';
             return '<tr class="' + s.status + cur + cascadeClass + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
-                '<td><span class="action-badge action-' + s.action + '">' + getActionLabel(s.action) + '</span></td>' +
+                '<td><span class="action-badge ' + getActionClass(s.action) + '">' + getActionLabel(s.action) + '</span></td>' +
                 '<td class="selector-cell" title="' + escapeHtml(sel) + '" onclick="viewTextDetail(' + idx + ', \'selector\')">' + escapeHtml(sel) + '</td>' +
                 '<td class="value-cell" title="' + escapeHtml(s.value || '') + '" onclick="viewTextDetail(' + idx + ', \'value\')">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
                 '<td><span class="status-dot ' + s.status + '"></span>' + statusLabel + '</td>' +
@@ -456,6 +456,10 @@
         function getActionLabel(action) {
             if (ASSERT_ACTIONS.indexOf(action) >= 0) return '断言';
             return action;
+        }
+        function getActionClass(action) {
+            if (ASSERT_ACTIONS.indexOf(action) >= 0) return 'action-assert';
+            return 'action-' + action;
         }
 
         function escapeHtml(str) {
