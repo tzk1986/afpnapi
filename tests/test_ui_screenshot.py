@@ -137,8 +137,8 @@ def test_screenshot_fallback_to_html_on_failure(temp_screenshot_dir, client):
     data = response.get_json()
     assert data["data"]["ok"] is True
 
-    # 验证 HTML 文件保存为 step_N.html
-    html_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}.html"
+    # 验证 HTML 文件保存为 step_N_debug.html（调试快照）
+    html_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_debug.html"
     assert html_path.exists()
     assert html_path.read_text(encoding="utf-8") == html_content
 

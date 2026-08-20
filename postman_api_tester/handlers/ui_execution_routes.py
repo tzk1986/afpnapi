@@ -320,21 +320,16 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
     filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
     png_path = screenshot_dir / f"{filename_prefix}.png"
 
-    # 保存 HTML 快照用于调试（可查看实际发送的 HTML 内容）
-    html_snapshot_path = screenshot_dir / f"{filename_prefix}.html"
+    # 总是保存 HTML 快照用于调试（可查看实际发送的 HTML 内容和图片 URL）
+    html_snapshot_path = screenshot_dir / f"{filename_prefix}_debug.html"
     try:
         html_snapshot_path.write_text(html_content, encoding="utf-8")
+        logger.debug(f"HTML snapshot saved: {html_snapshot_path}")
     except Exception as html_err:
         logger.debug(f"Failed to save HTML snapshot: {html_err}")
 
     try:
-        # 使用 set_content 方式：直接设置 HTML，注入 <base> 标签解析资源路径
         _convert_html_to_png(html_content, png_path, base_url=page_url)
-        # 转换成功后删除 HTML 快照，保持目录整洁
-        try:
-            html_snapshot_path.unlink()
-        except Exception:
-            pass
         logger.info(
             "ui_screenshot_saved",
             extra={
@@ -343,11 +338,11 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
                 "step_index": step_index,
                 "status": step_status,
                 "format": "png",
+                "html_snapshot": str(html_snapshot_path),
             },
         )
     except Exception as e:
         logger.warning(f"Failed to save screenshot as PNG, HTML snapshot kept at: {html_snapshot_path}: {e}")
-        # 保留 HTML 快照用于调试
 
     return BaseHandler.json_response({"ok": True})
 
@@ -813,6 +808,7 @@ def api_ui_testing_execution_screenshot(
     for name, mime in [
         (f"step_{step_index}.png", "image/png"),
         (f"step_{step_index}_fail.png", "image/png"),
+        (f"step_{step_index}_debug.html", "text/html; charset=utf-8"),
         (f"step_{step_index}.html", "text/html; charset=utf-8"),
         (f"step_{step_index}_fail.html", "text/html; charset=utf-8"),
     ]:
