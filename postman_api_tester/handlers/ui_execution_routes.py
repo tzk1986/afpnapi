@@ -296,15 +296,16 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
 
 def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
-    """前端回放引擎上报步骤截图（HTML 快照），后端转换为 PNG 保存。"""
+    """前端回放引擎上报步骤截图（HTML 快照或页面 URL），后端转换为 PNG 保存。"""
     payload = request.get_json(silent=True)
     if not payload:
         return BaseHandler.json_response({"ok": True})
 
     step_index = payload.get("step_index")
     html_content = payload.get("html", "")
+    page_url = payload.get("page_url", "")
     step_status = payload.get("status", "failed")  # 默认为 failed 以保持向后兼容
-    if step_index is None or not html_content:
+    if step_index is None:
         return BaseHandler.json_response({"ok": True})
 
     screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
@@ -312,48 +313,64 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
 
     # 根据步骤状态决定文件名前缀
     filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
-
-    # 先保存 HTML 到临时文件
-    temp_html_path = screenshot_dir / f"{filename_prefix}_temp.html"
     png_path = screenshot_dir / f"{filename_prefix}.png"
 
-    try:
-        # 保存 HTML 到临时文件
-        temp_html_path.write_text(html_content, encoding="utf-8")
+    # 优先使用 URL 方式截图（资源能正确加载），失败时回退到 HTML 方式
+    screenshot_saved = False
 
-        # 使用 Playwright 将 HTML 转换为 PNG
-        _convert_html_to_png(temp_html_path, png_path)
-
-        # 删除临时 HTML 文件
-        if temp_html_path.exists():
-            temp_html_path.unlink()
-
-        logger.info(
-            "ui_screenshot_saved",
-            extra={
-                "event": "ui.execution.screenshot_saved",
-                "job_id": job_id,
-                "step_index": step_index,
-                "status": step_status,
-                "format": "png",
-            },
-        )
-    except Exception as e:
-        logger.warning(f"Failed to save screenshot as PNG, falling back to HTML: {e}")
-        # 如果 PNG 转换失败，回退到保存 HTML
-        html_path = screenshot_dir / f"{filename_prefix}.html"
+    if page_url:
         try:
-            html_path.write_text(html_content, encoding="utf-8")
+            _convert_url_to_png(page_url, png_path)
+            screenshot_saved = True
+            logger.info(
+                "ui_screenshot_saved",
+                extra={
+                    "event": "ui.execution.screenshot_saved",
+                    "job_id": job_id,
+                    "step_index": step_index,
+                    "status": step_status,
+                    "format": "png",
+                    "method": "url",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to screenshot URL {page_url}: {e}, falling back to HTML")
+
+    if not screenshot_saved and html_content:
+        # 回退到 HTML 方式
+        temp_html_path = screenshot_dir / f"{filename_prefix}_temp.html"
+        try:
+            temp_html_path.write_text(html_content, encoding="utf-8")
+            _convert_html_to_png(temp_html_path, png_path, base_url=page_url)
             if temp_html_path.exists():
                 temp_html_path.unlink()
-        except Exception as fallback_error:
-            logger.warning(f"Failed to save fallback HTML: {fallback_error}")
+            screenshot_saved = True
+            logger.info(
+                "ui_screenshot_saved",
+                extra={
+                    "event": "ui.execution.screenshot_saved",
+                    "job_id": job_id,
+                    "step_index": step_index,
+                    "status": step_status,
+                    "format": "png",
+                    "method": "html",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save screenshot as PNG, falling back to HTML: {e}")
+            html_path = screenshot_dir / f"{filename_prefix}.html"
+            try:
+                html_path.write_text(html_content, encoding="utf-8")
+                if temp_html_path.exists():
+                    temp_html_path.unlink()
+            except Exception as fallback_error:
+                logger.warning(f"Failed to save fallback HTML: {fallback_error}")
 
     return BaseHandler.json_response({"ok": True})
 
 
-def _convert_html_to_png(html_path: Path, png_path: Path) -> None:
-    """使用 Playwright 将 HTML 文件转换为 PNG 图片。"""
+def _convert_url_to_png(url: str, png_path: Path) -> None:
+    """使用 Playwright 直接访问 URL 并截图。资源能正确加载。"""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -363,12 +380,53 @@ def _convert_html_to_png(html_path: Path, png_path: Path) -> None:
         browser = p.chromium.launch(headless=True)
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 720})
+            # 直接访问目标 URL，资源会正确加载
+            page.goto(url, wait_until="domcontentloaded", timeout=10000)
+            # 等待页面完全渲染（某些 SPA 框架需要额外时间）
+            page.wait_for_timeout(1000)
+            # 截图
+            page.screenshot(path=str(png_path), full_page=False)
+        finally:
+            browser.close()
+
+
+def _convert_html_to_png(html_path: Path, png_path: Path, base_url: str = "") -> None:
+    """使用 Playwright 将 HTML 文件转换为 PNG 图片。
+
+    Args:
+        html_path: HTML 文件路径
+        png_path: 输出 PNG 路径
+        base_url: 可选的基础 URL，用于解析相对路径资源
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        raise RuntimeError("Playwright is not installed")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 720})
+
+            # 如果提供了 base_url，在 HTML 中注入 <base> 标签以正确加载资源
+            if base_url:
+                html_content = html_path.read_text(encoding="utf-8")
+                # 在 <head> 标签后插入 <base> 标签
+                if "<head>" in html_content:
+                    html_content = html_content.replace(
+                        "<head>",
+                        f'<head><base href="{base_url}">',
+                        1
+                    )
+                    # 写入临时文件
+                    html_path.write_text(html_content, encoding="utf-8")
+
             # 加载 HTML 文件
             html_url = f"file://{html_path.resolve()}"
             # 使用 domcontentloaded 而不是 networkidle，避免外部资源加载超时
             page.goto(html_url, wait_until="domcontentloaded", timeout=5000)
-            # 短暂等待 DOM 渲染
-            page.wait_for_timeout(300)
+            # 等待资源加载
+            page.wait_for_timeout(500)
             # 截图
             page.screenshot(path=str(png_path), full_page=False)
         finally:

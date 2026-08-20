@@ -2463,17 +2463,22 @@ _REPLAYER_JS = r"""
     },
 
     _captureScreenshot: function(callback, stepStatus) {
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({
-            type: 'ui-replay-screenshot',
-            data: { step_index: this.currentIndex, status: stepStatus || 'passed' }
-          }, '*');
+      var self = this;
+      // 延迟截图，等待页面完成异步更新（如 SPA 框架的 DOM 更新、API 响应渲染等）
+      // 某些操作（如 click）触发异步更新，需要等待才能捕获到正确的页面状态
+      setTimeout(function() {
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'ui-replay-screenshot',
+              data: { step_index: self.currentIndex, status: stepStatus || 'passed' }
+            }, '*');
+          }
+          if (callback) callback(null);
+        } catch(e) {
+          if (callback) callback(null);
         }
-        if (callback) callback(null);
-      } catch(e) {
-        if (callback) callback(null);
-      }
+      }, 500);  // 等待 500ms 让页面完成渲染
     },
 
     _finishAll: function() {
