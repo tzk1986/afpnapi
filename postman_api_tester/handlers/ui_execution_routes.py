@@ -365,9 +365,10 @@ def _convert_html_to_png(html_path: Path, png_path: Path) -> None:
             page = browser.new_page(viewport={"width": 1280, "height": 720})
             # 加载 HTML 文件
             html_url = f"file://{html_path.resolve()}"
-            page.goto(html_url, wait_until="networkidle", timeout=10000)
-            # 等待一下让页面渲染完成
-            page.wait_for_timeout(500)
+            # 使用 domcontentloaded 而不是 networkidle，避免外部资源加载超时
+            page.goto(html_url, wait_until="domcontentloaded", timeout=5000)
+            # 短暂等待 DOM 渲染
+            page.wait_for_timeout(300)
             # 截图
             page.screenshot(path=str(png_path), full_page=False)
         finally:

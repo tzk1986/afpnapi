@@ -9,7 +9,7 @@ from .executor import PostmanTestExecutor
 from .parser import PostmanApiParser
 from .postman_api_tester import PostmanTestReport, run_postman_tests
 
-__version__ = "1.33.27"
+__version__ = "1.33.28"
 __author__ = "API Testing Team"
 
 __all__ = [
