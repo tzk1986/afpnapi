@@ -3,7 +3,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, Dict
 
 from flask import make_response
 from flask.typing import ResponseReturnValue
@@ -27,10 +27,7 @@ def api_export_junit(report_name: str) -> ResponseReturnValue:
     if not ENABLE_JUNIT_EXPORT:
         return _json_error("当前环境未启用 JUnit XML 导出能力。", 403, "COL_JUNIT_001")
 
-    report = get_report_or_error(report_name, "COL_JUNIT_002")
-    if isinstance(report, tuple):
-        return report
-    report_dict = cast(Dict[str, Any], report)
+    report_dict = get_report_or_error(report_name, "COL_JUNIT_002")
 
     try:
         xml_content = _svc_build_junit_xml(report_dict)

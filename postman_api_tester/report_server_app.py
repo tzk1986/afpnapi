@@ -12,6 +12,7 @@ import logging
 import os
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -23,6 +24,7 @@ from postman_api_tester.report_meta_repository import (
     configure_scan_excludes,
 )
 from postman_api_tester.report_repository import configure_report_repository
+from postman_api_tester.handlers.base_handler import register_error_handlers
 from postman_api_tester.utils.logging_utils import (
     configure_logging_from_config,
     get_log_sample_rate,
@@ -161,6 +163,8 @@ class ReportServerApp:
             if request_id:
                 response.headers["X-Request-Id"] = request_id
             return response
+
+        register_error_handlers(app)
 
     @staticmethod
     def run_app(app: Flask) -> None:
