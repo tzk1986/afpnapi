@@ -1322,28 +1322,76 @@ class UiHeadlessEngine:
             }
         try:
             locator = page.get_by_text(expected, exact=False)
-            locator.first.wait_for(state="attached", timeout=timeout_ms)
-            return {
-                "action": "assert_text_exists",
-                "selector": {},
-                "value": expected,
-                "status": "passed",
-                "error": "",
-            }
-        except Exception:
-            # 截取页面文本前 200 字符用于诊断
-            body_text = ""
-            try:
-                body_text = (page.inner_text("body") or "")[:200]
-            except Exception:
-                pass
+            # 先检查是否有匹配
+            match_count = locator.count()
+            if match_count > 0:
+                # 有匹配，等待第一个可见
+                locator.first.wait_for(state="visible", timeout=timeout_ms)
+                return {
+                    "action": "assert_text_exists",
+                    "selector": {},
+                    "value": expected,
+                    "status": "passed",
+                    "error": "",
+                    "match_count": match_count,
+                }
+            else:
+                # 无匹配，等待超时
+                locator.first.wait_for(state="attached", timeout=timeout_ms)
+                # 如果走到这里说明找到了
+                return {
+                    "action": "assert_text_exists",
+                    "selector": {},
+                    "value": expected,
+                    "status": "passed",
+                    "error": "",
+                    "match_count": 1,
+                }
+        except Exception as e:
+            # 失败时获取详细诊断信息
+            error_detail = self._build_text_exists_error(page, expected)
             return {
                 "action": "assert_text_exists",
                 "selector": {},
                 "value": expected,
                 "status": "failed",
-                "error": f"断言失败: 页面未找到文本 '{expected}'，页面内容前 200 字: '{body_text}'",
+                "error": error_detail,
             }
+
+    def _build_text_exists_error(
+        self, page: "Page", expected: str
+    ) -> str:
+        """构建 assert_text_exists 失败时的详细错误信息。"""
+        parts = [f"断言失败: 页面未找到文本 '{expected}'"]
+
+        # 获取匹配数量（可能元素存在但不可见）
+        try:
+            locator = page.get_by_text(expected, exact=False)
+            count = locator.count()
+            if count > 0:
+                parts.append(f"（找到 {count} 个匹配，但元素可能不可见）")
+        except Exception:
+            pass
+
+        # 获取页面文本预览（用于诊断）
+        try:
+            body_text = (page.inner_text("body") or "").strip()
+            total_len = len(body_text)
+            # 显示前 500 字，并告知总长度
+            preview = body_text[:500]
+            if total_len > 500:
+                preview += f"... (共 {total_len} 字)"
+            parts.append(f"页面文本预览: '{preview}'")
+        except Exception:
+            parts.append("（无法获取页面文本）")
+
+        # 获取当前 URL
+        try:
+            parts.append(f"当前 URL: {page.url}")
+        except Exception:
+            pass
+
+        return "；".join(parts)
 
     def _action_assert_visible(
         self, page: "Page", selector: Any, timeout_ms: int

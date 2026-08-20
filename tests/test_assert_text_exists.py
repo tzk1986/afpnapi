@@ -14,34 +14,53 @@ from unittest.mock import MagicMock, patch
 class FakeLocator:
     """模拟 Playwright Locator。"""
 
-    def __init__(self, found: bool, raise_on_wait: bool = False):
+    def __init__(self, found: bool, raise_on_wait: bool = False, count: int = 1, visible: bool = True):
         self._found = found
         self._raise_on_wait = raise_on_wait
+        self._count = count if found else 0
+        self._visible = visible
 
     @property
     def first(self):
         return self
+
+    def count(self) -> int:
+        return self._count
 
     def wait_for(self, state: str = "attached", timeout: int = 30000):
         if self._raise_on_wait:
             raise TimeoutError("Locator.wait_for: Timeout 30000ms exceeded")
         if not self._found:
             raise TimeoutError("Locator.wait_for: Timeout 30000ms exceeded")
+        # 如果要求 visible 但元素不可见，抛出超时
+        if state == "visible" and not self._visible:
+            raise TimeoutError("Locator.wait_for: Timeout 30000ms exceeded")
 
 
 class FakePage:
     """模拟 Playwright Page。"""
 
-    def __init__(self, body_text: str = "", text_found: bool = True, raise_on_wait: bool = False):
+    def __init__(
+        self,
+        body_text: str = "",
+        text_found: bool = True,
+        raise_on_wait: bool = False,
+        match_count: int = 1,
+        visible: bool = True,
+        url: str = "http://example.com/page"
+    ):
         self._body_text = body_text
         self._text_found = text_found
         self._raise_on_wait = raise_on_wait
+        self._match_count = match_count
+        self._visible = visible
+        self.url = url
 
     def get_by_text(self, text: str, exact: bool = False):
         # 简单模拟：如果 body_text 包含 text 则视为找到
         if text in self._body_text:
-            return FakeLocator(found=True)
-        return FakeLocator(found=False, raise_on_wait=True)
+            return FakeLocator(found=True, count=self._match_count, visible=self._visible)
+        return FakeLocator(found=False, raise_on_wait=True, count=0)
 
     def inner_text(self, selector: str) -> str:
         return self._body_text
@@ -82,7 +101,8 @@ class TestAssertTextExists(unittest.TestCase):
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["value"], "供应商")
         self.assertIn("供应商", result["error"])
-        self.assertIn("页面内容前 200 字", result["error"])
+        self.assertIn("页面文本预览", result["error"])
+        self.assertIn("当前 URL", result["error"])
 
     def test_result_structure(self):
         """返回结果应包含标准字段。"""
@@ -95,6 +115,25 @@ class TestAssertTextExists(unittest.TestCase):
         self.assertIn("status", result)
         self.assertIn("error", result)
         self.assertEqual(result["selector"], {})
+        # 成功时应有 match_count 字段
+        self.assertIn("match_count", result)
+        self.assertEqual(result["match_count"], 1)
+
+    def test_match_count_returned(self):
+        """成功时应返回匹配数量。"""
+        engine = self._make_engine()
+        page = FakePage(body_text="供应商A 供应商B 供应商C", text_found=True, match_count=3)
+        result = engine._action_assert_text_exists(page, "供应商", 5000)
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["match_count"], 3)
+
+    def test_text_exists_but_invisible_fails(self):
+        """文本存在但不可见时应失败。"""
+        engine = self._make_engine()
+        page = FakePage(body_text="隐藏的供应商文字", text_found=True, match_count=1, visible=False)
+        result = engine._action_assert_text_exists(page, "供应商", 5000)
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("不可见", result["error"])
 
 
 class TestAssertTextExistsChineseText(unittest.TestCase):
