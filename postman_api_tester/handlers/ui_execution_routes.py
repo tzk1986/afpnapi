@@ -296,22 +296,15 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
 
 def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
-    """前端回放引擎上报步骤截图。
-
-    支持两种方式：
-    1. base64_png: 前端 html2canvas 截图（优先使用，利用浏览器 Cookie 和缓存）
-    2. html: 后端 Playwright 渲染截图（回退方案）
-    """
+    """前端回放引擎上报步骤截图（HTML 快照），后端转换为 PNG 保存。"""
     payload = request.get_json(silent=True)
     if not payload:
         return BaseHandler.json_response({"ok": True})
 
     step_index = payload.get("step_index")
-    base64_png = payload.get("base64_png", "")
     html_content = payload.get("html", "")
-    page_url = payload.get("page_url", "")
     step_status = payload.get("status", "failed")  # 默认为 failed 以保持向后兼容
-    if step_index is None:
+    if step_index is None or not html_content:
         return BaseHandler.json_response({"ok": True})
 
     screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
@@ -319,123 +312,67 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
 
     # 根据步骤状态决定文件名前缀
     filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
+
+    # 先保存 HTML 到临时文件
+    temp_html_path = screenshot_dir / f"{filename_prefix}_temp.html"
     png_path = screenshot_dir / f"{filename_prefix}.png"
 
-    # 优先使用前端传来的 base64 PNG（html2canvas 截图）
-    if base64_png:
-        try:
-            import base64
-            png_data = base64.b64decode(base64_png)
-            png_path.write_bytes(png_data)
-            logger.info(
-                "ui_screenshot_saved",
-                extra={
-                    "event": "ui.execution.screenshot_saved",
-                    "job_id": job_id,
-                    "step_index": step_index,
-                    "status": step_status,
-                    "format": "png",
-                    "method": "base64",
-                    "size": len(png_data),
-                },
-            )
-            return BaseHandler.json_response({"ok": True})
-        except Exception as e:
-            logger.warning(f"Failed to save base64 PNG: {e}, falling back to HTML")
+    try:
+        # 保存 HTML 到临时文件
+        temp_html_path.write_text(html_content, encoding="utf-8")
 
-    # 回退到 HTML 方案
-    if html_content:
-        # 保存 HTML 快照用于调试
-        html_snapshot_path = screenshot_dir / f"{filename_prefix}_debug.html"
-        try:
-            html_snapshot_path.write_text(html_content, encoding="utf-8")
-            logger.debug(f"HTML snapshot saved: {html_snapshot_path}")
-        except Exception as html_err:
-            logger.debug(f"Failed to save HTML snapshot: {html_err}")
+        # 使用 Playwright 将 HTML 转换为 PNG
+        _convert_html_to_png(temp_html_path, png_path)
 
+        # 删除临时 HTML 文件
+        if temp_html_path.exists():
+            temp_html_path.unlink()
+
+        logger.info(
+            "ui_screenshot_saved",
+            extra={
+                "event": "ui.execution.screenshot_saved",
+                "job_id": job_id,
+                "step_index": step_index,
+                "status": step_status,
+                "format": "png",
+            },
+        )
+    except Exception as e:
+        logger.warning(f"Failed to save screenshot as PNG, falling back to HTML: {e}")
+        # 如果 PNG 转换失败，回退到保存 HTML
+        html_path = screenshot_dir / f"{filename_prefix}.html"
         try:
-            _convert_html_to_png(html_content, png_path, base_url=page_url)
-            logger.info(
-                "ui_screenshot_saved",
-                extra={
-                    "event": "ui.execution.screenshot_saved",
-                    "job_id": job_id,
-                    "step_index": step_index,
-                    "status": step_status,
-                    "format": "png",
-                    "method": "html",
-                },
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save screenshot as PNG, HTML snapshot kept at: {html_snapshot_path}: {e}")
+            html_path.write_text(html_content, encoding="utf-8")
+            if temp_html_path.exists():
+                temp_html_path.unlink()
+        except Exception as fallback_error:
+            logger.warning(f"Failed to save fallback HTML: {fallback_error}")
 
     return BaseHandler.json_response({"ok": True})
 
 
-def _convert_html_to_png(html_content: str, png_path: Path, base_url: str = "") -> None:
-    """使用 Playwright 将 HTML 内容转换为 PNG 图片。
-
-    方案：保存 HTML 到临时文件，通过 file:// 加载，注入 <base> 标签让资源正确加载。
-
-    Args:
-        html_content: HTML 内容字符串
-        png_path: 输出 PNG 路径
-        base_url: 可选的基础 URL，用于解析相对路径资源
-    """
+def _convert_html_to_png(html_path: Path, png_path: Path) -> None:
+    """使用 Playwright 将 HTML 文件转换为 PNG 图片。"""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         raise RuntimeError("Playwright is not installed")
 
-    # 保存 HTML 到临时文件
-    import tempfile
-    temp_dir = png_path.parent
-    temp_html_path = temp_dir / f"_temp_{png_path.stem}.html"
-
-    try:
-        # 注入 <base> 标签，让相对路径资源（图片、CSS）能正确加载
-        if base_url:
-            # 确保 base_url 以 / 结尾（用于解析相对路径）
-            if not base_url.endswith("/"):
-                base_url = base_url.rsplit("/", 1)[0] + "/" if "/" in base_url else base_url + "/"
-            # 在 <head> 标签后插入 <base> 标签
-            if "<head>" in html_content:
-                html_content = html_content.replace(
-                    "<head>",
-                    f'<head><base href="{base_url}">',
-                    1
-                )
-
-        temp_html_path.write_text(html_content, encoding="utf-8")
-
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(viewport={"width": 1280, "height": 720})
-                # 通过 file:// 加载 HTML 文件
-                html_url = f"file://{temp_html_path.resolve()}"
-                page.goto(html_url, wait_until="load", timeout=10000)
-
-                # 等待网络空闲（资源、图片、字体加载完成）
-                try:
-                    page.wait_for_load_state("networkidle", timeout=3000)
-                except Exception:
-                    pass  # 非关键，继续截图
-
-                # 额外等待 2 秒，确保 SPA 框架完成渲染
-                page.wait_for_timeout(2000)
-
-                # 截图
-                page.screenshot(path=str(png_path), full_page=False)
-            finally:
-                browser.close()
-    finally:
-        # 清理临时 HTML 文件
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
         try:
-            if temp_html_path.exists():
-                temp_html_path.unlink()
-        except Exception:
-            pass
+            page = browser.new_page(viewport={"width": 1280, "height": 720})
+            # 加载 HTML 文件
+            html_url = f"file://{html_path.resolve()}"
+            # 使用 domcontentloaded 而不是 networkidle，避免外部资源加载超时
+            page.goto(html_url, wait_until="domcontentloaded", timeout=5000)
+            # 短暂等待 DOM 渲染
+            page.wait_for_timeout(300)
+            # 截图
+            page.screenshot(path=str(png_path), full_page=False)
+        finally:
+            browser.close()
 
 
 def _extract_network_requests(steps: list) -> list:
@@ -833,7 +770,6 @@ def api_ui_testing_execution_screenshot(
     for name, mime in [
         (f"step_{step_index}.png", "image/png"),
         (f"step_{step_index}_fail.png", "image/png"),
-        (f"step_{step_index}_debug.html", "text/html; charset=utf-8"),
         (f"step_{step_index}.html", "text/html; charset=utf-8"),
         (f"step_{step_index}_fail.html", "text/html; charset=utf-8"),
     ]:

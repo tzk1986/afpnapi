@@ -257,7 +257,7 @@
                     console.log('[Parent] Replay state saved from engine, currentIndex:', data.currentIndex);
                     break;
                 case 'ui-replay-screenshot':
-                    captureScreenshot(data.step_index, data.status || 'failed', data.base64_png);
+                    captureScreenshot(data.step_index, data.status || 'failed');
                     break;
                 case 'ui-replay-paused':
                     isPaused = true;
@@ -635,53 +635,11 @@
             }
         }
 
-        function captureScreenshot(stepIndex, stepStatus, base64Data) {
-            // 如果传入了 base64 PNG 数据（来自 iframe 内的 html2canvas），直接上传
-            if (base64Data) {
-                fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        step_index: stepIndex,
-                        base64_png: base64Data,
-                        status: stepStatus || 'failed'
-                    })
-                }).then(function() {
-                    console.log('Screenshot saved (base64 from iframe):', stepIndex);
-                }).catch(function(e) {
-                    console.warn('Screenshot upload failed:', e);
-                });
-
-                // 更新步骤结果
-                var existingStep = null;
-                for (var i = 0; i < allSteps.length; i++) {
-                    if (allSteps[i].index === stepIndex) {
-                        existingStep = allSteps[i];
-                        break;
-                    }
-                }
-                if (existingStep) {
-                    existingStep.screenshot = 'saved';
-                    fetch('/api/ui-testing/execution/' + jobId + '/step', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ step_result: existingStep })
-                    }).catch(function() {});
-                }
-                return;
-            }
-
-            // 回退方案：如果 iframe 内截图失败，尝试在父页面截图（可能因跨域失败）
+        function captureScreenshot(stepIndex, stepStatus) {
             var frame = document.getElementById('replayFrame');
-            if (!frame || !frame.contentDocument) {
-                console.warn('Screenshot: iframe not ready');
-                return;
-            }
-
+            if (!frame || !frame.contentDocument) return;
             try {
-                var iframeDoc = frame.contentDocument.documentElement;
-                // 保存 HTML 用于调试
-                var html = iframeDoc.outerHTML;
+                var html = frame.contentDocument.documentElement.outerHTML;
                 fetch('/api/ui-testing/execution/' + jobId + '/screenshot', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -692,8 +650,27 @@
                         status: stepStatus || 'failed'
                     })
                 }).catch(function() {});
+
+                // 同时更新步骤结果的 screenshot 字段，确保报告页面能显示截图链接
+                // 注意：这里使用 'saved' 标记，表示截图已保存到磁盘
+                var existingStep = null;
+                for (var i = 0; i < allSteps.length; i++) {
+                    if (allSteps[i].index === stepIndex) {
+                        existingStep = allSteps[i];
+                        break;
+                    }
+                }
+                if (existingStep) {
+                    existingStep.screenshot = 'saved';
+                    // 上报步骤结果到后端，更新 screenshot 字段
+                    fetch('/api/ui-testing/execution/' + jobId + '/step', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ step_result: existingStep })
+                    }).catch(function() {});
+                }
             } catch(e) {
-                console.warn('Screenshot fallback failed:', e);
+                console.warn('Screenshot capture failed:', e);
             }
         }
 
