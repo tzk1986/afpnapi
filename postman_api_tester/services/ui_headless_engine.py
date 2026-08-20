@@ -710,10 +710,13 @@ class UiHeadlessEngine:
                     steps_passed += 1
                 else:
                     steps_failed += 1
+                    # 失败时自动截图（方便排查问题），保存为 step_{i}_fail.png
                     self._take_screenshot(page, job_id, i)
+                    step_result["screenshot"] = True
 
-                # 步骤勾选了截图，无论通过/失败都截图
-                if step.get("screenshot"):
+                # 步骤勾选了截图，无论通过/失败都截图（保存为 step_{i}.png）
+                # 失败时已截图，仅对通过且有勾选的情况再截一张
+                if step.get("screenshot") and step_result["status"] == "passed":
                     self._take_screenshot(page, job_id, i, suffix="")
                     step_result["screenshot"] = True
 

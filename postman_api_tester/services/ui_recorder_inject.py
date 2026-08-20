@@ -1910,22 +1910,25 @@ _REPLAYER_JS = r"""
             result.match_count = _countOccurrences(allText, searchText);
             result.duration_ms = Date.now() - stepStart;
 
-            // 匹配多次时输出日志提示
+            // 匹配多次时在 error 字段记录提示信息（会显示在报告中）
             if (result.match_count > 1) {
+              result.error = '提示: 匹配到 ' + result.match_count + ' 处文本 "' + searchText + '"';
               console.log('[ReplayEngine] assert_text_exists: 匹配到 ' + result.match_count + ' 处文本 "' + searchText + '"');
               if (typeof self._sendLog === 'function') {
                 try { self._sendLog('text_matched_multiple', '匹配到 ' + result.match_count + ' 处文本', { text: searchText, match_count: result.match_count }, 'info'); } catch(e) {}
               }
             }
 
-            // 检查步骤是否勾选了截图，如果勾选则截图
-            if (step.screenshot) {
+            // 截图逻辑：勾选截图 → 成功/失败都截图；未勾选但失败 → 也截图
+            var needScreenshot = step.screenshot || result.status === 'failed';
+            if (needScreenshot) {
+              var screenshotStatus = result.status === 'failed' ? 'failed' : '';
               self._captureScreenshot(function(screenshotData) {
                 result.screenshot = 'saved';
                 self.results.push(result);
                 self._notifyParent('step_complete', result);
                 self._executeNext();
-              }, 'passed');
+              }, screenshotStatus);
             } else {
               self.results.push(result);
               self._notifyParent('step_complete', result);
@@ -2043,8 +2046,10 @@ _REPLAYER_JS = r"""
 
         result.duration_ms = Date.now() - stepStart;
 
-        // 检查步骤是否勾选了截图，如果勾选则截图
-        if (step.screenshot) {
+        // 截图策略：勾选截图 → 成功/失败都截图；未勾选但失败/异常 → 也截图（方便排查问题）
+        var _needScreenshot = step.screenshot || result.status === 'failed' || result.status === 'error';
+        if (_needScreenshot) {
+          var _screenshotStatus = (result.status === 'failed' || result.status === 'error') ? 'failed' : '';
           self._captureScreenshot(function(screenshotData) {
             result.screenshot = 'saved'; // 标记截图已保存，用于报告页面显示截图链接
             self.results.push(result);
@@ -2053,7 +2058,7 @@ _REPLAYER_JS = r"""
             self._notifyParent('step_complete', result);
             if (typeof self._sendLog === 'function') try { self._sendLog('step_complete', result.status, { status: result.status, duration_ms: result.duration_ms, error: result.error || '', screenshot: 'saved' }, result.status === 'passed' ? 'info' : 'warn'); } catch(e) {}
             self._continueAfterStep(result, step, action, el);
-          }, result.status || 'passed');
+          }, _screenshotStatus);
         } else {
           self.results.push(result);
           // 保存当前状态（含当前步骤结果），用于跨页面导航后恢复
