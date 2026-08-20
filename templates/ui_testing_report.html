@@ -105,7 +105,7 @@
         .action-type { background: #fef3c7; color: #b45309; }
         .action-navigate { background: #e0e7ff; color: #4338ca; }
         .action-wait { background: #fef9c3; color: #a16207; }
-        .action-assert { background: #e0f2fe; color: #0369a1; }
+        .action-assert { background: #fee2e2; color: #dc2626; }
         .action-default { background: #f3f4f6; color: #374151; }
 
         .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
@@ -233,7 +233,7 @@
                     {% for step in steps %}
                     <tr class="{{ step.status }}" data-step-index="{{ loop.index0 }}" data-status="{{ step.status }}">
                         <td>{{ loop.index }}</td>
-                        <td><span class="action-badge action-{{ step.action }}">{{ step.action }}</span></td>
+                        <td><span class="action-badge action-{{ step.action }}">{{ step.action_label }}</span></td>
                         <td class="selector-cell" title="{{ step.selector_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'selector')">{{ step.selector_display }}</td>
                         <td class="value-cell" title="{{ step.value_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'value')">{{ step.value_display }}</td>
                         <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
@@ -401,7 +401,7 @@
                     var rowClass = s.status + (isCurrentStep(s) ? ' current' : '') + (isCascade ? ' cascade' : '');
                     existing.className = rowClass;
                     cells[0].textContent = i + 1;
-                    cells[1].innerHTML = '<span class="action-badge action-' + s.action + '">' + s.action + '</span>';
+                    cells[1].innerHTML = '<span class="action-badge action-' + s.action + '">' + getActionLabel(s.action) + '</span>';
                     var sel = formatSelector(s.selector);
                     cells[2].textContent = sel;
                     cells[2].title = sel;
@@ -441,7 +441,7 @@
                 : '';
             return '<tr class="' + s.status + cur + cascadeClass + '" data-step-index="' + idx + '" data-status="' + s.status + '">' +
                 '<td>' + (idx + 1) + '</td>' +
-                '<td><span class="action-badge action-' + s.action + '">' + s.action + '</span></td>' +
+                '<td><span class="action-badge action-' + s.action + '">' + getActionLabel(s.action) + '</span></td>' +
                 '<td class="selector-cell" title="' + escapeHtml(sel) + '" onclick="viewTextDetail(' + idx + ', \'selector\')">' + escapeHtml(sel) + '</td>' +
                 '<td class="value-cell" title="' + escapeHtml(s.value || '') + '" onclick="viewTextDetail(' + idx + ', \'value\')">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
                 '<td><span class="status-dot ' + s.status + '"></span>' + statusLabel + '</td>' +
@@ -449,6 +449,13 @@
                 '<td class="error-text" title="' + escapeHtml(s.error || '') + '" onclick="viewTextDetail(' + idx + ', \'error\')">' + escapeHtml((s.error || '').substring(0, 200)) + '</td>' +
                 '<td>' + screenshotCell + '</td>' +
                 '</tr>';
+        }
+
+        // 断言操作统一显示为"断言"，避免重叠
+        var ASSERT_ACTIONS = ['assert_visible', 'assert_text', 'assert_text_exists', 'assert_element_exists', 'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled', 'assert_disabled', 'assert_not_visible', 'assert_attribute', 'assert_toast', 'assert_css', 'assert_checked', 'assert_dialog', 'assert_cookie'];
+        function getActionLabel(action) {
+            if (ASSERT_ACTIONS.indexOf(action) >= 0) return '断言';
+            return action;
         }
 
         function escapeHtml(str) {

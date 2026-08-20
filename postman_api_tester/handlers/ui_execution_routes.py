@@ -553,10 +553,20 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
         }
 
         duration_ms = s.get("duration_ms", 0)
+        # 断言操作统一显示为"断言"
+        _ASSERT_ACTIONS = {
+            'assert_visible', 'assert_text', 'assert_text_exists', 'assert_element_exists',
+            'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled',
+            'assert_disabled', 'assert_not_visible', 'assert_attribute', 'assert_toast',
+            'assert_css', 'assert_checked', 'assert_dialog', 'assert_cookie'
+        }
+        action_name = s.get("action", "unknown")
+        action_label = "断言" if action_name in _ASSERT_ACTIONS else action_name
         steps.append(
             {
                 "status": step_status,
-                "action": s.get("action", "unknown"),
+                "action": action_name,
+                "action_label": action_label,
                 "selector_display": selector_display,
                 "value_display": value_display,
                 "status_label": step_status_labels.get(step_status, step_status),
