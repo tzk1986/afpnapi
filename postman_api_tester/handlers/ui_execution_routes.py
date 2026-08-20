@@ -296,21 +296,22 @@ def api_ui_testing_execution_finalize(job_id: str) -> ResponseReturnValue:
 
 
 def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue:
-    """前端回放引擎上报步骤截图（HTML 快照），后端转换为 PNG 保存。
+    """前端回放引擎上报步骤截图。
 
-    使用 Playwright 的 page.set_content() 直接设置 HTML 内容（而非通过 file:// 加载），
-    同时注入 <base> 标签让相对路径资源（图片、CSS）正确加载。
-    不能直接访问页面 URL，因为新启动的 Playwright 实例没有登录 Cookie。
+    支持两种方式：
+    1. base64_png: 前端 html2canvas 截图（优先使用，利用浏览器 Cookie 和缓存）
+    2. html: 后端 Playwright 渲染截图（回退方案）
     """
     payload = request.get_json(silent=True)
     if not payload:
         return BaseHandler.json_response({"ok": True})
 
     step_index = payload.get("step_index")
+    base64_png = payload.get("base64_png", "")
     html_content = payload.get("html", "")
     page_url = payload.get("page_url", "")
     step_status = payload.get("status", "failed")  # 默认为 failed 以保持向后兼容
-    if step_index is None or not html_content:
+    if step_index is None:
         return BaseHandler.json_response({"ok": True})
 
     screenshot_dir = _execution_store.base_dir / f"exec_{job_id}" / "screenshots"
@@ -320,29 +321,53 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
     filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
     png_path = screenshot_dir / f"{filename_prefix}.png"
 
-    # 总是保存 HTML 快照用于调试（可查看实际发送的 HTML 内容和图片 URL）
-    html_snapshot_path = screenshot_dir / f"{filename_prefix}_debug.html"
-    try:
-        html_snapshot_path.write_text(html_content, encoding="utf-8")
-        logger.debug(f"HTML snapshot saved: {html_snapshot_path}")
-    except Exception as html_err:
-        logger.debug(f"Failed to save HTML snapshot: {html_err}")
+    # 优先使用前端传来的 base64 PNG（html2canvas 截图）
+    if base64_png:
+        try:
+            import base64
+            png_data = base64.b64decode(base64_png)
+            png_path.write_bytes(png_data)
+            logger.info(
+                "ui_screenshot_saved",
+                extra={
+                    "event": "ui.execution.screenshot_saved",
+                    "job_id": job_id,
+                    "step_index": step_index,
+                    "status": step_status,
+                    "format": "png",
+                    "method": "base64",
+                    "size": len(png_data),
+                },
+            )
+            return BaseHandler.json_response({"ok": True})
+        except Exception as e:
+            logger.warning(f"Failed to save base64 PNG: {e}, falling back to HTML")
 
-    try:
-        _convert_html_to_png(html_content, png_path, base_url=page_url)
-        logger.info(
-            "ui_screenshot_saved",
-            extra={
-                "event": "ui.execution.screenshot_saved",
-                "job_id": job_id,
-                "step_index": step_index,
-                "status": step_status,
-                "format": "png",
-                "html_snapshot": str(html_snapshot_path),
-            },
-        )
-    except Exception as e:
-        logger.warning(f"Failed to save screenshot as PNG, HTML snapshot kept at: {html_snapshot_path}: {e}")
+    # 回退到 HTML 方案
+    if html_content:
+        # 保存 HTML 快照用于调试
+        html_snapshot_path = screenshot_dir / f"{filename_prefix}_debug.html"
+        try:
+            html_snapshot_path.write_text(html_content, encoding="utf-8")
+            logger.debug(f"HTML snapshot saved: {html_snapshot_path}")
+        except Exception as html_err:
+            logger.debug(f"Failed to save HTML snapshot: {html_err}")
+
+        try:
+            _convert_html_to_png(html_content, png_path, base_url=page_url)
+            logger.info(
+                "ui_screenshot_saved",
+                extra={
+                    "event": "ui.execution.screenshot_saved",
+                    "job_id": job_id,
+                    "step_index": step_index,
+                    "status": step_status,
+                    "format": "png",
+                    "method": "html",
+                },
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save screenshot as PNG, HTML snapshot kept at: {html_snapshot_path}: {e}")
 
     return BaseHandler.json_response({"ok": True})
 

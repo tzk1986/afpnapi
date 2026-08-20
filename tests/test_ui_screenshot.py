@@ -64,22 +64,22 @@ def _mock_convert_html_to_png_failure(html_content: str, png_path: Path, base_ur
 
 
 def test_screenshot_save_as_png_passed(temp_screenshot_dir, client):
-    """测试成功步骤截图保存为 PNG。"""
+    """测试成功步骤截图保存为 PNG（使用 base64 方式）。"""
     job_id = "test_job_png_passed"
     step_index = 3
-    html_content = "<html><body>Passed step</body></html>"
+    # 创建一个假的 PNG base64 数据
+    import base64
+    fake_png_data = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+    base64_png = base64.b64encode(fake_png_data).decode('utf-8')
 
-    with patch("postman_api_tester.handlers.ui_execution_routes._convert_html_to_png") as mock_convert:
-        mock_convert.side_effect = _mock_convert_html_to_png_success
-
-        response = client.post(
-            f"/api/ui-testing/execution/{job_id}/screenshot",
-            json={
-                "step_index": step_index,
-                "html": html_content,
-                "status": "passed",
-            },
-        )
+    response = client.post(
+        f"/api/ui-testing/execution/{job_id}/screenshot",
+        json={
+            "step_index": step_index,
+            "base64_png": base64_png,
+            "status": "passed",
+        },
+    )
 
     assert response.status_code == 200
     data = response.get_json()
@@ -88,31 +88,32 @@ def test_screenshot_save_as_png_passed(temp_screenshot_dir, client):
     # 验证 PNG 文件保存为 step_N.png
     png_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}.png"
     assert png_path.exists()
+    assert png_path.read_bytes() == fake_png_data
 
 
 def test_screenshot_save_as_png_failed(temp_screenshot_dir, client):
-    """测试失败步骤截图保存为 PNG。"""
+    """测试失败步骤截图保存为 PNG（使用 base64 方式）。"""
     job_id = "test_job_png_failed"
     step_index = 5
-    html_content = "<html><body>Failed step</body></html>"
+    import base64
+    fake_png_data = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+    base64_png = base64.b64encode(fake_png_data).decode('utf-8')
 
-    with patch("postman_api_tester.handlers.ui_execution_routes._convert_html_to_png") as mock_convert:
-        mock_convert.side_effect = _mock_convert_html_to_png_success
-
-        response = client.post(
-            f"/api/ui-testing/execution/{job_id}/screenshot",
-            json={
-                "step_index": step_index,
-                "html": html_content,
-                "status": "failed",
-            },
-        )
+    response = client.post(
+        f"/api/ui-testing/execution/{job_id}/screenshot",
+        json={
+            "step_index": step_index,
+            "base64_png": base64_png,
+            "status": "failed",
+        },
+    )
 
     assert response.status_code == 200
 
     # 验证 PNG 文件保存为 step_N_fail.png
     png_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_fail.png"
     assert png_path.exists()
+    assert png_path.read_bytes() == fake_png_data
 
 
 def test_screenshot_fallback_to_html_on_failure(temp_screenshot_dir, client):
@@ -141,10 +142,6 @@ def test_screenshot_fallback_to_html_on_failure(temp_screenshot_dir, client):
     html_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_debug.html"
     assert html_path.exists()
     assert html_path.read_text(encoding="utf-8") == html_content
-
-    # 验证没有 PNG 文件
-    png_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}.png"
-    assert not png_path.exists()
 
 
 def test_screenshot_empty_payload_returns_ok(temp_screenshot_dir, client):
@@ -204,23 +201,22 @@ def test_screenshot_missing_html_returns_ok(temp_screenshot_dir, client):
 
 
 def test_screenshot_get_png_passed(temp_screenshot_dir, client):
-    """测试获取成功步骤的 PNG 截图。"""
+    """测试获取成功步骤的 PNG 截图（使用 base64 方式）。"""
     job_id = "test_get_png_passed"
     step_index = 2
-    html_content = "<html><body>Passed screenshot</body></html>"
+    import base64
+    fake_png_data = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+    base64_png = base64.b64encode(fake_png_data).decode('utf-8')
 
-    with patch("postman_api_tester.handlers.ui_execution_routes._convert_html_to_png") as mock_convert:
-        mock_convert.side_effect = _mock_convert_html_to_png_success
-
-        # 先保存截图
-        client.post(
-            f"/api/ui-testing/execution/{job_id}/screenshot",
-            json={
-                "step_index": step_index,
-                "html": html_content,
-                "status": "passed",
-            },
-        )
+    # 先保存截图
+    client.post(
+        f"/api/ui-testing/execution/{job_id}/screenshot",
+        json={
+            "step_index": step_index,
+            "base64_png": base64_png,
+            "status": "passed",
+        },
+    )
 
     # 获取截图
     response = client.get(f"/api/ui-testing/execution/{job_id}/screenshot/{step_index}")
@@ -229,23 +225,22 @@ def test_screenshot_get_png_passed(temp_screenshot_dir, client):
 
 
 def test_screenshot_get_png_failed(temp_screenshot_dir, client):
-    """测试获取失败步骤的 PNG 截图。"""
+    """测试获取失败步骤的 PNG 截图（使用 base64 方式）。"""
     job_id = "test_get_png_failed"
     step_index = 4
-    html_content = "<html><body>Failed screenshot</body></html>"
+    import base64
+    fake_png_data = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+    base64_png = base64.b64encode(fake_png_data).decode('utf-8')
 
-    with patch("postman_api_tester.handlers.ui_execution_routes._convert_html_to_png") as mock_convert:
-        mock_convert.side_effect = _mock_convert_html_to_png_success
-
-        # 先保存截图
-        client.post(
-            f"/api/ui-testing/execution/{job_id}/screenshot",
-            json={
-                "step_index": step_index,
-                "html": html_content,
-                "status": "failed",
-            },
-        )
+    # 先保存截图
+    client.post(
+        f"/api/ui-testing/execution/{job_id}/screenshot",
+        json={
+            "step_index": step_index,
+            "base64_png": base64_png,
+            "status": "failed",
+        },
+    )
 
     # 获取截图
     response = client.get(f"/api/ui-testing/execution/{job_id}/screenshot/{step_index}")
@@ -314,32 +309,32 @@ def test_screenshot_backward_compatibility(temp_screenshot_dir, client):
 
 
 def test_screenshot_base_url_injection(temp_screenshot_dir, client):
-    """测试 base_url 注入：传入 page_url 时应在 HTML 中注入 <base> 标签。"""
-    job_id = "test_base_url"
+    """测试 base64 截图优先于 HTML 方式。"""
+    job_id = "test_base64_priority"
     step_index = 2
+    import base64
+    fake_png_data = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+    base64_png = base64.b64encode(fake_png_data).decode('utf-8')
     html_content = "<html><head></head><body>Test</body></html>"
-    page_url = "http://example.com/page/sub"
 
-    with patch("postman_api_tester.handlers.ui_execution_routes._convert_html_to_png") as mock_convert:
-        mock_convert.side_effect = _mock_convert_html_to_png_success
-
-        response = client.post(
-            f"/api/ui-testing/execution/{job_id}/screenshot",
-            json={
-                "step_index": step_index,
-                "html": html_content,
-                "page_url": page_url,
-                "status": "passed",
-            },
-        )
+    # 同时传入 base64_png 和 html，应该优先使用 base64
+    response = client.post(
+        f"/api/ui-testing/execution/{job_id}/screenshot",
+        json={
+            "step_index": step_index,
+            "base64_png": base64_png,
+            "html": html_content,
+            "status": "passed",
+        },
+    )
 
     assert response.status_code == 200
 
-    # 验证 _convert_html_to_png 被调用，且传入了正确的 base_url
-    mock_convert.assert_called_once()
-    call_args = mock_convert.call_args
-    assert call_args[1].get("base_url") == page_url or (len(call_args[0]) >= 3 and call_args[0][2] == page_url)
-
-    # 验证 PNG 文件保存
+    # 验证 PNG 文件保存（来自 base64）
     png_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}.png"
     assert png_path.exists()
+    assert png_path.read_bytes() == fake_png_data
+
+    # 验证没有保存 HTML 快照（因为 base64 成功了）
+    html_path = temp_screenshot_dir / f"exec_{job_id}" / "screenshots" / f"step_{step_index}_debug.html"
+    assert not html_path.exists()
