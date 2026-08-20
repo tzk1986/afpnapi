@@ -320,9 +320,21 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
     filename_prefix = f"step_{step_index}" if step_status == "passed" else f"step_{step_index}_fail"
     png_path = screenshot_dir / f"{filename_prefix}.png"
 
+    # 保存 HTML 快照用于调试（可查看实际发送的 HTML 内容）
+    html_snapshot_path = screenshot_dir / f"{filename_prefix}.html"
+    try:
+        html_snapshot_path.write_text(html_content, encoding="utf-8")
+    except Exception as html_err:
+        logger.debug(f"Failed to save HTML snapshot: {html_err}")
+
     try:
         # 使用 set_content 方式：直接设置 HTML，注入 <base> 标签解析资源路径
         _convert_html_to_png(html_content, png_path, base_url=page_url)
+        # 转换成功后删除 HTML 快照，保持目录整洁
+        try:
+            html_snapshot_path.unlink()
+        except Exception:
+            pass
         logger.info(
             "ui_screenshot_saved",
             extra={
@@ -334,12 +346,8 @@ def api_ui_testing_execution_screenshot_post(job_id: str) -> ResponseReturnValue
             },
         )
     except Exception as e:
-        logger.warning(f"Failed to save screenshot as PNG, falling back to HTML: {e}")
-        html_path = screenshot_dir / f"{filename_prefix}.html"
-        try:
-            html_path.write_text(html_content, encoding="utf-8")
-        except Exception as fallback_error:
-            logger.warning(f"Failed to save fallback HTML: {fallback_error}")
+        logger.warning(f"Failed to save screenshot as PNG, HTML snapshot kept at: {html_snapshot_path}: {e}")
+        # 保留 HTML 快照用于调试
 
     return BaseHandler.json_response({"ok": True})
 
@@ -373,17 +381,29 @@ def _convert_html_to_png(html_content: str, png_path: Path, base_url: str = "") 
                 f'<head><base href="{base_url}">',
                 1
             )
+        logger.debug(f"Injected <base> tag with URL: {base_url}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 720})
+
             # 使用 set_content 直接设置 HTML（而非 file:// 加载文件）
-            page.set_content(html_content, wait_until="domcontentloaded", timeout=5000)
-            # 等待资源（图片、字体）加载完成
-            page.wait_for_timeout(1000)
+            # 使用 load 而不是 domcontentloaded，等待所有资源加载完成
+            page.set_content(html_content, wait_until="load", timeout=10000)
+
+            # 等待网络空闲（资源、图片、字体加载完成）
+            try:
+                page.wait_for_load_state("networkidle", timeout=3000)
+            except Exception as e:
+                logger.debug(f"networkidle timeout (non-critical): {e}")
+
+            # 额外等待 2 秒，确保 SPA 框架完成渲染
+            page.wait_for_timeout(2000)
+
             # 截图
             page.screenshot(path=str(png_path), full_page=False)
+            logger.debug(f"Screenshot saved: {png_path}, size: {png_path.stat().st_size} bytes")
         finally:
             browser.close()
 
