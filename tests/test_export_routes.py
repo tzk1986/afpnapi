@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from flask import Flask
 
+from postman_api_tester.handlers.base_handler import register_error_handlers
 from postman_api_tester.handlers.export_routes import api_export_junit
 
 
@@ -13,6 +14,7 @@ from postman_api_tester.handlers.export_routes import api_export_junit
 def app_context() -> Generator[None, None, None]:
     """提供 Flask 应用上下文。"""
     app = Flask(__name__)
+    register_error_handlers(app)
     with app.test_request_context():
         yield
 
@@ -30,14 +32,16 @@ class TestApiExportJUnit:
             assert result[1] == 403
 
     def test_export_junit_report_not_found(self, app_context: None) -> None:
-        """报告不存在返回 404。"""
+        """报告不存在抛出 ReportNotFoundError。"""
         with patch(
             "postman_api_tester.handlers.export_routes.ENABLE_JUNIT_EXPORT", True
         ), patch("postman_api_tester.report_repository.find_report") as mock_find:
+            from postman_api_tester.handlers.base_handler import ReportNotFoundError
+
             mock_find.side_effect = FileNotFoundError()
-            result = api_export_junit("missing_report")
-            assert isinstance(result, tuple)
-            assert result[1] == 404
+            with pytest.raises(ReportNotFoundError) as exc_info:
+                api_export_junit("missing_report")
+            assert exc_info.value.error_code == "COL_JUNIT_002"
 
     def test_export_junit_success(self, app_context: None) -> None:
         """成功导出返回 XML 响应。"""

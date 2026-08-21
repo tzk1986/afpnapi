@@ -1,6 +1,6 @@
 """报告结果与分析路由处理函数。"""
 
-from typing import Any, Dict, cast
+from typing import Any, Dict
 
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
@@ -55,10 +55,7 @@ from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page
 
 def api_report_results(report_name: str) -> ResponseReturnValue:
     """报告结果列表（分页+筛选）API。"""
-    report = get_report_or_error(report_name, "")
-    if isinstance(report, tuple):
-        return report
-    report_dict = cast(Dict[str, Any], report)
+    report_dict = get_report_or_error(report_name, "")
 
     page = _clamp_page(request.args.get("page", 1))
     page_size = _clamp_page_size(
@@ -94,10 +91,7 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
             ValidationError("当前环境未启用测试结果分析能力。"), 403
         )
 
-    report = get_report_or_error(report_name, "")
-    if isinstance(report, tuple):
-        return report
-    report_dict = cast(Dict[str, Any], report)
+    report_dict = get_report_or_error(report_name, "")
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -143,14 +137,8 @@ def api_report_analytics_compare() -> ResponseReturnValue:
             ValidationError("left 和 right 参数不能为空"), 400
         )
 
-    left_report = get_report_or_error(left_name, "")
-    if isinstance(left_report, tuple):
-        return left_report
-    left_report_dict = cast(Dict[str, Any], left_report)
-    right_report = get_report_or_error(right_name, "")
-    if isinstance(right_report, tuple):
-        return right_report
-    right_report_dict = cast(Dict[str, Any], right_report)
+    left_report_dict = get_report_or_error(left_name, "")
+    right_report_dict = get_report_or_error(right_name, "")
 
     params = _normalize_analytics_query_params(
         top_n_raw=request.args.get("top_n"),
@@ -183,10 +171,7 @@ def api_report_result_detail(
     report_name: str, result_index: int
 ) -> ResponseReturnValue:
     """单条结果详情 API。"""
-    report = get_report_or_error(report_name, "")
-    if isinstance(report, tuple):
-        return report
-    report_dict = cast(Dict[str, Any], report)
+    report_dict = get_report_or_error(report_name, "")
 
     try:
         return jsonify(build_result_detail_payload(report_dict, result_index))
@@ -208,12 +193,6 @@ def api_compare() -> ResponseReturnValue:
         return BaseHandler.error_response(
             ValidationError("left 和 right 参数不能为空"), 400
         )
-    left = get_report_or_error(left_name, "")
-    if isinstance(left, tuple):
-        return left
-    left_dict = cast(Dict[str, Any], left)
-    right = get_report_or_error(right_name, "")
-    if isinstance(right, tuple):
-        return right
-    right_dict = cast(Dict[str, Any], right)
+    left_dict = get_report_or_error(left_name, "")
+    right_dict = get_report_or_error(right_name, "")
     return jsonify(build_compare_payload(left_dict, right_dict))

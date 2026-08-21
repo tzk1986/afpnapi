@@ -21,6 +21,8 @@ from postman_api_tester.handlers.report_meta_routes import (
 def app_context() -> Generator[None, None, None]:
     """提供 Flask 请求上下文。"""
     app = Flask(__name__)
+    from postman_api_tester.handlers.base_handler import register_error_handlers
+    register_error_handlers(app)
     with app.test_request_context():
         yield
 
@@ -44,24 +46,28 @@ class TestApiReportDetail:
     """api_report_detail 端点测试。"""
 
     def test_report_not_found(self, app_context: None) -> None:
-        """报告不存在返回 404。"""
+        """报告不存在抛出 ReportNotFoundError。"""
         with patch("postman_api_tester.report_repository.find_report") as mock_find:
+            from postman_api_tester.handlers.base_handler import ReportNotFoundError
+
             mock_find.side_effect = FileNotFoundError()
-            result = api_report_detail("missing")
-            assert isinstance(result, tuple)
-            assert result[1] == 404
+            with pytest.raises(ReportNotFoundError) as exc_info:
+                api_report_detail("missing")
+            assert exc_info.value.error_code == "RPT_META_001"
 
 
 class TestApiManualCases:
     """api_manual_cases 端点测试。"""
 
     def test_report_not_found(self, app_context: None) -> None:
-        """报告不存在返回 404。"""
+        """报告不存在抛出 ReportNotFoundError。"""
         with patch("postman_api_tester.report_repository.find_report") as mock_find:
+            from postman_api_tester.handlers.base_handler import ReportNotFoundError
+
             mock_find.side_effect = FileNotFoundError()
-            result = api_manual_cases("missing")
-            assert isinstance(result, tuple)
-            assert result[1] == 404
+            with pytest.raises(ReportNotFoundError) as exc_info:
+                api_manual_cases("missing")
+            assert exc_info.value.error_code == "RPT_META_002"
 
 
 class TestApiManualCaseAdd:

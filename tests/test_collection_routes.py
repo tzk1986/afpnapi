@@ -35,6 +35,8 @@ def app() -> Flask:
     """创建 Flask 测试应用。"""
     app = Flask(__name__)
     app.testing = True
+    from postman_api_tester.handlers.base_handler import register_error_handlers
+    register_error_handlers(app)
     return app
 
 

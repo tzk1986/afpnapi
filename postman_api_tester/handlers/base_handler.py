@@ -8,12 +8,40 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Tuple, Type, Union
 
-from flask import jsonify
+from flask import Flask, jsonify
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+class ReportNotFoundError(Exception):
+    """报告未找到异常。"""
+
+    def __init__(self, message: str, error_code: str = "") -> None:
+        self.message = message
+        self.error_code = error_code
+        super().__init__(message)
+
+
+def register_error_handlers(app: Flask) -> None:
+    """为 Flask app 注册全局异常处理器。
+
+    在应用工厂和测试 fixture 中均应调用，确保异常返回统一 JSON 格式。
+    """
+
+    @app.errorhandler(ReportNotFoundError)
+    def _handle_report_not_found(exc: ReportNotFoundError):  # type: ignore[no-untyped-def]
+        response_body: Dict[str, Any] = {
+            "code": "error",
+            "message": exc.message,
+            "data": None,
+            "timestamp": datetime.now().isoformat(),
+        }
+        if exc.error_code:
+            response_body["error_code"] = exc.error_code
+        return jsonify(response_body), 404
 
 
 class BaseHandler:
@@ -193,11 +221,11 @@ def get_report_or_error(
     report_name: str,
     error_code: str,
     find_report: Optional[Callable[[str], Dict[str, Any]]] = None,
-) -> Union[Dict[str, Any], ResponseReturnValue]:
-    """查找报告，不存在时返回 JSON 错误响应。
+) -> Dict[str, Any]:
+    """查找报告，不存在时抛出 ``ReportNotFoundError``。
 
-    消除各路由文件中重复的 ``_repo_find_report + FileNotFoundError`` 模式。
-    调用方应检查返回值是否为 tuple（Flask 响应），是则直接 return。
+    消除各路由文件中重复的 ``isinstance(report, tuple)`` 检查。
+    Flask 全局错误处理器捕获 ``ReportNotFoundError`` 并返回 JSON 错误响应。
 
     Args:
         report_name: 报告名称
@@ -205,7 +233,10 @@ def get_report_or_error(
         find_report: 查找函数，默认使用 report_repository.find_report
 
     Returns:
-        报告 dict（成功时），或 Flask 错误响应（失败时）
+        报告 dict
+
+    Raises:
+        ReportNotFoundError: 报告未找到时抛出
     """
     finder = find_report
     if finder is None:
@@ -215,7 +246,7 @@ def get_report_or_error(
     try:
         return finder(report_name)
     except FileNotFoundError as exc:
-        return json_error(str(exc), 404, error_code)
+        raise ReportNotFoundError(str(exc), error_code) from exc
 
 
 _ErrorMap = Dict[Type[Exception], Tuple[int, str]]
