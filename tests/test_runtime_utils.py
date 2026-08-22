@@ -1,8 +1,10 @@
 """runtime_utils 模块单元测试。
 
-覆盖 normalize_url_and_params、merge_url_with_params、item_path_text、
+覆盖 merge_url_with_params、item_path_text、
 checkpoint_key、checkpoint_file_path、load_checkpoint、save_checkpoint_atomic、
 compute_collection_fingerprint。
+
+注：normalize_url_and_params 已统一至 utils/url_utils.py，测试见 test_url_utils.py。
 """
 
 import json
@@ -17,57 +19,8 @@ from postman_api_tester.runtime_utils import (
     item_path_text,
     load_checkpoint,
     merge_url_with_params,
-    normalize_url_and_params,
     save_checkpoint_atomic,
 )
-
-
-class TestNormalizeUrlAndParams:
-    """normalize_url_and_params() URL 与参数合并测试。"""
-
-    def test_url_without_params(self) -> None:
-        url, params = normalize_url_and_params("https://example.com/api", None)
-        assert url == "https://example.com/api"
-        assert params == {}
-
-    def test_url_with_query_string(self) -> None:
-        url, params = normalize_url_and_params("https://example.com/api?a=1&b=2", None)
-        assert url == "https://example.com/api"
-        assert params == {"a": "1", "b": "2"}
-
-    def test_params_dict_merged(self) -> None:
-        url, params = normalize_url_and_params(
-            "https://example.com/api?a=1", {"b": "2"}
-        )
-        assert url == "https://example.com/api"
-        assert params == {"a": "1", "b": "2"}
-
-    def test_params_override_query(self) -> None:
-        url, params = normalize_url_and_params(
-            "https://example.com/api?a=1", {"a": "99"}
-        )
-        assert params["a"] == "99"
-
-    def test_empty_url(self) -> None:
-        url, params = normalize_url_and_params("", None)
-        assert url == ""
-        assert params == {}
-
-    def test_blank_url(self) -> None:
-        url, params = normalize_url_and_params("  ", None)
-        assert url == ""
-        assert params == {}
-
-    def test_url_with_fragment(self) -> None:
-        url, params = normalize_url_and_params(
-            "https://example.com/api?x=1#section", None
-        )
-        assert url == "https://example.com/api#section"
-        assert params == {"x": "1"}
-
-    def test_blank_query_values_preserved(self) -> None:
-        url, params = normalize_url_and_params("https://example.com/api?key=", None)
-        assert params == {"key": ""}
 
 
 class TestMergeUrlWithParams:

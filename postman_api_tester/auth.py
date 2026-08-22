@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, Sequence, TypedDict
 
 import requests
 
-from postman_api_tester.runtime_utils import normalize_url_and_params
+from postman_api_tester.utils.url_utils import normalize_url_and_params
 from postman_api_tester.session import RequestTimeout, SessionLike, normalize_timeout
 
 logger = logging.getLogger(__name__)
