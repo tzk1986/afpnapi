@@ -17,7 +17,12 @@ from urllib.parse import (  # noqa: E402
 
 
 def normalize_url_and_params(url: str, params: Any) -> Tuple[str, Dict[str, Any]]:
-    """Normalize URL and params into a canonical url + dict form."""
+    """Normalize URL and params into a canonical url + dict form.
+
+    - params (dict or list) take priority over URL query string.
+    - Returns the URL with query string stripped.
+    - If the URL has no query string, the original text is preserved.
+    """
     raw_url = str(url or "").strip()
     merged: Dict[str, Any] = {}
 
@@ -32,12 +37,16 @@ def normalize_url_and_params(url: str, params: Any) -> Tuple[str, Dict[str, Any]
 
     parts = urlsplit(raw_url)
     if parts.query:
+        # URL query params fill in keys not already provided by params
         for key, value in parse_qsl(parts.query, keep_blank_values=True):
             merged.setdefault(key, value)
-
-    normalized_url = urlunsplit(
-        (parts.scheme, parts.netloc, parts.path or "/", "", parts.fragment)
-    )
+        # Strip query from URL; preserve path as-is
+        normalized_url = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, "", parts.fragment)
+        )
+    else:
+        # No query string: preserve the original URL text
+        normalized_url = raw_url
     return normalized_url, merged
 
 

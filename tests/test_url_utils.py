@@ -88,7 +88,7 @@ class TestNormalizeUrlAndParams:
     def test_empty_url(self) -> None:
         """测试空 URL."""
         url, params = normalize_url_and_params("", None)
-        assert url == "/"
+        assert url == ""
         assert params == {}
 
     def test_url_with_fragment(self) -> None:

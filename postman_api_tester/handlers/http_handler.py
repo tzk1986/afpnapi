@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from postman_api_tester.runtime_utils import normalize_url_and_params
+from postman_api_tester.utils.url_utils import normalize_url_and_params
 from postman_api_tester.utils.request_builder import build_request_kwargs
 
 logger = logging.getLogger(__name__)

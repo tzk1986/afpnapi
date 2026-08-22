@@ -4,13 +4,14 @@
 ### 职责划分（async/sync）
 
 **同步优先（SYNC-ONLY）**：
-  - normalize_url_and_params() - URL 与参数合并
   - merge_url_with_params() - URL 与参数拼接
   - item_path_text() - 项路径序列化
   - compute_collection_fingerprint() - 集合指纹计算
   - checkpoint_file_path() - checkpoint 路径生成
   - load_checkpoint() - checkpoint 读取
   - save_checkpoint() - checkpoint 保存
+
+**注**：normalize_url_and_params() 已统一至 utils/url_utils.py，本模块通过导入重新导出。
 
 **说明**：
   所有导出函数均为**同步阻塞**操作。
@@ -26,30 +27,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-
-def normalize_url_and_params(
-    raw_url: str, params: Optional[Dict[str, Any]]
-) -> Tuple[str, Dict[str, Any]]:
-    """Normalize a request URL and merge query params without duplicates."""
-    url_text = str(raw_url or "").strip()
-    split = urlsplit(url_text)
-
-    merged_params: Dict[str, Any] = {}
-    for key, value in parse_qsl(split.query, keep_blank_values=True):
-        merged_params[str(key)] = value
-
-    if isinstance(params, dict):
-        for key, value in params.items():
-            merged_params[str(key)] = value
-
-    if split.query:
-        clean_url = urlunsplit(
-            (split.scheme, split.netloc, split.path, "", split.fragment)
-        )
-    else:
-        clean_url = url_text
-
-    return clean_url, merged_params
+from postman_api_tester.utils.url_utils import normalize_url_and_params
 
 
 def merge_url_with_params(raw_url: str, params: Dict[str, Any]) -> str:
