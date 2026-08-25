@@ -118,14 +118,30 @@
 
     <script>
         var cases = [];
+        var authProfileMap = {};
+
+        function loadAuthProfiles(callback) {
+            fetch('/api/ui-testing/auth-profiles')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var profiles = (result.data && result.data.profiles) || [];
+                    profiles.forEach(function(p) { authProfileMap[p.id] = p.name; });
+                    if (callback) callback();
+                })
+                .catch(function() {
+                    if (callback) callback();
+                });
+        }
 
         function loadCases() {
             fetch('/api/ui-testing/cases')
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
                     cases = result.data || [];
-                    renderCases();
-                    updateStats();
+                    loadAuthProfiles(function() {
+                        renderCases();
+                        updateStats();
+                    });
                 })
                 .catch(function(e) {
                     console.error('Failed to load cases:', e);
@@ -155,6 +171,7 @@
                         '<span>' + formatDate(c.created_at) + '</span>' +
                     '</div>' +
                     (tags ? '<div class="tags">' + tags + '</div>' : '') +
+                    (c.auth_profile_id && authProfileMap[c.auth_profile_id] ? '<div style="margin-bottom:8px;"><span class="tag" style="background:#e0f2fe;color:#0369a1;">🔑 ' + escapeHtml(authProfileMap[c.auth_profile_id]) + '</span></div>' : '') +
                     '<div class="exec-options" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:#6b7280;">' +
                         '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
                             '<input type="checkbox" id="clearLogin_' + c.id + '" /> 清除登录信息' +

@@ -30,8 +30,9 @@
 
         .field-group { display: grid; grid-template-columns: 100px 1fr; gap: 8px; align-items: center; margin-bottom: 12px; }
         .field-group label { font-size: 13px; color: #6b7280; }
-        .field-group input, .field-group textarea { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; width: 100%; }
-        .field-group input:focus, .field-group textarea:focus { border-color: #3b82f6; }
+        .field-group input, .field-group textarea, .field-group select { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; outline: none; width: 100%; }
+        .field-group input:focus, .field-group textarea:focus, .field-group select:focus { border-color: #3b82f6; }
+        .auth-hint { font-size: 11px; color: #9ca3af; margin-top: 4px; }
         .field-group textarea { min-height: 60px; resize: vertical; }
 
         .steps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -101,6 +102,13 @@
                 <label>基础 URL</label>
                 <input type="text" id="caseBaseUrl" placeholder="https://example.com" />
             </div>
+            <div class="field-group">
+                <label>认证档案</label>
+                <select id="caseAuthProfile">
+                    <option value="">不使用</option>
+                </select>
+            </div>
+            <div id="authProfileHint" class="auth-hint" style="display:none;margin-left:108px;margin-bottom:12px;"></div>
         </div>
 
         <!-- Steps -->
@@ -139,6 +147,48 @@
 
         var ACTION_OPTIONS = ['click', 'dblclick', 'type', 'select', 'check', 'uncheck', 'submit', 'keypress', 'navigate', 'new_tab', 'switch_tab', 'date_select', 'wait', 'wait_for', 'assert_visible', 'assert_text', 'assert_text_exists', 'assert_element_exists', 'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled', 'assert_disabled', 'assert_not_visible', 'assert_attribute', 'assert_toast', 'assert_css', 'assert_checked', 'assert_dialog', 'assert_cookie'];
 
+        function loadAuthProfiles(callback) {
+            fetch('/api/ui-testing/auth-profiles')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var profiles = (result.data && result.data.profiles) || [];
+                    var select = document.getElementById('caseAuthProfile');
+                    var hint = document.getElementById('authProfileHint');
+                    // 保留第一个"不使用"选项
+                    select.innerHTML = '<option value="">不使用</option>';
+                    profiles.forEach(function(p) {
+                        var opt = document.createElement('option');
+                        opt.value = p.id;
+                        var label = p.name || '未命名';
+                        if (p.base_url) label += ' (' + p.base_url + ')';
+                        label += ' [' + p.cookie_count + ' Cookie]';
+                        opt.textContent = label;
+                        select.appendChild(opt);
+                    });
+                    // 回显当前用例关联的认证档案
+                    if (caseData && caseData.auth_profile_id) {
+                        select.value = caseData.auth_profile_id;
+                        // 检查档案是否仍有效
+                        var found = profiles.find(function(p) { return p.id === caseData.auth_profile_id; });
+                        if (!found) {
+                            hint.textContent = '⚠ 当前关联的认证档案已失效，请重新选择';
+                            hint.style.color = '#ef4444';
+                            hint.style.display = 'block';
+                            select.value = '';
+                        } else {
+                            hint.style.display = 'none';
+                        }
+                    } else {
+                        hint.style.display = 'none';
+                    }
+                    if (callback) callback();
+                })
+                .catch(function() {
+                    // 加载失败不影响主流程
+                    if (callback) callback();
+                });
+        }
+
         function loadCase() {
             fetch('/api/ui-testing/cases/' + caseId)
                 .then(function(r) { return r.json(); })
@@ -153,6 +203,7 @@
                     document.getElementById('caseBaseUrl').value = caseData.base_url || '';
                     steps = caseData.steps || [];
                     renderSteps();
+                    loadAuthProfiles();
                 })
                 .catch(function(e) {
                     showError('加载用例失败: ' + e.message);
@@ -364,6 +415,7 @@
         }
 
         function saveCase() {
+            var authProfileVal = document.getElementById('caseAuthProfile').value;
             var payload = {
                 name: document.getElementById('caseName').value.trim(),
                 description: document.getElementById('caseDesc').value.trim(),
@@ -371,7 +423,8 @@
                 steps: steps,
                 assertions: (caseData && caseData.assertions) || [],
                 variables: (caseData && caseData.variables) || {},
-                tags: (caseData && caseData.tags) || []
+                tags: (caseData && caseData.tags) || [],
+                auth_profile_id: authProfileVal || null
             };
 
             if (!payload.name) {
@@ -408,10 +461,15 @@
                 .then(function(sResp) {
                     var mode = (sResp.data && sResp.data.default_mode) || 'browser_replay';
                     var clearLogin = document.getElementById('clearLoginCheck').checked;
+                    var authProfileVal = document.getElementById('caseAuthProfile').value;
+                    var execPayload = { mode: mode, options: { clear_login: clearLogin } };
+                    if (authProfileVal) {
+                        execPayload.auth_profile_id = authProfileVal;
+                    }
                     return fetch('/api/ui-testing/execute/' + caseId, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mode: mode, options: { clear_login: clearLogin } })
+                        body: JSON.stringify(execPayload)
                     });
                 })
                 .then(function(r) { return r.json(); })

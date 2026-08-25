@@ -6,7 +6,7 @@
 import logging
 import time
 import uuid
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from flask import abort, make_response, redirect, render_template, request, url_for
@@ -1300,14 +1300,75 @@ def api_ui_testing_recording_stop() -> ResponseReturnValue:
             "step_count": step_count,
         },
     )
+
+    # 导出代理会话 Cookie（供前端保存认证档案）
+    cookies_for_export: List[Dict[str, Any]] = []
+    base_url = session.get("base_url", "")
+    if base_url:
+        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
+        # 提取 origin（scheme://netloc），与代理会话存储格式一致
+        parsed = urlparse(base_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_url
+        proxy_sid = _proxy_session_store.find_session_by_base_url(origin)
+        if proxy_sid:
+            cookie_jar = _proxy_session_store.get_cookie_jar(proxy_sid)
+            if cookie_jar and len(cookie_jar) > 0:
+                cookies_for_export = _convert_cookie_jar_to_playwright(cookie_jar)
+                logger.info(
+                    "ui_recording_cookies_exported",
+                    extra={
+                        "event": "ui.recording.cookies_exported",
+                        "session_id": session_id,
+                        "origin": origin,
+                        "cookie_count": len(cookies_for_export),
+                    },
+                )
+
     return BaseHandler.json_response(
         {
             "session_id": session_id,
             "status": "completed",
             "step_count": step_count,
             "ended_at": session["ended_at"],
+            "cookies_for_export": cookies_for_export,
         }
     )
+
+
+def _convert_cookie_jar_to_playwright(
+    jar: Any,
+) -> List[Dict[str, Any]]:
+    """将 requests CookieJar 转换为 Playwright storage_state cookies 格式。"""
+    cookies: List[Dict[str, Any]] = []
+    for c in jar:
+        cookie: Dict[str, Any] = {
+            "name": c.name,
+            "value": c.value,
+            "domain": c.domain or "",
+            "path": c.path or "/",
+            "httpOnly": bool(c.has_nonstandard_attr("HttpOnly")),
+            "secure": bool(c.secure),
+            "sameSite": _get_same_site(c),
+        }
+        if c.expires is not None:
+            cookie["expires"] = c.expires
+        else:
+            cookie["expires"] = -1
+        cookies.append(cookie)
+    return cookies
+
+
+def _get_same_site(cookie: Any) -> str:
+    """从 Cookie 对象提取 SameSite 属性，默认 Lax。"""
+    ss = cookie.get_nonstandard_attr("SameSite")
+    if ss:
+        ss_lower = ss.lower()
+        if ss_lower == "strict":
+            return "Strict"
+        if ss_lower == "none":
+            return "None"
+    return "Lax"
 
 
 def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:
