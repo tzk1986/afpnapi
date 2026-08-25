@@ -482,6 +482,11 @@ ENABLE_PRE_REQUEST_SCRIPT = _env_bool("ENABLE_PRE_REQUEST_SCRIPT", "false")
 # UI_EXECUTION_RESULTS_DIR: 执行结果存储目录（默认 ui_testing_cases）
 UI_EXECUTION_RESULTS_DIR = str(os.environ.get("UI_EXECUTION_RESULTS_DIR", "")).strip()
 
+# UI_RECORDING_SESSIONS_DIR: 录制会话持久化存储目录（默认 ui_testing_recordings）
+UI_RECORDING_SESSIONS_DIR = str(
+    os.environ.get("UI_RECORDING_SESSIONS_DIR", "")
+).strip()
+
 # UI_EXECUTION_DEFAULT_DELAY_MS: 步骤间默认间隔（毫秒）
 UI_EXECUTION_DEFAULT_DELAY_MS = _env_int(
     "UI_EXECUTION_DEFAULT_DELAY_MS", 500, lo=100, hi=10000

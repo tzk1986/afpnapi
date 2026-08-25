@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urlparse
 from flask import abort, make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.config import REPORT_SERVER_PORT
+from postman_api_tester.config import REPORT_SERVER_PORT, UI_RECORDING_SESSIONS_DIR
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
 from postman_api_tester.services.ui_proxy_service import UiProxyService
@@ -24,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 # 全局实例
 _case_store = UiCaseStore()
-_recording = RecordingSessionStore()
+_recording = RecordingSessionStore(
+    storage_dir=UI_RECORDING_SESSIONS_DIR or "ui_testing_recordings"
+)
 
 # 命名常量
 MAX_PROXY_UNWRAP_DEPTH = 5
