@@ -281,6 +281,9 @@ from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_stop as _route_api_ui_testing_recording_stop,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
+    api_ui_testing_recording_local_storage as _route_api_ui_testing_recording_local_storage,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     ui_proxy_sessions_debug as _route_ui_proxy_sessions_debug,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
@@ -764,6 +767,11 @@ def api_ui_testing_recording_step() -> ResponseReturnValue:
 @app.route("/api/ui-testing/recording/stop", methods=["POST"])
 def api_ui_testing_recording_stop() -> ResponseReturnValue:
     return _route_api_ui_testing_recording_stop()
+
+
+@app.route("/api/ui-testing/recording/local-storage", methods=["POST"])
+def api_ui_testing_recording_local_storage() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_local_storage()
 
 
 @app.route("/api/ui-testing/recording/<path:session_id>")

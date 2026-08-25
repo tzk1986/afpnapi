@@ -42,6 +42,7 @@ class UiAuthProfileStore:
             "description": profile.get("description", ""),
             "base_url": profile.get("base_url", ""),
             "cookies": profile.get("cookies", []),
+            "local_storage": profile.get("local_storage", {}),
             "source": profile.get("source", "manual"),
             "proxy_session_id": profile.get("proxy_session_id", ""),
             "login_config_id": profile.get("login_config_id") or None,
@@ -88,6 +89,7 @@ class UiAuthProfileStore:
                             "description": data.get("description", ""),
                             "base_url": data.get("base_url", ""),
                             "cookie_count": len(data.get("cookies", [])),
+                            "local_storage_count": len(data.get("local_storage", {})),
                             "source": data.get("source", ""),
                             "login_config_id": data.get("login_config_id"),
                             "created_at": data.get("created_at", ""),
@@ -144,9 +146,22 @@ class UiAuthProfileStore:
             return None
         if self.is_expired(profile):
             return None
+
+        # 构建 origins（localStorage）
+        origins = []
+        local_storage = profile.get("local_storage", {})
+        base_url = profile.get("base_url", "")
+        if local_storage and base_url:
+            origins.append({
+                "origin": base_url.rstrip("/"),
+                "localStorage": [
+                    {"name": k, "value": v} for k, v in local_storage.items()
+                ]
+            })
+
         return {
             "cookies": profile.get("cookies", []),
-            "origins": [],  # Phase 1 不含 localStorage
+            "origins": origins,
         }
 
     def cleanup_expired(self) -> int:

@@ -12,7 +12,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from flask import make_response, render_template, request, send_file
 from flask.typing import ResponseReturnValue
@@ -72,10 +72,22 @@ def _cleanup_stale_jobs() -> None:
 
 
 def _write_auth_state_temp(job_id: str, profile: Dict[str, Any]) -> str:
-    """将认证档案的 cookies 转为 Playwright storage_state 格式，写入临时文件。"""
+    """将认证档案的 cookies + localStorage 转为 Playwright storage_state 格式，写入临时文件。"""
+    # 构建 origins（localStorage）
+    origins: List[Dict[str, Any]] = []
+    local_storage = profile.get("local_storage", {})
+    base_url = profile.get("base_url", "")
+    if local_storage and base_url:
+        origins.append({
+            "origin": base_url.rstrip("/"),
+            "localStorage": [
+                {"name": k, "value": v} for k, v in local_storage.items()
+            ],
+        })
+
     storage_state = {
         "cookies": profile.get("cookies", []),
-        "origins": [],  # Phase 1 不含 localStorage
+        "origins": origins,
     }
     temp_dir = os.path.join(os.getcwd(), "temp")
     os.makedirs(temp_dir, exist_ok=True)
