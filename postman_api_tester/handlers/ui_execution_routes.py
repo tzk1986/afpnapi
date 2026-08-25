@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from datetime import datetime
@@ -69,6 +71,20 @@ def _cleanup_stale_jobs() -> None:
             )
 
 
+def _write_auth_state_temp(job_id: str, profile: Dict[str, Any]) -> str:
+    """将认证档案的 cookies 转为 Playwright storage_state 格式，写入临时文件。"""
+    storage_state = {
+        "cookies": profile.get("cookies", []),
+        "origins": [],  # Phase 1 不含 localStorage
+    }
+    temp_dir = os.path.join(os.getcwd(), "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    path = os.path.join(temp_dir, f"auth_state_{job_id}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(storage_state, f, ensure_ascii=False)
+    return path
+
+
 def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     """创建执行任务，返回 job_id。
 
@@ -120,10 +136,10 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     if not case_data:
         return json_error(f"用例不存在: {case_id}", 404, "UIT_EXEC_001")
 
-    # 执行前清除代理 session cookie（仅当 clear_login 为 true 时）
+    # 执行前清除代理 session cookie（仅浏览器回放模式）
     clear_login = options.get("clear_login", True)
     base_url = case_data.get("base_url", "")
-    if base_url and clear_login:
+    if base_url and clear_login and mode != "headless":
         from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
         _proxy_session_store.clear_cookies_by_base_url(base_url)
@@ -160,8 +176,64 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
         options["viewport_width"] = hl_settings.get("viewport_width", 1280)
         options["viewport_height"] = hl_settings.get("viewport_height", 720)
         options["take_screenshots"] = hl_settings.get("take_screenshots", True)
+
+        # 加载认证档案（仅 Cookie，不含 localStorage）
+        # 优先级：执行请求中的 auth_profile_id > 用例中保存的 auth_profile_id
+        auth_state_path = None
+        auth_profile_id = payload.get("auth_profile_id") or case_data.get(
+            "auth_profile_id"
+        )
+        if auth_profile_id:
+            from postman_api_tester.services.ui_auth_profile_store import (
+                _auth_profile_store,
+            )
+
+            profile = _auth_profile_store.get_profile(auth_profile_id)
+            if profile and not _auth_profile_store.is_expired(profile):
+                try:
+                    auth_state_path = _write_auth_state_temp(job_id, profile)
+                except OSError as e:
+                    logger.error(
+                        "ui_execution_auth_temp_write_failed",
+                        extra={
+                            "event": "ui.execution.auth_temp_write_failed",
+                            "auth_profile_id": auth_profile_id,
+                            "error": str(e),
+                        },
+                    )
+                    auth_state_path = None
+                else:
+                    logger.info(
+                        "ui_execution_auth_profile_loaded",
+                        extra={
+                            "event": "ui.execution.auth_profile_loaded",
+                            "auth_profile_id": auth_profile_id,
+                            "cookie_count": len(profile.get("cookies", [])),
+                        },
+                    )
+            elif profile:
+                logger.warning(
+                    "ui_execution_auth_profile_expired",
+                    extra={
+                        "event": "ui.execution.auth_profile_expired",
+                        "auth_profile_id": auth_profile_id,
+                    },
+                )
+            else:
+                logger.warning(
+                    "ui_execution_auth_profile_not_found",
+                    extra={
+                        "event": "ui.execution.auth_profile_not_found",
+                        "auth_profile_id": auth_profile_id,
+                    },
+                )
+
         _execution_manager.start_headless(
-            job_id, case_data, options, on_complete=_send_webhook
+            job_id,
+            case_data,
+            options,
+            on_complete=_send_webhook,
+            auth_state_path=auth_state_path,
         )
         return BaseHandler.json_response(
             {

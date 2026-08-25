@@ -117,6 +117,57 @@ def _is_login_step(step: Dict[str, Any]) -> bool:
     return any(kw in combined for kw in _LOGIN_ENGLISH_KEYWORDS)
 
 
+def _validate_auth_state_file(
+    auth_state_path: Optional[str], job_id: str
+) -> Optional[Dict[str, Any]]:
+    """校验 auth_state 文件存在性和 JSON 格式。
+
+    返回 storage_state 字典（可直接传给 Playwright），
+    校验失败返回 None（降级为无登录状态执行）。
+    """
+    if not auth_state_path:
+        return None
+    path = Path(auth_state_path)
+    if not path.exists():
+        logger.warning(
+            "headless_auth_state_file_missing",
+            extra={
+                "event": "headless.auth_state_file_missing",
+                "auth_state_path": auth_state_path,
+                "job_id": job_id,
+            },
+        )
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("storage_state must be a JSON object")
+        if "cookies" not in data:
+            raise ValueError("storage_state missing 'cookies' field")
+        cookie_count = len(data.get("cookies", []))
+        logger.info(
+            "headless_auth_state_validated",
+            extra={
+                "event": "headless.auth_state_validated",
+                "auth_state_path": auth_state_path,
+                "job_id": job_id,
+                "cookie_count": cookie_count,
+            },
+        )
+        return data
+    except (json.JSONDecodeError, OSError, ValueError) as e:
+        logger.error(
+            "headless_auth_state_invalid",
+            extra={
+                "event": "headless.auth_state_invalid",
+                "auth_state_path": auth_state_path,
+                "job_id": job_id,
+                "error": str(e),
+            },
+        )
+        return None
+
+
 class HeadlessExecutionError(Exception):
     """无头执行异常。"""
 
@@ -145,6 +196,7 @@ class UiHeadlessEngine:
         cancel_flag: Optional[Any] = None,
         on_step_complete: Optional[Any] = None,
         on_browser_ready: Optional[Any] = None,
+        auth_state_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """执行所有步骤，返回摘要。
 
@@ -156,6 +208,7 @@ class UiHeadlessEngine:
             cancel_flag: threading.Event，被 set 时中止执行
             on_step_complete: 回调 (step_index, step_result_dict) -> None
             on_browser_ready: 浏览器启动完成回调 () -> None
+            auth_state_path: Playwright storage_state JSON 文件路径（可选）
         """
         timeout_ms = options.get("timeout", DEFAULT_TIMEOUT_MS)
         delay_ms = options.get("delay_between_steps", 200)
@@ -212,9 +265,13 @@ class UiHeadlessEngine:
         try:
             launcher = getattr(pw, self._browser_type, pw.chromium)
             browser = launcher.launch(headless=True)
-            context = browser.new_context(
-                viewport={"width": viewport_w, "height": viewport_h}
-            )
+            context_kwargs: Dict[str, Any] = {
+                "viewport": {"width": viewport_w, "height": viewport_h},
+            }
+            storage_state = _validate_auth_state_file(auth_state_path, job_id)
+            if storage_state is not None:
+                context_kwargs["storage_state"] = storage_state
+            context = browser.new_context(**context_kwargs)
             page = context.new_page()
             assert page is not None
             page.set_default_timeout(timeout_ms)

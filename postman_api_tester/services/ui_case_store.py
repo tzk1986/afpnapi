@@ -39,6 +39,7 @@ class UiCaseStore:
             "assertions": case.get("assertions", []),
             "variables": case.get("variables", {}),
             "tags": case.get("tags", []),
+            "auth_profile_id": case.get("auth_profile_id") or None,
             "created_at": now,
             "updated_at": now,
         }
@@ -71,6 +72,7 @@ class UiCaseStore:
                             "base_url": data.get("base_url", ""),
                             "step_count": len(data.get("steps", [])),
                             "tags": data.get("tags", []),
+                            "auth_profile_id": data.get("auth_profile_id"),
                             "created_at": data.get("created_at", ""),
                             "updated_at": data.get("updated_at", ""),
                         }
@@ -111,9 +113,14 @@ class UiCaseStore:
                 "assertions",
                 "variables",
                 "tags",
+                "auth_profile_id",
             ):
                 if key in updates:
-                    data[key] = updates[key]
+                    value = updates[key]
+                    # auth_profile_id 空字符串规范化为 None
+                    if key == "auth_profile_id" and not value:
+                        value = None
+                    data[key] = value
 
             data["updated_at"] = datetime.now().isoformat()
             file_path.write_text(
