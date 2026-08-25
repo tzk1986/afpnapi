@@ -1,0 +1,160 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录配置管理</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 22px; color: #0f172a; }
+        .back-link { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #3b82f6; }
+
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #fff; color: #3b82f6; border: 1px solid #93c5fd; }
+        .btn-secondary:hover { background: #eff6ff; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .desc-box { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .desc-box p { font-size: 13px; color: #6b7280; line-height: 1.6; }
+
+        table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; border-collapse: collapse; }
+        th { text-align: left; padding: 12px 16px; background: #f9fafb; font-size: 12px; color: #6b7280; font-weight: 500; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        tr:hover td { background: #f8fafc; }
+        .name-cell { font-weight: 500; color: #0f172a; }
+        .url-cell { font-family: monospace; font-size: 12px; color: #6b7280; word-break: break-all; }
+        .step-count { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: #dbeafe; color: #1d4ed8; }
+        .condition-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: #f3f4f6; color: #6b7280; }
+
+        .empty-state { text-align: center; padding: 60px 20px; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .empty-state h2 { font-size: 18px; color: #6b7280; margin-bottom: 8px; }
+        .empty-state p { font-size: 14px; color: #9ca3af; margin-bottom: 20px; }
+
+        .actions-cell { display: flex; gap: 6px; }
+
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 9999; transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/ui-testing" class="back-link">← 返回 UI 测试</a>
+                <h1 style="margin-top: 4px;">登录配置管理</h1>
+            </div>
+            <a href="/ui-testing/login-configs/editor" class="btn btn-primary">+ 新建配置</a>
+        </div>
+
+        <div class="desc-box">
+            <p>登录配置用于定义自动登录步骤。执行无头测试时，关联了登录配置的认证档案会自动执行登录步骤并保存 Cookie，实现「登录与业务用例解耦」。</p>
+        </div>
+
+        <div id="content"></div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        var configs = [];
+
+        function loadConfigs() {
+            fetch('/api/ui-testing/login-configs')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    configs = (result.data && result.data.configs) || [];
+                    render();
+                })
+                .catch(function(e) { showToast('加载失败: ' + e.message, 'error'); });
+        }
+
+        function render() {
+            var content = document.getElementById('content');
+            if (configs.length === 0) {
+                content.innerHTML = '<div class="empty-state">' +
+                    '<h2>暂无登录配置</h2>' +
+                    '<p>创建登录配置后，可在认证档案中关联使用</p>' +
+                    '<a href="/ui-testing/login-configs/editor" class="btn btn-primary">+ 新建配置</a>' +
+                    '</div>';
+                return;
+            }
+
+            var html = '<table><thead><tr>' +
+                '<th style="width:25%">名称</th>' +
+                '<th style="width:25%">目标 URL</th>' +
+                '<th style="width:10%">步骤数</th>' +
+                '<th style="width:15%">成功条件</th>' +
+                '<th style="width:12%">更新时间</th>' +
+                '<th style="width:13%">操作</th>' +
+                '</tr></thead><tbody>';
+
+            configs.forEach(function(c) {
+                var condType = (c.success_condition && c.success_condition.type) || '-';
+                html += '<tr>' +
+                    '<td class="name-cell">' + escapeHtml(c.name) + '</td>' +
+                    '<td class="url-cell">' + escapeHtml(c.base_url || '-') + '</td>' +
+                    '<td><span class="step-count">' + (c.step_count || 0) + ' 步</span></td>' +
+                    '<td><span class="condition-badge">' + escapeHtml(condType) + '</span></td>' +
+                    '<td style="font-size:12px;color:#9ca3af;">' + formatDate(c.updated_at) + '</td>' +
+                    '<td><div class="actions-cell">' +
+                        '<a href="/ui-testing/login-configs/editor/' + c.id + '" class="btn btn-sm btn-secondary">编辑</a>' +
+                        '<button class="btn btn-sm btn-danger" onclick="deleteConfig(\'' + c.id + '\', \'' + escapeHtml(c.name) + '\')">删除</button>' +
+                    '</div></td>' +
+                    '</tr>';
+            });
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+
+        function deleteConfig(id, name) {
+            if (!confirm('确认删除登录配置「' + name + '」？')) return;
+            fetch('/api/ui-testing/login-configs/' + id, { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.code === 200) {
+                        showToast('已删除', 'success');
+                        loadConfigs();
+                    } else {
+                        showToast('删除失败: ' + result.message, 'error');
+                    }
+                })
+                .catch(function(e) { showToast('删除失败: ' + e.message, 'error'); });
+        }
+
+        function formatDate(iso) {
+            if (!iso) return '-';
+            try {
+                var d = new Date(iso);
+                return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+            } catch(e) { return iso; }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type) {
+            var t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show ' + type;
+            setTimeout(function() { t.className = 'toast'; }, 3000);
+        }
+
+        loadConfigs();
+    </script>
+</body>
+</html>
+{% endraw %}

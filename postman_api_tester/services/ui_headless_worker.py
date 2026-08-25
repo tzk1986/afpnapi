@@ -48,6 +48,7 @@ def main() -> None:
         options: Dict[str, Any] = input_data["options"]
         job_id: str = input_data["job_id"]
         screenshots_dir: str | None = input_data.get("screenshots_dir")
+        auth_state_path: str | None = input_data.get("auth_state_path")
 
         from postman_api_tester.services.ui_headless_engine import UiHeadlessEngine
 
@@ -64,6 +65,7 @@ def main() -> None:
             base_url=base_url,
             options=options,
             job_id=job_id,
+            auth_state_path=auth_state_path,
             on_browser_ready=lambda: _write_line("BROWSER_READY"),
             on_step_complete=lambda _idx, step_result: _write_output(
                 {"step": step_result}

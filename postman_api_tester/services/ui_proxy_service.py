@@ -84,6 +84,7 @@ class _ProxySessionStore:
                 "token": "",  # 存储从 API 请求捕获的 Token
                 "platform_url": "",  # 存储 getEspSystemUrl 返回的平台 URL
                 "subsystem_token": "",  # 存储 loginOtherSystem 返回的子系统 Token
+                "local_storage": {},  # {origin: {key: value, ...}, ...}
             }
         return sid
 
@@ -171,6 +172,36 @@ class _ProxySessionStore:
                 return s.get("subsystem_token", "")
             return None
 
+    def update_local_storage(
+        self, session_id: str, origin: str, storage: Dict[str, str]
+    ) -> None:
+        """更新指定 origin 的 localStorage 数据（最新快照覆盖）。"""
+        if not storage:
+            return
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["local_storage"][origin] = dict(storage)
+                s["last_active"] = time.time()
+                logger.info(
+                    "proxy_session_local_storage_updated",
+                    extra={
+                        "event": "ui.proxy.session.local_storage_updated",
+                        "session_id": session_id[:8],
+                        "origin": origin,
+                        "key_count": len(storage),
+                    },
+                )
+
+    def get_local_storage(self, session_id: str) -> Dict[str, Dict[str, str]]:
+        """获取所有 origin 的 localStorage 数据。"""
+        with self._lock:
+            s = self._sessions.get(session_id)
+            if s:
+                s["last_active"] = time.time()
+                return dict(s.get("local_storage", {}))
+            return {}
+
     def get_base_url(self, session_id: str) -> Optional[str]:
         """获取会话关联的目标基础 URL。"""
         with self._lock:
@@ -223,6 +254,7 @@ class _ProxySessionStore:
                     s["token"] = ""
                     s["subsystem_token"] = ""
                     s["platform_url"] = ""
+                    s["local_storage"] = {}
                     s["last_active"] = time.time()
                     logger.info(
                         "proxy_session_cookies_cleared",
@@ -1456,6 +1488,40 @@ class UiProxyService:
                 "}"
             )
 
+        # 录制模式下：收集 localStorage 并发送到后端存储
+        storage_collect = ""
+        if recording_mode and session_id:
+            _escaped_sid = session_id.replace("\\", "\\\\").replace('"', '\\"')
+            storage_collect = (
+                "try{"
+                "var _sendLS=function(){"
+                "try{"
+                "var _ls={};var _keys=Object.keys(localStorage);"
+                "for(var _i=0;_i<_keys.length;_i++){"
+                "try{_ls[_keys[_i]]=localStorage.getItem(_keys[_i]);}catch(e){}"
+                "}"
+                "if(_keys.length>0){"
+                'fetch("/api/ui-testing/recording/local-storage",'
+                '{method:"POST",headers:{"Content-Type":"application/json"},'
+                'body:JSON.stringify({session_id:"' + _escaped_sid + '",'
+                'origin:location.protocol+"//"+location.host,'
+                "local_storage:_ls})}).catch(function(){});"
+                "}"
+                "}catch(e){}"
+                "};"
+                "setTimeout(_sendLS,800);"
+                'window.addEventListener("beforeunload",function(){_sendLS();});'
+                '}catch(e){}'
+            )
+            logger.info(
+                "proxy_early_storage_collect_injected",
+                extra={
+                    "event": "ui.proxy.early.storage_collect_injected",
+                    "session_id": session_id[:8],
+                    "target_url": target_url[:100],
+                },
+            )
+
         # 跨系统 Token 注入：回放模式下，如果 session 中有子系统 Token 且目标不是主平台登录页，
         # 将子系统 Token 注入 localStorage，覆盖可能残留的主平台 Token（解决 9301 等子系统"登录状态失效"）
         subsystem_token_inject = ""
@@ -1517,6 +1583,7 @@ class UiProxyService:
             'var _targetLoc=document.createElement("a");_targetLoc.href=_TURL;'
             "window.__proxyTargetLoc=_targetLoc;"
             + storage_clear
+            + storage_collect
             + subsystem_token_inject
             + "try{"
             "var _locProps={pathname:{get:function(){return _targetLoc.pathname;},set:function(v){_targetLoc.pathname=v;}},search:{get:function(){return _targetLoc.search;},set:function(v){_targetLoc.search=v;}},hash:{get:function(){return _targetLoc.hash;},set:function(v){_targetLoc.hash=v;}},host:{get:function(){return _targetLoc.host;}},hostname:{get:function(){return _targetLoc.hostname;}},protocol:{get:function(){return _targetLoc.protocol;}},port:{get:function(){return _targetLoc.port;}},origin:{get:function(){return _targetLoc.origin;}},href:{get:function(){return _targetLoc.href;}}};"

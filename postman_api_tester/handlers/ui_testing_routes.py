@@ -6,7 +6,7 @@
 import logging
 import time
 import uuid
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from flask import abort, make_response, redirect, render_template, request, url_for
@@ -1279,6 +1279,63 @@ def api_ui_testing_recording_step() -> ResponseReturnValue:
     return BaseHandler.json_response({"ok": True, "step_index": idx})
 
 
+def api_ui_testing_recording_local_storage() -> ResponseReturnValue:
+    """接收录制 iframe 上报的 localStorage 数据，存储到代理会话。"""
+    payload = request.get_json(silent=True) or {}
+    session_id = payload.get("session_id", "")
+    origin = payload.get("origin", "")
+    local_storage = payload.get("local_storage", {})
+
+    if not session_id or not origin:
+        return BaseHandler.json_response(
+            {"ok": False, "error": "missing session_id or origin"}, 400
+        )
+
+    # 找到对应的代理会话（通过录制会话关联的 base_url 查找）
+    recording_session = _recording.get(session_id)
+    if not recording_session:
+        return json_error(f"录制会话不存在: {session_id}", 404, "UIT_REC_006")
+
+    base_url = recording_session.get("base_url", "")
+    if not base_url:
+        return BaseHandler.json_response({"ok": True, "stored": False})
+
+    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
+    # 提取 origin（scheme://netloc），与代理会话存储格式一致
+    parsed = urlparse(base_url)
+    target_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_url
+    proxy_sid = _proxy_session_store.find_session_by_base_url(target_origin)
+
+    # 如果代理会话不存在，自动创建（录制早期 localStorage 可能先于代理请求到达）
+    if not proxy_sid and local_storage:
+        proxy_sid = _proxy_session_store.create_session(target_origin)
+        logger.info(
+            "ui_recording_local_storage_proxy_session_created",
+            extra={
+                "event": "ui.recording.local_storage.proxy_session_created",
+                "session_id": session_id,
+                "proxy_sid": proxy_sid[:8],
+                "target_origin": target_origin,
+            },
+        )
+
+    if proxy_sid and local_storage:
+        _proxy_session_store.update_local_storage(proxy_sid, origin, local_storage)
+        logger.info(
+            "ui_recording_local_storage_received",
+            extra={
+                "event": "ui.recording.local_storage_received",
+                "session_id": session_id,
+                "origin": origin,
+                "key_count": len(local_storage),
+            },
+        )
+        return BaseHandler.json_response({"ok": True, "stored": True})
+
+    return BaseHandler.json_response({"ok": True, "stored": False})
+
+
 def api_ui_testing_recording_stop() -> ResponseReturnValue:
     """停止录制会话。"""
     payload = request.get_json(silent=True) or {}
@@ -1300,14 +1357,91 @@ def api_ui_testing_recording_stop() -> ResponseReturnValue:
             "step_count": step_count,
         },
     )
+
+    # 导出代理会话 Cookie（供前端保存认证档案）
+    cookies_for_export: List[Dict[str, Any]] = []
+    local_storage_for_export: Dict[str, str] = {}
+    base_url = session.get("base_url", "")
+    if base_url:
+        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
+
+        # 提取 origin（scheme://netloc），与代理会话存储格式一致
+        parsed = urlparse(base_url)
+        origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_url
+        proxy_sid = _proxy_session_store.find_session_by_base_url(origin)
+        if proxy_sid:
+            cookie_jar = _proxy_session_store.get_cookie_jar(proxy_sid)
+            if cookie_jar and len(cookie_jar) > 0:
+                cookies_for_export = _convert_cookie_jar_to_playwright(cookie_jar)
+                logger.info(
+                    "ui_recording_cookies_exported",
+                    extra={
+                        "event": "ui.recording.cookies_exported",
+                        "session_id": session_id,
+                        "origin": origin,
+                        "cookie_count": len(cookies_for_export),
+                    },
+                )
+            # 导出 localStorage（合并所有 origin 的数据）
+            all_ls = _proxy_session_store.get_local_storage(proxy_sid)
+            if all_ls:
+                for _ls_origin, ls_data in all_ls.items():
+                    local_storage_for_export.update(ls_data)
+                logger.info(
+                    "ui_recording_local_storage_exported",
+                    extra={
+                        "event": "ui.recording.local_storage_exported",
+                        "session_id": session_id,
+                        "origin_count": len(all_ls),
+                        "key_count": len(local_storage_for_export),
+                    },
+                )
+
     return BaseHandler.json_response(
         {
             "session_id": session_id,
             "status": "completed",
             "step_count": step_count,
             "ended_at": session["ended_at"],
+            "cookies_for_export": cookies_for_export,
+            "local_storage_for_export": local_storage_for_export,
         }
     )
+
+
+def _convert_cookie_jar_to_playwright(
+    jar: Any,
+) -> List[Dict[str, Any]]:
+    """将 requests CookieJar 转换为 Playwright storage_state cookies 格式。"""
+    cookies: List[Dict[str, Any]] = []
+    for c in jar:
+        cookie: Dict[str, Any] = {
+            "name": c.name,
+            "value": c.value,
+            "domain": c.domain or "",
+            "path": c.path or "/",
+            "httpOnly": bool(c.has_nonstandard_attr("HttpOnly")),
+            "secure": bool(c.secure),
+            "sameSite": _get_same_site(c),
+        }
+        if c.expires is not None:
+            cookie["expires"] = c.expires
+        else:
+            cookie["expires"] = -1
+        cookies.append(cookie)
+    return cookies
+
+
+def _get_same_site(cookie: Any) -> str:
+    """从 Cookie 对象提取 SameSite 属性，默认 Lax。"""
+    ss = cookie.get_nonstandard_attr("SameSite")
+    if ss:
+        ss_lower = ss.lower()
+        if ss_lower == "strict":
+            return "Strict"
+        if ss_lower == "none":
+            return "None"
+    return "Lax"
 
 
 def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:

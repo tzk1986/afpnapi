@@ -281,6 +281,9 @@ from postman_api_tester.handlers.ui_testing_routes import (
     api_ui_testing_recording_stop as _route_api_ui_testing_recording_stop,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
+    api_ui_testing_recording_local_storage as _route_api_ui_testing_recording_local_storage,
+)
+from postman_api_tester.handlers.ui_testing_routes import (
     ui_proxy_sessions_debug as _route_ui_proxy_sessions_debug,
 )
 from postman_api_tester.handlers.ui_testing_routes import (
@@ -303,6 +306,27 @@ from postman_api_tester.handlers.ui_testing_routes import (
 )
 from postman_api_tester.handlers.ui_testing_routes import (
     ui_testing_static_fallback as _route_ui_testing_static_fallback,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profiles_list as _route_api_ui_auth_profiles_list,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profiles_create as _route_api_ui_auth_profiles_create,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profile_get as _route_api_ui_auth_profile_get,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profile_update as _route_api_ui_auth_profile_update,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profile_delete as _route_api_ui_auth_profile_delete,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profile_export as _route_api_ui_auth_profile_export,
+)
+from postman_api_tester.handlers.ui_auth_routes import (
+    api_ui_auth_profiles_cleanup as _route_api_ui_auth_profiles_cleanup,
 )
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import (
@@ -745,6 +769,11 @@ def api_ui_testing_recording_stop() -> ResponseReturnValue:
     return _route_api_ui_testing_recording_stop()
 
 
+@app.route("/api/ui-testing/recording/local-storage", methods=["POST"])
+def api_ui_testing_recording_local_storage() -> ResponseReturnValue:
+    return _route_api_ui_testing_recording_local_storage()
+
+
 @app.route("/api/ui-testing/recording/<path:session_id>")
 def api_ui_testing_recording_get(session_id: str) -> ResponseReturnValue:
     return _route_api_ui_testing_recording_get(session_id)
@@ -873,6 +902,116 @@ def api_ui_testing_reports_list() -> ResponseReturnValue:
 @app.route("/api/ui-testing/report/<path:job_id>", methods=["DELETE"])
 def api_ui_testing_report_delete(job_id: str) -> ResponseReturnValue:
     return _route_api_ui_testing_report_delete(job_id)
+
+
+# ── UI 认证档案 ──
+
+
+@app.route("/api/ui-testing/auth-profiles", methods=["GET"])
+def ui_auth_profiles_list() -> ResponseReturnValue:
+    return _route_api_ui_auth_profiles_list()
+
+
+@app.route("/api/ui-testing/auth-profiles", methods=["POST"])
+def ui_auth_profiles_create() -> ResponseReturnValue:
+    return _route_api_ui_auth_profiles_create()
+
+
+@app.route("/api/ui-testing/auth-profiles/<path:profile_id>", methods=["GET"])
+def ui_auth_profile_get(profile_id: str) -> ResponseReturnValue:
+    return _route_api_ui_auth_profile_get(profile_id)
+
+
+@app.route("/api/ui-testing/auth-profiles/<path:profile_id>", methods=["PUT"])
+def ui_auth_profile_update(profile_id: str) -> ResponseReturnValue:
+    return _route_api_ui_auth_profile_update(profile_id)
+
+
+@app.route("/api/ui-testing/auth-profiles/<path:profile_id>", methods=["DELETE"])
+def ui_auth_profile_delete(profile_id: str) -> ResponseReturnValue:
+    return _route_api_ui_auth_profile_delete(profile_id)
+
+
+@app.route(
+    "/api/ui-testing/auth-profiles/<path:profile_id>/export", methods=["GET"]
+)
+def ui_auth_profile_export_route(profile_id: str) -> ResponseReturnValue:
+    return _route_api_ui_auth_profile_export(profile_id)
+
+
+@app.route("/api/ui-testing/auth-profiles/cleanup", methods=["POST"])
+def ui_auth_profiles_cleanup() -> ResponseReturnValue:
+    return _route_api_ui_auth_profiles_cleanup()
+
+
+# ── 登录配置路由 ──────────────────────────────────────────────────
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_config_delete as _route_api_ui_login_config_delete,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_config_get as _route_api_ui_login_config_get,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_config_test as _route_api_ui_login_config_test,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_config_update as _route_api_ui_login_config_update,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_configs_create as _route_api_ui_login_configs_create,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    api_ui_login_configs_list as _route_api_ui_login_configs_list,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    ui_login_config_editor_page as _route_ui_login_config_editor_page,
+)
+from postman_api_tester.handlers.ui_login_routes import (
+    ui_login_configs_page as _route_ui_login_configs_page,
+)
+
+
+@app.route("/api/ui-testing/login-configs", methods=["GET"])
+def ui_login_configs_list_route() -> ResponseReturnValue:
+    return _route_api_ui_login_configs_list()
+
+
+@app.route("/api/ui-testing/login-configs", methods=["POST"])
+def ui_login_configs_create_route() -> ResponseReturnValue:
+    return _route_api_ui_login_configs_create()
+
+
+@app.route("/api/ui-testing/login-configs/<path:config_id>", methods=["GET"])
+def ui_login_config_get_route(config_id: str) -> ResponseReturnValue:
+    return _route_api_ui_login_config_get(config_id)
+
+
+@app.route("/api/ui-testing/login-configs/<path:config_id>", methods=["PUT"])
+def ui_login_config_update_route(config_id: str) -> ResponseReturnValue:
+    return _route_api_ui_login_config_update(config_id)
+
+
+@app.route("/api/ui-testing/login-configs/<path:config_id>", methods=["DELETE"])
+def ui_login_config_delete_route(config_id: str) -> ResponseReturnValue:
+    return _route_api_ui_login_config_delete(config_id)
+
+
+@app.route(
+    "/api/ui-testing/login-configs/<path:config_id>/test", methods=["POST"]
+)
+def ui_login_config_test_route(config_id: str) -> ResponseReturnValue:
+    return _route_api_ui_login_config_test(config_id)
+
+
+@app.route("/ui-testing/login-configs")
+def ui_login_configs_page_route() -> ResponseReturnValue:
+    return _route_ui_login_configs_page()
+
+
+@app.route("/ui-testing/login-configs/editor")
+@app.route("/ui-testing/login-configs/editor/<path:config_id>")
+def ui_login_config_editor_page_route(config_id: str = "") -> ResponseReturnValue:
+    return _route_ui_login_config_editor_page(config_id)
 
 
 @app.route("/favicon.ico")

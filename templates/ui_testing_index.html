@@ -78,6 +78,7 @@
             </div>
             <div class="header-actions">
                 <a href="/ui-testing/reports" class="btn btn-secondary">报告列表</a>
+                <a href="/ui-testing/login-configs" class="btn btn-secondary">登录配置</a>
                 <a href="/ui-recorder" class="btn btn-secondary">查看录制</a>
                 <a href="/ui-testing/settings" class="btn btn-secondary">设置</a>
                 <a href="/ui-testing/recorder" class="btn btn-primary">+ 新建录制</a>
@@ -118,14 +119,30 @@
 
     <script>
         var cases = [];
+        var authProfileMap = {};
+
+        function loadAuthProfiles(callback) {
+            fetch('/api/ui-testing/auth-profiles')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var profiles = (result.data && result.data.profiles) || [];
+                    profiles.forEach(function(p) { authProfileMap[p.id] = p.name; });
+                    if (callback) callback();
+                })
+                .catch(function() {
+                    if (callback) callback();
+                });
+        }
 
         function loadCases() {
             fetch('/api/ui-testing/cases')
                 .then(function(r) { return r.json(); })
                 .then(function(result) {
                     cases = result.data || [];
-                    renderCases();
-                    updateStats();
+                    loadAuthProfiles(function() {
+                        renderCases();
+                        updateStats();
+                    });
                 })
                 .catch(function(e) {
                     console.error('Failed to load cases:', e);
@@ -155,6 +172,7 @@
                         '<span>' + formatDate(c.created_at) + '</span>' +
                     '</div>' +
                     (tags ? '<div class="tags">' + tags + '</div>' : '') +
+                    (c.auth_profile_id && authProfileMap[c.auth_profile_id] ? '<div style="margin-bottom:8px;"><span class="tag" style="background:#e0f2fe;color:#0369a1;">🔑 ' + escapeHtml(authProfileMap[c.auth_profile_id]) + '</span></div>' : '') +
                     '<div class="exec-options" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:#6b7280;">' +
                         '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">' +
                             '<input type="checkbox" id="clearLogin_' + c.id + '" /> 清除登录信息' +

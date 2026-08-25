@@ -5,12 +5,14 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from flask import make_response, render_template, request, send_file
 from flask.typing import ResponseReturnValue
@@ -69,6 +71,109 @@ def _cleanup_stale_jobs() -> None:
             )
 
 
+def _write_auth_state_temp(job_id: str, profile: Dict[str, Any]) -> str:
+    """将认证档案的 cookies + localStorage 转为 Playwright storage_state 格式，写入临时文件。"""
+    # 构建 origins（localStorage）
+    origins: List[Dict[str, Any]] = []
+    local_storage = profile.get("local_storage", {})
+    base_url = profile.get("base_url", "")
+    if local_storage and base_url:
+        origins.append({
+            "origin": base_url.rstrip("/"),
+            "localStorage": [
+                {"name": k, "value": v} for k, v in local_storage.items()
+            ],
+        })
+
+    storage_state = {
+        "cookies": profile.get("cookies", []),
+        "origins": origins,
+    }
+    temp_dir = os.path.join(os.getcwd(), "temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    path = os.path.join(temp_dir, f"auth_state_{job_id}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(storage_state, f, ensure_ascii=False)
+    return path
+
+
+def _refresh_auth_from_login_config(
+    profile: Dict[str, Any],
+    login_config_id: str,
+    auth_profile_id: str,
+) -> Dict[str, Any]:
+    """Phase 2: 执行登录配置获取 Cookie，更新认证档案并返回更新后的档案。"""
+    from postman_api_tester.services.ui_auth_profile_store import _auth_profile_store
+    from postman_api_tester.services.ui_headless_engine import UiHeadlessEngine
+    from postman_api_tester.services.ui_login_config_store import _login_config_store
+
+    config = _login_config_store.get_config(login_config_id)
+    if not config:
+        logger.warning(
+            "ui_execution_login_config_not_found",
+            extra={
+                "event": "ui.execution.login_config_not_found",
+                "login_config_id": login_config_id,
+                "auth_profile_id": auth_profile_id,
+            },
+        )
+        return profile
+
+    login_steps = config.get("login_steps", [])
+    base_url = config.get("base_url", "")
+    if not login_steps or not base_url:
+        logger.warning(
+            "ui_execution_login_config_empty",
+            extra={
+                "event": "ui.execution.login_config_empty",
+                "login_config_id": login_config_id,
+            },
+        )
+        return profile
+
+    try:
+        engine = UiHeadlessEngine(browser_type="chromium")
+        result = engine.execute_login_config(
+            login_steps=login_steps,
+            base_url=base_url,
+        )
+    except Exception as e:
+        logger.error(
+            "ui_execution_login_config_error",
+            extra={
+                "event": "ui.execution.login_config_error",
+                "login_config_id": login_config_id,
+                "error": str(e),
+            },
+        )
+        return profile
+
+    if result.get("status") != "passed" or not result.get("cookies"):
+        logger.warning(
+            "ui_execution_login_config_failed",
+            extra={
+                "event": "ui.execution.login_config_failed",
+                "login_config_id": login_config_id,
+                "error": result.get("error", ""),
+            },
+        )
+        return profile
+
+    # 更新认证档案的 cookies
+    updated_profile = {**profile, "cookies": result["cookies"]}
+    _auth_profile_store.save_profile(updated_profile)
+    logger.info(
+        "ui_execution_auth_refreshed",
+        extra={
+            "event": "ui.execution.auth_refreshed",
+            "auth_profile_id": auth_profile_id,
+            "login_config_id": login_config_id,
+            "cookie_count": len(result["cookies"]),
+        },
+    )
+    return updated_profile
+
+
 def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     """创建执行任务，返回 job_id。
 
@@ -120,10 +225,10 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
     if not case_data:
         return json_error(f"用例不存在: {case_id}", 404, "UIT_EXEC_001")
 
-    # 执行前清除代理 session cookie（仅当 clear_login 为 true 时）
+    # 执行前清除代理 session cookie（仅浏览器回放模式）
     clear_login = options.get("clear_login", True)
     base_url = case_data.get("base_url", "")
-    if base_url and clear_login:
+    if base_url and clear_login and mode != "headless":
         from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
         _proxy_session_store.clear_cookies_by_base_url(base_url)
@@ -160,8 +265,72 @@ def api_ui_testing_execute(case_id: str) -> ResponseReturnValue:
         options["viewport_width"] = hl_settings.get("viewport_width", 1280)
         options["viewport_height"] = hl_settings.get("viewport_height", 720)
         options["take_screenshots"] = hl_settings.get("take_screenshots", True)
+
+        # 加载认证档案（仅 Cookie，不含 localStorage）
+        # 优先级：执行请求中的 auth_profile_id > 用例中保存的 auth_profile_id
+        auth_state_path = None
+        auth_profile_id = payload.get("auth_profile_id") or case_data.get(
+            "auth_profile_id"
+        )
+        if auth_profile_id:
+            from postman_api_tester.services.ui_auth_profile_store import (
+                _auth_profile_store,
+            )
+
+            profile = _auth_profile_store.get_profile(auth_profile_id)
+            if profile and not _auth_profile_store.is_expired(profile):
+                # Phase 2: 如果认证档案关联了登录配置，且 Cookie 为空或过期，自动执行登录
+                login_config_id = profile.get("login_config_id")
+                if login_config_id and not profile.get("cookies"):
+                    profile = _refresh_auth_from_login_config(
+                        profile, login_config_id, auth_profile_id
+                    )
+
+                if profile and profile.get("cookies"):
+                    try:
+                        auth_state_path = _write_auth_state_temp(job_id, profile)
+                    except OSError as e:
+                        logger.error(
+                            "ui_execution_auth_temp_write_failed",
+                            extra={
+                                "event": "ui.execution.auth_temp_write_failed",
+                                "auth_profile_id": auth_profile_id,
+                                "error": str(e),
+                            },
+                        )
+                        auth_state_path = None
+                    else:
+                        logger.info(
+                            "ui_execution_auth_profile_loaded",
+                            extra={
+                                "event": "ui.execution.auth_profile_loaded",
+                                "auth_profile_id": auth_profile_id,
+                                "cookie_count": len(profile.get("cookies", [])),
+                            },
+                        )
+            elif profile:
+                logger.warning(
+                    "ui_execution_auth_profile_expired",
+                    extra={
+                        "event": "ui.execution.auth_profile_expired",
+                        "auth_profile_id": auth_profile_id,
+                    },
+                )
+            else:
+                logger.warning(
+                    "ui_execution_auth_profile_not_found",
+                    extra={
+                        "event": "ui.execution.auth_profile_not_found",
+                        "auth_profile_id": auth_profile_id,
+                    },
+                )
+
         _execution_manager.start_headless(
-            job_id, case_data, options, on_complete=_send_webhook
+            job_id,
+            case_data,
+            options,
+            on_complete=_send_webhook,
+            auth_state_path=auth_state_path,
         )
         return BaseHandler.json_response(
             {

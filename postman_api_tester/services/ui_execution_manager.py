@@ -32,6 +32,7 @@ def _worker_input_json(
     case_data: Dict[str, Any],
     options: Dict[str, Any],
     screenshots_dir: Optional[str],
+    auth_state_path: Optional[str] = None,
 ) -> str:
     """构建传递给子进程的 JSON 输入，写入临时文件并返回文件路径。"""
     input_data = {
@@ -39,6 +40,7 @@ def _worker_input_json(
         "case_data": case_data,
         "options": options,
         "screenshots_dir": screenshots_dir,
+        "auth_state_path": auth_state_path,
     }
     # 写入临时文件（避免 stdin 管道编码问题）
     with tempfile.NamedTemporaryFile(
@@ -58,6 +60,22 @@ def _resolve_worker_script() -> str:
         os.path.dirname(os.path.abspath(__file__)),
         "ui_headless_worker.py",
     )
+
+
+def _cleanup_auth_state(auth_state_path: Optional[str]) -> None:
+    """安全清理 auth_state 临时文件。"""
+    if not auth_state_path:
+        return
+    try:
+        os.unlink(auth_state_path)
+    except OSError:
+        logger.warning(
+            "ui_execution_auth_temp_cleanup_failed",
+            extra={
+                "event": "ui.execution.auth_temp_cleanup_failed",
+                "auth_state_path": auth_state_path,
+            },
+        )
 
 
 class UiExecutionManager:
@@ -85,6 +103,7 @@ class UiExecutionManager:
         case_data: Dict[str, Any],
         options: Dict[str, Any],
         on_complete: Optional[Callable[[Dict[str, Any]], None]] = None,
+        auth_state_path: Optional[str] = None,
     ) -> None:
         """启动无头浏览器后台执行（通过子进程隔离 Playwright）。"""
         if not is_playwright_available():
@@ -117,7 +136,10 @@ class UiExecutionManager:
             str(job_dir) if options.get("take_screenshots", True) else None
         )
 
-        input_file = _worker_input_json(job_id, case_data, options, screenshots_dir)
+        input_file = _worker_input_json(
+            job_id, case_data, options, screenshots_dir,
+            auth_state_path=auth_state_path,
+        )
 
         cancel_event = threading.Event()
         process: Optional[subprocess.Popen[Any]] = None
@@ -315,12 +337,38 @@ class UiExecutionManager:
                     os.unlink(input_file)
                 except OSError:
                     pass
+                # 清理 auth_state 临时文件
+                _cleanup_auth_state(auth_state_path)
 
         t = threading.Thread(target=run, name=f"ui-exec-{job_id}", daemon=True)
         with _lock:
             if job_id in _active_jobs:
                 _active_jobs[job_id]["thread"] = t
-        t.start()
+        try:
+            t.start()
+        except RuntimeError:
+            # 兜底：线程启动失败，手动清理临时文件
+            logger.error(
+                "ui_execution_thread_start_failed",
+                extra={
+                    "event": "ui.execution.thread_start_failed",
+                    "job_id": job_id,
+                },
+            )
+            _cleanup_auth_state(auth_state_path)
+            try:
+                os.unlink(input_file)
+            except OSError:
+                pass
+            self._store.finalize_job(
+                job_id, "failed",
+                {"steps_total": 0, "steps_passed": 0,
+                 "steps_failed": 0, "total_duration_ms": 0},
+            )
+            if on_complete is not None:
+                result = self._store.get_result(job_id)
+                if result:
+                    on_complete(result)
 
     def cancel(self, job_id: str) -> bool:
         """取消执行。返回是否成功发出取消信号。"""
