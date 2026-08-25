@@ -900,6 +900,116 @@ class UiHeadlessEngine:
             "_step_results": _step_results,
         }
 
+    def execute_login_config(
+        self,
+        login_steps: List[Dict[str, Any]],
+        base_url: str,
+        timeout_ms: int = DEFAULT_TIMEOUT_MS,
+    ) -> Dict[str, Any]:
+        """执行登录步骤并捕获 Cookie。
+
+        用于 Phase 2「前置登录步骤」：执行登录配置中的步骤，
+        成功时从浏览器上下文提取 Cookie，返回 storage_state 兼容格式。
+        """
+        from urllib.parse import urlparse
+
+        pw = sync_playwright().start()
+        browser: Optional[Browser] = None
+        context: Optional[BrowserContext] = None
+
+        steps_passed = 0
+        steps_failed = 0
+        step_results: List[Dict[str, Any]] = []
+
+        try:
+            launcher = getattr(pw, self._browser_type, pw.chromium)
+            browser = launcher.launch(headless=True)
+            context = browser.new_context(
+                viewport={"width": 1280, "height": 720},
+            )
+            page = context.new_page()
+            assert page is not None
+            page.set_default_timeout(timeout_ms)
+
+            if base_url:
+                page.goto(base_url, wait_until="load")
+
+            for i, step in enumerate(login_steps):
+                step_start = time.time()
+                step_result = self._execute_step(page, step, base_url, timeout_ms)
+                step_duration = int((time.time() - step_start) * 1000)
+                step_result["duration_ms"] = step_duration
+                step_result["index"] = i
+                step_results.append(step_result)
+
+                if step_result.get("status") == "passed":
+                    steps_passed += 1
+                else:
+                    steps_failed += 1
+                    break
+
+            status = "passed" if steps_failed == 0 else "failed"
+            cookies: List[Dict[str, Any]] = []
+
+            if status == "passed":
+                try:
+                    raw_cookies = context.cookies()
+                    # 转换为 storage_state 兼容格式
+                    target_domain = urlparse(base_url).hostname or ""
+                    for c in raw_cookies:
+                        cookie_entry: Dict[str, Any] = {
+                            "name": c.get("name", ""),
+                            "value": c.get("value", ""),
+                            "domain": c.get("domain", ""),
+                            "path": c.get("path", "/"),
+                            "expires": c.get("expires", -1),
+                            "httpOnly": c.get("httpOnly", False),
+                            "secure": c.get("secure", False),
+                            "sameSite": c.get("sameSite", "Lax"),
+                        }
+                        cookies.append(cookie_entry)
+                        # 仅保留目标域名及其子域的 Cookie
+                    if target_domain:
+                        cookies = [
+                            c
+                            for c in cookies
+                            if not c["domain"]
+                            or c["domain"].endswith(target_domain)
+                            or target_domain.endswith(c["domain"].lstrip("."))
+                        ]
+                except Exception as e:
+                    logger.warning("login_config_cookie_capture_failed: %s", e)
+
+            return {
+                "status": status,
+                "steps_total": len(login_steps),
+                "steps_passed": steps_passed,
+                "steps_failed": steps_failed,
+                "cookies": cookies,
+                "cookie_count": len(cookies),
+                "error": (
+                    step_results[-1].get("error", "")
+                    if status == "failed" and step_results
+                    else ""
+                ),
+            }
+        except Exception as e:
+            logger.error("login_config_execution_error: %s", e, exc_info=True)
+            return {
+                "status": "error",
+                "error": str(e),
+                "cookies": [],
+                "cookie_count": 0,
+            }
+        finally:
+            if context is not None:
+                with contextlib.suppress(Exception):
+                    context.close()
+            if browser is not None:
+                with contextlib.suppress(Exception):
+                    browser.close()
+            pw.stop()
+
     def _execute_step(
         self, page: "Page", step: Dict[str, Any], base_url: str, timeout_ms: int
     ) -> Dict[str, Any]:

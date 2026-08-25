@@ -1,0 +1,402 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>登录配置编辑器</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 22px; color: #0f172a; }
+        .back-link { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #3b82f6; }
+
+        .panel { background: #fff; border-radius: 10px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .panel h2 { font-size: 15px; margin-bottom: 16px; color: #0f172a; border-bottom: 1px solid #f3f4f6; padding-bottom: 10px; }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+        .form-group .hint { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+
+        input[type="text"], input[type="url"], select, textarea {
+            width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
+            background: #fff; color: #1f2937; transition: border-color 0.15s;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        textarea { font-family: monospace; font-size: 13px; resize: vertical; min-height: 80px; }
+
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-secondary:hover { background: #f3f4f6; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        .steps-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .steps-table th { text-align: left; padding: 8px 10px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 500; color: #6b7280; font-size: 12px; }
+        .steps-table td { padding: 6px 8px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .steps-table input, .steps-table select { padding: 6px 8px; font-size: 12px; }
+        .step-num { color: #9ca3af; text-align: center; width: 30px; font-size: 12px; }
+        .step-remove { color: #ef4444; cursor: pointer; border: none; background: none; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+        .step-remove:hover { background: #fef2f2; }
+
+        .add-step-row { padding: 12px 0; text-align: center; }
+
+        .test-result { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 13px; display: none; }
+        .test-result.show { display: block; }
+        .test-result.passed { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+        .test-result.failed { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 9999; transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        .json-editor { font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/ui-testing/login-configs" class="back-link">← 返回列表</a>
+                <h1 style="margin-top: 4px;" id="pageTitle">新建登录配置</h1>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-success" onclick="testLogin()" id="testBtn" type="button">测试登录</button>
+                <button class="btn btn-primary" onclick="saveConfig()" type="button">保存</button>
+            </div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="panel">
+            <h2>基本信息</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>配置名称 *</label>
+                    <input type="text" id="configName" placeholder="如：管理员登录" />
+                </div>
+                <div class="form-group">
+                    <label>目标 URL *</label>
+                    <input type="url" id="baseUrl" placeholder="http://example.com" />
+                    <div class="hint">登录页面的完整 URL</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <input type="text" id="description" placeholder="可选描述" />
+            </div>
+        </div>
+
+        <!-- 登录步骤 -->
+        <div class="panel">
+            <h2>登录步骤</h2>
+            <div class="hint" style="margin-bottom:12px;font-size:12px;color:#9ca3af;">
+                按顺序定义登录操作。支持的 action: navigate（导航）、click（点击）、type（输入）、wait_for（等待）
+            </div>
+            <table class="steps-table">
+                <thead>
+                    <tr>
+                        <th style="width:30px">#</th>
+                        <th style="width:100px">操作</th>
+                        <th>选择器</th>
+                        <th style="width:200px">值 / URL</th>
+                        <th style="width:36px"></th>
+                    </tr>
+                </thead>
+                <tbody id="stepsBody"></tbody>
+            </table>
+            <div class="add-step-row">
+                <button class="btn btn-sm btn-secondary" onclick="addStep()" type="button">+ 添加步骤</button>
+            </div>
+        </div>
+
+        <!-- 成功条件 -->
+        <div class="panel">
+            <h2>登录成功验证</h2>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>验证方式</label>
+                    <select id="conditionType">
+                        <option value="">不验证（仅步骤通过即可）</option>
+                        <option value="url_pattern">URL 包含路径</option>
+                        <option value="cookie_exists">Cookie 存在</option>
+                        <option value="element_exists">元素存在</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>验证值</label>
+                    <input type="text" id="conditionValue" placeholder="如：/dashboard 或 JSESSIONID" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 测试结果 -->
+        <div id="testResult" class="test-result"></div>
+
+        <!-- 高级：JSON 编辑器 -->
+        <div class="panel" style="margin-top:16px;">
+            <h2 style="cursor:pointer;" onclick="toggleAdvanced()">高级 - JSON 编辑 ▾</h2>
+            <div id="advancedEditor" style="display:none;">
+                <div class="hint" style="margin-bottom:8px;font-size:12px;color:#9ca3af;">
+                    直接编辑 JSON 格式的完整配置。保存时将覆盖上方表单数据。
+                </div>
+                <textarea id="jsonEditor" class="json-editor" rows="15"></textarea>
+                <div style="margin-top:8px;display:flex;gap:8px;">
+                    <button class="btn btn-sm btn-secondary" onclick="loadFromJson()" type="button">从 JSON 加载到表单</button>
+                    <button class="btn btn-sm btn-secondary" onclick="exportToJson()" type="button">从表单导出到 JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        var CONFIG_ID = '{{ config_id }}' || '';
+        var steps = [];
+
+        function init() {
+            if (CONFIG_ID) {
+                document.getElementById('pageTitle').textContent = '编辑登录配置';
+                loadConfig(CONFIG_ID);
+            } else {
+                addStep('navigate', '', '/login');
+            }
+        }
+
+        function loadConfig(id) {
+            fetch('/api/ui-testing/login-configs/' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var c = result.data;
+                    if (!c) { showToast('配置不存在', 'error'); return; }
+                    document.getElementById('configName').value = c.name || '';
+                    document.getElementById('baseUrl').value = c.base_url || '';
+                    document.getElementById('description').value = c.description || '';
+
+                    var sc = c.success_condition || {};
+                    document.getElementById('conditionType').value = sc.type || '';
+                    document.getElementById('conditionValue').value = sc.value || '';
+
+                    steps = (c.login_steps || []).map(function(s) {
+                        return {
+                            action: s.action || '',
+                            selector: typeof s.selector === 'string' ? s.selector : (s.selector && s.selector.primary) || '',
+                            value: s.value || '',
+                        };
+                    });
+                    renderSteps();
+                });
+        }
+
+        function renderSteps() {
+            var tbody = document.getElementById('stepsBody');
+            if (steps.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#9ca3af;">暂无步骤，点击下方添加</td></tr>';
+                return;
+            }
+            var html = '';
+            steps.forEach(function(s, i) {
+                html += '<tr>' +
+                    '<td class="step-num">' + (i + 1) + '</td>' +
+                    '<td><select onchange="steps[' + i + '].action=this.value">' +
+                        '<option value="navigate"' + (s.action === 'navigate' ? ' selected' : '') + '>navigate</option>' +
+                        '<option value="click"' + (s.action === 'click' ? ' selected' : '') + '>click</option>' +
+                        '<option value="type"' + (s.action === 'type' ? ' selected' : '') + '>type</option>' +
+                        '<option value="wait_for"' + (s.action === 'wait_for' ? ' selected' : '') + '>wait_for</option>' +
+                    '</select></td>' +
+                    '<td><input type="text" value="' + escapeAttr(s.selector) + '" onchange="steps[' + i + '].selector=this.value" placeholder="CSS 选择器（navigate/wait_for 留空）" /></td>' +
+                    '<td><input type="text" value="' + escapeAttr(s.value) + '" onchange="steps[' + i + '].value=this.value" placeholder="URL / 文本值" /></td>' +
+                    '<td><button class="step-remove" onclick="removeStep(' + i + ')" title="删除步骤">&times;</button></td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        function addStep(action, selector, value) {
+            steps.push({ action: action || 'click', selector: selector || '', value: value || '' });
+            renderSteps();
+        }
+
+        function removeStep(index) {
+            steps.splice(index, 1);
+            renderSteps();
+        }
+
+        function buildConfig() {
+            var name = document.getElementById('configName').value.trim();
+            var baseUrl = document.getElementById('baseUrl').value.trim();
+            if (!name) { showToast('请填写配置名称', 'error'); return null; }
+            if (!baseUrl) { showToast('请填写目标 URL', 'error'); return null; }
+
+            var config = {
+                name: name,
+                base_url: baseUrl,
+                description: document.getElementById('description').value.trim(),
+                login_steps: steps.map(function(s, i) {
+                    return {
+                        action: s.action,
+                        selector: s.action === 'navigate' || s.action === 'wait_for' ? {} : { primary: s.selector, type: 'css' },
+                        value: s.value,
+                        tag: '',
+                        tag_text: '',
+                    };
+                }),
+                success_condition: {},
+            };
+
+            var condType = document.getElementById('conditionType').value;
+            var condValue = document.getElementById('conditionValue').value.trim();
+            if (condType) {
+                config.success_condition = { type: condType, value: condValue };
+            }
+
+            return config;
+        }
+
+        function saveConfig() {
+            var config = buildConfig();
+            if (!config) return;
+
+            var url = '/api/ui-testing/login-configs';
+            var method = 'POST';
+            if (CONFIG_ID) {
+                url = '/api/ui-testing/login-configs/' + CONFIG_ID;
+                method = 'PUT';
+                config.id = CONFIG_ID;
+            }
+
+            fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.code === 200 || result.code === 201) {
+                    showToast('保存成功', 'success');
+                    if (!CONFIG_ID && result.data && result.data.id) {
+                        CONFIG_ID = result.data.id;
+                        history.replaceState(null, '', '/ui-testing/login-configs/editor/' + CONFIG_ID);
+                        document.getElementById('pageTitle').textContent = '编辑登录配置';
+                    }
+                } else {
+                    showToast('保存失败: ' + result.message, 'error');
+                }
+            })
+            .catch(function(e) { showToast('保存失败: ' + e.message, 'error'); });
+        }
+
+        function testLogin() {
+            if (!CONFIG_ID) {
+                showToast('请先保存配置再测试', 'error');
+                return;
+            }
+            var btn = document.getElementById('testBtn');
+            btn.disabled = true;
+            btn.textContent = '测试中...';
+
+            var resultDiv = document.getElementById('testResult');
+            resultDiv.className = 'test-result';
+            resultDiv.style.display = 'none';
+
+            fetch('/api/ui-testing/login-configs/' + CONFIG_ID + '/test', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var d = result.data || {};
+                    btn.disabled = false;
+                    btn.textContent = '测试登录';
+
+                    if (d.status === 'passed') {
+                        resultDiv.className = 'test-result show passed';
+                        resultDiv.innerHTML = '<strong>登录成功</strong><br>' +
+                            'Cookie 数量: ' + d.cookie_count + '<br>' +
+                            '步骤: ' + d.steps_passed + '/' + d.steps_total + ' 通过<br>' +
+                            (d.cookies && d.cookies.length > 0 ? 'Cookie: ' + d.cookies.slice(0, 3).map(function(c) { return c.name; }).join(', ') + (d.cookies.length > 3 ? '...' : '') : '');
+                    } else {
+                        resultDiv.className = 'test-result show failed';
+                        resultDiv.innerHTML = '<strong>登录失败</strong><br>' +
+                            '错误: ' + escapeHtml(d.error || '未知错误') + '<br>' +
+                            '步骤: ' + d.steps_passed + '/' + d.steps_total + ' 通过';
+                    }
+                })
+                .catch(function(e) {
+                    btn.disabled = false;
+                    btn.textContent = '测试登录';
+                    resultDiv.className = 'test-result show failed';
+                    resultDiv.innerHTML = '<strong>测试异常</strong><br>' + escapeHtml(e.message);
+                });
+        }
+
+        function toggleAdvanced() {
+            var el = document.getElementById('advancedEditor');
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            if (el.style.display === 'block') {
+                exportToJson();
+            }
+        }
+
+        function exportToJson() {
+            var config = buildConfig();
+            if (config) {
+                document.getElementById('jsonEditor').value = JSON.stringify(config, null, 2);
+            }
+        }
+
+        function loadFromJson() {
+            try {
+                var config = JSON.parse(document.getElementById('jsonEditor').value);
+                document.getElementById('configName').value = config.name || '';
+                document.getElementById('baseUrl').value = config.base_url || '';
+                document.getElementById('description').value = config.description || '';
+                var sc = config.success_condition || {};
+                document.getElementById('conditionType').value = sc.type || '';
+                document.getElementById('conditionValue').value = sc.value || '';
+                steps = (config.login_steps || []).map(function(s) {
+                    return {
+                        action: s.action || '',
+                        selector: typeof s.selector === 'string' ? s.selector : (s.selector && s.selector.primary) || '',
+                        value: s.value || '',
+                    };
+                });
+                renderSteps();
+                showToast('已从 JSON 加载', 'success');
+            } catch (e) {
+                showToast('JSON 解析失败: ' + e.message, 'error');
+            }
+        }
+
+        function escapeAttr(str) {
+            return String(str || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function showToast(msg, type) {
+            var t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show ' + type;
+            setTimeout(function() { t.className = 'toast'; }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
+{% endraw %}

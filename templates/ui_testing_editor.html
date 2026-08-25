@@ -162,6 +162,7 @@
                         var label = p.name || '未命名';
                         if (p.base_url) label += ' (' + p.base_url + ')';
                         label += ' [' + p.cookie_count + ' Cookie]';
+                        if (p.login_config_id) label += ' [自动登录]';
                         opt.textContent = label;
                         select.appendChild(opt);
                     });
