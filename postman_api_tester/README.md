@@ -1,7 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.36.0
-发布日期：2026-08-25
+版本：v1.36.2
+发布日期：2026-08-26
+
+本版新增重点（v1.36.2）：
+- **代码质量提升**：消除 `ui_proxy_service.py` 冗余局部 import，新增 `_ProxySessionStore` 43 项单元测试覆盖
 
 本版新增重点（v1.36.0）：
 - **localStorage 支持（Phase 3）**：录制时 JS 注入收集 localStorage + 认证档案持久化 localStorage + Playwright storage_state origins 导出

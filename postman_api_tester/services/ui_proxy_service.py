@@ -236,9 +236,6 @@ class _ProxySessionStore:
         所以只比较 origin（scheme + netloc），忽略路径差异。
         """
         cleared = 0
-        # 提取 origin 用于匹配（忽略路径）
-        from urllib.parse import urlparse
-
         parsed = urlparse(base_url)
         target_origin = f"{parsed.scheme}://{parsed.netloc}"
 
@@ -658,9 +655,7 @@ class UiProxyService:
             )
             # 改写 Location 为代理 URL
             if location:
-                from urllib.parse import urlparse as _urlparse
-
-                parsed_loc = _urlparse(location)
+                parsed_loc = urlparse(location)
                 if parsed_loc.scheme and parsed_loc.netloc:
                     # 绝对 URL：改写为代理 URL
                     rewritten_location = (
@@ -669,9 +664,6 @@ class UiProxyService:
                         else f"/ui-testing/proxy?url={location}"
                     )
                 else:
-                    # 相对 URL：拼接为基础 URL 再改写
-                    from urllib.parse import urljoin
-
                     abs_location = urljoin(url, location)
                     rewritten_location = (
                         f"/ui-testing/proxy?url={abs_location}&replay=1"
@@ -962,9 +954,7 @@ class UiProxyService:
                             _platform_url = _pu
                             break
             if _platform_url:
-                from urllib.parse import urlparse as _urlparse_retry
-
-                _orig_parsed = _urlparse_retry(url)
+                _orig_parsed = urlparse(url)
                 _retry_url = _platform_url.rstrip("/") + _orig_parsed.path
                 if _orig_parsed.query:
                     _retry_url += "?" + _orig_parsed.query
