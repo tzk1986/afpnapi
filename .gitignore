@@ -9,6 +9,7 @@ logs/
 uploaded_collections/
 variables.json
 ui_testing_cases/
+ui_testing_recordings/
 uireports/
 
 # 备份与临时文件

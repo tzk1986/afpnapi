@@ -125,6 +125,7 @@
                 <button class="btn btn-secondary" onclick="moveStepUp()" id="btnMoveUp" disabled>↑ 上移</button>
                 <button class="btn btn-secondary" onclick="moveStepDown()" id="btnMoveDown" disabled>↓ 下移</button>
                 <button class="btn btn-secondary" onclick="exportSteps()">导出 JSON</button>
+                <button class="btn btn-primary" onclick="showSaveAuthDialog()" id="btnSaveAuth" style="margin-left: auto; background: #10b981; border-color: #10b981;">💾 保存认证档案</button>
             </div>
         </div>
     </div>
@@ -157,6 +158,22 @@
         </div>
     </div>
 
+    <!-- Save auth profile dialog -->
+    <div class="modal-overlay" id="saveAuthModal">
+        <div class="modal">
+            <h3>保存为认证档案</h3>
+            <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
+                将录制得到的 Cookie 和 localStorage 保存为认证档案，用于无头执行时跳过登录。
+            </p>
+            <label for="authName">档案名称</label>
+            <input type="text" id="authName" placeholder="例如：生产环境登录" />
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideSaveAuthDialog()">取消</button>
+                <button class="btn btn-success" onclick="saveAuthProfile()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ====== State ======
         var steps = [];
@@ -166,6 +183,8 @@
         var selectedStepIndex = -1;
         var recordStartTime = null;
         var durationTimer = null;
+        var exportedCookies = [];
+        var exportedLocalStorage = {};
 
         // ====== URL & iframe ======
         function openUrl() {
@@ -255,12 +274,28 @@
                 frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'stop' }, '*');
             }
 
-            // Update server session
+            // Update server session and capture exported data
             if (sessionId) {
                 fetch('/api/ui-testing/recording/stop', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ session_id: sessionId })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    exportedCookies = data.data.cookies_for_export || [];
+                    exportedLocalStorage = data.data.local_storage_for_export || {};
+                    console.log('[Recorder] Exported cookies:', exportedCookies.length);
+                    console.log('[Recorder] Exported localStorage:', Object.keys(exportedLocalStorage).length, 'keys');
+                    // Enable auth profile button if we have auth data
+                    var hasAuthData = exportedCookies.length > 0 || Object.keys(exportedLocalStorage).length > 0;
+                    document.getElementById('btnSaveAuth').disabled = !hasAuthData;
+                    if (hasAuthData) {
+                        document.getElementById('btnSaveAuth').title = '保存登录状态为认证档案';
+                    }
+                })
+                .catch(function(e) {
+                    console.warn('[Recorder] Failed to export auth data:', e);
                 });
             }
 
@@ -510,6 +545,65 @@
         document.getElementById('caseName').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') saveAsCase();
             if (e.key === 'Escape') hideSaveDialog();
+        });
+
+        // ====== Save auth profile ======
+        function showSaveAuthDialog() {
+            var hasAuthData = exportedCookies.length > 0 || Object.keys(exportedLocalStorage).length > 0;
+            if (!hasAuthData) {
+                alert('没有可保存的认证数据。请先录制登录操作。');
+                return;
+            }
+            document.getElementById('saveAuthModal').classList.add('active');
+            document.getElementById('authName').focus();
+        }
+
+        function hideSaveAuthDialog() {
+            document.getElementById('saveAuthModal').classList.remove('active');
+        }
+
+        function saveAuthProfile() {
+            var name = document.getElementById('authName').value.trim();
+            if (!name) { alert('请输入档案名称'); return; }
+
+            // 从 currentUrl 提取 base_url (origin)
+            var baseUrl = '';
+            try {
+                var urlObj = new URL(currentUrl);
+                baseUrl = urlObj.origin;
+            } catch (e) {
+                baseUrl = currentUrl;
+            }
+
+            var payload = {
+                name: name,
+                base_url: baseUrl,
+                cookies: exportedCookies,
+                local_storage: exportedLocalStorage,
+                source: 'recording',
+                description: '录制于 ' + new Date().toLocaleString()
+            };
+
+            fetch('/api/ui-testing/auth-profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                hideSaveAuthDialog();
+                var cookieCount = exportedCookies.length;
+                var lsCount = Object.keys(exportedLocalStorage).length;
+                alert('认证档案已保存！ID: ' + data.data.id + '\nCookie: ' + cookieCount + ' 条\nlocalStorage: ' + lsCount + ' 个键');
+            })
+            .catch(function(e) {
+                alert('保存失败: ' + e.message);
+            });
+        }
+
+        document.getElementById('authName').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') saveAuthProfile();
+            if (e.key === 'Escape') hideSaveAuthDialog();
         });
 
         // ====== Helpers ======

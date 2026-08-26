@@ -1,7 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.35.0
+版本：v1.36.0
 发布日期：2026-08-25
+
+本版新增重点（v1.36.0）：
+- **localStorage 支持（Phase 3）**：录制时 JS 注入收集 localStorage + 认证档案持久化 localStorage + Playwright storage_state origins 导出
 
 本版新增重点（v1.35.0）：
 - **前置登录步骤（Phase 2）**：登录配置管理 + 自动执行登录步骤获取 Cookie + 认证档案关联登录配置
