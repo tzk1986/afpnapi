@@ -1,7 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.36.2
+版本：v1.36.3
 发布日期：2026-08-26
+
+本版新增重点（v1.36.3）：
+- **import 整合**：`ui_testing_routes.py` 将 10 处 `_proxy_session_store` 局部 import 提升为模块级导入，同步更新 `test_phase3_local_storage.py` mock 路径
 
 本版新增重点（v1.36.2）：
 - **代码质量提升**：消除 `ui_proxy_service.py` 冗余局部 import，新增 `_ProxySessionStore` 43 项单元测试覆盖

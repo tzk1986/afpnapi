@@ -396,7 +396,7 @@ class TestRecordingStopLocalStorageExport:
             json={"session_id": "test-sid"},
         ), \
              patch("postman_api_tester.handlers.ui_testing_routes._recording") as mock_rec, \
-             patch("postman_api_tester.services.ui_proxy_service._proxy_session_store") as mock_store:
+             patch("postman_api_tester.handlers.ui_testing_routes._proxy_session_store") as mock_store:
             mock_rec.stop.return_value = mock_session
             mock_store.find_session_by_base_url.return_value = "proxy-sid"
             mock_store.get_cookie_jar.return_value = []
@@ -428,7 +428,7 @@ class TestRecordingStopLocalStorageExport:
             json={"session_id": "test-sid"},
         ), \
              patch("postman_api_tester.handlers.ui_testing_routes._recording") as mock_rec, \
-             patch("postman_api_tester.services.ui_proxy_service._proxy_session_store") as mock_store:
+             patch("postman_api_tester.handlers.ui_testing_routes._proxy_session_store") as mock_store:
             mock_rec.stop.return_value = mock_session
             mock_store.find_session_by_base_url.return_value = "proxy-sid"
             mock_store.get_cookie_jar.return_value = []
