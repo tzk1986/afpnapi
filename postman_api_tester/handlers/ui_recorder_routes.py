@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from flask import jsonify, make_response, render_template, request
+from flask import make_response, render_template, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import BaseHandler
@@ -155,7 +155,7 @@ def api_ui_recorder_session_export(session_id: str) -> ResponseReturnValue:
             "ended_at": session["ended_at"],
         },
     }
-    return jsonify(export_data)
+    return BaseHandler.json_response(export_data)
 
 
 # ── 页面路由 ──
