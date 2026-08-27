@@ -15,7 +15,7 @@ from flask.typing import ResponseReturnValue
 from postman_api_tester.config import REPORT_SERVER_PORT, UI_RECORDING_SESSIONS_DIR
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_case_store import UiCaseStore
-from postman_api_tester.services.ui_proxy_service import UiProxyService
+from postman_api_tester.services.ui_proxy_service import UiProxyService, _proxy_session_store
 from postman_api_tester.services.ui_recorder_inject import get_replayer_js
 from postman_api_tester.services.ui_recording_store import RecordingSessionStore
 from postman_api_tester.utils.security import sanitize_cookies
@@ -94,7 +94,6 @@ def _handle_cross_origin_session(
     session_origin: str,
 ) -> str:
     """跨域 Token 继承：查找或创建目标 origin 的 session，传递 Token。"""
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     logger.info(
         "proxy_session_origin_mismatch",
@@ -168,7 +167,6 @@ def _handle_cross_origin_session(
 
 def _find_session_by_cookie(base_url: str, target_origin: str) -> "str | None":
     """从 Cookie 查找 session，处理 origin 匹配和跨域继承。"""
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     sid = request.cookies.get("_proxy_session")
     if not sid:
@@ -208,7 +206,6 @@ def _find_session_by_cookie(base_url: str, target_origin: str) -> "str | None":
 
 def _find_session_by_referer() -> "str | None":
     """从 Referer 提取目标 URL 以复用 session。"""
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     referer = request.headers.get("Referer", "")
     if not referer or "/ui-testing/proxy?url=" not in referer:
@@ -248,7 +245,6 @@ def _create_new_session_with_inheritance(base_url: str) -> str:
     """创建新 session，继承同 origin Token 并加载浏览器 JSESSIONID。"""
     from http.cookiejar import Cookie as _Cookie
 
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     logger.warning(
         "proxy_session_creating_new",
@@ -434,7 +430,6 @@ def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnVal
 
 def _get_or_create_proxy_session(base_url: str, recording_mode: bool) -> str:
     """获取或创建代理会话，录制模式下清除旧会话。"""
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     if recording_mode:
         old_sid = request.cookies.get("_proxy_session")
@@ -828,11 +823,6 @@ def ui_testing_static_fallback(filename: str = "") -> ResponseReturnValue:
 
     通过 Referer 中的 proxy URL 或 Cookie session 提取目标地址。
     """
-    from postman_api_tester.services.ui_proxy_service import (
-        UiProxyService,
-        _proxy_session_store,
-    )
-
     # 从请求路径构造目标 URL（移除前导 /）
     resource_path = request.path.lstrip("/")
     if not resource_path:
@@ -1006,7 +996,6 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
         },
     )
 
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     if not target_url:
         session_id_cookie = request.cookies.get("_proxy_session")
@@ -1300,7 +1289,6 @@ def api_ui_testing_recording_local_storage() -> ResponseReturnValue:
     if not base_url:
         return BaseHandler.json_response({"ok": True, "stored": False})
 
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     # 提取 origin（scheme://netloc），与代理会话存储格式一致
     parsed = urlparse(base_url)
@@ -1363,8 +1351,7 @@ def api_ui_testing_recording_stop() -> ResponseReturnValue:
     local_storage_for_export: Dict[str, str] = {}
     base_url = session.get("base_url", "")
     if base_url:
-        from postman_api_tester.services.ui_proxy_service import _proxy_session_store
-
+    
         # 提取 origin（scheme://netloc），与代理会话存储格式一致
         parsed = urlparse(base_url)
         origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_url
@@ -1491,7 +1478,6 @@ def api_ui_testing_recording_save_as_case(session_id: str = "") -> ResponseRetur
 
 def ui_proxy_sessions_debug() -> ResponseReturnValue:
     """调试端点：导出所有活跃代理会话的 cookie 状态。"""
-    from postman_api_tester.services.ui_proxy_service import _proxy_session_store
 
     sessions = _proxy_session_store.dump_sessions()
     return BaseHandler.json_response(
