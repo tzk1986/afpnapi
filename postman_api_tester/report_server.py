@@ -328,6 +328,9 @@ from postman_api_tester.handlers.ui_auth_routes import (
 from postman_api_tester.handlers.ui_auth_routes import (
     api_ui_auth_profiles_cleanup as _route_api_ui_auth_profiles_cleanup,
 )
+from postman_api_tester.handlers.ui_auth_routes import (
+    ui_auth_profiles_page as _route_ui_auth_profiles_page,
+)
 from postman_api_tester.report_job_store import configure_run_jobs
 from postman_api_tester.report_meta_repository import (
     configure_reports_dir,
@@ -942,6 +945,11 @@ def ui_auth_profile_export_route(profile_id: str) -> ResponseReturnValue:
 @app.route("/api/ui-testing/auth-profiles/cleanup", methods=["POST"])
 def ui_auth_profiles_cleanup() -> ResponseReturnValue:
     return _route_api_ui_auth_profiles_cleanup()
+
+
+@app.route("/ui-testing/auth-profiles")
+def ui_auth_profiles_page_route() -> ResponseReturnValue:
+    return _route_ui_auth_profiles_page()
 
 
 # ── 登录配置路由 ──────────────────────────────────────────────────

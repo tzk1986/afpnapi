@@ -8,13 +8,20 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from flask import request
+from flask import make_response, render_template, request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import BaseHandler, json_error
 from postman_api_tester.services.ui_auth_profile_store import _auth_profile_store
 
 logger = logging.getLogger(__name__)
+
+
+def ui_auth_profiles_page() -> ResponseReturnValue:
+    """认证档案管理页面。"""
+    resp = make_response(render_template("ui_testing_auth_profiles.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
 
 
 def api_ui_auth_profiles_list() -> ResponseReturnValue:

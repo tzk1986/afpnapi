@@ -1,0 +1,387 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>认证档案管理</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif; background: #f3f6fb; color: #1f2937; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+        .header { background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 22px; color: #0f172a; }
+        .back-link { color: #6b7280; text-decoration: none; font-size: 13px; }
+        .back-link:hover { color: #3b82f6; }
+
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; transition: all 0.15s; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #fff; color: #3b82f6; border: 1px solid #93c5fd; }
+        .btn-secondary:hover { background: #eff6ff; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .desc-box { background: #fff; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+        .desc-box p { font-size: 13px; color: #6b7280; line-height: 1.6; }
+
+        table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; border-collapse: collapse; }
+        th { text-align: left; padding: 12px 16px; background: #f9fafb; font-size: 12px; color: #6b7280; font-weight: 500; border-bottom: 2px solid #e5e7eb; }
+        td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        tr:hover td { background: #f8fafc; }
+        .name-cell { font-weight: 500; color: #0f172a; }
+        .url-cell { font-family: monospace; font-size: 12px; color: #6b7280; word-break: break-all; }
+
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .badge-info { background: #dbeafe; color: #1d4ed8; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-gray { background: #f3f4f6; color: #6b7280; }
+
+        .empty-state { text-align: center; padding: 60px 20px; background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .empty-state h2 { font-size: 18px; color: #6b7280; margin-bottom: 8px; }
+        .empty-state p { font-size: 14px; color: #9ca3af; margin-bottom: 20px; }
+
+        .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; font-size: 14px; color: #fff; z-index: 9999; transform: translateX(120%); transition: transform 0.3s; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 10000; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 12px; padding: 24px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { font-size: 18px; margin-bottom: 16px; color: #0f172a; }
+        .modal-section { margin-bottom: 20px; }
+        .modal-section h3 { font-size: 14px; color: #6b7280; margin-bottom: 8px; font-weight: 500; }
+        .modal-section pre { background: #f9fafb; padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 300px; overflow-y: auto; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+
+        .edit-form label { display: block; font-size: 13px; color: #374151; margin-bottom: 4px; font-weight: 500; }
+        .edit-form input, .edit-form textarea { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+        .edit-form textarea { font-family: monospace; min-height: 100px; resize: vertical; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <a href="/ui-testing" class="back-link">← 返回 UI 测试</a>
+                <h1 style="margin-top: 4px;">认证档案管理</h1>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateModal()">+ 新建档案</button>
+        </div>
+
+        <div class="desc-box">
+            <p>认证档案用于保存登录状态（Cookie/localStorage），执行无头测试时可自动加载，跳过登录步骤。录制完成后点击「💾 保存认证档案」可快速创建。</p>
+        </div>
+
+        <div id="content"></div>
+    </div>
+
+    <!-- 查看详情 Modal -->
+    <div id="viewModal" class="modal-overlay">
+        <div class="modal">
+            <h2>认证档案详情</h2>
+            <div id="viewContent"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeViewModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑 Modal -->
+    <div id="editModal" class="modal-overlay">
+        <div class="modal">
+            <h2>编辑认证档案</h2>
+            <form id="editForm" class="edit-form" onsubmit="saveProfile(event)">
+                <input type="hidden" id="editId">
+                <label for="editName">档案名称</label>
+                <input type="text" id="editName" required>
+
+                <label for="editDescription">描述</label>
+                <input type="text" id="editDescription">
+
+                <label for="editBaseUrl">目标 URL</label>
+                <input type="text" id="editBaseUrl" required>
+
+                <label for="editCookies">Cookies (JSON)</label>
+                <textarea id="editCookies" placeholder='[{"name":"...", "value":"...", "domain":"...", "path":"..."}]'></textarea>
+
+                <label for="editLocalStorage">localStorage (JSON)</label>
+                <textarea id="editLocalStorage" placeholder='{"key1":"value1", "key2":"value2"}'></textarea>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 新建 Modal -->
+    <div id="createModal" class="modal-overlay">
+        <div class="modal">
+            <h2>新建认证档案</h2>
+            <form id="createForm" class="edit-form" onsubmit="createProfile(event)">
+                <label for="createName">档案名称</label>
+                <input type="text" id="createName" required placeholder="例如：生产环境登录">
+
+                <label for="createDescription">描述</label>
+                <input type="text" id="createDescription" placeholder="可选">
+
+                <label for="createBaseUrl">目标 URL</label>
+                <input type="text" id="createBaseUrl" required placeholder="例如：http://example.com">
+
+                <label for="createCookies">Cookies (JSON)</label>
+                <textarea id="createCookies" placeholder='[{"name":"...", "value":"...", "domain":"...", "path":"..."}]'></textarea>
+
+                <label for="createLocalStorage">localStorage (JSON)</label>
+                <textarea id="createLocalStorage" placeholder='{"key1":"value1", "key2":"value2"}'></textarea>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">取消</button>
+                    <button type="submit" class="btn btn-primary">创建</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        var profiles = [];
+
+        function loadProfiles() {
+            fetch('/api/ui-testing/auth-profiles')
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    profiles = (result.data && result.data.profiles) || [];
+                    render();
+                })
+                .catch(function(e) { showToast('加载失败: ' + e.message, 'error'); });
+        }
+
+        function render() {
+            var content = document.getElementById('content');
+            if (profiles.length === 0) {
+                content.innerHTML = '<div class="empty-state">' +
+                    '<h2>暂无认证档案</h2>' +
+                    '<p>录制完成后点击「💾 保存认证档案」可快速创建</p>' +
+                    '<button class="btn btn-primary" onclick="showCreateModal()">+ 新建档案</button>' +
+                    '</div>';
+                return;
+            }
+
+            var html = '<table><thead><tr>' +
+                '<th style="width:20%">名称</th>' +
+                '<th style="width:20%">目标 URL</th>' +
+                '<th style="width:10%">Cookies</th>' +
+                '<th style="width:10%">localStorage</th>' +
+                '<th style="width:15%">更新时间</th>' +
+                '<th style="width:25%">操作</th>' +
+                '</tr></thead><tbody>';
+
+            for (var i = 0; i < profiles.length; i++) {
+                var p = profiles[i];
+                html += '<tr>' +
+                    '<td class="name-cell">' + escapeHtml(p.name) + '</td>' +
+                    '<td class="url-cell">' + escapeHtml(p.base_url) + '</td>' +
+                    '<td><span class="badge ' + (p.cookie_count > 0 ? 'badge-success' : 'badge-gray') + '">' + p.cookie_count + ' 个</span></td>' +
+                    '<td><span class="badge ' + (p.local_storage_count > 0 ? 'badge-success' : 'badge-gray') + '">' + p.local_storage_count + ' 个</span></td>' +
+                    '<td>' + formatTime(p.updated_at) + '</td>' +
+                    '<td class="actions-cell">' +
+                        '<button class="btn btn-sm btn-secondary" onclick="viewProfile(\'' + p.id + '\')">查看</button>' +
+                        '<button class="btn btn-sm btn-secondary" onclick="editProfile(\'' + p.id + '\')">编辑</button>' +
+                        '<button class="btn btn-sm btn-danger" onclick="deleteProfile(\'' + p.id + '\', \'' + escapeHtml(p.name) + '\')">删除</button>' +
+                    '</td>' +
+                    '</tr>';
+            }
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        }
+
+        function viewProfile(id) {
+            fetch('/api/ui-testing/auth-profiles/' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var p = result.data;
+                    var html = '<div class="modal-section">' +
+                        '<h3>基本信息</h3>' +
+                        '<table style="width:100%; font-size:13px;">' +
+                        '<tr><td style="width:120px; color:#6b7280;">ID</td><td>' + p.id + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">名称</td><td>' + escapeHtml(p.name) + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">描述</td><td>' + escapeHtml(p.description || '-') + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">目标 URL</td><td>' + escapeHtml(p.base_url) + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">创建时间</td><td>' + formatTime(p.created_at) + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">更新时间</td><td>' + formatTime(p.updated_at) + '</td></tr>' +
+                        '<tr><td style="color:#6b7280;">来源</td><td>' + escapeHtml(p.source || 'manual') + '</td></tr>' +
+                        '</table>' +
+                        '</div>';
+
+                    html += '<div class="modal-section">' +
+                        '<h3>Cookies (' + (p.cookies || []).length + ' 个)</h3>' +
+                        '<pre>' + JSON.stringify(p.cookies || [], null, 2) + '</pre>' +
+                        '</div>';
+
+                    html += '<div class="modal-section">' +
+                        '<h3>localStorage (' + Object.keys(p.local_storage || {}).length + ' 个)</h3>' +
+                        '<pre>' + JSON.stringify(p.local_storage || {}, null, 2) + '</pre>' +
+                        '</div>';
+
+                    document.getElementById('viewContent').innerHTML = html;
+                    document.getElementById('viewModal').classList.add('active');
+                })
+                .catch(function(e) { showToast('加载详情失败: ' + e.message, 'error'); });
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewModal').classList.remove('active');
+        }
+
+        function editProfile(id) {
+            fetch('/api/ui-testing/auth-profiles/' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    var p = result.data;
+                    document.getElementById('editId').value = p.id;
+                    document.getElementById('editName').value = p.name;
+                    document.getElementById('editDescription').value = p.description || '';
+                    document.getElementById('editBaseUrl').value = p.base_url;
+                    document.getElementById('editCookies').value = JSON.stringify(p.cookies || [], null, 2);
+                    document.getElementById('editLocalStorage').value = JSON.stringify(p.local_storage || {}, null, 2);
+                    document.getElementById('editModal').classList.add('active');
+                })
+                .catch(function(e) { showToast('加载档案失败: ' + e.message, 'error'); });
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        function saveProfile(event) {
+            event.preventDefault();
+            var id = document.getElementById('editId').value;
+            var data = {
+                name: document.getElementById('editName').value,
+                description: document.getElementById('editDescription').value,
+                base_url: document.getElementById('editBaseUrl').value
+            };
+
+            try {
+                data.cookies = JSON.parse(document.getElementById('editCookies').value || '[]');
+                data.local_storage = JSON.parse(document.getElementById('editLocalStorage').value || '{}');
+            } catch (e) {
+                showToast('JSON 格式错误: ' + e.message, 'error');
+                return;
+            }
+
+            fetch('/api/ui-testing/auth-profiles/' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.code === 200) {
+                    showToast('保存成功', 'success');
+                    closeEditModal();
+                    loadProfiles();
+                } else {
+                    showToast('保存失败: ' + result.message, 'error');
+                }
+            })
+            .catch(function(e) { showToast('保存失败: ' + e.message, 'error'); });
+        }
+
+        function showCreateModal() {
+            document.getElementById('createForm').reset();
+            document.getElementById('createModal').classList.add('active');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').classList.remove('active');
+        }
+
+        function createProfile(event) {
+            event.preventDefault();
+            var data = {
+                name: document.getElementById('createName').value,
+                description: document.getElementById('createDescription').value,
+                base_url: document.getElementById('createBaseUrl').value
+            };
+
+            try {
+                data.cookies = JSON.parse(document.getElementById('createCookies').value || '[]');
+                data.local_storage = JSON.parse(document.getElementById('createLocalStorage').value || '{}');
+            } catch (e) {
+                showToast('JSON 格式错误: ' + e.message, 'error');
+                return;
+            }
+
+            fetch('/api/ui-testing/auth-profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(result) {
+                if (result.code === 201) {
+                    showToast('创建成功', 'success');
+                    closeCreateModal();
+                    loadProfiles();
+                } else {
+                    showToast('创建失败: ' + result.message, 'error');
+                }
+            })
+            .catch(function(e) { showToast('创建失败: ' + e.message, 'error'); });
+        }
+
+        function deleteProfile(id, name) {
+            if (!confirm('确定要删除认证档案「' + name + '」吗？')) return;
+
+            fetch('/api/ui-testing/auth-profiles/' + id, { method: 'DELETE' })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.code === 200) {
+                        showToast('删除成功', 'success');
+                        loadProfiles();
+                    } else {
+                        showToast('删除失败: ' + result.message, 'error');
+                    }
+                })
+                .catch(function(e) { showToast('删除失败: ' + e.message, 'error'); });
+        }
+
+        function formatTime(iso) {
+            if (!iso) return '-';
+            var d = new Date(iso);
+            var y = d.getFullYear();
+            var m = String(d.getMonth() + 1).padStart(2, '0');
+            var day = String(d.getDate()).padStart(2, '0');
+            var h = String(d.getHours()).padStart(2, '0');
+            var min = String(d.getMinutes()).padStart(2, '0');
+            return y + '-' + m + '-' + day + ' ' + h + ':' + min;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type) {
+            var toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            setTimeout(function() { toast.classList.remove('show'); }, 3000);
+        }
+
+        loadProfiles();
+    </script>
+</body>
+</html>
+{% endraw %}

@@ -1500,7 +1500,16 @@ class UiProxyService:
                 "}catch(e){}"
                 "};"
                 "setTimeout(_sendLS,800);"
+                "setInterval(_sendLS,2000);"
                 'window.addEventListener("beforeunload",function(){_sendLS();});'
+                'window.addEventListener("message",function(e){'
+                "if(e.data&&e.data.type==='_ui_recorder_collect_storage'){"
+                "_sendLS();"
+                "if(e.source&&e.source.postMessage){"
+                "e.source.postMessage({type:'_ui_recorder_storage_collected'},e.origin||'*');"
+                "}"
+                "}"
+                "});"
                 '}catch(e){}'
             )
             logger.info(

@@ -268,9 +268,37 @@
             recording = false;
             clearInterval(durationTimer);
 
-            // Notify iframe to stop
             var frame = document.getElementById('browserFrame');
+
+            // 先通知 iframe 收集 localStorage，等待完成后再停止录制
+            var collectStorageTimeout = setTimeout(function() {
+                console.log('[Recorder] localStorage collection timeout, proceeding with stop');
+                finalizeStopRecording(frame);
+            }, 2000); // 最多等待 2 秒
+
+            // 监听 iframe 的收集完成响应
+            var storageCollectedHandler = function(e) {
+                if (e.data && e.data.type === '_ui_recorder_storage_collected') {
+                    console.log('[Recorder] localStorage collected from iframe');
+                    clearTimeout(collectStorageTimeout);
+                    window.removeEventListener('message', storageCollectedHandler);
+                    // 等待数据到达后端（稍微延迟）
+                    setTimeout(function() {
+                        finalizeStopRecording(frame);
+                    }, 500);
+                }
+            };
+            window.addEventListener('message', storageCollectedHandler);
+
+            // 通知 iframe 收集 localStorage
             if (frame.contentWindow) {
+                frame.contentWindow.postMessage({ type: '_ui_recorder_collect_storage' }, '*');
+            }
+        }
+
+        function finalizeStopRecording(frame) {
+            // Notify iframe to stop
+            if (frame && frame.contentWindow) {
                 frame.contentWindow.postMessage({ type: 'ui-recorder-control', action: 'stop' }, '*');
             }
 
