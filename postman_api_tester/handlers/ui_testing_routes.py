@@ -429,28 +429,48 @@ def _prepare_proxy_context() -> "tuple[str, str, bool, bool] | ResponseReturnVal
 
 
 def _get_or_create_proxy_session(base_url: str, recording_mode: bool) -> str:
-    """获取或创建代理会话，录制模式下清除旧会话。"""
+    """获取或创建代理会话。
+
+    录制模式下复用已有会话（保留已收集的 Cookie/localStorage），
+    仅在无有效会话时创建新会话。
+    """
 
     if recording_mode:
-        old_sid = request.cookies.get("_proxy_session")
-        if old_sid:
-            _proxy_session_store.delete_session(old_sid)
+        # 录制模式：优先复用已有会话（通过 cookie 或 base_url 查找）
+        existing_sid = request.cookies.get("_proxy_session")
+        if existing_sid and _proxy_session_store.get_base_url(existing_sid):
+            session_id = existing_sid
             logger.info(
-                "recording_clear_old_session",
+                "recording_reuse_existing_session",
                 extra={
-                    "event": "ui.recording.session_cleared",
-                    "old_session_id": old_sid[:8],
+                    "event": "ui.recording.session.reuse",
+                    "session_id": session_id[:8],
+                    "base_url": base_url,
                 },
             )
-        session_id = _proxy_session_store.create_session(base_url)
-        logger.info(
-            "recording_new_session_created",
-            extra={
-                "event": "ui.recording.session.new",
-                "session_id": session_id[:8],
-                "base_url": base_url,
-            },
-        )
+        else:
+            # 尝试通过 base_url 查找已有会话
+            existing_by_url = _proxy_session_store.find_session_by_base_url(base_url)
+            if existing_by_url:
+                session_id = existing_by_url
+                logger.info(
+                    "recording_reuse_session_by_base_url",
+                    extra={
+                        "event": "ui.recording.session.reuse_by_url",
+                        "session_id": session_id[:8],
+                        "base_url": base_url,
+                    },
+                )
+            else:
+                session_id = _proxy_session_store.create_session(base_url)
+                logger.info(
+                    "recording_new_session_created",
+                    extra={
+                        "event": "ui.recording.session.new",
+                        "session_id": session_id[:8],
+                        "base_url": base_url,
+                    },
+                )
     else:
         session_id = _get_proxy_session_id(base_url)
 
@@ -1035,25 +1055,40 @@ def ui_testing_spa_resource_fallback(resource_path: str) -> ResponseReturnValue:
     recording_mode = params.get("recording", [""])[0] == "1"
 
     if recording_mode:
-        old_sid = request.cookies.get("_proxy_session")
-        if old_sid:
-            _proxy_session_store.delete_session(old_sid)
+        # 录制模式：优先复用已有会话（保留已收集的 Cookie/localStorage）
+        existing_sid = request.cookies.get("_proxy_session")
+        if existing_sid and _proxy_session_store.get_base_url(existing_sid):
+            session_id = existing_sid
             logger.info(
-                "spa_fallback_recording_clear_session",
+                "spa_fallback_recording_reuse_session",
                 extra={
-                    "event": "ui.proxy.fallback.recording_clear",
-                    "old_session_id": old_sid[:8],
+                    "event": "ui.proxy.fallback.recording_reuse",
+                    "session_id": session_id[:8],
+                    "base_url": base_url,
                 },
             )
-        session_id = _proxy_session_store.create_session(base_url)
-        logger.info(
-            "spa_fallback_recording_new_session",
-            extra={
-                "event": "ui.proxy.fallback.recording_new",
-                "session_id": session_id[:8],
-                "base_url": base_url,
-            },
-        )
+        else:
+            existing_by_url = _proxy_session_store.find_session_by_base_url(base_url)
+            if existing_by_url:
+                session_id = existing_by_url
+                logger.info(
+                    "spa_fallback_recording_reuse_by_url",
+                    extra={
+                        "event": "ui.proxy.fallback.recording_reuse_by_url",
+                        "session_id": session_id[:8],
+                        "base_url": base_url,
+                    },
+                )
+            else:
+                session_id = _proxy_session_store.create_session(base_url)
+                logger.info(
+                    "spa_fallback_recording_new_session",
+                    extra={
+                        "event": "ui.proxy.fallback.recording_new",
+                        "session_id": session_id[:8],
+                        "base_url": base_url,
+                    },
+                )
     else:
         session_id = _get_proxy_session_id(base_url)
 
@@ -1269,52 +1304,29 @@ def api_ui_testing_recording_step() -> ResponseReturnValue:
 
 
 def api_ui_testing_recording_local_storage() -> ResponseReturnValue:
-    """接收录制 iframe 上报的 localStorage 数据，存储到代理会话。"""
+    """接收录制 iframe 上报的 localStorage 数据，存储到代理会话。
+
+    注意：前端早期脚本注入的 session_id 实际上是代理会话 ID（proxy session ID），
+    不是录制会话 ID。因此直接使用 session_id 作为代理会话 ID 存储 localStorage。
+    """
     payload = request.get_json(silent=True) or {}
-    session_id = payload.get("session_id", "")
+    proxy_session_id = payload.get("session_id", "")
     origin = payload.get("origin", "")
     local_storage = payload.get("local_storage", {})
 
-    if not session_id or not origin:
+    if not proxy_session_id or not origin:
         return BaseHandler.json_response(
             {"ok": False, "error": "missing session_id or origin"}, 400
         )
 
-    # 找到对应的代理会话（通过录制会话关联的 base_url 查找）
-    recording_session = _recording.get(session_id)
-    if not recording_session:
-        return json_error(f"录制会话不存在: {session_id}", 404, "UIT_REC_006")
-
-    base_url = recording_session.get("base_url", "")
-    if not base_url:
-        return BaseHandler.json_response({"ok": True, "stored": False})
-
-
-    # 提取 origin（scheme://netloc），与代理会话存储格式一致
-    parsed = urlparse(base_url)
-    target_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else base_url
-    proxy_sid = _proxy_session_store.find_session_by_base_url(target_origin)
-
-    # 如果代理会话不存在，自动创建（录制早期 localStorage 可能先于代理请求到达）
-    if not proxy_sid and local_storage:
-        proxy_sid = _proxy_session_store.create_session(target_origin)
-        logger.info(
-            "ui_recording_local_storage_proxy_session_created",
-            extra={
-                "event": "ui.recording.local_storage.proxy_session_created",
-                "session_id": session_id,
-                "proxy_sid": proxy_sid[:8],
-                "target_origin": target_origin,
-            },
-        )
-
-    if proxy_sid and local_storage:
-        _proxy_session_store.update_local_storage(proxy_sid, origin, local_storage)
+    # session_id 就是代理会话 ID，直接用它存储 localStorage
+    if local_storage:
+        _proxy_session_store.update_local_storage(proxy_session_id, origin, local_storage)
         logger.info(
             "ui_recording_local_storage_received",
             extra={
                 "event": "ui.recording.local_storage_received",
-                "session_id": session_id,
+                "proxy_session_id": proxy_session_id[:8],
                 "origin": origin,
                 "key_count": len(local_storage),
             },

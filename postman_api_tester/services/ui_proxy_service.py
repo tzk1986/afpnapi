@@ -1500,7 +1500,7 @@ class UiProxyService:
                 "}catch(e){}"
                 "};"
                 "setTimeout(_sendLS,800);"
-                "setInterval(_sendLS,2000);"
+                "var _lsTimer=setInterval(_sendLS,2000);"
                 'window.addEventListener("beforeunload",function(){_sendLS();});'
                 'window.addEventListener("message",function(e){'
                 "if(e.data&&e.data.type==='_ui_recorder_collect_storage'){"
@@ -1508,6 +1508,9 @@ class UiProxyService:
                 "if(e.source&&e.source.postMessage){"
                 "e.source.postMessage({type:'_ui_recorder_storage_collected'},e.origin||'*');"
                 "}"
+                "}"
+                "if(e.data&&e.data.type==='ui-recorder-control'&&e.data.action==='stop'){"
+                "clearInterval(_lsTimer);_lsTimer=null;_sendLS();"
                 "}"
                 "});"
                 '}catch(e){}'

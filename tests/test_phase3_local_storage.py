@@ -316,24 +316,40 @@ class TestRecordingLocalStorageEndpoint:
             resp = api_ui_testing_recording_local_storage()
             assert resp[1] == 400
 
-    def test_endpoint_nonexistent_recording_session(self) -> None:
+    def test_endpoint_stores_directly_to_proxy_session(self) -> None:
+        """新行为：session_id 直接作为代理会话 ID，无需录制会话存在。"""
         from postman_api_tester.handlers.ui_testing_routes import (
             api_ui_testing_recording_local_storage,
         )
+        from postman_api_tester.services.ui_proxy_service import _ProxySessionStore
 
         app = self._get_app()
+        # 手动创建一个代理会话
+        proxy_store = _ProxySessionStore()
+        proxy_sid = proxy_store.create_session("http://example.com")
+
         with app.test_request_context(
             "/api/ui-testing/recording/local-storage",
             method="POST",
             json={
-                "session_id": "nonexistent",
+                "session_id": proxy_sid,
                 "origin": "http://example.com",
                 "local_storage": {"token": "abc"},
             },
         ):
-            resp = api_ui_testing_recording_local_storage()
-            # Should return 404 (UIT_REC_006)
-            assert resp[1] == 404
+            # 需要临时替换全局 _proxy_session_store
+            import postman_api_tester.handlers.ui_testing_routes as routes_module
+            original_store = routes_module._proxy_session_store
+            routes_module._proxy_session_store = proxy_store
+            try:
+                resp = api_ui_testing_recording_local_storage()
+                # Should return 200 with stored=True
+                assert resp[1] == 200
+                # Verify localStorage was stored
+                stored = proxy_store.get_local_storage(proxy_sid)
+                assert stored == {"http://example.com": {"token": "abc"}}
+            finally:
+                routes_module._proxy_session_store = original_store
 
     def test_endpoint_creates_proxy_session_if_missing(self) -> None:
         """代理会话不存在时自动创建。"""
