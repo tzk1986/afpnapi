@@ -355,9 +355,13 @@ class TestApiUiRecorderSessionExport:
         resp = client.get("/api/ui-recorder/session/rec_export/export")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["version"] == "1.0"
-        assert data["session_id"] == "rec_export"
-        assert len(data["steps"]) == 1
+        # 验证 BaseHandler.json_response() 标准格式
+        assert "data" in data
+        assert data["code"] == 200
+        export_data = data["data"]
+        assert export_data["version"] == "1.0"
+        assert export_data["session_id"] == "rec_export"
+        assert len(export_data["steps"]) == 1
 
     def test_export_nonexistent(self, client) -> None:
         resp = client.get("/api/ui-recorder/session/nonexistent_xyz/export")
@@ -465,9 +469,12 @@ class TestFullRecordingFlow:
         resp = client.get(f"/api/ui-recorder/session/{session_id}/export")
         assert resp.status_code == 200
         exported = resp.get_json()
-        assert exported["version"] == "1.0"
-        assert len(exported["steps"]) == 5
-        assert exported["metadata"]["total_steps"] == 5
+        # 验证 BaseHandler.json_response() 标准格式
+        assert "data" in exported
+        export_data = exported["data"]
+        assert export_data["version"] == "1.0"
+        assert len(export_data["steps"]) == 5
+        assert export_data["metadata"]["total_steps"] == 5
 
         # 7. 删除
         resp = client.delete(f"/api/ui-recorder/session/{session_id}")
@@ -562,6 +569,9 @@ class TestSwitchTabRecording:
         resp = client.get(f"/api/ui-recorder/session/{session_id}/export")
         assert resp.status_code == 200
         exported = resp.get_json()
-        assert len(exported["steps"]) == 1
-        assert exported["steps"][0]["action"] == "switch_tab"
-        assert exported["steps"][0]["page_url"] == "http://example.com/other"
+        # 验证 BaseHandler.json_response() 标准格式
+        assert "data" in exported
+        export_data = exported["data"]
+        assert len(export_data["steps"]) == 1
+        assert export_data["steps"][0]["action"] == "switch_tab"
+        assert export_data["steps"][0]["page_url"] == "http://example.com/other"
