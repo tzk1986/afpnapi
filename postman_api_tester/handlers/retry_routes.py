@@ -3,10 +3,11 @@
 from functools import partial
 from typing import Any, Dict, Tuple
 
-from flask import jsonify, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import (
+    BaseHandler,
     get_report_or_error,
 )
 from postman_api_tester.handlers.base_handler import (
@@ -112,7 +113,7 @@ def _dispatch_retry(retry_mode: str) -> ResponseReturnValue:
 
     count = len(paths)
     label = "失败接口" if retry_mode == "failures" else "接口"
-    return jsonify(
+    return BaseHandler.json_response(
         build_retry_queued_payload(
             job_id=job_id,
             retry_count=count,

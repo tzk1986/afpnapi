@@ -1,11 +1,13 @@
 """retry_routes 单元测试。"""
 
-from typing import Generator
+import json
+from typing import Any, Generator, Tuple
 from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
 
+import postman_api_tester.handlers.retry_routes as retry_routes_module
 from postman_api_tester.handlers.retry_routes import (
     api_retry_all,
     api_retry_failures,
@@ -90,3 +92,40 @@ class TestApiRetryAll:
             result = api_retry_all()
             assert isinstance(result, tuple)
             assert result[1] == 400
+
+
+class TestRetryQueuedResponseFormat:
+    """入队成功响应使用 BaseHandler.json_response 统一包装格式。"""
+
+    def _call_queued(self) -> Tuple[Any, int]:
+        runtime_ctx = {"saved_file": "report_runtime.json", "runtime": object()}
+        with patch.object(retry_routes_module, "ENABLE_RETRY_FAILURES", True), patch(
+            "postman_api_tester.handlers.retry_routes.request"
+        ) as mock_request, patch.object(
+            retry_routes_module, "get_report_or_error", return_value={}
+        ), patch.object(
+            retry_routes_module,
+            "_job_prepare_retry_job_context",
+            return_value=(["GET /api/a"], runtime_ctx, None),
+        ), patch.object(
+            retry_routes_module, "_job_enqueue_retry_job", return_value="job_123"
+        ):
+            mock_request.get_json = MagicMock(return_value={"report_name": "r.html"})
+            return retry_routes_module.api_retry_failures()
+
+    def test_success_wrapped_format(self, app_context: None) -> None:
+        """成功响应为 {code, message, data, timestamp} 包装格式。"""
+        resp, status = self._call_queued()
+        assert status == 200
+        body = json.loads(resp.get_data(as_text=True))
+        assert body["code"] == 200
+        assert set(body) >= {"code", "message", "data", "timestamp"}
+
+    def test_success_payload_fields(self, app_context: None) -> None:
+        """入队载荷字段位于 data 下。"""
+        resp, _ = self._call_queued()
+        body = json.loads(resp.get_data(as_text=True))
+        payload = body["data"]
+        assert payload["job_id"] == "job_123"
+        assert payload["retry_count"] == 1
+        assert payload["status"] == "queued"

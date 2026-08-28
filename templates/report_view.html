@@ -5048,11 +5048,11 @@ async function retryFailures() {
         });
         const data = await resp.json();
         if (!resp.ok) {
-            alert('重试失败：' + (data.error || resp.status));
+            alert('重试失败：' + ((data.data && (data.data.details || data.data.error)) || data.message || resp.status));
             if (btn) { btn.disabled = false; btn.textContent = '🔄 重试失败接口'; }
             return;
         }
-        if (confirm(`已创建重试任务（共 ${data.retry_count} 个接口），job_id: ${data.job_id}。\n点击确定前往首页查看进度。`)) {
+        if (confirm(`已创建重试任务（共 ${data.data.retry_count} 个接口），job_id: ${data.data.job_id}。\n点击确定前往首页查看进度。`)) {
             window.location.href = '/';
         } else {
             if (btn) { btn.disabled = false; btn.textContent = '🔄 重试失败接口'; }
@@ -5086,11 +5086,11 @@ async function retryAll() {
         });
         const data = await resp.json();
         if (!resp.ok) {
-            alert('全量重试失败：' + (data.error || resp.status));
+            alert('全量重试失败：' + ((data.data && (data.data.details || data.data.error)) || data.message || resp.status));
             if (btn) { btn.disabled = false; btn.textContent = '🔁 重试全部接口'; }
             return;
         }
-        if (confirm(`已创建全量重试任务（共 ${data.retry_count} 个接口），job_id: ${data.job_id}。\n点击确定前往首页查看进度。`)) {
+        if (confirm(`已创建全量重试任务（共 ${data.data.retry_count} 个接口），job_id: ${data.data.job_id}。\n点击确定前往首页查看进度。`)) {
             window.location.href = '/';
         } else {
             if (btn) { btn.disabled = false; btn.textContent = '🔁 重试全部接口'; }
