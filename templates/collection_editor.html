@@ -2173,12 +2173,13 @@
                         body: formData,
                     });
                     const runData = await runResp.json();
-                    if (runResp.ok && runData.job_id) {
+                    const runPayload = runData.data || runData;
+                    if (runResp.ok && runPayload.job_id) {
                         setStatus('执行任务已提交，正在轮询状态...');
-                        startExecPolling(runData.job_id);
+                        startExecPolling(runPayload.job_id);
                     } else {
                         const errCode = runData.error_code ? `[${runData.error_code}] ` : '';
-                        showExecResult(false, '执行提交失败', errCode + (runData.details || runData.message || '请查看错误码联系开发'), null);
+                        showExecResult(false, '执行提交失败', errCode + (runPayload.details || runData.message || '请查看错误码联系开发'), null);
                     }
                 } else {
                     const errCode = data.error_code ? `[${data.error_code}] ` : '';

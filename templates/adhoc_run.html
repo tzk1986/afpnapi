@@ -970,10 +970,11 @@ async function startRunAdhocJob() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
-        const data = await response.json();
+        const raw = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '任务创建失败');
+            throw new Error((raw.data && (raw.data.details || raw.data.error)) || raw.message || raw.error || '任务创建失败');
         }
+        const data = raw.data || raw;
         setAdhocStatus(`ad-hoc 任务已启动（${data.job_id}），正在执行...`);
         watchAdhocJob(data.job_id);
     } catch (error) {

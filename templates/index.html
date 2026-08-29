@@ -1251,8 +1251,9 @@ async function startRunPostmanJob() {
             data = { error: rawText || '服务返回了非 JSON 响应。' };
         }
         if (!response.ok) {
-            throw new Error(data.error || '任务创建失败');
+            throw new Error((data.data && (data.data.details || data.data.error)) || data.message || data.error || '任务创建失败');
         }
+        data = data.data || data;
         setRunStatus(`任务已启动（${data.job_id}），正在执行...`);
         watchRunPostmanJob(data.job_id);
     } catch (error) {
