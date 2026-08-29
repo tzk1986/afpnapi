@@ -132,8 +132,10 @@ def main() -> None:
         ),
         "export-collection",
     )
-    out["export_file_name"] = export_resp.get("file_name")
-    out["export_scope"] = export_resp.get("export_scope")
+    # v1.37.4 起 export-collection 返回 BaseHandler.json_response 包装格式
+    export_data = export_resp.get("data") or export_resp
+    out["export_file_name"] = export_data.get("file_name")
+    out["export_scope"] = export_data.get("export_scope")
 
     # security checks
     out["re_request_invalid_scheme_status"] = requests.post(

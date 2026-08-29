@@ -5145,10 +5145,11 @@ async function exportLatestCollectionLegacy(payload, summaryTotal, threshold, st
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        const data = await response.json();
+        const raw = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '导出失败');
+            throw new Error((raw.data && (raw.data.details || raw.data.error)) || raw.message || '导出失败');
         }
+        const data = raw.data || raw;
 
         const warningText = (data.warnings && data.warnings.length)
             ? `\n\n未精确定位 ${data.skipped_count} 条，详情请查看控制台。`

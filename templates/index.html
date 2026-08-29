@@ -1086,10 +1086,11 @@ async function previewCollectionApis() {
             method: 'POST',
             body: formData,
         });
-        const data = await response.json();
+        const raw = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '接口解析失败');
+            throw new Error((raw.data && (raw.data.details || raw.data.error)) || raw.message || '接口解析失败');
         }
+        const data = raw.data || raw;
         previewApis = Array.isArray(data.items) ? data.items : [];
         previewApiByPath = new Map();
         selectedApis = new Map();
