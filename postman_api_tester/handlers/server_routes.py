@@ -67,7 +67,11 @@ EXPORTS_DIR = (REPORTS_DIR.parent / "uploaded_collections" / "exports").resolve(
 
 
 def health() -> ResponseReturnValue:
-    """健康检查端点。"""
+    """健康检查端点。
+
+    注意：本端点与 /api/log-metrics 供监控系统解析，
+    保持原始 JSON 结构，不套用 BaseHandler.json_response 包装。
+    """
     return jsonify(
         build_health_payload(
             datetime.now().isoformat(),
@@ -94,7 +98,7 @@ def api_environments() -> ResponseReturnValue:
                 "has_token": bool(env_cfg.get("token", "").strip()),
             }
         )
-    return jsonify(
+    return BaseHandler.json_response(
         build_environments_payload(env_list=env_list, default_env_name=DEFAULT_ENV_NAME)
     )
 
@@ -126,7 +130,7 @@ def api_report_delete(report_name: str) -> ResponseReturnValue:
             ValidationError(f"报告不存在: {report_name}"), 404
         )
     logger.info("删除报告产物成功: report=%s files=%s", report_name, deleted_files)
-    return jsonify(
+    return BaseHandler.json_response(
         build_report_delete_payload(
             report_name=report_name, deleted_files=deleted_files
         )

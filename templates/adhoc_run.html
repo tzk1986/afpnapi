@@ -1050,7 +1050,8 @@ renderAdhocCaseList();
     try {
         const resp = await fetch('/api/environments');
         if (!resp.ok) return;
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         const envs = data.environments || [];
         const defaultEnv = data.default || '';
         envs.forEach(env => {

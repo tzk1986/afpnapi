@@ -996,7 +996,7 @@ async function deleteReport(reportName) {
         });
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '删除失败');
+            throw new Error((data.data && (data.data.details || data.data.error)) || data.message || data.error || '删除失败');
         }
 
         reports = reports.filter((item) => item.report_name !== reportName);
@@ -1333,7 +1333,8 @@ renderReports();
     try {
         const resp = await fetch('/api/environments');
         if (!resp.ok) return;
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         const envs = data.environments || [];
         const defaultEnv = data.default || '';
         const seenNames = new Set();
