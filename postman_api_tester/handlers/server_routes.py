@@ -27,6 +27,7 @@ from postman_api_tester.report_repository import (
 from postman_api_tester.report_repository import (
     list_reports as _repo_list_reports,
 )
+from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import (
     DEFAULT_ENV_NAME,
     ENVIRONMENTS,
@@ -44,25 +45,7 @@ from postman_api_tester.utils.logging_utils import (
 logger = logging.getLogger(__name__)
 
 
-MODULE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = MODULE_DIR.parent
-
-
-def _resolve_reports_dir() -> Path:
-    """解析报告目录。"""
-    env_dir = (
-        os.environ.get("POSTMAN_REPORTS_DIR") or os.environ.get("REPORTS_DIR") or ""
-    ).strip()
-    if env_dir:
-        return Path(env_dir).expanduser().resolve()
-    from postman_api_tester.report_server_config import REPORT_OUTPUT_DIR as _cfg_dir
-
-    if _cfg_dir:
-        return Path(_cfg_dir).expanduser().resolve()
-    return (PROJECT_ROOT / "reports").resolve()
-
-
-REPORTS_DIR = _resolve_reports_dir()
+REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 EXPORTS_DIR = (REPORTS_DIR.parent / "uploaded_collections" / "exports").resolve()
 
 
