@@ -90,6 +90,7 @@ def check_manual_cases_api(report_name):
             print(f"   ❌ 状态码: {resp.status_code}")
             return False
         data = resp.json()
+        data = data.get("data") or data  # 兼容 BaseHandler.json_response 包装
         cases = data.get("manual_cases", [])
 
         if not cases:

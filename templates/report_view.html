@@ -3682,9 +3682,10 @@ async function overrideCurrentResultStatus(targetStatus) {
                 reason,
             }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '人工判定失败');
+            throw new Error(data.details || data.error || raw.message || '人工判定失败');
         }
 
         applySummaryToCards(data.summary || {});
@@ -3728,9 +3729,10 @@ async function restoreCurrentResultStatus() {
                 reason,
             }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '恢复失败');
+            throw new Error(data.details || data.error || raw.message || '恢复失败');
         }
 
         applySummaryToCards(data.summary || {});
@@ -3769,9 +3771,10 @@ async function toggleCurrentCaseExclusion() {
                 excluded: nextExcluded,
             })
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '排除操作失败');
+            throw new Error(data.details || data.error || raw.message || '排除操作失败');
         }
         currentDetailData.excluded = nextExcluded;
         const btn = document.getElementById('excludeCaseBtn');
@@ -3854,9 +3857,10 @@ async function confirmSaveCurrentAsManualCase() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ report_name: reportName, case: casePayload }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '保存人工用例失败');
+            throw new Error(data.details || data.error || raw.message || '保存人工用例失败');
         }
         await reloadManualCases();
         cancelEditRetry();
@@ -4282,9 +4286,10 @@ async function confirmSaveManualCase(caseId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(bodyData),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '保存失败');
+            throw new Error(data.details || data.error || raw.message || '保存失败');
         }
         closeManualEditor();
         await reloadManualCases();
@@ -4336,9 +4341,10 @@ async function directSaveManualCase(caseId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(bodyData),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '保存失败');
+            throw new Error(data.details || data.error || raw.message || '保存失败');
         }
         closeManualEditor();
         await reloadManualCases();
@@ -4400,9 +4406,10 @@ async function saveManualCase(caseId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(bodyData),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '保存失败');
+            throw new Error(data.details || data.error || raw.message || '保存失败');
         }
         closeManualEditor();
         await reloadManualCases();
@@ -4421,9 +4428,10 @@ async function deleteManualCase(caseId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ report_name: reportName, case_id: caseId }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '删除失败');
+            throw new Error(data.details || data.error || raw.message || '删除失败');
         }
         await reloadManualCases();
     } catch (error) {
@@ -4442,9 +4450,10 @@ async function toggleManualCaseExclusion(exclusionKey, excluded) {
                 excluded: !excluded,
             }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '操作失败');
+            throw new Error(data.details || data.error || raw.message || '操作失败');
         }
         await reloadManualCases();
         await reloadResults(currentResultsPage);
@@ -4470,9 +4479,10 @@ async function toggleResultExclusion(encodedKey, excluded) {
                 excluded: !excluded,
             }),
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '操作失败');
+            throw new Error(data.details || data.error || raw.message || '操作失败');
         }
         await reloadResults(currentResultsPage);
     } catch (error) {
@@ -4758,9 +4768,10 @@ async function reloadManualCases() {
     container.innerHTML = '<div class="loading">加载人工用例中...</div>';
     try {
         const resp = await fetch(`/api/manual-cases/${encodeURIComponent(reportName)}`);
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '加载失败');
+            throw new Error(data.details || data.error || raw.message || '加载失败');
         }
         manualExclusions = new Set(data.manual_exclusions || []);
         manualCases = (data.manual_cases || []).map((item) => ({ ...item }));
@@ -5009,9 +5020,10 @@ async function toggleCurrentManualCaseExclusion(caseId) {
                 excluded: nextExcluded,
             })
         });
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '排除操作失败');
+            throw new Error(data.details || data.error || raw.message || '排除操作失败');
         }
         caseData.excluded = nextExcluded;
         await reloadManualCases();

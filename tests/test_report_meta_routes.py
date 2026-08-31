@@ -209,3 +209,43 @@ class TestApiReportResultJudgement:
             result = api_report_result_judgement()
             assert isinstance(result, tuple)
             assert result[1] == 400
+
+
+class TestWrappedResponseFormat:
+    """L-1（v1.37.9）包装格式回归测试。"""
+
+    def test_manual_cases_list_uses_wrapper(self, app_context: None) -> None:
+        """人工用例列表成功响应为 {code, message, data} 包装格式。"""
+        with patch(
+            "postman_api_tester.report_repository.find_report"
+        ) as mock_find:
+            mock_find.return_value = {"manual_cases": [], "manual_exclusions": []}
+            result = api_manual_cases("test")
+            assert isinstance(result, tuple)
+            assert result[1] == 200
+            body = result[0].get_json()
+        assert body["code"] == 200
+        assert "manual_cases" in body["data"]
+
+    def test_result_judgement_uses_wrapper(self, app_context: None) -> None:
+        """人工判定成功响应为包装格式，summary/result 位于 data 下。"""
+        with (
+            patch(
+                "postman_api_tester.handlers.report_meta_routes.request"
+            ) as mock_request,
+            patch(
+                "postman_api_tester.handlers.report_meta_routes."
+                "_svc_set_report_result_judgement"
+            ) as mock_svc,
+        ):
+            mock_request.get_json = MagicMock(
+                return_value={"report_name": "test", "result_index": 0}
+            )
+            mock_svc.return_value = {"summary": {"total": 1}, "result": {"status": "PASSED"}}
+            result = api_report_result_judgement()
+            assert isinstance(result, tuple)
+            assert result[1] == 200
+            body = result[0].get_json()
+        assert body["code"] == 200
+        assert body["data"]["summary"] == {"total": 1}
+        assert body["data"]["result"] == {"status": "PASSED"}

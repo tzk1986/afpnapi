@@ -85,12 +85,21 @@ _UPDATE_REPORT_META_FN = partial(
 
 
 def api_reports() -> ResponseReturnValue:
-    """报告列表 API。"""
+    """报告列表 API。
+
+    注意：本端点与 /api/report-meta/<report_name> 属约束 3.10.5 列举的
+    既有稳定接口（/api/reports 被列表页与多个脚本消费、report-meta 为
+    页面直链原始 JSON），保持原始 JSON 结构，不套用
+    BaseHandler.json_response 包装。
+    """
     return jsonify(_repo_list_reports())
 
 
 def api_report_detail(report_name: str) -> ResponseReturnValue:
-    """报告元数据详情 API。错误码：RPT_META_001"""
+    """报告元数据详情 API。错误码：RPT_META_001
+
+    原始格式保留原因见 api_reports docstring（约束 3.10.5）。
+    """
     report_dict = get_report_or_error(report_name, "RPT_META_001")
     return jsonify(build_report_meta_payload(report_dict))
 
@@ -105,7 +114,7 @@ def api_manual_cases(report_name: str) -> ResponseReturnValue:
         default_folder=MANUAL_CASE_FOLDER_NAME,
         enabled=ENABLE_MANUAL_CASES,
     )
-    return jsonify(payload)
+    return BaseHandler.json_response(payload)
 
 
 @handle_api_errors({
@@ -137,7 +146,7 @@ def api_manual_case_add() -> ResponseReturnValue:
         update_report_meta=_UPDATE_REPORT_META_FN,
         create_id=lambda: uuid.uuid4().hex,
     )
-    return jsonify(
+    return BaseHandler.json_response(
         build_manual_case_upsert_payload(report_name=report_name, result=result)
     )
 
@@ -168,7 +177,7 @@ def api_manual_case_update() -> ResponseReturnValue:
         normalize_manual_case=_normalize_manual_case,
         update_report_meta=_UPDATE_REPORT_META_FN,
     )
-    return jsonify(
+    return BaseHandler.json_response(
         build_manual_case_upsert_payload(report_name=report_name, result=result)
     )
 
@@ -197,7 +206,7 @@ def api_manual_case_delete() -> ResponseReturnValue:
         normalize_manual_exclusions=_normalize_manual_exclusions,
         update_report_meta=_UPDATE_REPORT_META_FN,
     )
-    return jsonify(
+    return BaseHandler.json_response(
         build_manual_case_delete_payload(report_name=report_name, result=result)
     )
 
@@ -231,7 +240,7 @@ def api_report_case_exclusion() -> ResponseReturnValue:
         normalize_manual_exclusions=_normalize_manual_exclusions,
         update_report_meta=_UPDATE_REPORT_META_FN,
     )
-    return jsonify(
+    return BaseHandler.json_response(
         build_case_exclusion_payload(
             report_name=report_name, excluded=excluded, result=result
         )
@@ -278,7 +287,7 @@ def api_report_result_judgement() -> ResponseReturnValue:
         invalidate_reports_cache=_repo_invalidate_reports_cache,
     )
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_result_judgement_payload(
             report_name=report_name,
             result_index=result_index,

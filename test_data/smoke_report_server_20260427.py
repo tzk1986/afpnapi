@@ -85,6 +85,7 @@ def main() -> None:
         ),
         "manual-cases add",
     )
+    add = add.get("data") or add  # 兼容 BaseHandler.json_response 包装
     case_id = str((add.get("case") or {}).get("id") or "")
     if not case_id:
         raise RuntimeError("manual-cases add did not return case id")
@@ -107,6 +108,7 @@ def main() -> None:
         ),
         "manual-cases update",
     )
+    upd = upd.get("data") or upd  # 兼容 BaseHandler.json_response 包装
     out["manual_update_status"] = (upd.get("case") or {}).get("status")
 
     dele = _must_ok(
@@ -117,6 +119,7 @@ def main() -> None:
         ),
         "manual-cases delete",
     )
+    dele = dele.get("data") or dele  # 兼容 BaseHandler.json_response 包装
     out["manual_delete_count"] = len(dele.get("manual_cases") or [])
 
     # export-collection
