@@ -8,10 +8,13 @@
 import json
 import logging
 
-from flask import jsonify, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    BaseHandler,
+    json_error as _json_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +50,7 @@ def api_collection_parse() -> ResponseReturnValue:
         )
 
         result = _svc_parse_collection_to_flat(collection_data)
-        return jsonify(result)
+        return BaseHandler.json_response(result)
 
     except json.JSONDecodeError as e:
         return _json_error(f"JSON 语法错误：{e}", 400, "CE_PARSE_003")
@@ -81,7 +84,7 @@ def api_collection_save() -> ResponseReturnValue:
             return _json_error(f"数据校验失败：{'; '.join(errors)}", 400, "CE_SAVE_002")
 
         collection_json = _svc_build_collection_json(flat_data)
-        return jsonify({"collection_json": collection_json})
+        return BaseHandler.json_response({"collection_json": collection_json})
 
     except Exception as e:
         logger.exception("save_collection error")
@@ -104,7 +107,7 @@ def api_collection_dependency() -> ResponseReturnValue:
         )
 
         result = _svc_analyze_dependency_map(flat_data["groups"])
-        return jsonify(result)
+        return BaseHandler.json_response(result)
 
     except Exception as e:
         logger.exception("dependency_analysis error")
@@ -143,7 +146,7 @@ def api_collection_send() -> ResponseReturnValue:
                 f"目标接口返回 {status}：{err_msg}", status, "CE_SEND_004"
             )
 
-        return jsonify(
+        return BaseHandler.json_response(
             {
                 "status_code": result["status_code"],
                 "elapsed_ms": result["elapsed_ms"],
