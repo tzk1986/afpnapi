@@ -2,10 +2,11 @@
 
 from typing import Any, Dict
 
-from flask import jsonify, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester import report_server_config as _rsc
+from postman_api_tester.handlers.base_handler import BaseHandler
 from postman_api_tester.handlers.base_handler import json_error as _json_error
 from postman_api_tester.handlers.http_handler import (
     execute_http_request as _http_execute_http_request,
@@ -100,10 +101,11 @@ def test_token() -> ResponseReturnValue:
     payload = request.get_json(silent=True) or {}
     token = str(payload.get("token", "")).strip()
     if not token:
-        return jsonify(
-            build_test_token_payload(success=False, message="token 不能为空")
-        ), 400
-    return jsonify(
+        return BaseHandler.json_response(
+            build_test_token_payload(success=False, message="token 不能为空"),
+            400,
+        )
+    return BaseHandler.json_response(
         build_test_token_payload(success=True, message="token 格式有效，可用于后续请求")
     )
 
@@ -212,7 +214,7 @@ def re_request_api() -> ResponseReturnValue:
 
     if not exec_result["success"]:
         normalized_url, normalized_params = _normalize_url_and_params(url, params)
-        return jsonify(
+        return BaseHandler.json_response(
             build_re_request_error_payload(
                 source=source,
                 url=url,
@@ -250,7 +252,7 @@ def re_request_api() -> ResponseReturnValue:
             invalidate_reports_cache=_repo_invalidate_reports_cache,
         )
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_re_request_success_payload(
             source=source,
             method=method,
@@ -305,7 +307,7 @@ def api_proxy_request() -> ResponseReturnValue:
             "HTTP_PROXY_003",
         )
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_proxy_response_payload(
             status_code=exec_result["status_code"],
             elapsed_ms=exec_result["elapsed_ms"],

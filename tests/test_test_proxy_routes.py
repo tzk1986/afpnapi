@@ -42,10 +42,8 @@ class TestTestToken:
         ) as mock_request:
             mock_request.get_json = MagicMock(return_value={"token": "abc123"})
             result = _test_token_handler()
-            from flask import Response
-
-            assert isinstance(result, Response)
-            assert result.status_code == 200
+            assert isinstance(result, tuple)
+            assert result[1] == 200
 
     def test_test_token_missing(self, app_context: None) -> None:
         """缺少 token 返回 400。"""
@@ -219,3 +217,33 @@ class TestCheckProxyHostAllowed:
         assert result is not None
         assert isinstance(result, tuple)
         assert result[1] == 403
+
+
+class TestWrappedResponseFormat:
+    """L-1（v1.37.10）包装格式回归测试。"""
+
+    def test_empty_token_uses_wrapper(self, app_context: None) -> None:
+        """空 token 的 400 业务 payload 为 {code, message, data} 包装格式。"""
+        with patch(
+            "postman_api_tester.handlers.test_proxy_routes.request"
+        ) as mock_request:
+            mock_request.get_json = MagicMock(return_value={"token": ""})
+            result = _test_token_handler()
+            assert isinstance(result, tuple)
+            assert result[1] == 400
+            body = result[0].get_json()
+        assert body["code"] == 400
+        assert body["data"]["success"] is False
+
+    def test_valid_token_uses_wrapper(self, app_context: None) -> None:
+        """有效 token 成功响应为包装格式，success 位于 data 下。"""
+        with patch(
+            "postman_api_tester.handlers.test_proxy_routes.request"
+        ) as mock_request:
+            mock_request.get_json = MagicMock(return_value={"token": "abc123"})
+            result = _test_token_handler()
+            assert isinstance(result, tuple)
+            assert result[1] == 200
+            body = result[0].get_json()
+        assert body["code"] == 200
+        assert body["data"]["success"] is True
