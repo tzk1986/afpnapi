@@ -996,7 +996,7 @@ async function deleteReport(reportName) {
         });
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '删除失败');
+            throw new Error((data.data && (data.data.details || data.data.error)) || data.message || data.error || '删除失败');
         }
 
         reports = reports.filter((item) => item.report_name !== reportName);
@@ -1086,10 +1086,11 @@ async function previewCollectionApis() {
             method: 'POST',
             body: formData,
         });
-        const data = await response.json();
+        const raw = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || '接口解析失败');
+            throw new Error((raw.data && (raw.data.details || raw.data.error)) || raw.message || '接口解析失败');
         }
+        const data = raw.data || raw;
         previewApis = Array.isArray(data.items) ? data.items : [];
         previewApiByPath = new Map();
         selectedApis = new Map();
@@ -1250,8 +1251,9 @@ async function startRunPostmanJob() {
             data = { error: rawText || '服务返回了非 JSON 响应。' };
         }
         if (!response.ok) {
-            throw new Error(data.error || '任务创建失败');
+            throw new Error((data.data && (data.data.details || data.data.error)) || data.message || data.error || '任务创建失败');
         }
+        data = data.data || data;
         setRunStatus(`任务已启动（${data.job_id}），正在执行...`);
         watchRunPostmanJob(data.job_id);
     } catch (error) {
@@ -1331,7 +1333,8 @@ renderReports();
     try {
         const resp = await fetch('/api/environments');
         if (!resp.ok) return;
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         const envs = data.environments || [];
         const defaultEnv = data.default || '';
         const seenNames = new Set();

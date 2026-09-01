@@ -60,8 +60,11 @@ class TestApiEnvironments:
             "postman_api_tester.handlers.server_routes.build_environments_payload"
         ) as mock_build:
             mock_build.return_value = {"envs": [], "default": ""}
-            result = api_environments()
-            assert result.json == {"envs": [], "default": ""}
+            resp, status = api_environments()
+            assert status == 200
+            body = resp.json
+            assert body["code"] == 200
+            assert body["data"] == {"envs": [], "default": ""}
 
     def test_api_environments_hides_token(self, app_context: None) -> None:
         """环境列表不暴露 token 值。"""
@@ -93,10 +96,13 @@ class TestApiReportDelete:
         ) as mock_delete:
             mock_delete.return_value = ["file1.json"]
             result = api_report_delete("test_report")
-            # jsonify 返回 Response 对象
-            from flask import Response
-
-            assert isinstance(result, Response)
+            # BaseHandler.json_response 返回 (Response, status) 元组包装格式
+            assert isinstance(result, tuple)
+            resp, status = result
+            assert status == 200
+            body = resp.json
+            assert body["code"] == 200
+            assert body["data"]["report_name"] == "test_report"
 
     def test_api_report_delete_not_found(self, app_context: None) -> None:
         """删除不存在的报告返回 404。"""

@@ -134,7 +134,8 @@ class TestApiCollectionParse:
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "groups" in data
+        assert data["code"] == 200
+        assert "groups" in data["data"]
         mock_parse.assert_called_once_with(SAMPLE_COLLECTION)
 
     @patch(
@@ -229,7 +230,8 @@ class TestApiCollectionSave:
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "collection_json" in data
+        assert data["code"] == 200
+        assert "collection_json" in data["data"]
 
     @patch(
         "postman_api_tester.services.collection_editor_service.validate_for_execution",
@@ -279,9 +281,10 @@ class TestApiCollectionDependency:
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "produced" in data
-        assert "consumed" in data
-        assert "warnings" in data
+        assert data["code"] == 200
+        assert "produced" in data["data"]
+        assert "consumed" in data["data"]
+        assert "warnings" in data["data"]
 
     @patch(
         "postman_api_tester.services.collection_editor_service.analyze_dependency_map",
@@ -364,9 +367,10 @@ class TestApiCollectionSend:
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["status_code"] == 200
-        assert data["elapsed_ms"] == 50
-        assert data["response_body"] == {"data": "ok"}
+        assert data["code"] == 200
+        assert data["data"]["status_code"] == 200
+        assert data["data"]["elapsed_ms"] == 50
+        assert data["data"]["response_body"] == {"data": "ok"}
 
     @patch(
         "postman_api_tester.services.collection_editor_service.send_single_request",

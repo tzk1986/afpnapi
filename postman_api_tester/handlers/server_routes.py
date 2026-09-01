@@ -27,6 +27,7 @@ from postman_api_tester.report_repository import (
 from postman_api_tester.report_repository import (
     list_reports as _repo_list_reports,
 )
+from postman_api_tester.report_server_app import ReportServerApp
 from postman_api_tester.report_server_config import (
     DEFAULT_ENV_NAME,
     ENVIRONMENTS,
@@ -44,30 +45,16 @@ from postman_api_tester.utils.logging_utils import (
 logger = logging.getLogger(__name__)
 
 
-MODULE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = MODULE_DIR.parent
-
-
-def _resolve_reports_dir() -> Path:
-    """解析报告目录。"""
-    env_dir = (
-        os.environ.get("POSTMAN_REPORTS_DIR") or os.environ.get("REPORTS_DIR") or ""
-    ).strip()
-    if env_dir:
-        return Path(env_dir).expanduser().resolve()
-    from postman_api_tester.report_server_config import REPORT_OUTPUT_DIR as _cfg_dir
-
-    if _cfg_dir:
-        return Path(_cfg_dir).expanduser().resolve()
-    return (PROJECT_ROOT / "reports").resolve()
-
-
-REPORTS_DIR = _resolve_reports_dir()
+REPORTS_DIR = ReportServerApp._resolve_reports_dir()
 EXPORTS_DIR = (REPORTS_DIR.parent / "uploaded_collections" / "exports").resolve()
 
 
 def health() -> ResponseReturnValue:
-    """健康检查端点。"""
+    """健康检查端点。
+
+    注意：本端点与 /api/log-metrics 供监控系统解析，
+    保持原始 JSON 结构，不套用 BaseHandler.json_response 包装。
+    """
     return jsonify(
         build_health_payload(
             datetime.now().isoformat(),
@@ -94,7 +81,7 @@ def api_environments() -> ResponseReturnValue:
                 "has_token": bool(env_cfg.get("token", "").strip()),
             }
         )
-    return jsonify(
+    return BaseHandler.json_response(
         build_environments_payload(env_list=env_list, default_env_name=DEFAULT_ENV_NAME)
     )
 
@@ -126,7 +113,7 @@ def api_report_delete(report_name: str) -> ResponseReturnValue:
             ValidationError(f"报告不存在: {report_name}"), 404
         )
     logger.info("删除报告产物成功: report=%s files=%s", report_name, deleted_files)
-    return jsonify(
+    return BaseHandler.json_response(
         build_report_delete_payload(
             report_name=report_name, deleted_files=deleted_files
         )

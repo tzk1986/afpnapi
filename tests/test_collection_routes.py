@@ -132,9 +132,12 @@ class TestApiCollectionPreview:
         )
         assert resp.status_code == 200
         resp_data = resp.get_json()
-        assert (
-            "items" in resp_data or "preview_items" in resp_data or "total" in resp_data
-        )
+        # BaseHandler.json_response 统一包装格式
+        assert resp_data["code"] == 200
+        payload = resp_data["data"]
+        assert payload["items"] == [{"name": "req1", "method": "GET"}]
+        assert payload["total"] == 1
+        assert payload["file_name"] == "test.json"
 
 
 class TestApiExportCollection:
@@ -205,7 +208,7 @@ class TestApiExportCollection:
     def test_success(
         self, mock_export: MagicMock, mock_find: MagicMock, app: Flask
     ) -> None:
-        """导出成功。"""
+        """导出成功，响应为 BaseHandler.json_response 统一包装格式。"""
         _register_routes(app)
         resp = app.test_client().post(
             "/api/export-collection",
@@ -213,6 +216,12 @@ class TestApiExportCollection:
             content_type="application/json",
         )
         assert resp.status_code == 200
+        resp_data = resp.get_json()
+        assert resp_data["code"] == 200
+        payload = resp_data["data"]
+        assert payload["file_name"] == "test.json"
+        assert payload["download_url"] == "/exports/test.json"
+        assert payload["updated_count"] == 1
 
 
 class TestApiExportCollectionStream:

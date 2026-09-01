@@ -10,7 +10,10 @@ from typing import Any, Dict, List, Optional, SupportsInt, Tuple
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
-from postman_api_tester.handlers.base_handler import json_error as _json_error
+from postman_api_tester.handlers.base_handler import (
+    BaseHandler,
+    json_error as _json_error,
+)
 from postman_api_tester.report_job_store import get_run_job, set_run_job
 from postman_api_tester.report_repository import (
     invalidate_reports_cache as _repo_invalidate_reports_cache,
@@ -320,7 +323,7 @@ def api_run_postman() -> ResponseReturnValue:
         selected_item_paths=selected_item_paths if selected_item_paths else None,
     )
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_job_queued_payload(
             job_id=job_id, message="任务已创建，请轮询状态接口获取执行进度。"
         )
@@ -398,7 +401,7 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
         selected_item_paths=None,
     )
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_job_queued_payload(
             job_id=job_id, message="ad-hoc 任务已创建，请轮询状态接口获取执行进度。"
         )

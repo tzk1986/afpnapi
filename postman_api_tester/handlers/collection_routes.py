@@ -5,10 +5,11 @@ import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from flask import Response, jsonify, request, stream_with_context
+from flask import Response, request, stream_with_context
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import (
+    BaseHandler,
     get_report_or_error,
 )
 from postman_api_tester.handlers.base_handler import (
@@ -71,7 +72,7 @@ def api_collection_preview() -> ResponseReturnValue:
     if total >= COLLECTION_PREVIEW_MAX_ITEMS:
         truncated = True
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_collection_preview_payload(
             file_name=original_name,
             total=total,
@@ -119,7 +120,7 @@ def api_export_collection() -> ResponseReturnValue:
         logger.exception("export_collection error")
         return _json_error(f"导出异常：{type(exc).__name__}", 500, "COL_EXPORT_003")
 
-    return jsonify(
+    return BaseHandler.json_response(
         build_export_collection_payload(
             report_name=report_name,
             exported=exported,

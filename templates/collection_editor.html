@@ -706,7 +706,8 @@
                     method: 'POST',
                     body: formData,
                 });
-                const data = await resp.json();
+                const raw = await resp.json();
+                const data = raw.data || raw;
                 if (resp.ok) {
                     // 检测是否已有数据，提示用户选择导入模式
                     if (state.collection && state.allRequests.length > 0) {
@@ -730,8 +731,8 @@
                         setStatus(`已加载 ${state.allRequests.length} 个接口`);
                     }
                 } else {
-                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    setStatus('解析失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
+                    const errCode = raw.error_code ? `[${raw.error_code}] ` : '';
+                    setStatus('解析失败：' + errCode + (data.details || raw.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
                 setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
@@ -1960,7 +1961,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({groups: state.collection.groups}),
                 });
-                const data = await resp.json();
+                const raw = await resp.json();
+                const data = raw.data || raw;
                 if (resp.ok) {
                     // 将全局/环境变量标记为已生产（source=全局/环境），避免显示"未定义"
                     // 环境优先级高于共享，先注入环境再注入共享（共享不覆盖环境）
@@ -1985,8 +1987,8 @@
                     renderDependencyInfo(data);
                     setStatus('变量依赖分析完成');
                 } else {
-                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    setStatus('分析失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
+                    const errCode = raw.error_code ? `[${raw.error_code}] ` : '';
+                    setStatus('分析失败：' + errCode + (data.details || raw.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
                 setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
@@ -2096,7 +2098,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(exportPayload),
                 });
-                const data = await resp.json();
+                const raw = await resp.json();
+                const data = raw.data || raw;
                 if (resp.ok) {
                     const jsonStr = JSON.stringify(data.collection_json, null, 2);
                     const blob = new Blob([jsonStr], {type: 'application/json'});
@@ -2108,8 +2111,8 @@
                     URL.revokeObjectURL(url);
                     setStatus('导出成功');
                 } else {
-                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    setStatus('导出失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
+                    const errCode = raw.error_code ? `[${raw.error_code}] ` : '';
+                    setStatus('导出失败：' + errCode + (data.details || raw.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
                 setStatus('请求失败：' + e.message + '（COM_NET_001）', 'error');
@@ -2133,7 +2136,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(state.collection),
                 });
-                const data = await resp.json();
+                const raw = await resp.json();
+                const data = raw.data || raw;
                 if (resp.ok) {
                     const jsonStr = JSON.stringify(data.collection_json);
                     const blob = new Blob([jsonStr], {type: 'application/json'});
@@ -2173,16 +2177,17 @@
                         body: formData,
                     });
                     const runData = await runResp.json();
-                    if (runResp.ok && runData.job_id) {
+                    const runPayload = runData.data || runData;
+                    if (runResp.ok && runPayload.job_id) {
                         setStatus('执行任务已提交，正在轮询状态...');
-                        startExecPolling(runData.job_id);
+                        startExecPolling(runPayload.job_id);
                     } else {
                         const errCode = runData.error_code ? `[${runData.error_code}] ` : '';
-                        showExecResult(false, '执行提交失败', errCode + (runData.details || runData.message || '请查看错误码联系开发'), null);
+                        showExecResult(false, '执行提交失败', errCode + (runPayload.details || runData.message || '请查看错误码联系开发'), null);
                     }
                 } else {
-                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    showExecResult(false, '保存失败', errCode + (data.details || data.message || '请查看错误码联系开发'), null);
+                    const errCode = raw.error_code ? `[${raw.error_code}] ` : '';
+                    showExecResult(false, '保存失败', errCode + (data.details || raw.message || '请查看错误码联系开发'), null);
                 }
             } catch (e) {
                 showExecResult(false, '请求失败', e.message + '（COM_NET_001）', null);
@@ -2360,7 +2365,8 @@
                         variables: collectVariables(),
                     }),
                 });
-                const data = await resp.json();
+                const raw = await resp.json();
+                const data = raw.data || raw;
                 if (resp.ok) {
                     state.lastResponse = data;
                     state.lastResponseTab = 'body';
@@ -2371,8 +2377,8 @@
                     // 保存到对比历史
                     saveToCompareHistory(state.editBuffer, data);
                 } else {
-                    const errCode = data.error_code ? `[${data.error_code}] ` : '';
-                    setStatus('请求失败：' + errCode + (data.details || data.message || '请查看错误码联系开发'), 'error');
+                    const errCode = raw.error_code ? `[${raw.error_code}] ` : '';
+                    setStatus('请求失败：' + errCode + (data.details || raw.message || '请查看错误码联系开发'), 'error');
                 }
             } catch (e) {
                 setStatus('网络错误：' + e.message + '（COM_NET_001）', 'error');

@@ -1,7 +1,12 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.36.3
-发布日期：2026-08-26
+版本：v1.37.9
+发布日期：2026-09-01
+
+本版新增重点（v1.37.0 ~ v1.37.9）：
+- **API 响应格式统一（L-1 系列）**：ui_recorder / retry / collection / job 入队 / server / collection_editor / report_meta 等 handler 的成功响应统一为 `{code, message, data, timestamp}` 包装格式，前端统一入口解包；`/health`、`/api/log-metrics`、`/api/run-postman-status`、`/api/reports`、`/api/report-meta` 按决策保留原始格式（监控/稳定接口语义）
+- **代理侧 localStorage 泄漏修复（v1.37.0）**：录制器代理页 setInterval 随会话结束清理
+- **`_resolve_reports_dir` 双实现合并（M-12，v1.37.7）**：server_routes 复用 `ReportServerApp._resolve_reports_dir()` 并清理死代码
 
 本版新增重点（v1.36.3）：
 - **import 整合**：`ui_testing_routes.py` 将 10 处 `_proxy_session_store` 局部 import 提升为模块级导入，同步更新 `test_phase3_local_storage.py` mock 路径

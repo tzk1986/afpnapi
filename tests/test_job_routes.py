@@ -1,11 +1,14 @@
 """job_routes 单元测试。"""
 
+import json
 from pathlib import Path
 from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
+
+import postman_api_tester.handlers.job_routes as job_routes_module
 
 from postman_api_tester.handlers.job_routes import (
     _resolve_output_dir,
@@ -98,6 +101,40 @@ class TestApiRunAdHocTests:
             result = api_run_ad_hoc_tests()
             assert isinstance(result, tuple)
             assert result[1] == 400
+
+
+class TestJobQueuedResponseFormat:
+    """入队成功响应使用 BaseHandler.json_response 统一包装格式。"""
+
+    def test_adhoc_queued_wrapped(
+        self, app_context: None, tmp_path: Path
+    ) -> None:
+        """ad-hoc 入队响应为 {code, message, data, timestamp} 格式。"""
+        with patch.object(job_routes_module, "ENABLE_ADHOC_RUN", True), patch(
+            "postman_api_tester.handlers.job_routes.request"
+        ) as mock_request, patch.object(
+            job_routes_module,
+            "_svc_normalize_adhoc_case",
+            side_effect=lambda item, idx, base: item,
+        ), patch.object(
+            job_routes_module, "_svc_build_adhoc_collection", return_value={}
+        ), patch.object(
+            job_routes_module,
+            "_build_saved_json_path",
+            return_value=tmp_path / "adhoc.json",
+        ), patch.object(
+            job_routes_module, "_svc_save_collection_json"
+        ), patch.object(job_routes_module, "_enqueue_job"):
+            mock_request.get_json = MagicMock(
+                return_value={"cases": [{"name": "a", "method": "GET", "url": "x"}]}
+            )
+            resp, status = job_routes_module.api_run_ad_hoc_tests()
+        assert status == 200
+        body = json.loads(resp.get_data(as_text=True))
+        assert body["code"] == 200
+        assert set(body) >= {"code", "message", "data", "timestamp"}
+        assert body["data"]["status"] == "queued"
+        assert body["data"]["job_id"]
 
 
 class TestApiRunPostmanStatus:
