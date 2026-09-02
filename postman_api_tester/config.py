@@ -277,10 +277,10 @@ DEFAULT_ENV_NAME: str = os.environ.get("DEFAULT_ENV_NAME", "")
 
 # ==============================================================
 # 升级五：断言规则增强（JSONPath 校验）
-# ENABLE_ASSERTIONS: 是否启用 JSONPath 断言校验（默认 false，需要安装 jsonpath-ng）
+# ENABLE_ASSERTIONS: 是否启用 JSONPath 断言校验（默认 true，需要安装 jsonpath-ng）
 # ASSERTIONS_ENGINE: 断言引擎，目前仅支持 'jsonpath'
 # ==============================================================
-ENABLE_ASSERTIONS = _env_bool("ENABLE_ASSERTIONS", "false")
+ENABLE_ASSERTIONS = _env_bool("ENABLE_ASSERTIONS", "true")  # 仅控制 UI 显隐；执行由 x_assertions+jsonpath-ng 决定（executor.py _run_assertions）
 ASSERTIONS_ENGINE = (
     str(os.environ.get("ASSERTIONS_ENGINE", "jsonpath")).strip() or "jsonpath"
 )

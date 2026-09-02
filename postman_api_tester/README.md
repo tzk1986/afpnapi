@@ -1,9 +1,9 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.37.11
+版本：v1.37.12
 发布日期：2026-09-02
 
-本版新增重点（v1.37.0 ~ v1.37.11）：
+本版新增重点（v1.37.0 ~ v1.37.12）：
 - **API 响应格式统一（L-1 系列）**：ui_recorder / retry / collection / job 入队 / server / collection_editor / report_meta / test_proxy / report_result 等 handler 的成功响应统一为 `{code, message, data, timestamp}` 包装格式，前端统一入口解包；`/health`、`/api/log-metrics`、`/api/run-postman-status`、`/api/reports`、`/api/report-meta` 按决策保留原始格式（监控/稳定接口语义）
 - **代理侧 localStorage 泄漏修复（v1.37.0）**：录制器代理页 setInterval 随会话结束清理
 - **`_resolve_reports_dir` 双实现合并（M-12，v1.37.7）**：server_routes 复用 `ReportServerApp._resolve_reports_dir()` 并清理死代码
@@ -531,7 +531,7 @@ pip install -r requirements.txt
 - `REPORT_ANALYTICS_ENABLE_SAMPLES`：是否默认返回错误样本（默认 `False`）
 - `REPORT_ANALYTICS_HISTOGRAM_BUCKETS`：响应时间直方图桶边界（默认 `0,50,100,200,500,1000,3000,5000`）
 - `QUALITY_SCORE_FAILED_PENALTY` / `QUALITY_SCORE_ERROR_PENALTY` / `QUALITY_SCORE_SLOW_PENALTY` / `QUALITY_SCORE_ASSERTION_MISSING_PENALTY`：质量评分扣分项阈值
-- `ENABLE_ASSERTIONS`：是否启用 JSONPath 断言校验（默认 `False`，需显式开启）
+- `ENABLE_ASSERTIONS`：是否显示 ad-hoc 页面的 JSONPath 断言配置入口（默认 `True`；仅控制 UI 显隐，不影响执行——断言仅在用例配置 `x_assertions` 且安装 jsonpath-ng 时才执行）
 - `ASSERTIONS_ENGINE`：断言引擎类型（默认 `jsonpath`）
 - `ENVIRONMENTS`：多环境配置字典（键为环境名，值为 `{base_url, token}`），通过环境变量 `ENVIRONMENTS_JSON` 注入 JSON
 - `DEFAULT_ENV_NAME`：默认激活的环境名称
