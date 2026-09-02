@@ -1,9 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.37.12
+版本：v1.37.13
 发布日期：2026-09-02
 
-本版新增重点（v1.37.0 ~ v1.37.12）：
+本版新增重点（v1.37.0 ~ v1.37.13）：
+- **CLI 每日冒烟调度脚本**：新增 `tools/scaffold/run_daily_smoke.py`，按冒烟清单顺序执行多个 Collection、失败自动重试（借 `selected_item_paths` 重跑）、汇总通过率并返回退出码（0/1/2）、可选飞书推送；不依赖 report server，Web 端不可用时照常执行。详见操作手册 §5.9 与快速命令参考 §5.1
 - **API 响应格式统一（L-1 系列）**：ui_recorder / retry / collection / job 入队 / server / collection_editor / report_meta / test_proxy / report_result 等 handler 的成功响应统一为 `{code, message, data, timestamp}` 包装格式，前端统一入口解包；`/health`、`/api/log-metrics`、`/api/run-postman-status`、`/api/reports`、`/api/report-meta` 按决策保留原始格式（监控/稳定接口语义）
 - **代理侧 localStorage 泄漏修复（v1.37.0）**：录制器代理页 setInterval 随会话结束清理
 - **`_resolve_reports_dir` 双实现合并（M-12，v1.37.7）**：server_routes 复用 `ReportServerApp._resolve_reports_dir()` 并清理死代码
@@ -609,6 +610,14 @@ python postman_api_tester/run_test_and_open.py
 4. 每页条数
 
 执行完会自动打开报告中心。
+
+### 方式 C：每日冒烟批量调度（CLI，不依赖报告中心）
+
+```powershell
+python tools/scaffold/run_daily_smoke.py "D:\-11\11\auto-assets\collections\smoke_manifest.txt" --retries 1
+```
+
+适合无人值守每日回归：按清单一次跑多个 Collection，失败自动重试一轮，输出 `smoke_summary_*.json/.md` 汇总，退出码 0=全过、1=有失败、2=参数错误。清单格式与定时任务注册见操作手册 §5.9。
 
 ## 4. 查看报告（正式使用）
 
