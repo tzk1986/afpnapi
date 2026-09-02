@@ -3615,7 +3615,8 @@ async function sendRetry() {
                 body: JSON.stringify(requestMeta),
             });
         }
-        const result = await resp.json();
+        const raw = await resp.json();
+        const result = raw.data || raw;
 
         const isPass = result.status === 'PASSED';
         resultDiv.className = 'retry-result-box ' + (isPass ? 'ok' : 'fail');
@@ -4202,9 +4203,10 @@ async function sendManualRequest() {
                 body: JSON.stringify({ method, url, headers: headers || {}, params: params || {}, ...bodyResult.request }),
             });
         }
-        const data = await resp.json();
+        const raw = await resp.json();
+        const data = raw.data || raw;
         if (!resp.ok) {
-            throw new Error(data.error || '请求失败');
+            throw new Error(data.details || data.error || raw.message || '请求失败');
         }
         _mcLastResponse = data;
         const sc = data.status_code;

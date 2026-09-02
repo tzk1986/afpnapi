@@ -442,7 +442,8 @@
             testBtn.disabled = true;
             try {
                 const response = await fetch('/test-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) });
-                const result = await response.json();
+                const raw = await response.json();
+                const result = raw.data || raw;
                 if (result.success) { alert('Token 有效'); testBtn.textContent = 'Token 有效'; testBtn.style.backgroundColor = '#28a745'; }
                 else { alert('Token 无效: ' + (result.message || '未知错误')); testBtn.textContent = '✗ Token无效'; testBtn.style.backgroundColor = '#dc3545'; }
             } catch (error) { alert('Token 测试失败: ' + error.message); testBtn.textContent = '测试失败'; testBtn.style.backgroundColor = '#dc3545'; }
@@ -460,7 +461,8 @@
                 const requestData = { url: result.url, method: result.method, headers: result.request_info?.headers || {}, params: result.request_info?.params || {}, body: result.request_info?.body || null, token: token };
                 const response = await fetch('/re-request-api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestData) });
                 if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                const newResult = await response.json();
+                const raw = await response.json();
+                const newResult = raw.data || raw;
                 allResults[resultIdx] = newResult;
                 delete detailCache[resultIdx];
                 loadDetail(resultIdx);
