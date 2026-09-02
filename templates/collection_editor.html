@@ -775,6 +775,15 @@
                     }
                 }
             }
+            // 合并集合共享断言（去重追加）
+            if (Array.isArray(data.x_shared_assertions) && data.x_shared_assertions.length) {
+                const arr = ensureSharedAssertions();
+                const seen = new Set(arr.map(v => JSON.stringify(v)));
+                for (const r of data.x_shared_assertions) {
+                    const k = JSON.stringify(r);
+                    if (!seen.has(k)) { arr.push(r); seen.add(k); }
+                }
+            }
             // 重新收集所有请求
             state.allRequests = collectAllRequests(state.collection.groups);
             state.selectedIds = new Set();
@@ -1636,14 +1645,8 @@
 
         // Assertions Tab (JSONPath 断言)
         const ASSERTION_OPS = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'contains', 'regex', 'length_eq', 'type', 'schema', 'exists', 'not_exists'];
-        function renderAssertionTab(req) {
-            const rules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
-
-            let html = '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
-            html += 'JSONPath 断言：响应通过结果判定（errCode/message）后逐条校验，任一失败则用例判为失败。';
-            html += '<br>expected 支持 JSON 字面量（数字/布尔/带引号字符串/对象），暂不支持 {{变量}} 替换。';
-            html += '</div>';
-            html += '<div style="margin-bottom:12px;">';
+        function renderAssertionRuleRows(rules, p) {
+            let html = '<div style="margin-bottom:12px;">';
             for (let i = 0; i < rules.length; i++) {
                 const r = rules[i] || {};
                 const op = ASSERTION_OPS.includes(r.op) ? r.op : 'eq';
@@ -1653,18 +1656,113 @@
                     expectedStr = typeof r.expected === 'object' ? JSON.stringify(r.expected) : String(r.expected);
                 }
                 html += `<div class="kv-row">
-                    <input type="text" placeholder="JSONPath（如 $.errCode）" style="flex:2;" value="${escapeAttr(r.path || '')}" onchange="updateAssertionField(${i}, 'path', this.value)">
-                    <select style="flex:1;" onchange="updateAssertionOp(${i}, this.value)">
+                    <input type="text" placeholder="JSONPath（如 $.errCode）" style="flex:2;" value="${escapeAttr(r.path || '')}" onchange="update${p}AssertionField(${i}, 'path', this.value)">
+                    <select style="flex:1;" onchange="update${p}AssertionOp(${i}, this.value)">
                         ${ASSERTION_OPS.map(o => `<option value="${o}" ${op === o ? 'selected' : ''}>${o}</option>`).join('')}
                     </select>
-                    <input type="text" placeholder="expected（JSON 字面量）" style="flex:2;" value="${escapeAttr(expectedStr)}" ${noExpected ? 'disabled' : ''} onchange="updateAssertionField(${i}, 'expected', this.value)">
-                    <button type="button" onclick="removeAssertion(${i})"></button>
+                    <input type="text" placeholder="expected（JSON 字面量）" style="flex:2;" value="${escapeAttr(expectedStr)}" ${noExpected ? 'disabled' : ''} onchange="update${p}AssertionField(${i}, 'expected', this.value)">
+                    <button type="button" onclick="remove${p}Assertion(${i})"></button>
                 </div>`;
             }
             html += '</div>';
+            return html;
+        }
+
+        function renderJudgmentTriState(field, label, value) {
+            const cur = value === true || value === false ? String(value) : '';
+            let html = `<div class="kv-row" style="align-items:center;">`;
+            html += `<label style="flex:0 0 120px;font-size:12px;color:#334155;">${label}</label>`;
+            html += `<select style="flex:1;" onchange="updateJudgmentField('${field}', this.value)">`;
+            html += `<option value="" ${cur === '' ? 'selected' : ''}>继承（默认）</option>`;
+            html += `<option value="true" ${cur === 'true' ? 'selected' : ''}>强制开启</option>`;
+            html += `<option value="false" ${cur === 'false' ? 'selected' : ''}>强制关闭</option>`;
+            html += `</select></div>`;
+            return html;
+        }
+
+        function renderAssertionTab(req) {
+            let html = '';
+
+            // v1.37.18 一级判定小节
+            html += '<div style="margin-bottom:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">';
+            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">一级判定</div>';
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">errCode 与 message 均选「强制关闭」= 本接口成败仅由 HTTP 状态码 + 断言决定（只看断言）。关闭后请务必配置断言（自有或集合共享），否则结果近乎恒 PASSED。任务级「关闭一级判定」勾选时优先于这里的设置。</div>';
+            html += renderJudgmentTriState('x_enable_err_code_judgment', 'errCode 判定', req.x_enable_err_code_judgment);
+            html += renderJudgmentTriState('x_enable_message_judgment', 'message 判定', req.x_enable_message_judgment);
+            html += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;user-select:none;margin-top:6px;">
+                <input type="checkbox" ${req.x_skip_shared_assertions === true ? 'checked' : ''} onchange="updateJudgmentSkip(this.checked)"> 共享断言豁免（本接口不执行集合共享断言，只执行自己的断言）
+            </label>`;
+            html += '</div>';
+
+            // v1.37.18 集合共享断言小节（集合属性，对本集合全部接口生效）
+            const shared = (state.collection && Array.isArray(state.collection.x_shared_assertions)) ? state.collection.x_shared_assertions : [];
+            html += '<div style="margin-bottom:14px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">';
+            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">集合共享断言（统一判断，作用于全部接口）</div>';
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">共享规则与每个接口的自有断言合并执行（共享在前，全部通过才算过）。想让共享断言接管业务成败，需先关闭一级判定（接口级上方三态或执行时任务级开关），否则判定失败会短路断言。个别接口不想执行共享断言，在该接口上方勾选「共享断言豁免」。</div>';
+            html += renderAssertionRuleRows(shared, 'Shared');
+            html += `<button type="button" class="btn btn-secondary" onclick="addSharedAssertion()" style="font-size:12px;">+ 添加共享断言规则</button>`;
+            html += '</div>';
+
+            // 本接口自有断言
+            const rules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
+            html += '本接口断言：响应通过结果判定（errCode/message）后逐条校验，任一失败则用例判为失败。';
+            html += '<br>expected 支持 JSON 字面量（数字/布尔/带引号字符串/对象），暂不支持 {{变量}} 替换。';
+            html += '</div>';
+            html += renderAssertionRuleRows(rules, '');
             html += `<button type="button" class="btn btn-secondary" onclick="addAssertion()" style="font-size:12px;">+ 添加断言规则</button>`;
 
             return html;
+        }
+
+        function updateJudgmentField(field, value) {
+            if (!state.editBuffer) return;
+            state.editBuffer[field] = value === '' ? null : (value === 'true');
+            syncToAllRequests();
+        }
+
+        function updateJudgmentSkip(checked) {
+            if (!state.editBuffer) return;
+            state.editBuffer.x_skip_shared_assertions = checked ? true : null;
+            syncToAllRequests();
+        }
+
+        function ensureSharedAssertions() {
+            if (!state.collection) return null;
+            if (!Array.isArray(state.collection.x_shared_assertions)) {
+                state.collection.x_shared_assertions = [];
+            }
+            return state.collection.x_shared_assertions;
+        }
+
+        function addSharedAssertion() {
+            const arr = ensureSharedAssertions();
+            if (!arr) return;
+            arr.push({path: '', op: 'eq', expected: null});
+            renderEditor();
+        }
+
+        function removeSharedAssertion(index) {
+            if (state.collection && Array.isArray(state.collection.x_shared_assertions)) {
+                state.collection.x_shared_assertions.splice(index, 1);
+                renderEditor();
+            }
+        }
+
+        function updateSharedAssertionField(index, field, value) {
+            const arr = state.collection && state.collection.x_shared_assertions;
+            if (Array.isArray(arr) && arr[index]) {
+                arr[index][field] = field === 'expected' ? parseAssertionExpected(value) : value;
+            }
+        }
+
+        function updateSharedAssertionOp(index, op) {
+            const arr = state.collection && state.collection.x_shared_assertions;
+            if (Array.isArray(arr) && arr[index]) {
+                arr[index].op = op;
+                if (op === 'exists' || op === 'not_exists') arr[index].expected = null;
+                renderEditor();
+            }
         }
 
         // Pre-request Tab

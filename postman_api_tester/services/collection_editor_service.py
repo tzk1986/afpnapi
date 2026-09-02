@@ -6,14 +6,29 @@
 - 变量依赖关系分析（生产/消费/警告）
 """
 
+import logging
 import re
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from postman_api_tester.assertions import normalize_assertion_rules
 
+logger = logging.getLogger(__name__)
+
 _VARIABLE_REF_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 _BASE_URL_VARS = frozenset({"baseUrl", "base_url"})
+
+# v1.37.18: 与 parser._parse_x_extensions bool 分支同口径的字符串白名单
+_TRUTHY_STRINGS = {"1", "true", "yes", "y", "on"}
+
+
+def _normalize_optional_bool(value: Any) -> Optional[bool]:
+    """缺失=None（继承）；bool 原值；其余按 parser 同口径字符串归一化为 bool。"""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in _TRUTHY_STRINGS
 
 
 def parse_collection_to_flat(collection_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,6 +53,10 @@ def parse_collection_to_flat(collection_data: Dict[str, Any]) -> Dict[str, Any]:
             "_postman_id": info.get("_postman_id", uuid.uuid4().hex),
             "variables": variables,
         },
+        # v1.37.18: 集合级共享断言（作用于全部接口）
+        "x_shared_assertions": normalize_assertion_rules(
+            collection_data.get("x_shared_assertions"), source="editor-parse"
+        ),
         "groups": _walk_items(collection_data.get("item", []), depth=0),
     }
 
@@ -170,7 +189,8 @@ def _parse_request_node(
             request_obj.get("x_assertions"), source="editor-parse"
         )
 
-    return {
+    # v1.37.18: 判定字段往返（缺失=None，编辑器不丢手工配置）
+    flat: Dict[str, Any] = {
         "id": req_id,
         "name": item.get("name", ""),
         "method": str(method).upper(),
@@ -182,7 +202,25 @@ def _parse_request_node(
         "x_extract": x_extract,
         "x_assertions": x_assertions,
         "description": item.get("description", ""),
+        "x_enable_err_code_judgment": None,
+        "x_enable_message_judgment": None,
+        "x_skip_shared_assertions": None,
+        "x_success_err_codes": "",
+        "x_success_messages": "",
     }
+    if isinstance(request_obj, dict):
+        for bool_key in (
+            "x_enable_err_code_judgment",
+            "x_enable_message_judgment",
+            "x_skip_shared_assertions",
+        ):
+            if request_obj.get(bool_key) is not None:
+                flat[bool_key] = _normalize_optional_bool(request_obj[bool_key])
+        for str_key in ("x_success_err_codes", "x_success_messages"):
+            raw_str = request_obj.get(str_key)
+            if raw_str is not None and str(raw_str).strip():
+                flat[str_key] = str(raw_str).strip()
+    return flat
 
 
 def _get_url_str(url_obj: Any) -> str:
@@ -284,6 +322,13 @@ def build_collection_json(flat_data: Dict[str, Any]) -> Dict[str, Any]:
         "variable": info.get("variables", []),
     }
 
+    # v1.37.18: 根级共享断言写回（归一化防御前端脏值，空不写字段）
+    shared = normalize_assertion_rules(
+        flat_data.get("x_shared_assertions"), source="editor-build"
+    )
+    if shared:
+        collection["x_shared_assertions"] = shared
+
     return collection
 
 
@@ -336,12 +381,31 @@ def _build_request_object(request: Dict[str, Any]) -> Dict[str, Any]:
     if x_extract and isinstance(x_extract, dict):
         postman_req["x_extract"] = x_extract
 
-    # x_assertions（再次归一化，防御前端脏数据）
+    # x_assertions（再次归一化，防御前端脏值）
     x_assertions = normalize_assertion_rules(
         request.get("x_assertions"), source="editor-build"
     )
     if x_assertions:
         postman_req["x_assertions"] = x_assertions
+
+    # v1.37.18: 判定字段写回（bool 三字段 is-not-None 才写且严格 isinstance 防御；
+    # success 两字段非空 str 才写——编辑器不编辑、仅保留不丢失）
+    for bool_key in (
+        "x_enable_err_code_judgment",
+        "x_enable_message_judgment",
+        "x_skip_shared_assertions",
+    ):
+        value = request.get(bool_key)
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            postman_req[bool_key] = value
+        else:
+            logger.warning("editor-build 丢弃非 bool 判定字段 %s: %r", bool_key, value)
+    for str_key in ("x_success_err_codes", "x_success_messages"):
+        raw_str = request.get(str_key)
+        if isinstance(raw_str, str) and raw_str.strip():
+            postman_req[str_key] = raw_str.strip()
 
     return postman_req
 

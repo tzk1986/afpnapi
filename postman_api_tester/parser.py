@@ -54,6 +54,8 @@ class ApiConfig(TypedDict, total=False):
     x_success_messages: Optional[str]
     x_enable_err_code_judgment: Optional[bool]
     x_enable_message_judgment: Optional[bool]
+    x_skip_shared_assertions: Optional[bool]
+    x_shared_assertions: Optional[List[AssertionConfig]]
     x_extract: Optional[Dict[str, str]]
     x_pre_request: Optional[Dict[str, str]]
     x_repeat: Optional[int]
@@ -139,6 +141,18 @@ class PostmanApiParser:
 
         for index, item in enumerate(items):
             apis.extend(self._parse_item(item, item_path=[index]))
+
+        # v1.37.18: 集合级共享断言挂到每个 item 的独立键（不并入 item 自有
+        # x_assertions，防编辑器往返/导出把共享逐 item 落盘造成重复注入）；
+        # item 标记 x_skip_shared_assertions=true 时豁免不挂。
+        shared_rules = normalize_assertion_rules(
+            self.data.get("x_shared_assertions"), source="parser"
+        )
+        if shared_rules:
+            for api in apis:
+                if api.get("x_skip_shared_assertions"):
+                    continue
+                api["x_shared_assertions"] = shared_rules
 
         self.collections = apis
         return apis
@@ -241,7 +255,11 @@ class PostmanApiParser:
                     extensions[field] = str_value
 
         # 布尔类型扩展
-        bool_fields = ("x_enable_err_code_judgment", "x_enable_message_judgment")
+        bool_fields = (
+            "x_enable_err_code_judgment",
+            "x_enable_message_judgment",
+            "x_skip_shared_assertions",
+        )
         for field in bool_fields:
             bool_value: Any = request.get(field)
             if bool_value is not None:

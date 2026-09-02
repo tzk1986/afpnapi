@@ -119,6 +119,8 @@ def _copy_api_config(
         "x_success_messages",
         "x_enable_err_code_judgment",
         "x_enable_message_judgment",
+        "x_skip_shared_assertions",
+        "x_shared_assertions",
     ):
         if field in api:
             result[field] = api[field]

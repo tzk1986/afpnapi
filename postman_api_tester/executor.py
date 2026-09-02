@@ -740,11 +740,19 @@ class PostmanTestExecutor:
         assertion_engine_error = ""
 
         raw_assertions = api.get("x_assertions")
-        assertions_rules = (
+        own_rules = (
             [item for item in raw_assertions if isinstance(item, dict)]
             if isinstance(raw_assertions, list)
             else []
         )
+        # v1.37.18: 集合级共享断言在前、item 自有在后（parser 已按豁免规则挂键）
+        raw_shared = api.get("x_shared_assertions")
+        shared_rules = (
+            [item for item in raw_shared if isinstance(item, dict)]
+            if isinstance(raw_shared, list)
+            else []
+        )
+        assertions_rules = shared_rules + own_rules
 
         if assertions_rules and _ASSERTIONS_AVAILABLE:
             try:
