@@ -46,6 +46,49 @@ SUPPORTED_OPS = {
 }
 
 
+def normalize_assertion_rules(
+    raw: Any, source: str = ""
+) -> List[Dict[str, Any]]:
+    """归一化外部输入（Collection JSON / ad-hoc payload / 编辑器）的断言规则。
+
+    仅保留含非空 path 且 op 在 SUPPORTED_OPS 内的 dict 规则；非法项丢弃并告警。
+    parser / ad-hoc / 编辑器三入口共用本函数，保证校验口径唯一。
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        logger.warning(
+            "assertion rules ignored: expect list",
+            extra={
+                "event": "assertion.rules.dropped",
+                "source": source,
+                "got_type": type(raw).__name__,
+            },
+        )
+        return []
+    rules: List[Dict[str, Any]] = []
+    for index, item in enumerate(raw):
+        path = ""
+        op = ""
+        if isinstance(item, dict):
+            path = str(item.get("path", "")).strip()
+            op = str(item.get("op", "")).strip().lower()
+        if not isinstance(item, dict) or not path or op not in SUPPORTED_OPS:
+            logger.warning(
+                "assertion rule dropped: invalid item",
+                extra={
+                    "event": "assertion.rule.dropped",
+                    "source": source,
+                    "rule_index": index,
+                    "op": op,
+                    "has_path": bool(path),
+                },
+            )
+            continue
+        rules.append({"path": path, "op": op, "expected": item.get("expected")})
+    return rules
+
+
 def evaluate_assertions(
     response_body: Any, assertions: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:

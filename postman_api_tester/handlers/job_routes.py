@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, SupportsInt, Tuple
 from flask import jsonify, request
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.assertions import normalize_assertion_rules
 from postman_api_tester.handlers.base_handler import (
     BaseHandler,
     json_error as _json_error,
@@ -368,6 +369,13 @@ def api_run_ad_hoc_tests() -> ResponseReturnValue:
             _svc_normalize_adhoc_case(item, idx, base_url)
             for idx, item in enumerate(raw_cases)
         ]
+        # 升级五：payload 顶层全局断言规则，应用到每条 ad-hoc 用例
+        adhoc_assertions = normalize_assertion_rules(
+            payload.get("assertions_json"), source="ad-hoc"
+        )
+        if adhoc_assertions:
+            for case in normalized_cases:
+                case["x_assertions"] = adhoc_assertions
         collection_data = _svc_build_adhoc_collection(
             normalized_cases, collection_name, base_url
         )

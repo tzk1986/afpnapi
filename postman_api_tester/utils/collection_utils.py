@@ -641,6 +641,8 @@ def build_adhoc_collection(
             request_obj["x_enable_message_judgment"] = case["x_enable_message_judgment"]
         if case.get("x_extract") is not None:
             request_obj["x_extract"] = case["x_extract"]
+        if case.get("x_assertions"):
+            request_obj["x_assertions"] = case["x_assertions"]
         if case.get("repeat") is not None and int(case["repeat"]) > 1:
             request_obj["x_repeat"] = int(case["repeat"])
 

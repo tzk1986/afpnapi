@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict, Union
 from urllib.parse import urljoin
 
+from postman_api_tester.assertions import normalize_assertion_rules
 from postman_api_tester.exceptions import ParseError
 
 logger = logging.getLogger(__name__)
@@ -273,6 +274,13 @@ class PostmanApiParser:
                 extensions["x_repeat"] = repeat_val
             except (TypeError, ValueError):
                 pass
+
+        # 列表类型扩展：JSONPath 断言规则（归一化过滤非法项）
+        assertion_rules = normalize_assertion_rules(
+            request.get("x_assertions"), source="parser"
+        )
+        if assertion_rules:
+            extensions["x_assertions"] = assertion_rules
 
         return extensions
 
