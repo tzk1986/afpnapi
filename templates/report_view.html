@@ -2990,6 +2990,7 @@ async function openDetail(index) {
     }
 
     body.innerHTML = `
+        ${renderAssertionResultsHtml(data)}
         <div class="detail-grid">
             <div class="detail-card">
                 <div class="detail-card-head">
@@ -3068,6 +3069,42 @@ async function openDetail(index) {
     currentDetailData = data;
     renderDetailPanels(data);
     renderResponseBody((data.response_info || {}).body, 'preview');
+}
+
+function renderAssertionResultsHtml(data) {
+    const results = Array.isArray(data.assertion_results) ? data.assertion_results : [];
+    const engineError = data.assertion_engine_error || '';
+    if (!results.length && !engineError) return '';
+    const fmt = (v) => {
+        if (v === null || v === undefined) return '-';
+        if (typeof v === 'object') { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+        return String(v);
+    };
+    const th = 'padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:left;';
+    const td = 'padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:ui-monospace,Consolas,monospace;word-break:break-all;';
+    const rows = results.map((r) => `
+        <tr>
+            <td style="${td}">${r.passed ? '✅' : '❌'}</td>
+            <td style="${td}">${escapeHtml(fmt(r.path))}</td>
+            <td style="${td}">${escapeHtml(fmt(r.op))}</td>
+            <td style="${td}">${escapeHtml(fmt(r.expected))}</td>
+            <td style="${td}">${escapeHtml(fmt(r.actual))}</td>
+            <td style="${td}">${escapeHtml(fmt(r.message))}</td>
+        </tr>`).join('');
+    const failedCount = results.filter((r) => !r.passed).length;
+    let html = `<div class="detail-card" style="margin-bottom:12px;padding:10px 12px;">
+        <div class="detail-card-head"><h4>断言结果（${results.length} 条${failedCount ? '，失败 ' + failedCount + ' 条' : '，全部通过'}）</h4></div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="color:#64748b;">
+                <th style="${th}"></th><th style="${th}">path</th><th style="${th}">op</th><th style="${th}">expected</th><th style="${th}">actual</th><th style="${th}">说明</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    if (engineError) {
+        html += `<div style="margin-top:6px;color:#b45309;font-size:12px;">⚠ 断言引擎异常：${escapeHtml(fmt(engineError))}</div>`;
+    }
+    html += '</div>';
+    return html;
 }
 
 function toggleHistory(btn) {

@@ -101,6 +101,8 @@ def build_result_detail_payload(
         "detail_available": bool(detail),
         "data_index": result.get("data_index", 0),
         "extracted_variables": result.get("extracted_variables", {}),
+        "assertion_results": result.get("assertion_results") or [],
+        "assertion_engine_error": result.get("assertion_engine_error") or "",
         "repeat_index": result.get("repeat_index", 0),
         "repeat_total": result.get("repeat_total", 1),
         "repeat_group": result.get("repeat_group", ""),

@@ -210,6 +210,46 @@ class TestBuildResultDetailPayload:
 
         assert result["judgement_source"] == "auto"
 
+    @patch("postman_api_tester.services.report_results_service.load_report_details_map")
+    def test_assertion_results_passthrough(self, mock_load):
+        """v1.37.16: 详情载荷透传 assertion_results / assertion_engine_error。"""
+        mock_load.return_value = {}
+
+        assertions = [
+            {"path": "$.errCode", "op": "eq", "expected": 0,
+             "actual": 1, "passed": False, "message": "断言失败"}
+        ]
+        report = {
+            "results": [
+                {
+                    "name": "API1", "method": "GET", "url": "http://test.com",
+                    "assertion_results": assertions,
+                    "assertion_engine_error": "engine-boom",
+                }
+            ],
+            "manual_exclusions": [],
+        }
+
+        result = build_result_detail_payload(report, 0)
+
+        assert result["assertion_results"] == assertions
+        assert result["assertion_engine_error"] == "engine-boom"
+
+    @patch("postman_api_tester.services.report_results_service.load_report_details_map")
+    def test_old_report_without_assertions_defaults_empty(self, mock_load):
+        """v1.37.16: 旧报告无断言字段 → 缺省空列表/空串，不抛错。"""
+        mock_load.return_value = {}
+
+        report = {
+            "results": [{"name": "API1", "method": "GET", "url": "http://test.com"}],
+            "manual_exclusions": [],
+        }
+
+        result = build_result_detail_payload(report, 0)
+
+        assert result["assertion_results"] == []
+        assert result["assertion_engine_error"] == ""
+
 
 class TestBuildManualCasesPayload:
     """Tests for build_manual_cases_payload."""
