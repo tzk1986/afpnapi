@@ -114,8 +114,18 @@ _RUN_POSTMAN_JOB_FN = partial(
 )
 
 
+_DISABLE_FIRST_LEVEL_FORM_KEY = "judgment_disable_first_level"
+_ENABLE_JUDGMENT_BOOL_KEYS = ("enable_err_code_judgment", "enable_message_judgment")
+
+
 def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
-    """从表单解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
+    """从表单解析可配置结果判定参数，无任何配置时返回 None。填写即启用。
+
+    升级 v1.37.17：支持关闭一级判定（errCode/message）调试开关——表单字段
+    `judgment_disable_first_level=1`（HTML checkbox 勾选才提交）等价于同时把
+    enable_err_code_judgment 与 enable_message_judgment 置 False，使本次执行仅
+    由「HTTP 状态码 + JSONPath 断言」决定成败。未提交该字段时维持现状（None 透传）。
+    """
     config: Dict[str, Any] = {}
 
     raw_err_codes = form.get("judgment_success_err_codes")
@@ -126,13 +136,23 @@ def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
     if raw_messages is not None and str(raw_messages).strip():
         config["success_messages"] = str(raw_messages).strip()
 
+    if str(form.get(_DISABLE_FIRST_LEVEL_FORM_KEY) or "").strip() == "1":
+        config["enable_err_code_judgment"] = False
+        config["enable_message_judgment"] = False
+
     return config if config else None
 
 
 def _parse_judgment_config_from_payload(
     payload: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
-    """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。填写即启用。"""
+    """从 JSON payload 解析可配置结果判定参数，无任何配置时返回 None。填写即启用。
+
+    升级 v1.37.17：judgment_config 支持显式 bool 开关
+    （enable_err_code_judgment / enable_message_judgment），非 bool 脏值丢弃
+    （避免字符串 "false" 经 _opt_bool 误判为 True）；便捷组合键
+    disable_first_level=true 展开为两个开关同时 False。
+    """
     raw_cfg = payload.get("judgment_config")
     if isinstance(raw_cfg, dict) and raw_cfg:
         config: Dict[str, Any] = {}
@@ -140,6 +160,12 @@ def _parse_judgment_config_from_payload(
             config["success_err_codes"] = str(raw_cfg["success_err_codes"]).strip()
         if "success_messages" in raw_cfg and str(raw_cfg["success_messages"]).strip():
             config["success_messages"] = str(raw_cfg["success_messages"]).strip()
+        for key in _ENABLE_JUDGMENT_BOOL_KEYS:
+            if isinstance(raw_cfg.get(key), bool):
+                config[key] = raw_cfg[key]
+        if raw_cfg.get("disable_first_level") is True:
+            config["enable_err_code_judgment"] = False
+            config["enable_message_judgment"] = False
         return config if config else None
     return None
 

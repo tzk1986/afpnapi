@@ -344,6 +344,9 @@
                 <input type="file" id="fileInput" accept=".json" style="display:none;" onchange="handleFileUpload(event)">
                 <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📂 导入 JSON</button>
                 <button type="button" class="btn btn-secondary" onclick="exportCollection()">💾 导出 JSON</button>
+                <label class="debug-judgment-toggle" title="调试用：本次执行关闭 errCode/message 一级判定，成败仅由 HTTP 状态码 + JSONPath 断言决定" style="display:flex;align-items:center;gap:4px;font-size:12px;color:#64748b;cursor:pointer;user-select:none;">
+                    <input type="checkbox" id="disableFirstLevelJudgment" style="cursor:pointer;"> 关闭一级判定
+                </label>
                 <button type="button" class="btn btn-primary" onclick="executeCollection()">▶ 执行</button>
                 <button type="button" class="btn btn-secondary" onclick="clearRuntimeVars()" title="清除运行时变量池">🧹 清除变量</button>
                 <a class="btn btn-secondary" href="/" style="text-decoration:none;">← 返回首页</a>
@@ -2199,10 +2202,33 @@
         // Execute Collection
         let execPollTimer = null;
 
+        function collectionHasAnyAssertions() {
+            const groups = (state.collection && state.collection.groups) || [];
+            const walk = function(gs) {
+                for (const g of gs) {
+                    for (const r of (g.requests || [])) {
+                        if (r.x_assertions && r.x_assertions.length > 0) return true;
+                    }
+                    if (walk(g.subgroups || [])) return true;
+                }
+                return false;
+            };
+            return walk(groups);
+        }
+
         async function executeCollection() {
             if (!state.collection) {
                 setStatus('请先导入 Collection', 'error');
                 return;
+            }
+
+            // v1.37.17 调试开关：关闭一级判定（errCode/message），成败仅由状态码+断言决定
+            const disableJudgmentEl = document.getElementById('disableFirstLevelJudgment');
+            const judgmentOff = !!(disableJudgmentEl && disableJudgmentEl.checked);
+            if (judgmentOff && !collectionHasAnyAssertions()) {
+                if (!confirm('已勾选关闭一级判定，但当前集合未配置任何断言，结果将仅按 HTTP 状态码判定（近乎恒 PASSED）。确定继续？')) {
+                    return;
+                }
             }
 
             showExecModal('执行中...', true);
@@ -2241,6 +2267,10 @@
                     // 使用 Collection 名称作为报告名
                     const colName = (state.collection.collection_info && state.collection.collection_info.name) || 'collection';
                     formData.append('report_name', colName);
+
+                    if (judgmentOff) {
+                        formData.append('judgment_disable_first_level', '1');
+                    }
 
                     // 添加上传的文件（formdata/binary 模式）
                     if (state.uploadedFiles && Object.keys(state.uploadedFiles).length > 0) {

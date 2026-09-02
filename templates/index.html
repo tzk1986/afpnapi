@@ -310,6 +310,10 @@
                             <input id="judgmentSuccessMessages" type="text" placeholder="默认值: success">
                         </div>
                     </div>
+                    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:#334155;cursor:pointer;user-select:none;">
+                        <input id="judgmentDisableFirstLevel" type="checkbox" style="cursor:pointer;">
+                        关闭一级判定（errCode/message），仅按 HTTP 状态码 + JSONPath 断言判定成败（调试用；若集合无断言，结果近乎恒 PASSED）
+                    </label>
                     <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
                 </div>
             </details>
@@ -1213,6 +1217,9 @@ async function startRunPostmanJob() {
     if (jErrCodes && jErrCodes.value.trim()) formData.append('judgment_success_err_codes', jErrCodes.value.trim());
     const jMsgs = document.getElementById('judgmentSuccessMessages');
     if (jMsgs && jMsgs.value.trim()) formData.append('judgment_success_messages', jMsgs.value.trim());
+    // v1.37.17 调试开关：勾选提交 judgment_disable_first_level=1（与编辑器执行同款字段）
+    const jDisable = document.getElementById('judgmentDisableFirstLevel');
+    if (jDisable && jDisable.checked) formData.append('judgment_disable_first_level', '1');
     // 数据驱动文件（可选）
     const dataFileInput = document.getElementById('dataFileInput');
     if (dataFileInput && dataFileInput.files && dataFileInput.files[0]) {

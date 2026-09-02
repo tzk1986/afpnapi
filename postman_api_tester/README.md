@@ -1,9 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.37.16
+版本：v1.37.17
 发布日期：2026-09-02
 
-本版新增重点（v1.37.0 ~ v1.37.16）：
+本版新增重点（v1.37.0 ~ v1.37.17）：
+- **一级判定任务级可关闭（v1.37.17）**：执行时可勾选「关闭一级判定」，本次执行所有接口的 errCode/message 判定关闭，成败仅由 HTTP 状态码 + JSONPath 断言决定（调试断言、混合正/异常用例场景）；首页「判定条件配置」折叠区与编辑器工具栏双入口，未勾选行为与既往完全一致
 - **JSONPath 断言全链路生效（v1.37.14~16）**：修复 parser/ad-hoc 断链（此前断言输入被静默丢弃），可视化编辑器新增「断言」页签（JSONPath + 13 操作符，随 `ENABLE_ASSERTIONS` 显隐），报告执行详情弹窗新增「断言结果」表；⚠️ 存量带 `x_assertions` 集合的断言自 v1.37.14 起真正执行
 - **CLI 每日冒烟调度脚本**：新增 `tools/scaffold/run_daily_smoke.py`，按冒烟清单顺序执行多个 Collection、失败自动重试（借 `selected_item_paths` 重跑）、汇总通过率并返回退出码（0/1/2）、可选飞书推送；不依赖 report server，Web 端不可用时照常执行。详见操作手册 §5.9 与快速命令参考 §5.1
 - **API 响应格式统一（L-1 系列）**：ui_recorder / retry / collection / job 入队 / server / collection_editor / report_meta / test_proxy / report_result 等 handler 的成功响应统一为 `{code, message, data, timestamp}` 包装格式，前端统一入口解包；`/health`、`/api/log-metrics`、`/api/run-postman-status`、`/api/reports`、`/api/report-meta` 按决策保留原始格式（监控/稳定接口语义）
