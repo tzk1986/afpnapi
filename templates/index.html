@@ -1020,7 +1020,8 @@ async function compareReports() {
         return;
     }
     const response = await fetch(`/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`);
-    const data = await response.json();
+    const raw = await response.json();
+    const data = raw.data || raw;
     const metrics = `
         <div class="compare-grid">
             <div class="card"><div class="muted">基准报告</div><div class="metric">${escapeHtml(data.left.report_name)}</div></div>

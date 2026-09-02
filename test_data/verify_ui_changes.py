@@ -52,7 +52,8 @@ def check_report_results_api(report_name):
         if resp.status_code != 200:
             print(f"   ❌ 状态码: {resp.status_code}")
             return False
-        data = resp.json()
+        raw = resp.json()
+        data = raw.get("data") or raw
         items = data.get("items", [])
         if not items:
             print("   ⚠️  无数据")

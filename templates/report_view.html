@@ -2214,9 +2214,10 @@ async function reloadAnalytics(forceReload) {
             include_samples: params.includeSamples ? 'true' : 'false',
         });
         const response = await fetch(`/api/report-analytics/${encodeURIComponent(reportName)}?${query.toString()}`);
-        const data = await response.json();
+        const raw = await response.json();
+        const data = raw.data || raw;
         if (!response.ok) {
-            throw new Error(data.error || '分析数据加载失败');
+            throw new Error(data.details || data.error || raw.message || '分析数据加载失败');
         }
         renderAnalytics(data);
         analyticsLoaded = true;
@@ -2328,9 +2329,10 @@ async function reloadAnalyticsCompare(forceReload) {
             include_samples: params.includeSamples ? 'true' : 'false',
         });
         const response = await fetch(`/api/report-analytics-compare?${query.toString()}`);
-        const data = await response.json();
+        const raw = await response.json();
+        const data = raw.data || raw;
         if (!response.ok) {
-            throw new Error(data.error || '对比分析加载失败');
+            throw new Error(data.details || data.error || raw.message || '对比分析加载失败');
         }
         renderAnalyticsCompare(data);
         analyticsCompareLoaded = true;
@@ -2799,7 +2801,8 @@ async function reloadResults(page = 1) {
     });
     document.getElementById('resultTableContainer').innerHTML = '<div class="loading">加载报告数据中...</div>';
     const response = await fetch(`/api/report-results/${encodeURIComponent(reportName)}?${params.toString()}`);
-    const data = await response.json();
+    const raw = await response.json();
+    const data = raw.data || raw;
     renderResults(data);
 }
 
@@ -2936,7 +2939,8 @@ async function openDetail(index) {
     currentDetailData = null;
 
     const response = await fetch(`/api/report-result-detail/${encodeURIComponent(reportName)}/${index}`);
-    const data = await response.json();
+    const raw = await response.json();
+    const data = raw.data || raw;
 
     document.getElementById('detailTitle').innerHTML = escapeHtml(data.name || '执行详情') +
         (data.retried ? ' <span class="retried-badge">已重试</span>' : '');
