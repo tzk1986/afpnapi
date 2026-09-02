@@ -1,8 +1,16 @@
-"""报告结果与分析路由处理函数。"""
+"""报告结果与分析路由处理函数。
+
+L-1（v1.37.11）说明：本文件的 `/api/report-results`、`/api/report-analytics`、
+`/api/compare` 属约束 3.10.5 列举的既有稳定接口，原样保留会直接破坏既有消费方。
+决策：成功响应统一包装为 `{code, message, data}`（错误格式 error_response 不变），
+前端 5 处消费方同步入口解包：`index.html`（/api/compare）、`report_view.html`
+（report-analytics / report-analytics-compare / report-results / report-result-detail），
+test_data 冒烟脚本兼容解包，页面内消费字段不受影响。
+"""
 
 from typing import Any, Dict
 
-from flask import jsonify, request
+from flask import request
 from flask.typing import ResponseReturnValue
 
 from postman_api_tester.handlers.base_handler import BaseHandler, get_report_or_error
@@ -54,7 +62,11 @@ from postman_api_tester.utils.server_utils import clamp_page_size as _clamp_page
 
 
 def api_report_results(report_name: str) -> ResponseReturnValue:
-    """报告结果列表（分页+筛选）API。"""
+    """报告结果列表（分页+筛选）API。
+
+    v1.37.11：成功响应经 L-1 统一包装为 {code, message, data}；
+    属约束 3.10.5 稳定接口，前端消费方已同步入口解包。
+    """
     report_dict = get_report_or_error(report_name, "")
 
     page = _clamp_page(request.args.get("page", 1))
@@ -79,7 +91,7 @@ def api_report_results(report_name: str) -> ResponseReturnValue:
         status_filter=status_filter,
         include_excluded=include_excluded,
     )
-    return jsonify(payload)
+    return BaseHandler.json_response(payload)
 
 
 def api_report_analytics(report_name: str) -> ResponseReturnValue:
@@ -116,7 +128,7 @@ def api_report_analytics(report_name: str) -> ResponseReturnValue:
         assertion_missing_penalty=QUALITY_SCORE_ASSERTION_MISSING_PENALTY,
         assertions_enabled=ENABLE_ASSERTIONS,
     )
-    return jsonify(payload)
+    return BaseHandler.json_response(payload)
 
 
 def api_report_analytics_compare() -> ResponseReturnValue:
@@ -164,7 +176,7 @@ def api_report_analytics_compare() -> ResponseReturnValue:
         assertion_missing_penalty=QUALITY_SCORE_ASSERTION_MISSING_PENALTY,
         assertions_enabled=ENABLE_ASSERTIONS,
     )
-    return jsonify(payload)
+    return BaseHandler.json_response(payload)
 
 
 def api_report_result_detail(
@@ -174,7 +186,9 @@ def api_report_result_detail(
     report_dict = get_report_or_error(report_name, "")
 
     try:
-        return jsonify(build_result_detail_payload(report_dict, result_index))
+        return BaseHandler.json_response(
+            build_result_detail_payload(report_dict, result_index)
+        )
     except IndexError:
         from postman_api_tester.exceptions import ValidationError
 
@@ -184,7 +198,11 @@ def api_report_result_detail(
 
 
 def api_compare() -> ResponseReturnValue:
-    """历史报告对比 API。"""
+    """历史报告对比 API。
+
+    v1.37.11：成功响应经 L-1 统一包装为 {code, message, data}；
+    属约束 3.10.5 稳定接口，唯一前端消费方已同步入口解包。
+    """
     left_name = request.args.get("left", "")
     right_name = request.args.get("right", "")
     if not left_name or not right_name:
@@ -195,4 +213,4 @@ def api_compare() -> ResponseReturnValue:
         )
     left_dict = get_report_or_error(left_name, "")
     right_dict = get_report_or_error(right_name, "")
-    return jsonify(build_compare_payload(left_dict, right_dict))
+    return BaseHandler.json_response(build_compare_payload(left_dict, right_dict))

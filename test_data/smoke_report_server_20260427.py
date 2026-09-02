@@ -16,9 +16,12 @@ def _must_ok(resp: requests.Response, name: str) -> Dict[str, Any]:
     if resp.status_code >= 400:
         raise RuntimeError(f"{name} failed: {resp.status_code} {resp.text[:200]}")
     try:
-        return resp.json()
+        data = resp.json()
     except ValueError:
         return {"_text": resp.text}
+    if isinstance(data, dict):
+        data = data.get("data") or data
+    return data
 
 
 def main() -> None:

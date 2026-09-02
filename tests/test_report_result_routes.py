@@ -72,7 +72,8 @@ class TestApiReportResults:
         resp = app.test_client().get("/api/report-results/test_report")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "results" in data
+        assert data["code"] == 200
+        assert "results" in data["data"]
 
     @patch(
         "postman_api_tester.handlers.report_result_routes._build_report_results_payload",
@@ -214,7 +215,8 @@ class TestApiReportResultDetail:
         resp = app.test_client().get("/api/report-results/test_report/0")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert "request_info" in data or "response_info" in data
+        assert data["code"] == 200
+        assert "request_info" in data["data"] or "response_info" in data["data"]
 
     @patch(
         "postman_api_tester.handlers.report_result_routes.build_result_detail_payload",
