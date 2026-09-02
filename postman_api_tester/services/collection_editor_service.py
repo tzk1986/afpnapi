@@ -10,6 +10,8 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from postman_api_tester.assertions import normalize_assertion_rules
+
 _VARIABLE_REF_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 _BASE_URL_VARS = frozenset({"baseUrl", "base_url"})
 
@@ -161,6 +163,13 @@ def _parse_request_node(
                 str(k): str(v) for k, v in x_extract_raw.items() if isinstance(v, str)
             }
 
+    # 提取 x_assertions（经归一化过滤非法项）
+    x_assertions: List[Dict[str, Any]] = []
+    if isinstance(request_obj, dict):
+        x_assertions = normalize_assertion_rules(
+            request_obj.get("x_assertions"), source="editor-parse"
+        )
+
     return {
         "id": req_id,
         "name": item.get("name", ""),
@@ -171,6 +180,7 @@ def _parse_request_node(
         "body_mode": body_mode,
         "body_data": body_data,
         "x_extract": x_extract,
+        "x_assertions": x_assertions,
         "description": item.get("description", ""),
     }
 
@@ -325,6 +335,13 @@ def _build_request_object(request: Dict[str, Any]) -> Dict[str, Any]:
     x_extract = request.get("x_extract", {})
     if x_extract and isinstance(x_extract, dict):
         postman_req["x_extract"] = x_extract
+
+    # x_assertions（再次归一化，防御前端脏数据）
+    x_assertions = normalize_assertion_rules(
+        request.get("x_assertions"), source="editor-build"
+    )
+    if x_assertions:
+        postman_req["x_assertions"] = x_assertions
 
     return postman_req
 

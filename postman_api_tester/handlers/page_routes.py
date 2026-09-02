@@ -107,7 +107,9 @@ def adhoc_run_page() -> ResponseReturnValue:
 
 def collection_editor_page() -> ResponseReturnValue:
     """Collection 可视化编辑器页面。"""
-    return render_template("collection_editor.html")
+    return render_template(
+        "collection_editor.html", enable_assertions=ENABLE_ASSERTIONS
+    )
 
 
 def report_view() -> ResponseReturnValue:

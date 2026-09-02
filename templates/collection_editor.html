@@ -1242,8 +1242,8 @@
             }
 
             const tab = state.activeTab || 'general';
-            const tabs = ['general', 'headers', 'params', 'body', 'pre_request', 'extract'];
-            const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', pre_request: 'Pre-request', extract: 'x_extract'};
+            const tabs = ['general', 'headers', 'params', 'body', 'pre_request', 'extract'{% endraw %}{% if enable_assertions %}, 'assertions'{% endif %}{% raw %}];
+            const tabLabels = {general: 'General', headers: 'Headers', params: 'Params', body: 'Body', pre_request: 'Pre-request', extract: 'x_extract'{% endraw %}{% if enable_assertions %}, assertions: '断言'{% endif %}{% raw %}};
             const tabsHtml = tabs.map((t, i) =>
                 `<button type="button" class="tab ${t === tab ? 'active' : ''}" role="tab" aria-selected="${t === tab}" aria-controls="tab-panel-${t}" id="tab-${t}" onclick="switchTab('${t}', this)" tabindex="${t === tab ? 0 : -1}">${tabLabels[t]}</button>`
             ).join('');
@@ -1384,6 +1384,7 @@
                 case 'params': content.innerHTML = renderKVTab(req.params || [], 'params'); break;
                 case 'body': content.innerHTML = renderBodyTab(req); break;
                 case 'extract': content.innerHTML = renderExtractTab(req); break;
+                case 'assertions': content.innerHTML = renderAssertionTab(req); break;
                 case 'pre_request': content.innerHTML = renderPreRequestTab(req); break;
             }
         }
@@ -1394,6 +1395,7 @@
                 case 'params': return renderKVTab(req.params || [], 'params');
                 case 'body': return renderBodyTab(req);
                 case 'extract': return renderExtractTab(req);
+                case 'assertions': return renderAssertionTab(req);
                 case 'pre_request': return renderPreRequestTab(req);
                 default: return renderGeneralTab(req);
             }
@@ -1629,6 +1631,39 @@
             return html;
         }
 
+        // Assertions Tab (JSONPath 断言)
+        const ASSERTION_OPS = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'contains', 'regex', 'length_eq', 'type', 'schema', 'exists', 'not_exists'];
+        function renderAssertionTab(req) {
+            const rules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
+
+            let html = '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
+            html += 'JSONPath 断言：响应通过结果判定（errCode/message）后逐条校验，任一失败则用例判为失败。';
+            html += '<br>expected 支持 JSON 字面量（数字/布尔/带引号字符串/对象），暂不支持 {{变量}} 替换。';
+            html += '</div>';
+            html += '<div style="margin-bottom:12px;">';
+            for (let i = 0; i < rules.length; i++) {
+                const r = rules[i] || {};
+                const op = ASSERTION_OPS.includes(r.op) ? r.op : 'eq';
+                const noExpected = (op === 'exists' || op === 'not_exists');
+                let expectedStr = '';
+                if (!noExpected && r.expected !== null && r.expected !== undefined) {
+                    expectedStr = typeof r.expected === 'object' ? JSON.stringify(r.expected) : String(r.expected);
+                }
+                html += `<div class="kv-row">
+                    <input type="text" placeholder="JSONPath（如 $.errCode）" style="flex:2;" value="${escapeAttr(r.path || '')}" onchange="updateAssertionField(${i}, 'path', this.value)">
+                    <select style="flex:1;" onchange="updateAssertionOp(${i}, this.value)">
+                        ${ASSERTION_OPS.map(o => `<option value="${o}" ${op === o ? 'selected' : ''}>${o}</option>`).join('')}
+                    </select>
+                    <input type="text" placeholder="expected（JSON 字面量）" style="flex:2;" value="${escapeAttr(expectedStr)}" ${noExpected ? 'disabled' : ''} onchange="updateAssertionField(${i}, 'expected', this.value)">
+                    <button type="button" onclick="removeAssertion(${i})"></button>
+                </div>`;
+            }
+            html += '</div>';
+            html += `<button type="button" class="btn btn-secondary" onclick="addAssertion()" style="font-size:12px;">+ 添加断言规则</button>`;
+
+            return html;
+        }
+
         // Pre-request Tab
         function renderPreRequestTab(req) {
             const preReqs = req.x_pre_request || {};
@@ -1823,6 +1858,48 @@
                     syncToAllRequests();
                     renderEditor();
                 }
+            }
+        }
+
+        function parseAssertionExpected(raw) {
+            if (raw === '') return null;
+            try { return JSON.parse(raw); } catch (e) { return raw; }
+        }
+
+        function addAssertion() {
+            if (state.editBuffer) {
+                if (!Array.isArray(state.editBuffer.x_assertions)) state.editBuffer.x_assertions = [];
+                state.editBuffer.x_assertions.push({path: '', op: 'eq', expected: null});
+                syncToAllRequests();
+                renderEditor();
+            }
+        }
+
+        function removeAssertion(index) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_assertions)) {
+                state.editBuffer.x_assertions.splice(index, 1);
+                syncToAllRequests();
+                renderEditor();
+            }
+        }
+
+        function updateAssertionField(index, field, value) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_assertions)) {
+                const rule = state.editBuffer.x_assertions[index];
+                if (!rule) return;
+                rule[field] = field === 'expected' ? parseAssertionExpected(value) : value;
+                syncToAllRequests();
+            }
+        }
+
+        function updateAssertionOp(index, op) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_assertions)) {
+                const rule = state.editBuffer.x_assertions[index];
+                if (!rule) return;
+                rule.op = op;
+                if (op === 'exists' || op === 'not_exists') rule.expected = null;
+                syncToAllRequests();
+                renderEditor();
             }
         }
 

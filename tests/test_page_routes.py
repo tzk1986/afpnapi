@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from flask import Flask
 
+import postman_api_tester.handlers.page_routes as page_routes_module
 from postman_api_tester.handlers.page_routes import (
     adhoc_run_page,
     collection_editor_page,
@@ -157,7 +158,10 @@ class TestCollectionEditorPage:
             result = collection_editor_page()
 
             assert result == "<html>editor</html>"
-            mock_render.assert_called_once_with("collection_editor.html")
+            mock_render.assert_called_once_with(
+                "collection_editor.html",
+                enable_assertions=page_routes_module.ENABLE_ASSERTIONS,
+            )
 
 
 class TestReportView:

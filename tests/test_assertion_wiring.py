@@ -158,3 +158,113 @@ class TestAdhocHandlerWiring:
             assert case["x_assertions"] == [
                 {"path": "$.errCode", "op": "eq", "expected": 0}
             ]
+
+
+class TestEditorRoundtrip:
+    """v1.37.15：编辑器 service parse→build 往返不丢断言。"""
+
+    def _flat_with(self, assertions: Any) -> Dict[str, Any]:
+        return {
+            "collection_info": {
+                "name": "c",
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+                "_postman_id": "pid",
+                "variables": [],
+            },
+            "groups": [
+                {
+                    "group_name": "",
+                    "requests": [
+                        {
+                            "id": "r1",
+                            "name": "api1",
+                            "method": "GET",
+                            "url": "http://svc.test/api",
+                            "headers": [],
+                            "params": [],
+                            "body_mode": "none",
+                            "body_data": None,
+                            "x_extract": {},
+                            "x_assertions": assertions,
+                            "description": "",
+                        }
+                    ],
+                    "subgroups": [],
+                }
+            ],
+        }
+
+    def test_parse_extracts_normalized_assertions(self, tmp_path: Path) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            parse_collection_to_flat,
+        )
+
+        collection = _make_collection(
+            {
+                "x_assertions": [
+                    {"path": "$.errCode", "op": "EQ", "expected": 0},
+                    {"path": "$.x", "op": "bogus"},
+                ]
+            }
+        )
+        flat = parse_collection_to_flat(collection)
+        req = flat["groups"][-1]["requests"][0]
+        assert req["x_assertions"] == [
+            {"path": "$.errCode", "op": "eq", "expected": 0}
+        ]
+
+    def test_parse_absent_assertions_empty_list(self, tmp_path: Path) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            parse_collection_to_flat,
+        )
+
+        flat = parse_collection_to_flat(_make_collection({}))
+        req = flat["groups"][-1]["requests"][0]
+        assert req["x_assertions"] == []
+
+    def test_build_passthrough_roundtrip(self) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            build_collection_json,
+        )
+
+        rules = [{"path": "$.errCode", "op": "eq", "expected": 0}]
+        rebuilt = build_collection_json(self._flat_with(rules))
+        request_obj = rebuilt["item"][0]["request"]
+        assert request_obj["x_assertions"] == rules
+
+    def test_build_filters_dirty_assertions(self) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            build_collection_json,
+        )
+
+        dirty = [{"path": "$.a", "op": "eq", "expected": 1}, "junk"]
+        rebuilt = build_collection_json(self._flat_with(dirty))
+        request_obj = rebuilt["item"][0]["request"]
+        assert request_obj["x_assertions"] == [
+            {"path": "$.a", "op": "eq", "expected": 1}
+        ]
+
+    def test_build_empty_assertions_key_absent(self) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            build_collection_json,
+        )
+
+        rebuilt = build_collection_json(self._flat_with([]))
+        request_obj = rebuilt["item"][0]["request"]
+        assert "x_assertions" not in request_obj
+
+    def test_roundtrip_parse_then_build(self, tmp_path: Path) -> None:
+        from postman_api_tester.services.collection_editor_service import (
+            build_collection_json,
+            parse_collection_to_flat,
+        )
+
+        collection = _make_collection(
+            {"x_assertions": [{"path": "$.data.id", "op": "exists"}]}
+        )
+        flat = parse_collection_to_flat(collection)
+        rebuilt = build_collection_json(flat)
+        request_obj = rebuilt["item"][0]["request"]
+        assert request_obj["x_assertions"] == [
+            {"path": "$.data.id", "op": "exists", "expected": None}
+        ]
