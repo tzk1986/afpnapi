@@ -250,6 +250,25 @@ STRATEGY_SPECS: List[Tuple[str, int, Callable[["Page", Dict[str, Any]], Optional
 ]
 
 
+def original_selector_desc(step: Dict[str, Any]) -> str:
+    """事件/heal_info 用原始选择器摘要（primary 优先，[:200] 字段红线）。"""
+    sel = step.get("selector", "")
+    primary = (
+        str(sel.get("primary") or "") if isinstance(sel, dict) else str(sel or "")
+    )
+    return primary[:_FIELD_MAX_LEN]
+
+
+def build_heal_info(old_selector: str, result: HealResult) -> Dict[str, Any]:
+    """step_result["heal_info"] 结构（v3 §二 I-2：old/new/strategy/confidence）。"""
+    return {
+        "old_selector": old_selector[:_FIELD_MAX_LEN],
+        "new_selector": str(result.new_selector_desc)[:_FIELD_MAX_LEN],
+        "strategy": result.strategy,
+        "confidence": result.confidence,
+    }
+
+
 def try_heal(
     page: "Page", step: Dict[str, Any], case_id: str, step_index: int
 ) -> Optional[HealResult]:
