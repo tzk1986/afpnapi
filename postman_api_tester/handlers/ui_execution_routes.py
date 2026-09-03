@@ -743,6 +743,8 @@ def ui_testing_report_page(job_id: str) -> ResponseReturnValue:
                 "duration_s": f"{duration_ms / 1000:.2f}",
                 "error": s.get("error", ""),
                 "screenshot": s.get("screenshot", False),
+                "healed": s.get("healed", False),
+                "heal_info": s.get("heal_info", {}),
                 "_diag": s.get("_diag", {}),
                 "_pre_newtab_diag": s.get("_pre_newtab_diag", {}),
             }

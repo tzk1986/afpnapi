@@ -482,6 +482,64 @@ class TestEngineHookGate:
         assert sink_events[-1]["confidence"] == 95
 
 
+class TestStoreHealKeys:
+    """S2.1/M4：store 四处键增量 + 旧记录 .get 兼容。"""
+
+    def _store(self, tmp_path: Any) -> Any:
+        from postman_api_tester.services.ui_execution_store import UiExecutionStore
+
+        return UiExecutionStore(base_dir=tmp_path)
+
+    def test_create_record_zero_default(self, tmp_path: Any) -> None:
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "headless", "用例")
+        assert store.get_result(job)["healed_steps"] == 0  # type: ignore[index]
+
+    def test_finalize_small_summary_default(self, tmp_path: Any) -> None:
+        # M4 风险 1：manager 异常分支固定小 dict 无 healed_steps 键 → 默认 0 不 KeyError
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "headless", "用例")
+        store.finalize_job(job, "failed", {"status": "failed"})
+        assert store.get_result(job)["healed_steps"] == 0  # type: ignore[index]
+
+    def test_finalize_reads_summary(self, tmp_path: Any) -> None:
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "headless", "用例")
+        store.finalize_job(job, "passed", {"healed_steps": 3})
+        assert store.get_result(job)["healed_steps"] == 3  # type: ignore[index]
+
+    def test_update_step_conditional_double_write(self, tmp_path: Any) -> None:
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "headless", "用例")
+        heal_info = {"old_selector": "#a", "new_selector": "#b", "strategy": "test_id", "confidence": 95}
+        store.update_step(job, {"index": 0, "status": "passed", "healed": True, "heal_info": heal_info})
+        # post-check 二次回写（不含 heal 键）：合并分支保留 heal 字段
+        store.update_step(job, {"index": 0, "status": "failed", "error": "重定向"})
+        step = store.get_result(job)["steps"][0]  # type: ignore[index]
+        assert step["healed"] is True and step["heal_info"] == heal_info
+        assert step["status"] == "failed"
+
+    def test_update_step_no_heal_keys_untouched(self, tmp_path: Any) -> None:
+        # browser 模式步骤不产 heal 键 → 不得凭空加字段
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "browser_replay", "用例")
+        store.update_step(job, {"index": 0, "status": "passed"})
+        store.update_step(job, {"index": 0, "status": "passed", "duration_ms": 5})
+        assert "healed" not in store.get_result(job)["steps"][0]  # type: ignore[index]
+
+    def test_list_results_projection_old_record(self, tmp_path: Any) -> None:
+        import json as _json
+
+        store = self._store(tmp_path)
+        job = store.create_job("c1", "headless", "旧记录")
+        legacy = {"job_id": job, "case_id": "c1", "status": "passed", "steps": []}
+        (store.base_dir / f"exec_{job}" / "result.json").write_text(
+            _json.dumps(legacy), encoding="utf-8"
+        )
+        items = store.list_results()
+        assert items and items[0]["healed_steps"] == 0  # F-10 旧记录兼容
+
+
 class TestFindElementHookProtection:
     """V6-1/V6-2：钩子经 _find_element 的端到端保护。"""
 
