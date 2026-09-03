@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 from dataclasses import dataclass
@@ -243,10 +244,144 @@ def _resolve_role_and_name(step: Dict[str, Any]) -> Tuple[str, str]:
     return role, name
 
 
-# 四级策略声明表（v2 N-5 表驱动；③text 模糊 / ④xpath-LCS 于 S1.5 接入）
+def _heal_by_text(page: "Page", step: Dict[str, Any]) -> Optional[HealResult]:
+    """策略③（置信 75）：get_by_text(text, exact=False) + tag 过滤（M8）。"""
+    info = _element_info(step)
+    text = str(info.get("text") or "").strip()
+    if not text:
+        return None
+    tag = str(info.get("tag") or "").lower()
+    try:
+        if re.fullmatch(r"[a-z][a-z0-9]*", tag):
+            locator = page.locator(tag).get_by_text(text, exact=False)
+        else:
+            locator = page.get_by_text(text, exact=False)
+    except Exception:  # noqa: BLE001 - 构建失败视为未命中
+        return None
+    if not _adopt_candidate(locator):
+        return None
+    return HealResult(
+        locator=locator,
+        strategy="text",
+        confidence=CONF_TEXT,
+        new_selector_desc=f"text={text}"[:_FIELD_MAX_LEN],
+    )
+
+
+# 策略④现场 xpath 采集 JS（v2 N-13 仅主文档；M8 风险 2：走 arg 传参零拼接）
+_XPATH_PROBE_JS = """(args) => {
+  const out = [];
+  const els = document.getElementsByTagName(args.tag);
+  const limit = Math.min(els.length, args.max);
+  for (let i = 0; i < limit; i++) {
+    const el = els[i];
+    const segs = [];
+    let node = el;
+    while (node && node.nodeType === 1 && node.parentNode) {
+      let idx = 1;
+      let sib = node.previousElementSibling;
+      while (sib) {
+        if (sib.tagName === node.tagName) idx++;
+        sib = sib.previousElementSibling;
+      }
+      segs.push(node.tagName.toLowerCase() + '[' + idx + ']');
+      node = node.parentNode;
+    }
+    segs.reverse();
+    const cls = (el.className || '');
+    out.push({
+      tag: el.tagName.toLowerCase(),
+      id: el.id || '',
+      cls: String(cls).split(/\\s+/).slice(0, 2).join(' '),
+      text: (el.textContent || '').trim().slice(0, 80),
+      testid: el.getAttribute('data-testid') || '',
+      xpath: '/' + segs.join('/'),
+    });
+  }
+  return out;
+}"""
+
+# 路径段结构（tag+index 序列）提取：不含 class/text 加分（M8 风险 4 规避）
+_XPATH_SEGMENT_RE = re.compile(r"([a-zA-Z][\w:-]*)")
+
+
+def _xpath_segments(xpath: str) -> List[str]:
+    """xpath → 段结构列表：`//div[1]/button[2]` → ['div[1]', 'button[2]']。"""
+    segs: List[str] = []
+    for part in xpath.split("/"):
+        part = part.strip()
+        if not part:
+            continue
+        segs.append(part)
+    return segs
+
+
+def _score_xpath(target: str, candidate: str) -> int:
+    """difflib LCS 连续分（0~100），只比对路径段结构序列。"""
+    ratio = difflib.SequenceMatcher(
+        None, _xpath_segments(target), _xpath_segments(candidate)
+    ).ratio()
+    return int(ratio * 100)
+
+
+def _heal_by_xpath_lcs(page: "Page", step: Dict[str, Any]) -> Optional[HealResult]:
+    """策略④（连续分）：fallback_xpath 与现场同 tag 元素 xpath 做 LCS，取最优唯一。"""
+    selector = step.get("selector")
+    target = ""
+    if isinstance(selector, dict):
+        target = str(
+            selector.get("fallback_xpath") or selector.get("primary") or ""
+        ).strip()
+    elif selector:
+        target = str(selector).strip()
+    if not target.startswith(("/", "(")):
+        return None
+
+    info = _element_info(step)
+    tag = str(info.get("tag") or "").lower()
+    if not re.fullmatch(r"[a-z][a-z0-9]*", tag):
+        tail = [s for s in _xpath_segments(target) if s]
+        match = _XPATH_SEGMENT_RE.match(tail[-1]) if tail else None
+        tag = match.group(1).lower() if match else ""
+    if not tag:
+        return None
+
+    try:
+        candidates = page.evaluate(_XPATH_PROBE_JS, {"tag": tag, "max": 200})
+    except Exception:  # noqa: BLE001 - 采集失败视为未命中
+        return None
+    if not isinstance(candidates, list):
+        return None
+
+    scored = sorted(
+        (c for c in candidates if isinstance(c, dict) and c.get("xpath")),
+        key=lambda c: -_score_xpath(target, str(c["xpath"])),
+    )
+    for cand in scored:
+        cand_xpath = str(cand["xpath"])
+        score = _score_xpath(target, cand_xpath)
+        if score < CONF_TEXT:  # 低于 ③ 固定分即无继续价值（降序剪枝）
+            break
+        try:
+            locator = page.locator(f"xpath={cand_xpath}")
+        except Exception:  # noqa: BLE001
+            continue
+        if _adopt_candidate(locator):
+            return HealResult(
+                locator=locator,
+                strategy="xpath_lcs",
+                confidence=score,
+                new_selector_desc=cand_xpath[:_FIELD_MAX_LEN],
+            )
+    return None
+
+
+# 四级策略声明表（v2 N-5 表驱动；④ xpath-lcs 为连续分，表内分值仅为序占位）
 STRATEGY_SPECS: List[Tuple[str, int, Callable[["Page", Dict[str, Any]], Optional[HealResult]]]] = [
     ("test_id", CONF_TESTID, _heal_by_testid),
     ("role_text", CONF_ROLE, _heal_by_role_text),
+    ("text", CONF_TEXT, _heal_by_text),
+    ("xpath_lcs", 0, _heal_by_xpath_lcs),
 ]
 
 
