@@ -112,6 +112,8 @@
         .status-dot.passed { background: #10b981; }
         .status-dot.failed { background: #ef4444; }
         .status-dot.skipped { background: #d1d5db; }
+        .heal-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: #fff7ed; color: #9a3412; white-space: nowrap; }
+        .stat-card.healed .stat-value { color: #9a3412; }
 
         .error-text { color: #ef4444; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
         .error-text:hover { text-decoration: underline; }
@@ -189,6 +191,10 @@
                 <div class="stat-value" id="stepsFailed">{{ steps_failed }}</div>
                 <div class="stat-label">失败</div>
             </div>
+            <div class="stat-card healed">
+                <div class="stat-value" id="stepsHealed">{{ steps | selectattr('healed') | list | length }}</div>
+                <div class="stat-label">自愈</div>
+            </div>
             <div class="stat-card duration">
                 <div class="stat-value" id="durationS">{{ duration_s }}s</div>
                 <div class="stat-label">总耗时</div>
@@ -236,7 +242,7 @@
                         <td><span class="action-badge {% if step.action in ['assert_visible', 'assert_text', 'assert_text_exists', 'assert_element_exists', 'assert_url', 'assert_title', 'assert_count', 'assert_value', 'assert_enabled', 'assert_disabled', 'assert_not_visible', 'assert_attribute', 'assert_toast', 'assert_css', 'assert_checked', 'assert_dialog', 'assert_cookie'] %}action-assert{% else %}action-{{ step.action }}{% endif %}">{{ step.action_label }}</span></td>
                         <td class="selector-cell" title="{{ step.selector_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'selector')">{{ step.selector_display }}</td>
                         <td class="value-cell" title="{{ step.value_display }}" onclick="viewTextDetail({{ loop.index0 }}, 'value')">{{ step.value_display }}</td>
-                        <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}</td>
+                        <td><span class="status-dot {{ step.status }}"></span>{{ step.status_label }}{% if step.healed %}<span class="heal-badge" title="原:{{ step.heal_info.old_selector }} → 新:{{ step.heal_info.new_selector }} ({{ step.heal_info.strategy }}/{{ step.heal_info.confidence }})">已自愈</span>{% endif %}</td>
                         <td class="duration-cell">{{ step.duration_s }}s</td>
                         <td class="error-text" title="{{ step.error }}" onclick="viewTextDetail({{ loop.index0 }}, 'error')">{{ step.error }}</td>
                         <td>{% if step.status == 'failed' or step.screenshot %}<a class="screenshot-link" data-step="{{ loop.index0 }}" data-status="{{ step.status }}" onclick="viewScreenshot(this)">截图</a>{% endif %}{% if step.status == 'failed' %} <a class="screenshot-link" data-step="{{ loop.index0 }}" onclick="viewErrorLog(this)">日志</a>{% endif %}</td>
@@ -309,9 +315,11 @@
             var sPassed = data.steps_passed || 0;
             var sFailed = data.steps_failed || 0;
 
+            var sHealed = steps.filter(function(x) { return x.healed; }).length;
             document.getElementById('stepsTotal').textContent = sTotal;
             document.getElementById('stepsPassed').textContent = sPassed;
             document.getElementById('stepsFailed').textContent = sFailed;
+            document.getElementById('stepsHealed').textContent = sHealed;
 
             var durationMs = data.total_duration_ms || 0;
             document.getElementById('durationS').textContent = (durationMs / 1000).toFixed(2) + 's';
@@ -411,7 +419,7 @@
                     cells[3].title = s.value || '';
                     cells[3].onclick = function() { viewTextDetail(i, 'value'); };
                     var sLabels = {'passed': '通过', 'failed': '失败', 'skipped': '跳过', 'error': '错误', 'not_executed': '未执行'};
-                    cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (isCascade ? '级联失败' : (sLabels[s.status] || s.status));
+                    cells[4].innerHTML = '<span class="status-dot ' + s.status + '"></span>' + (isCascade ? '级联失败' : (sLabels[s.status] || s.status)) + healBadgeHtml(s);
                     cells[5].textContent = ((s.duration_ms || 0) / 1000).toFixed(2) + 's';
                     cells[6].textContent = (s.error || '').substring(0, 200);
                     cells[6].title = s.error || '';
@@ -425,6 +433,14 @@
                     tbody.insertAdjacentHTML('beforeend', renderStepRow(steps[i], i, cascadeFrom));
                 }
             }
+        }
+
+        function healBadgeHtml(s) {
+            if (!s.healed) return '';
+            var info = s.heal_info || {};
+            return '<span class="heal-badge" title="原:' + escapeHtml(info.old_selector || '') +
+                ' → 新:' + escapeHtml(info.new_selector || '') +
+                ' (' + escapeHtml(info.strategy || '') + '/' + (info.confidence || '') + ')">已自愈</span>';
         }
 
         function renderStepRow(s, idx, cascadeFrom) {
@@ -444,7 +460,7 @@
                 '<td><span class="action-badge ' + getActionClass(s.action) + '">' + getActionLabel(s.action) + '</span></td>' +
                 '<td class="selector-cell" title="' + escapeHtml(sel) + '" onclick="viewTextDetail(' + idx + ', \'selector\')">' + escapeHtml(sel) + '</td>' +
                 '<td class="value-cell" title="' + escapeHtml(s.value || '') + '" onclick="viewTextDetail(' + idx + ', \'value\')">' + escapeHtml((s.value || '').toString().substring(0, 60)) + '</td>' +
-                '<td><span class="status-dot ' + s.status + '"></span>' + statusLabel + '</td>' +
+                '<td><span class="status-dot ' + s.status + '"></span>' + statusLabel + healBadgeHtml(s) + '</td>' +
                 '<td class="duration-cell">' + ((s.duration_ms || 0) / 1000).toFixed(2) + 's</td>' +
                 '<td class="error-text" title="' + escapeHtml(s.error || '') + '" onclick="viewTextDetail(' + idx + ', \'error\')">' + escapeHtml((s.error || '').substring(0, 200)) + '</td>' +
                 '<td>' + screenshotCell + '</td>' +
