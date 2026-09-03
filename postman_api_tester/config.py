@@ -513,3 +513,8 @@ UI_HEADLESS_BROWSER = (
 
 # UI_HEADLESS_TIMEOUT_S: 无头执行全局超时（秒）
 UI_HEADLESS_TIMEOUT_S = _env_int("UI_HEADLESS_TIMEOUT_S", 300, lo=30, hi=3600)
+
+# UI 自愈（仅无头引擎；回放引擎暂不支持，见方案 v3）
+UI_SELF_HEALING_ENABLED = _env_bool("UI_SELF_HEALING_ENABLED", "false")
+UI_HEALING_CONFIDENCE = _env_int("UI_HEALING_CONFIDENCE", 70, lo=10, hi=100)  # 整数百分比
+UI_HEALING_MAX_PER_CASE = _env_int("UI_HEALING_MAX_PER_CASE", 5, lo=1, hi=50)  # 单用例尝试数熔断上限
