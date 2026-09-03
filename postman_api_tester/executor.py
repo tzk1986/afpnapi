@@ -461,7 +461,7 @@ class PostmanTestExecutor:
 
             # 结果判定
             judgment_passed, judgment_fail_reason = self._evaluate_judgment(
-                api, status_code, err_code, response_message
+                api, status_code, err_code, response_message, response_data
             )
 
             if judgment_passed:
@@ -690,9 +690,19 @@ class PostmanTestExecutor:
         )
 
     def _evaluate_judgment(
-        self, api: ApiConfig, status_code: int, err_code: str, response_message: str
+        self,
+        api: ApiConfig,
+        status_code: int,
+        err_code: str,
+        response_message: str,
+        response_data: object,
     ) -> Tuple[bool, str]:
-        """评估结果判定，返回 (passed, fail_reason)。"""
+        """评估结果判定，返回 (passed, fail_reason)。
+
+        v1.37.22: 内置维度通过后追加自定义判定规则（x_judgment_rules，AND 语义）；
+        内置已失败不评自定义（保持短路顺序）；errCode/message 均关闭时视为
+        主判定关闭态，自定义规则一并跳过（状态码兜底保留，设计红线）。
+        """
         expected_status_value = api.get("expected_status")
         expected_status = (
             expected_status_value if isinstance(expected_status_value, int) else 200
@@ -721,7 +731,7 @@ class PostmanTestExecutor:
             task_success_messages=_opt_str(task_jcfg.get("success_messages")),
         )
 
-        return evaluate_result_judgment(
+        passed, fail_reason = evaluate_result_judgment(
             status_code=status_code,
             expected_status=expected_status,
             err_code=err_code,
@@ -731,6 +741,43 @@ class PostmanTestExecutor:
             enable_err_code_judgment=judgment_params["enable_err_code_judgment"],
             enable_message_judgment=judgment_params["enable_message_judgment"],
         )
+        if not passed:
+            return passed, fail_reason
+        return self._evaluate_custom_judgment_rules(api, response_data, judgment_params)
+
+    def _evaluate_custom_judgment_rules(
+        self,
+        api: ApiConfig,
+        response_data: object,
+        judgment_params: Dict[str, object],
+    ) -> Tuple[bool, str]:
+        """v1.37.22: 自定义一级判定规则评估（复用断言引擎求值，AND 聚合）。"""
+        raw_rules = api.get("x_judgment_rules")
+        rules = (
+            [item for item in raw_rules if isinstance(item, dict)]
+            if isinstance(raw_rules, list)
+            else []
+        )
+        if not rules:
+            return True, ""
+        enable_err = judgment_params.get("enable_err_code_judgment")
+        enable_msg = judgment_params.get("enable_message_judgment")
+        if not enable_err and not enable_msg:
+            return True, ""
+        if not _ASSERTIONS_AVAILABLE:
+            return False, "自定义判定失败: jsonpath_ng 未安装，无法评估 x_judgment_rules"
+        try:
+            results = _evaluate_assertions(response_data, rules)
+        except Exception as judgment_exc:
+            return False, f"自定义判定失败: 判定引擎异常: {judgment_exc}"
+        failed_msgs = [
+            str(r.get("message") or f"{r.get('path')} {r.get('op')} 判定失败")
+            for r in results
+            if not r.get("passed")
+        ]
+        if failed_msgs:
+            return False, "自定义判定失败: " + "; ".join(failed_msgs)
+        return True, ""
 
     def _run_assertions(
         self, api: ApiConfig, response_data: object

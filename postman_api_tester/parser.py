@@ -56,6 +56,7 @@ class ApiConfig(TypedDict, total=False):
     x_enable_message_judgment: Optional[bool]
     x_skip_shared_assertions: Optional[bool]
     x_shared_assertions: Optional[List[AssertionConfig]]
+    x_judgment_rules: Optional[List[AssertionConfig]]
     x_extract: Optional[Dict[str, str]]
     x_pre_request: Optional[Dict[str, str]]
     x_repeat: Optional[int]
@@ -299,6 +300,13 @@ class PostmanApiParser:
         )
         if assertion_rules:
             extensions["x_assertions"] = assertion_rules
+
+        # v1.37.22: 自定义一级判定规则（复用断言三元组结构，判定阶段执行）
+        judgment_rules = normalize_assertion_rules(
+            request.get("x_judgment_rules"), source="parser"
+        )
+        if judgment_rules:
+            extensions["x_judgment_rules"] = judgment_rules
 
         return extensions
 
