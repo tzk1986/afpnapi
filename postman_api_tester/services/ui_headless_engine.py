@@ -12,6 +12,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from postman_api_tester.config import (
+    UI_HEALING_CONFIDENCE,
+    UI_HEALING_MAX_PER_CASE,
+    UI_SELF_HEALING_ENABLED,
+)
+from postman_api_tester.services import ui_healing
+
 logger = logging.getLogger(__name__)
 
 # 无头执行日志目录
@@ -186,6 +193,17 @@ class UiHeadlessEngine:
             )
         self._browser_type = browser_type
         self._screenshots_dir = screenshots_dir
+        # UI 自愈上下文（V6-1 定稿 9 属性 + _heal_ctx 承载 case_id；登录链路全程默认 False）
+        self._job_id: str = ""
+        self._healing_active: bool = False
+        self._heal_ctx: str = ""
+        self._current_step_index: int = -1
+        self._current_action: str = ""
+        self._current_step: Optional[Dict[str, Any]] = None
+        self._last_heal: Optional[Dict[str, Any]] = None
+        self._heal_attempts: int = 0
+        self._healed_steps: int = 0
+        self._heal_once: set = set()
 
     def execute(
         self,
@@ -210,6 +228,9 @@ class UiHeadlessEngine:
             on_browser_ready: 浏览器启动完成回调 () -> None
             auth_state_path: Playwright storage_state JSON 文件路径（可选）
         """
+        self._job_id = job_id
+        self._healing_active = True
+        self._heal_ctx = str(options.get("case_id", "") or "")
         timeout_ms = options.get("timeout", DEFAULT_TIMEOUT_MS)
         delay_ms = options.get("delay_between_steps", 200)
         viewport_w = options.get("viewport_width", 1280)
