@@ -184,9 +184,14 @@ def _parse_request_node(
 
     # 提取 x_assertions（经归一化过滤非法项）
     x_assertions: List[Dict[str, Any]] = []
+    x_judgment_rules: List[Dict[str, Any]] = []
     if isinstance(request_obj, dict):
         x_assertions = normalize_assertion_rules(
             request_obj.get("x_assertions"), source="editor-parse"
+        )
+        # v1.37.22: 自定义一级判定规则往返
+        x_judgment_rules = normalize_assertion_rules(
+            request_obj.get("x_judgment_rules"), source="editor-parse"
         )
 
     # v1.37.18: 判定字段往返（缺失=None，编辑器不丢手工配置）
@@ -201,6 +206,7 @@ def _parse_request_node(
         "body_data": body_data,
         "x_extract": x_extract,
         "x_assertions": x_assertions,
+        "x_judgment_rules": x_judgment_rules,
         "description": item.get("description", ""),
         "x_enable_err_code_judgment": None,
         "x_enable_message_judgment": None,
@@ -387,6 +393,13 @@ def _build_request_object(request: Dict[str, Any]) -> Dict[str, Any]:
     )
     if x_assertions:
         postman_req["x_assertions"] = x_assertions
+
+    # v1.37.22: 自定义一级判定规则写回（再次归一化，空不写）
+    x_judgment_rules = normalize_assertion_rules(
+        request.get("x_judgment_rules"), source="editor-build"
+    )
+    if x_judgment_rules:
+        postman_req["x_judgment_rules"] = x_judgment_rules
 
     # v1.37.18: 判定字段写回（bool 三字段 is-not-None 才写且严格 isinstance 防御；
     # success 两字段非空 str 才写——编辑器不编辑、仅保留不丢失）

@@ -1692,6 +1692,14 @@
             html += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;user-select:none;margin-top:6px;">
                 <input type="checkbox" ${req.x_skip_shared_assertions === true ? 'checked' : ''} onchange="updateJudgmentSkip(this.checked)"> 共享断言豁免（本接口不执行集合共享断言，只执行自己的断言）
             </label>`;
+            // v1.37.22 自定义一级判定规则（判定阶段执行，任一失败短路断言）
+            const jRules = Array.isArray(req.x_judgment_rules) ? req.x_judgment_rules : [];
+            html += '<div style="margin-top:10px;">';
+            html += '<div style="font-weight:600;font-size:12px;margin-bottom:4px;">自定义判定规则（内置判定通过后执行，任一失败 → 判 FAILED 且不再执行断言）</div>';
+            html += '<div style="margin-bottom:6px;font-size:12px;color:#666;">与断言结构相同、阶段不同：判定失败会短路断言；任务级勾选「关闭一级判定」或本接口 errCode/message 均强制关闭时，这些规则一并不执行。「成功标准」类规则建议放断言（关闭判定时仍执行）。</div>';
+            html += renderAssertionRuleRows(jRules, 'Judgment');
+            html += `<button type="button" class="btn btn-secondary" onclick="addJudgmentRule()" style="font-size:12px;">+ 添加判定规则</button>`;
+            html += '</div>';
             html += '</div>';
 
             // v1.37.18 集合共享断言小节（集合属性，对本集合全部接口生效）
@@ -1725,6 +1733,44 @@
             if (!state.editBuffer) return;
             state.editBuffer.x_skip_shared_assertions = checked ? true : null;
             syncToAllRequests();
+        }
+
+        // v1.37.22 自定义判定规则 handler（作用于 editBuffer.x_judgment_rules）
+        function addJudgmentRule() {
+            if (state.editBuffer) {
+                if (!Array.isArray(state.editBuffer.x_judgment_rules)) state.editBuffer.x_judgment_rules = [];
+                state.editBuffer.x_judgment_rules.push({path: '', op: 'eq', expected: null});
+                syncToAllRequests();
+                renderEditor();
+            }
+        }
+
+        function removeJudgmentAssertion(index) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_judgment_rules)) {
+                state.editBuffer.x_judgment_rules.splice(index, 1);
+                syncToAllRequests();
+                renderEditor();
+            }
+        }
+
+        function updateJudgmentAssertionField(index, field, value) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_judgment_rules)) {
+                const rule = state.editBuffer.x_judgment_rules[index];
+                if (!rule) return;
+                rule[field] = field === 'expected' ? parseAssertionExpected(value) : value;
+                syncToAllRequests();
+            }
+        }
+
+        function updateJudgmentAssertionOp(index, op) {
+            if (state.editBuffer && Array.isArray(state.editBuffer.x_judgment_rules)) {
+                const rule = state.editBuffer.x_judgment_rules[index];
+                if (!rule) return;
+                rule.op = op;
+                if (op === 'exists' || op === 'not_exists') rule.expected = null;
+                syncToAllRequests();
+                renderEditor();
+            }
         }
 
         function ensureSharedAssertions() {
