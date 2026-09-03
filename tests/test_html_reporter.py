@@ -300,6 +300,72 @@ class TestBuildReportMetadata:
         assert meta["interrupted"] is True
         assert meta["interrupt_reason"] == "timeout"
 
+    def test_assertion_fields_persisted(self) -> None:
+        # v1.37.20 回归防线：断言明细必须随 meta 落盘，否则在线详情弹窗永远为空
+        result = _make_result(
+            status="FAILED",
+            message="断言失败: $.errCode: 100001 eq 100002 断言失败",
+        )
+        result["assertion_results"] = [
+            {
+                "path": "$.errCode",
+                "op": "eq",
+                "expected": 100002,
+                "actual": 100001,
+                "passed": False,
+                "message": "断言失败",
+            }
+        ]
+        result["assertion_engine_error"] = ""
+        report = _make_mock_report([result])
+        summary = report.generate_summary()
+        meta = HtmlReporter._build_report_metadata(
+            report, summary, "/tmp/r.html", "/tmp/r_details.json"
+        )
+
+        entry = meta["results"][0]
+        assert entry["assertion_results"][0]["path"] == "$.errCode"
+        assert entry["assertion_results"][0]["passed"] is False
+        assert entry["assertion_engine_error"] == ""
+
+    def test_missing_assertion_fields_default_empty(self) -> None:
+        result = _make_result()
+        report = _make_mock_report([result])
+        summary = report.generate_summary()
+        meta = HtmlReporter._build_report_metadata(
+            report, summary, "/tmp/r.html", "/tmp/r_details.json"
+        )
+
+        entry = meta["results"][0]
+        assert entry["assertion_results"] == []
+        assert entry["assertion_engine_error"] == ""
+
+    def test_meta_json_on_disk_contains_assertion_results(
+        self, tmp_path: Path
+    ) -> None:
+        # 端到端钉桩：executor 写入 → generate_html_report → meta.json 落盘可见
+        result = _make_result(status="FAILED")
+        result["assertion_results"] = [
+            {"path": "$.data", "op": "exists", "expected": None,
+             "actual": "x", "passed": True, "message": ""}
+        ]
+        report = _make_mock_report([result])
+        output_path = str(tmp_path / "report.html")
+
+        with patch.object(
+            HtmlReporter, "_generate_index_html", return_value="<html></html>"
+        ):
+            with patch.object(
+                HtmlReporter, "_generate_page_html", return_value="<html></html>"
+            ):
+                HtmlReporter.generate_html_report(
+                    report, output_path, results_per_page=30
+                )
+
+        with (tmp_path / "report_meta.json").open("r", encoding="utf-8") as f:
+            meta = json.load(f)
+        assert meta["results"][0]["assertion_results"][0]["path"] == "$.data"
+
 
 class TestGenerateHtmlReport:
     """Tests for generate_html_report static method."""

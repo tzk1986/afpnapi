@@ -245,6 +245,10 @@ class HtmlReporter:
                     "message": result.get("message", ""),
                     "err_code": result.get("err_code", ""),
                     "response_time_ms": result.get("response_time_ms", 0),
+                    # v1.37.20: 断言明细必须随 meta 落盘，否则在线详情弹窗与
+                    # analytics 断言覆盖率永远消费不到（写侧缺口回归防线）
+                    "assertion_results": result.get("assertion_results") or [],
+                    "assertion_engine_error": result.get("assertion_engine_error") or "",
                 }
                 for result in report.results
             ],
