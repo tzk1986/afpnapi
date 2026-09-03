@@ -2301,6 +2301,9 @@
         let execPollTimer = null;
 
         function collectionHasAnyAssertions() {
+            // v1.37.19: 集合共享断言同样计入，避免"仅配共享断言"时误弹确认
+            const shared = state.collection && state.collection.x_shared_assertions;
+            if (Array.isArray(shared) && shared.length > 0) return true;
             const groups = (state.collection && state.collection.groups) || [];
             const walk = function(gs) {
                 for (const g of gs) {

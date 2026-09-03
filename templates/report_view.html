@@ -68,7 +68,7 @@
         .pager-info { text-align: center; color: #64748b; margin-top: 4px; }
         .detail-mask { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.48); display: none; align-items: center; justify-content: center; padding: 20px; }
         .detail-mask.show { display: flex; }
-        .detail-dialog { width: min(1100px, 100%); max-height: 90vh; overflow: auto; background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24); }
+        .detail-dialog { width: min(1100px, 100%); max-height: 90vh; overflow: auto; background: #fff; border-radius: 18px; padding: 20px; box-shadow: 0 18px 44px rgba(15, 23, 42, 0.24); min-width: 0; }
         .detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 16px; }
         .detail-head-main { flex: 1; min-width: 0; }
         .detail-head h3 { margin: 0 0 6px; }
@@ -3080,11 +3080,11 @@ function renderAssertionResultsHtml(data) {
         if (typeof v === 'object') { try { return JSON.stringify(v); } catch (e) { return String(v); } }
         return String(v);
     };
-    const th = 'padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:left;';
-    const td = 'padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:ui-monospace,Consolas,monospace;word-break:break-all;';
+    const th = 'padding:4px 8px;border-bottom:1px solid #e2e8f0;text-align:left;position:sticky;top:0;background:#fff;';
+    const td = 'padding:4px 8px;border-bottom:1px solid #f1f5f9;font-family:ui-monospace,Consolas,monospace;overflow-wrap:anywhere;word-break:break-all;';
     const rows = results.map((r) => `
         <tr>
-            <td style="${td}">${r.passed ? '✅' : '❌'}</td>
+            <td style="${td}text-align:center;">${r.passed ? '✅' : '❌'}</td>
             <td style="${td}">${escapeHtml(fmt(r.path))}</td>
             <td style="${td}">${escapeHtml(fmt(r.op))}</td>
             <td style="${td}">${escapeHtml(fmt(r.expected))}</td>
@@ -3092,14 +3092,26 @@ function renderAssertionResultsHtml(data) {
             <td style="${td}">${escapeHtml(fmt(r.message))}</td>
         </tr>`).join('');
     const failedCount = results.filter((r) => !r.passed).length;
-    let html = `<div class="detail-card" style="margin-bottom:12px;padding:10px 12px;">
+    // v1.37.21: table-layout:fixed + colgroup 定宽，长文本在单元格内换行，
+    // 断言内容长短不再撑破弹窗布局（原 auto 布局下说明列被裁到视口外）
+    let html = `<div class="detail-card" style="margin-bottom:12px;padding:10px 12px;min-width:0;">
         <div class="detail-card-head"><h4>断言结果（${results.length} 条${failedCount ? '，失败 ' + failedCount + ' 条' : '，全部通过'}）</h4></div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <div style="overflow:auto;max-height:320px;min-width:0;">
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;">
+            <colgroup>
+                <col style="width:36px;">
+                <col style="width:22%;">
+                <col style="width:8%;">
+                <col style="width:22%;">
+                <col style="width:22%;">
+                <col>
+            </colgroup>
             <thead><tr style="color:#64748b;">
                 <th style="${th}"></th><th style="${th}">path</th><th style="${th}">op</th><th style="${th}">expected</th><th style="${th}">actual</th><th style="${th}">说明</th>
             </tr></thead>
             <tbody>${rows}</tbody>
-        </table>`;
+        </table>
+        </div>`;
     if (engineError) {
         html += `<div style="margin-top:6px;color:#b45309;font-size:12px;">⚠ 断言引擎异常：${escapeHtml(fmt(engineError))}</div>`;
     }
