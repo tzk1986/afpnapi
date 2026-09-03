@@ -310,9 +310,15 @@
                             <input id="judgmentSuccessMessages" type="text" placeholder="默认值: success">
                         </div>
                     </div>
+                    <div style="margin-top:12px;">
+                        <div style="font-weight:600;font-size:13px;color:#334155;margin-bottom:4px;">自定义判定规则（可选，对本次执行的每个接口生效）</div>
+                        <div class="selector-tip" style="margin-bottom:6px;">内置判定（状态码/errCode/message）通过后追加评估，任一失败 → FAILED 且不再执行断言。与接口级 x_judgment_rules 合并执行，任务级在前。</div>
+                        <div id="judgmentRulesRows"></div>
+                        <button type="button" onclick="addJudgmentRuleRow()" style="font-size:12px;padding:4px 10px;cursor:pointer;">+ 添加判定规则</button>
+                    </div>
                     <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:#334155;cursor:pointer;user-select:none;">
                         <input id="judgmentDisableFirstLevel" type="checkbox" style="cursor:pointer;">
-                        关闭一级判定（errCode/message），仅按 HTTP 状态码 + JSONPath 断言判定成败（调试用；若集合无断言，结果近乎恒 PASSED）
+                        关闭一级判定（errCode/message），仅按 HTTP 状态码 + JSONPath 断言判定成败（调试用；若集合无断言，结果近乎恒 PASSED；勾选后上方自定义判定规则一并不执行）
                     </label>
                     <div class="selector-tip" style="margin-top:6px;">提示：不填写则使用全局默认配置；填写后仅对本次执行生效。优先级：此处配置 &gt; 集合内接口级 x_* 字段 &gt; 全局 config。</div>
                 </div>
@@ -1190,6 +1196,69 @@ function toggleVarExample() {
     panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 }
 
+// v1.37.23: 任务级自定义判定规则（与编辑器断言三元组同结构，提交为 judgment_rules_json）
+const JUDGMENT_RULE_OPS = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'exists', 'not_exists', 'contains', 'regex', 'length_eq', 'type', 'schema'];
+
+function addJudgmentRuleRow() {
+    const wrap = document.getElementById('judgmentRulesRows');
+    if (!wrap) return;
+    const row = document.createElement('div');
+    row.className = 'judgment-rule-row';
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+    const path = document.createElement('input');
+    path.type = 'text';
+    path.placeholder = 'JSONPath（如 $.data.status）';
+    path.style.cssText = 'flex:2;border:1px solid #cbd5e1;border-radius:4px;padding:4px 6px;font-size:12px;';
+    const op = document.createElement('select');
+    op.style.cssText = 'flex:1;border:1px solid #cbd5e1;border-radius:4px;padding:4px 6px;font-size:12px;';
+    JUDGMENT_RULE_OPS.forEach(function (o) {
+        const opt = document.createElement('option');
+        opt.value = o;
+        opt.textContent = o;
+        op.appendChild(opt);
+    });
+    const exp = document.createElement('input');
+    exp.type = 'text';
+    exp.placeholder = 'expected（JSON 字面量）';
+    exp.style.cssText = 'flex:2;border:1px solid #cbd5e1;border-radius:4px;padding:4px 6px;font-size:12px;';
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '删除';
+    del.style.cssText = 'flex:0 0 auto;font-size:12px;padding:4px 10px;cursor:pointer;';
+    del.onclick = function () { row.remove(); };
+    op.onchange = function () {
+        const noExp = (op.value === 'exists' || op.value === 'not_exists');
+        exp.disabled = noExp;
+        if (noExp) exp.value = '';
+    };
+    row.appendChild(path);
+    row.appendChild(op);
+    row.appendChild(exp);
+    row.appendChild(del);
+    wrap.appendChild(row);
+}
+
+function collectJudgmentRules() {
+    const rules = [];
+    document.querySelectorAll('#judgmentRulesRows .judgment-rule-row').forEach(function (row) {
+        const inputs = row.querySelectorAll('input');
+        const sel = row.querySelector('select');
+        if (!inputs.length || !sel) return;
+        const path = inputs[0].value.trim();
+        if (!path) return;
+        const op = sel.value;
+        let expected = null;
+        if (op !== 'exists' && op !== 'not_exists') {
+            const raw = inputs[1].value.trim();
+            if (raw !== '') {
+                try { expected = JSON.parse(raw); } catch (e) { expected = raw; }
+            }
+        }
+        rules.push({path: path, op: op, expected: expected});
+    });
+    return rules;
+}
+
 async function startRunPostmanJob() {
     const fileInput = document.getElementById('collectionFile');
     const file = fileInput.files && fileInput.files[0];
@@ -1220,6 +1289,9 @@ async function startRunPostmanJob() {
     // v1.37.17 调试开关：勾选提交 judgment_disable_first_level=1（与编辑器执行同款字段）
     const jDisable = document.getElementById('judgmentDisableFirstLevel');
     if (jDisable && jDisable.checked) formData.append('judgment_disable_first_level', '1');
+    // v1.37.23: 任务级自定义判定规则（有效行才提交，JSON 数组字符串）
+    const jRules = collectJudgmentRules();
+    if (jRules.length) formData.append('judgment_rules_json', JSON.stringify(jRules));
     // 数据驱动文件（可选）
     const dataFileInput = document.getElementById('dataFileInput');
     if (dataFileInput && dataFileInput.files && dataFileInput.files[0]) {

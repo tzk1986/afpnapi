@@ -116,6 +116,7 @@ _RUN_POSTMAN_JOB_FN = partial(
 
 _DISABLE_FIRST_LEVEL_FORM_KEY = "judgment_disable_first_level"
 _ENABLE_JUDGMENT_BOOL_KEYS = ("enable_err_code_judgment", "enable_message_judgment")
+_TASK_RULES_FORM_KEY = "judgment_rules_json"
 
 
 def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
@@ -125,6 +126,10 @@ def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
     `judgment_disable_first_level=1`（HTML checkbox 勾选才提交）等价于同时把
     enable_err_code_judgment 与 enable_message_judgment 置 False，使本次执行仅
     由「HTTP 状态码 + JSONPath 断言」决定成败。未提交该字段时维持现状（None 透传）。
+
+    升级 v1.37.23：支持任务级自定义判定规则 `judgment_rules_json`（JSON 数组，
+    元素为 {path, op, expected} 三元组），归一化后挂 judgment_config.custom_rules，
+    执行时与接口级 x_judgment_rules 合并（任务在前）。非法 JSON 抛 ValueError。
     """
     config: Dict[str, Any] = {}
 
@@ -139,6 +144,18 @@ def _parse_judgment_config_from_form(form: Any) -> Optional[Dict[str, Any]]:
     if str(form.get(_DISABLE_FIRST_LEVEL_FORM_KEY) or "").strip() == "1":
         config["enable_err_code_judgment"] = False
         config["enable_message_judgment"] = False
+
+    # v1.37.23: 任务级自定义判定规则（judgment_rules_json，JSON 数组字符串），
+    # 解析后挂 custom_rules 键，executor 与接口级 x_judgment_rules 合并评估
+    raw_rules_json = form.get(_TASK_RULES_FORM_KEY)
+    if raw_rules_json is not None and str(raw_rules_json).strip():
+        try:
+            parsed_rules = json.loads(str(raw_rules_json).strip())
+        except (json.JSONDecodeError, ValueError):
+            raise ValueError("judgment_rules_json 必须是有效的 JSON 数组")
+        task_rules = normalize_assertion_rules(parsed_rules, source="task-form")
+        if task_rules:
+            config["custom_rules"] = task_rules
 
     return config if config else None
 
@@ -166,6 +183,12 @@ def _parse_judgment_config_from_payload(
         if raw_cfg.get("disable_first_level") is True:
             config["enable_err_code_judgment"] = False
             config["enable_message_judgment"] = False
+        # v1.37.23: 任务级自定义判定规则（judgment_config.custom_rules，数组）
+        task_rules = normalize_assertion_rules(
+            raw_cfg.get("custom_rules"), source="task-payload"
+        )
+        if task_rules:
+            config["custom_rules"] = task_rules
         return config if config else None
     return None
 
@@ -276,7 +299,10 @@ def api_run_postman() -> ResponseReturnValue:
             )
 
     # 解析可配置结果判定（judgment_config）
-    judgment_config = _parse_judgment_config_from_form(request.form)
+    try:
+        judgment_config = _parse_judgment_config_from_form(request.form)
+    except ValueError as exc:
+        return _json_error(str(exc), 400, "JOB_RUN_008")
 
     # 解析数据驱动文件（可选）
     data_file_path = ""

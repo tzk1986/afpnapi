@@ -751,13 +751,24 @@ class PostmanTestExecutor:
         response_data: object,
         judgment_params: Dict[str, object],
     ) -> Tuple[bool, str]:
-        """v1.37.22: 自定义一级判定规则评估（复用断言引擎求值，AND 聚合）。"""
+        """v1.37.22: 自定义一级判定规则评估（复用断言引擎求值，AND 聚合）。
+
+        v1.37.23: 追加任务级规则 judgment_config.custom_rules（Web 首页/JSON 提交），
+        任务规则在前、接口级 x_judgment_rules 在后；关闭一级判定的跳过语义不变。
+        """
+        task_raw = (self.judgment_config or {}).get("custom_rules")
+        task_rules = (
+            [item for item in task_raw if isinstance(item, dict)]
+            if isinstance(task_raw, list)
+            else []
+        )
         raw_rules = api.get("x_judgment_rules")
-        rules = (
+        item_rules = (
             [item for item in raw_rules if isinstance(item, dict)]
             if isinstance(raw_rules, list)
             else []
         )
+        rules = task_rules + item_rules
         if not rules:
             return True, ""
         enable_err = judgment_params.get("enable_err_code_judgment")
