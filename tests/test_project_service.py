@@ -563,3 +563,37 @@ def test_use_phase_declaration_check(env: _Env) -> None:
     with pytest.raises(ProjectError) as exc:
         env.svc.load_template_merged("tpl_evil")
     assert exc.value.code == "PRJ_203"
+
+
+def test_shipped_builtin_templates_valid_and_creatable(tmp_path: Path) -> None:
+    """S4.1 回归：随包 3 内置模板声明合法且各自可建项目（真实包目录，非 fixture）。"""
+    svc = ProjectService(
+        project_store=ProjectStore(projects_dir=tmp_path / "projects"),
+        template_store=ProjectTemplateStore(
+            user_dir=tmp_path / "empty_user_templates"
+        ),
+    )
+    items = svc.list_templates()["items"]
+    by_id = {str(t.get("id")): t for t in items}
+    for tid in ("tpl_api_basic", "tpl_api_esp", "tpl_api_payment"):
+        assert tid in by_id, f"内置模板缺失: {tid}"
+        tpl = by_id[tid]
+        assert tpl.get("source") == "builtin"
+        answers: Dict[str, Any] = {}
+        for var in tpl.get("variables") or []:
+            key = str(var["key"])
+            vtype = str(var.get("type") or "string")
+            if vtype == "enum":
+                answers[key] = (var.get("options") or [""])[0]
+            elif vtype == "bool":
+                answers[key] = bool(var.get("default"))
+            else:
+                answers[key] = str(var.get("default") or "冒烟值")
+        project = svc.create_project(
+            {"name": f"内置回归-{tid}", "template_id": tid, "variables": answers}
+        )
+        assert project["collections"], f"{tid} 未生成集合"
+        assert sum(int(c["request_count"]) for c in project["collections"]) >= 1
+        tracing = svc.get_tracing(project["id"])
+        assert int(tracing["total"]) >= 2, f"{tid} tracing 示例行缺失"
+        assert project["docs"].get("readme"), f"{tid} 缺 README"
