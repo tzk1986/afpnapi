@@ -448,7 +448,8 @@ def test_reconcile_done_after_restart(env: _Env, monkeypatch: pytest.MonkeyPatch
 
     def fake_find(name: str) -> Dict[str, Any]:
         assert name == "r1"
-        return {"passed": 3, "failed": 1}
+        # 真实 ReportRecord 结构：计数在 summary 嵌套层
+        return {"summary": {"passed": 3, "failed": 1}}
 
     monkeypatch.setattr(ps, "find_report", fake_find)
     detail = env.svc.get_project(pid)
@@ -486,7 +487,7 @@ def test_reconcile_memory_terminal_with_counts(
         env, [{"job_id": "j1", "report_name": "r1", "time": "t", "status": "running", "passed": None, "failed": None}]
     )
     monkeypatch.setattr(ps, "get_run_job", lambda jid: {"status": "success"})
-    monkeypatch.setattr(ps, "find_report", lambda name: {"passed": 5, "failed": 0})
+    monkeypatch.setattr(ps, "find_report", lambda name: {"summary": {"passed": 5, "failed": 0}})
     entry = env.svc.get_project(pid)["statistics"]["execution_history"][0]
     assert entry["status"] == "done"
     assert (entry["passed"], entry["failed"]) == (5, 0)

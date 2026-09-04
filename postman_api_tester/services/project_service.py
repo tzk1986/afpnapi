@@ -1115,11 +1115,12 @@ class ProjectService:
         except Exception as exc:
             logger.warning("对账读取报告失败 %s: %s", report_name, exc)
             return None
+        # 计数在 record["summary"] 嵌套层（report_repository.load_report_meta 结构）
+        summary = report.get("summary")
+        if not isinstance(summary, dict):
+            return None
         try:
-            return (
-                int(str(report.get("passed") or 0)),
-                int(str(report.get("failed") or 0)),
-            )
+            return (int(str(summary.get("passed") or 0)), int(str(summary.get("failed") or 0)))
         except (TypeError, ValueError):
             return None
 
