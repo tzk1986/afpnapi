@@ -122,6 +122,7 @@ def _copy_api_config(
         "x_skip_shared_assertions",
         "x_shared_assertions",
         "x_judgment_rules",
+        "x_shared_judgment_rules",
     ):
         if field in api:
             result[field] = api[field]
