@@ -259,12 +259,17 @@ def _mk_template(tid: str, **overrides: Any) -> Dict[str, Any]:
     return tpl
 
 
+def _put_template(root: Path, dirname: str, payload: Dict[str, Any]) -> Path:
+    d = root / dirname
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / "template.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
 def test_template_builtin_only(tmp_path: Path) -> None:
     builtin = tmp_path / "builtin"
-    builtin.mkdir()
-    (builtin / "tpl_api_basic.json").write_text(
-        json.dumps(_mk_template("tpl_api_basic")), encoding="utf-8"
-    )
+    _put_template(builtin, "api_basic", _mk_template("tpl_api_basic"))
     store = ProjectTemplateStore(builtin_dir=builtin, user_dir=tmp_path / "user")
     items = store.list_templates()
     assert [t["id"] for t in items] == ["tpl_api_basic"]
@@ -276,12 +281,10 @@ def test_template_builtin_only(tmp_path: Path) -> None:
 def test_template_user_override_builtin(tmp_path: Path) -> None:
     builtin = tmp_path / "builtin"
     user = tmp_path / "user"
-    builtin.mkdir()
-    (builtin / "tpl_api_basic.json").write_text(
-        json.dumps(_mk_template("tpl_api_basic", desc="内置")), encoding="utf-8"
-    )
+    _put_template(builtin, "api_basic", _mk_template("tpl_api_basic", desc="内置"))
     store = ProjectTemplateStore(builtin_dir=builtin, user_dir=user)
-    store.save_user_template(_mk_template("tpl_api_basic", desc="用户版"))
+    saved = store.save_user_template(_mk_template("tpl_api_basic", desc="用户版"))
+    assert saved == user / "tpl_api_basic" / "template.json"  # 用户模板以 id 作目录名
     got = store.get_template("tpl_api_basic")
     assert got is not None
     assert got["source"] == "user" and got["desc"] == "用户版"
@@ -291,16 +294,32 @@ def test_template_user_override_builtin(tmp_path: Path) -> None:
     assert store.user_template_path_exists("tpl_api_basic")
 
 
-def test_template_corrupted_and_invalid_names_skipped(tmp_path: Path) -> None:
+def test_template_corrupted_and_invalid_ids_skipped(tmp_path: Path) -> None:
     builtin = tmp_path / "builtin"
-    builtin.mkdir()
-    (builtin / "tpl_good.json").write_text(json.dumps(_mk_template("tpl_good")), encoding="utf-8")
-    (builtin / "tpl_broken.json").write_text("{nope", encoding="utf-8")
-    (builtin / "CON.json").write_text("{}", encoding="utf-8")
+    _put_template(builtin, "good", _mk_template("tpl_good"))
+    _put_template(builtin, "broken", {})  # 占位后覆写损坏内容
+    (builtin / "broken" / "template.json").write_text("{nope", encoding="utf-8")
+    _put_template(builtin, "evil", _mk_template("../evil"))  # 内容 id 非法
+    _put_template(builtin, "upper", _mk_template("Tpl_Good"))  # 大写非法
     store = ProjectTemplateStore(builtin_dir=builtin, user_dir=tmp_path / "user")
     items = store.list_templates()
     assert [t["id"] for t in items] == ["tpl_good"]
     assert store.get_template("tpl_broken") is None
     assert store.get_template("../evil") is None
+    assert store.builtin_template_exists("tpl_good") is True
+    assert store.builtin_template_exists("Tpl_Good") is False
     with pytest.raises(ValueError):
-        store.save_user_template(_mk_template("tpl_x"))  # 2 字符 < {2,32} 边界含 2，此为 1
+        store.save_user_template(_mk_template("tpl_x"))  # 前缀后仅 1 字符 < {2,32}
+
+
+def test_template_get_prefers_user_shortcut(tmp_path: Path) -> None:
+    builtin = tmp_path / "builtin"
+    user = tmp_path / "user"
+    _put_template(builtin, "a", _mk_template("tpl_aa"))
+    _put_template(user, "b", _mk_template("tpl_bb"))
+    store = ProjectTemplateStore(builtin_dir=builtin, user_dir=user)
+    got = store.get_template("tpl_aa")
+    assert got is not None and got["source"] == "builtin"
+    assert store.get_template("tpl_missing") is None
+    # 目录名 ≠ id（内置短名惯例）：id 以文件内容为权威
+    assert got["id"] == "tpl_aa"

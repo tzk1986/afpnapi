@@ -256,9 +256,13 @@ class ProjectStore:
 class ProjectTemplateStore:
     """模板两源存储：builtin（包内只读，随代码分发）+ user（可写，gitignore）。
 
-    读取合并规则（v3 4.1 定稿）：同名 id 以 user 覆盖 builtin；
-    返回对象附 source 字段（builtin|user），文件名 <tpl_id>.json 即 id 权威。
+    磁盘布局（v5 一节定稿）：`<root>/<目录名>/template.json`；
+    内置模板目录名为短名（api_basic 等），模板 id 以文件内容 `id` 字段为权威
+    （格式 `^tpl_[a-z0-9_]{2,32}$`）。用户模板以 id 作目录名写入 user 根。
+    合并规则（v3 4.1 定稿）：同名 id 以 user 覆盖 builtin，附 source 字段。
     """
+
+    TEMPLATE_FILE_NAME = "template.json"
 
     def __init__(
         self,
@@ -271,85 +275,79 @@ class ProjectTemplateStore:
             else PROJECT_BUILTIN_TEMPLATES_DIR
         )
         self._user = Path(user_dir) if user_dir is not None else PROJECT_TEMPLATES_DIR
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     @staticmethod
     def is_valid_template_id(template_id: str) -> bool:
         return bool(TEMPLATE_ID_RE.fullmatch(str(template_id or "")))
 
-    def _path_in(self, base: Path, template_id: str) -> Path:
+    def _user_template_path(self, template_id: str) -> Path:
+        """用户模板写入路径：id 即目录名，正则白名单已排除一切穿越字符。"""
         if not self.is_valid_template_id(template_id):
             raise ValueError(f"非法模板 id: {template_id!r}")
-        candidate = (base / f"{template_id}.json").resolve()
-        if not candidate.is_relative_to(base.resolve()):
+        base = self._user.resolve()
+        candidate = (base / template_id / self.TEMPLATE_FILE_NAME).resolve()
+        if not candidate.is_relative_to(base):
             raise ValueError(f"模板路径穿越拒绝: {template_id!r}")
         return candidate
 
-    def _sources(self) -> Tuple[Tuple[Path, str], ...]:
-        # 顺序即覆盖优先级：user 在前，先命中先赢
-        return ((self._user, "user"), (self._builtin, "builtin"))
+    def _scan_source(self, base: Path, source: str) -> Dict[str, Dict[str, Any]]:
+        """扫描单源全部模板；id 非法/损坏条目跳过（记日志），返回 id→对象。"""
+        found: Dict[str, Dict[str, Any]] = {}
+        if not base.is_dir():
+            return found
+        for tpl_path in sorted(base.glob(f"*/{self.TEMPLATE_FILE_NAME}")):
+            try:
+                data = json.loads(tpl_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as exc:
+                logger.warning("扫描模板失败 %s: %s", tpl_path, exc)
+                continue
+            if not isinstance(data, dict):
+                continue
+            tid = str(data.get("id") or "")
+            if not self.is_valid_template_id(tid):
+                logger.warning("模板 id 非法，跳过: %s (%s)", tpl_path, tid)
+                continue
+            data["source"] = source
+            found[tid] = data
+        return found
 
     def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """按 id 取模板（合并两源，user 覆盖 builtin），附 source 标记。"""
         if not self.is_valid_template_id(template_id):
             return None
         with self._lock:
-            for base, source in self._sources():
-                path = self._path_in(base, template_id)
-                if not path.is_file():
-                    continue
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError) as exc:
-                    logger.warning("读取模板失败 %s: %s", path, exc)
-                    return None
-                if not isinstance(data, dict):
-                    return None
-                data["source"] = source
-                data.setdefault("id", template_id)
-                return data
-        return None
+            merged = self._scan_source(self._user, "user")
+            if template_id not in merged:
+                merged.update(self._scan_source(self._builtin, "builtin"))
+            return merged.get(template_id)
 
     def list_templates(self) -> List[Dict[str, Any]]:
-        """两源合并列表；同名 user 覆盖 builtin；按 id 排序。"""
-        merged: Dict[str, Dict[str, Any]] = {}
+        """两源合并列表；同名 id user 覆盖 builtin；按 id 排序。"""
         with self._lock:
-            for base, source in ((self._builtin, "builtin"), (self._user, "user")):
-                if not base.is_dir():
-                    continue
-                for path in sorted(base.glob("tpl_*.json")):
-                    tid = path.stem
-                    if not self.is_valid_template_id(tid):
-                        continue
-                    try:
-                        data = json.loads(path.read_text(encoding="utf-8"))
-                    except (json.JSONDecodeError, OSError) as exc:
-                        logger.warning("扫描模板失败 %s: %s", path, exc)
-                        continue
-                    if not isinstance(data, dict):
-                        continue
-                    data["source"] = source
-                    data["id"] = tid
-                    merged[tid] = data
-        return [merged[key] for key in sorted(merged)]
+            merged = self._scan_source(self._builtin, "builtin")
+            merged.update(self._scan_source(self._user, "user"))
+            return [merged[key] for key in sorted(merged)]
 
     def template_exists(self, template_id: str) -> bool:
         return self.get_template(template_id) is not None
 
     def builtin_template_exists(self, template_id: str) -> bool:
+        """内置源是否已有同 id 模板（A15 TPL_002 只读拒绝依据）。"""
         if not self.is_valid_template_id(template_id):
             return False
-        return self._path_in(self._builtin, template_id).is_file()
+        with self._lock:
+            return template_id in self._scan_source(self._builtin, "builtin")
 
     def user_template_path_exists(self, template_id: str) -> bool:
         if not self.is_valid_template_id(template_id):
             return False
-        return self._path_in(self._user, template_id).is_file()
+        return self._user_template_path(template_id).is_file()
 
     def save_user_template(self, template: Dict[str, Any]) -> Path:
         """写用户模板（原子写；user 目录懒建发生在这里）。"""
         template_id = str(template.get("id") or "")
-        path = self._path_in(self._user, template_id)
+        path = self._user_template_path(template_id)
         with self._lock:
             path.parent.mkdir(parents=True, exist_ok=True)
             _atomic_write_json(path, template)
