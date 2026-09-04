@@ -12,6 +12,7 @@ token 优先级：命令行参数 > 环境变量 POSTMAN_TOKEN > 此文件中的
 
 import json as _json_cfg
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 _TRUTHY = frozenset(("1", "true", "yes", "y", "on"))
@@ -518,3 +519,46 @@ UI_HEADLESS_TIMEOUT_S = _env_int("UI_HEADLESS_TIMEOUT_S", 300, lo=30, hi=3600)
 UI_SELF_HEALING_ENABLED = _env_bool("UI_SELF_HEALING_ENABLED", "false")
 UI_HEALING_CONFIDENCE = _env_int("UI_HEALING_CONFIDENCE", 70, lo=10, hi=100)  # 整数百分比
 UI_HEALING_MAX_PER_CASE = _env_int("UI_HEALING_MAX_PER_CASE", 5, lo=1, hi=50)  # 单用例尝试数熔断上限
+
+# ===== 项目脚手架（v1.39.0，默认关闭；开关关闭时零文件系统痕迹，G-25）=====
+
+# ENABLE_PROJECT_SCAFFOLD: 总开关。关闭时 /projects 页面与全部脚手架 API 返回 403 PRJ_100
+ENABLE_PROJECT_SCAFFOLD = _env_bool("ENABLE_PROJECT_SCAFFOLD", "false")
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _env_path(key: str, default: Path) -> Path:
+    """读取目录路径环境变量，空白回退默认值（仅派生路径，不创建目录）。"""
+    raw = str(os.environ.get(key, "")).strip()
+    return Path(raw) if raw else default
+
+
+# PROJECTS_DIR: 项目数据根目录（env 可覆盖，默认仓库根 projects/，懒建）
+PROJECTS_DIR = _env_path("PROJECTS_DIR", _PROJECT_ROOT / "projects")
+
+# PROJECT_TEMPLATES_DIR: 用户上传模板根目录（env 可覆盖，默认仓库根 project_templates/，懒建）
+PROJECT_TEMPLATES_DIR = _env_path(
+    "PROJECT_TEMPLATES_DIR", _PROJECT_ROOT / "project_templates"
+)
+
+# PROJECT_BUILTIN_TEMPLATES_DIR: 随包内置只读模板目录（包内 project_templates/）
+PROJECT_BUILTIN_TEMPLATES_DIR = Path(__file__).resolve().parent / "project_templates"
+
+# PROJECT_LIST_PAGE_SIZE_DEFAULT: 项目列表默认分页大小
+PROJECT_LIST_PAGE_SIZE_DEFAULT = _env_int(
+    "PROJECT_LIST_PAGE_SIZE_DEFAULT", 20, lo=1, hi=100
+)
+
+# PROJECT_MAX_COLLECTIONS: 单项目可挂 Collection 数量上限
+PROJECT_MAX_COLLECTIONS = _env_int("PROJECT_MAX_COLLECTIONS", 50, lo=1, hi=500)
+
+# PROJECT_TEMPLATE_MAX_BYTES: 模板文件体积上限（A15 声明期校验，默认 256KB）
+PROJECT_TEMPLATE_MAX_BYTES = _env_int(
+    "PROJECT_TEMPLATE_MAX_BYTES", 262144, lo=1024, hi=1048576
+)
+
+# PROJECT_EXECUTION_HISTORY_MAX: 执行历史指针保留条数上限（超出截断最旧）
+PROJECT_EXECUTION_HISTORY_MAX = _env_int(
+    "PROJECT_EXECUTION_HISTORY_MAX", 20, lo=1, hi=200
+)
