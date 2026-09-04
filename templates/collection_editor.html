@@ -1680,6 +1680,17 @@
             return html;
         }
 
+        // v1.38.2 阶段徽标合并渲染：groups=[{rules, prefix, badge, color}]，空组不渲染
+        function renderRuleRowsWithBadge(groups) {
+            let html = '';
+            for (const g of groups) {
+                if (!Array.isArray(g.rules) || g.rules.length === 0) continue;
+                html += `<div style="margin:6px 0 2px;"><span style="display:inline-block;padding:1px 8px;border-radius:10px;background:${g.color};color:#fff;font-size:11px;">${g.badge}</span></div>`;
+                html += renderAssertionRuleRows(g.rules, g.prefix);
+            }
+            return html;
+        }
+
         function renderJudgmentTriState(field, label, value) {
             const cur = value === true || value === false ? String(value) : '';
             let html = `<div class="kv-row" style="align-items:center;">`;
@@ -1695,51 +1706,53 @@
         function renderAssertionTab(req) {
             let html = '';
 
-            // v1.37.18 一级判定小节
+            // v1.38.2 A+C 简化：判定/断言合并渲染（存储仍为四键各自的两个数组，行 handler 按前缀分派不变）
+            const jRules = Array.isArray(req.x_judgment_rules) ? req.x_judgment_rules : [];
+            const aRules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
+            const sharedA = (state.collection && Array.isArray(state.collection.x_shared_assertions)) ? state.collection.x_shared_assertions : [];
+            const sharedJ = (state.collection && Array.isArray(state.collection.x_shared_judgment_rules)) ? state.collection.x_shared_judgment_rules : [];
+            const takeover = req.x_enable_err_code_judgment === false && req.x_enable_message_judgment === false;
+
+            // 卡片1：本接口规则（成功标准快捷 + 豁免 + 三态折叠 + 判定/断言徽标合并列表）
             html += '<div style="margin-bottom:14px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">';
-            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">一级判定</div>';
-            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">errCode 与 message 均选「强制关闭」= 本接口成败仅由 HTTP 状态码 + 断言决定（只看断言）。关闭后请务必配置断言（自有或集合共享），否则结果近乎恒 PASSED。任务级「关闭一级判定」勾选时优先于这里的设置。</div>';
+            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">本接口规则</div>';
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">带「判定」徽标的规则先执行（任一失败 → 该接口判 FAILED 且短路断言），带「断言」徽标的后执行。expected 支持 JSON 字面量（数字/布尔/带引号字符串/对象），暂不支持 {{变量}} 替换。</div>';
+            html += `<div class="kv-row" style="align-items:center;">
+                <label style="flex:0 0 80px;font-size:12px;color:#334155;">成功标准</label>
+                <label style="font-size:12px;color:#334155;cursor:pointer;margin-right:16px;"><input type="radio" name="ifSuccessMode" value="builtin" ${!takeover ? 'checked' : ''} onchange="updateJudgmentMode('builtin')"> 内置业务判定（errCode/message）</label>
+                <label style="font-size:12px;color:#334155;cursor:pointer;"><input type="radio" name="ifSuccessMode" value="assert" ${takeover ? 'checked' : ''} onchange="updateJudgmentMode('assert')"> 断言接管（关闭内置判定，仅状态码+断言）</label>
+            </div>`;
+            html += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;user-select:none;margin:6px 0;">
+                <input type="checkbox" ${req.x_skip_shared_assertions === true ? 'checked' : ''} onchange="updateJudgmentSkip(this.checked)"> 豁免集合共享规则（本接口不执行集合共享判定/断言，只执行自己的）
+            </label>`;
+            html += '<details style="margin:6px 0;font-size:12px;color:#334155;"><summary style="cursor:pointer;">⚙ 精细控制（errCode / message 判定三态）</summary>';
+            html += '<div style="margin:6px 0;font-size:12px;color:#666;">两者均「强制关闭」等效于上方「断言接管」；「继承」跟随全局默认。任务级「关闭一级判定」勾选时优先于这里的设置。</div>';
             html += renderJudgmentTriState('x_enable_err_code_judgment', 'errCode 判定', req.x_enable_err_code_judgment);
             html += renderJudgmentTriState('x_enable_message_judgment', 'message 判定', req.x_enable_message_judgment);
-            html += `<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#334155;cursor:pointer;user-select:none;margin-top:6px;">
-                <input type="checkbox" ${req.x_skip_shared_assertions === true ? 'checked' : ''} onchange="updateJudgmentSkip(this.checked)"> 共享断言豁免（本接口不执行集合共享断言，只执行自己的断言）
-            </label>`;
-            // v1.37.22 自定义一级判定规则（判定阶段执行，任一失败短路断言）
-            const jRules = Array.isArray(req.x_judgment_rules) ? req.x_judgment_rules : [];
-            html += '<div style="margin-top:10px;">';
-            html += '<div style="font-weight:600;font-size:12px;margin-bottom:4px;">自定义判定规则（内置判定通过后执行，任一失败 → 判 FAILED 且不再执行断言）</div>';
-            html += '<div style="margin-bottom:6px;font-size:12px;color:#666;">与断言结构相同、阶段不同：判定失败会短路断言；任务级勾选「关闭一级判定」或本接口 errCode/message 均强制关闭时，这些规则一并不执行。「成功标准」类规则建议放断言（关闭判定时仍执行）。</div>';
-            html += renderAssertionRuleRows(jRules, 'Judgment');
-            html += `<button type="button" class="btn btn-secondary" onclick="addJudgmentRule()" style="font-size:12px;">+ 添加判定规则</button>`;
-            html += '</div>';
+            html += '</details>';
+            html += renderRuleRowsWithBadge([
+                {rules: jRules, prefix: 'Judgment', badge: '判定', color: '#f59e0b'},
+                {rules: aRules, prefix: '', badge: '断言', color: '#10b981'}
+            ]);
+            html += `<div style="display:flex;gap:6px;align-items:center;">
+                <select id="addPhaseSel" style="width:110px;font-size:12px;"><option value="assert">断言</option><option value="judgment">判定</option></select>
+                <button type="button" class="btn btn-secondary" onclick="addRuleWithPhase('addPhaseSel')" style="font-size:12px;">+ 添加规则</button>
+            </div>`;
             html += '</div>';
 
-            // v1.37.18 集合共享断言小节（集合属性，对本集合全部接口生效）
-            const shared = (state.collection && Array.isArray(state.collection.x_shared_assertions)) ? state.collection.x_shared_assertions : [];
+            // 卡片2：集合共享规则（共享判定 + 共享断言徽标合并列表，集合属性）
             html += '<div style="margin-bottom:14px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;">';
-            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">集合共享断言（统一判断，作用于全部接口）</div>';
-            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">共享规则与每个接口的自有断言合并执行（共享在前，全部通过才算过）。想让共享断言接管业务成败，需先关闭一级判定（接口级上方三态或执行时任务级开关），否则判定失败会短路断言。个别接口不想执行共享断言，在该接口上方勾选「共享断言豁免」。</div>';
-            html += renderAssertionRuleRows(shared, 'Shared');
-            html += `<button type="button" class="btn btn-secondary" onclick="addSharedAssertion()" style="font-size:12px;">+ 添加共享断言规则</button>`;
+            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">集合共享规则（作用于本集合全部接口）</div>';
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">「判定」徽标：内置判定通过后、断言之前执行，任一失败短路该接口断言；「断言」徽标：与每个接口自有断言合并执行（共享在前）。两者均受任务级「关闭一级判定」联动（关闭后一并不执行），接口可在上方勾选「豁免集合共享规则」。想让共享断言接管业务成败，需各接口选「断言接管」（或三态双关），否则判定失败会短路断言。</div>';
+            html += renderRuleRowsWithBadge([
+                {rules: sharedJ, prefix: 'SharedJ', badge: '判定', color: '#f59e0b'},
+                {rules: sharedA, prefix: 'Shared', badge: '断言', color: '#10b981'}
+            ]);
+            html += `<div style="display:flex;gap:6px;align-items:center;">
+                <select id="addSharedPhaseSel" style="width:110px;font-size:12px;"><option value="assert">断言</option><option value="judgment">判定</option></select>
+                <button type="button" class="btn btn-secondary" onclick="addSharedRuleWithPhase('addSharedPhaseSel')" style="font-size:12px;">+ 添加共享规则</button>
+            </div>`;
             html += '</div>';
-
-            // v1.38.1 集合共享判定小节（集合属性，作用于全部接口的一级判定层）
-            const sharedJ = (state.collection && Array.isArray(state.collection.x_shared_judgment_rules)) ? state.collection.x_shared_judgment_rules : [];
-            html += '<div style="margin-bottom:14px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;">';
-            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">集合共享判定（统一业务判定，作用于全部接口判定层）</div>';
-            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">内置判定（errCode/message/状态码）通过后、断言之前执行，任一失败 → 该接口判 FAILED 且短路断言。与接口自有「自定义判定规则」合并（共享在前）。与共享断言一样受「关闭一级判定」开关联动：关闭后共享判定一并跳过。豁免复用接口上方「共享断言豁免」勾选。expected 暂不支持 {{变量}} 替换。</div>';
-            html += renderAssertionRuleRows(sharedJ, 'SharedJ');
-            html += `<button type="button" class="btn btn-secondary" onclick="addSharedJudgmentRule()" style="font-size:12px;">+ 添加共享判定规则</button>`;
-            html += '</div>';
-
-            // 本接口自有断言
-            const rules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
-            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
-            html += '本接口断言：响应通过结果判定（errCode/message）后逐条校验，任一失败则用例判为失败。';
-            html += '<br>expected 支持 JSON 字面量（数字/布尔/带引号字符串/对象），暂不支持 {{变量}} 替换。';
-            html += '</div>';
-            html += renderAssertionRuleRows(rules, '');
-            html += `<button type="button" class="btn btn-secondary" onclick="addAssertion()" style="font-size:12px;">+ 添加断言规则</button>`;
 
             return html;
         }
@@ -1753,6 +1766,27 @@
         function updateJudgmentSkip(checked) {
             if (!state.editBuffer) return;
             state.editBuffer.x_skip_shared_assertions = checked ? true : null;
+            syncToAllRequests();
+        }
+
+        // v1.38.2 成功标准快捷开关：assert=两 x_enable_* 置 false（等效三态双关）；builtin=置 null 回继承
+        function updateJudgmentMode(mode) {
+            if (!state.editBuffer) return;
+            if (mode === 'assert') {
+                const ownA = Array.isArray(state.editBuffer.x_assertions) ? state.editBuffer.x_assertions.length : 0;
+                const sharedA = (state.collection && Array.isArray(state.collection.x_shared_assertions)) ? state.collection.x_shared_assertions.length : 0;
+                if (ownA === 0 && sharedA === 0) {
+                    if (!confirm('未配置任何断言（自有与集合共享均为空）：关闭内置判定后结果近乎恒 PASSED。仍要接管吗？')) {
+                        renderEditor();
+                        return;
+                    }
+                }
+                state.editBuffer.x_enable_err_code_judgment = false;
+                state.editBuffer.x_enable_message_judgment = false;
+            } else {
+                state.editBuffer.x_enable_err_code_judgment = null;
+                state.editBuffer.x_enable_message_judgment = null;
+            }
             syncToAllRequests();
         }
 
@@ -1862,6 +1896,25 @@
                 arr[index].op = op;
                 if (op === 'exists' || op === 'not_exists') arr[index].expected = null;
                 renderEditor();
+            }
+        }
+
+        // v1.38.2 阶段下拉分派添加：judgment → 判定组 handler，assert → 断言组 handler（存储仍各归各数组）
+        function addRuleWithPhase(selId) {
+            const sel = document.getElementById(selId);
+            if (sel && sel.value === 'judgment') {
+                addJudgmentRule();
+            } else {
+                addAssertion();
+            }
+        }
+
+        function addSharedRuleWithPhase(selId) {
+            const sel = document.getElementById(selId);
+            if (sel && sel.value === 'judgment') {
+                addSharedJudgmentRule();
+            } else {
+                addSharedAssertion();
             }
         }
 
