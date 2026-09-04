@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "tpl_api_basic",
+  "name": "基础接口测试",
+  "description": "通用 HTTP 接口冒烟模板：健康自检样例集合（含 x_assertions 断言样板）+ 追溯表骨架。",
+  "version": "1.0.0",
+  "metadata_template": {
+    "system": "{{system}}",
+    "module": "{{module}}",
+    "owner": "{{owner}}"
+  },
+  "variables": [
+    {
+      "key": "system",
+      "label": "所属系统",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "通用",
+        "业务中台",
+        "开放平台"
+      ],
+      "description": "用于元数据归类"
+    },
+    {
+      "key": "module",
+      "label": "模块",
+      "type": "string",
+      "required": true,
+      "description": "如：订单、用户"
+    },
+    {
+      "key": "owner",
+      "label": "负责人",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "base_url",
+      "label": "服务基地址",
+      "type": "string",
+      "required": true,
+      "default": "http://127.0.0.1:5000",
+      "description": "样例请求 {{base_url}}/health"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/README.md",
+      "content_template": "# {{project_name}}\n\n- 系统：{{system}}\n- 模块：{{module}}\n- 负责人：{{owner}}\n- 基地址：{{base_url}}\n\n集合 `基础冒烟` 为健康自检样例，x_assertions 演示 JSONPath 等值断言；克隆后替换为真实业务接口。\n",
+      "render": true
+    },
+    {
+      "path": "tracing.json",
+      "content_template": "{\n  \"schema_version\": 1,\n  \"rows\": [\n    {\n      \"case_no\": \"TC-001\",\n      \"title\": \"健康检查\",\n      \"priority\": \"P0\",\n      \"convert_status\": \"automated\",\n      \"collection_id\": \"\",\n      \"request_id\": \"\"\n    },\n    {\n      \"case_no\": \"TC-002\",\n      \"title\": \"核心业务流程（待补充）\",\n      \"priority\": \"P1\",\n      \"convert_status\": \"pending\",\n      \"collection_id\": \"\",\n      \"request_id\": \"\"\n    }\n  ]\n}",
+      "render": false
+    },
+    {
+      "path": "collections/basic.json",
+      "content_template": "{\n  \"info\": {\n    \"name\": \"基础冒烟\",\n    \"schema\": \"https://schema.getpostman.com/json/collection/v2.1.0/collection.json\"\n  },\n  \"item\": [\n    {\n      \"name\": \"健康自检\",\n      \"request\": {\n        \"method\": \"GET\",\n        \"header\": [],\n        \"url\": \"{{base_url}}/health\",\n        \"x_assertions\": [\n          {\n            \"path\": \"$.status\",\n            \"op\": \"eq\",\n            \"expected\": \"ok\"\n          }\n        ]\n      }\n    }\n  ]\n}",
+      "render": true
+    }
+  ]
+}

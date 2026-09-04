@@ -251,6 +251,21 @@
             </div>
         </section>
 
+        {% if enable_project_scaffold %}
+        <section class="panel">
+            <div class="feature-card">
+                <div>
+                    <h3>项目脚手架</h3>
+                    <p style="margin:4px 0 0;color:#64748b;font-size:13px;">按模板批量创建接口测试项目，管理项目集合、用例追溯表与执行历史。</p>
+                </div>
+                <div class="feature-actions">
+                    <a class="primary" href="/projects">打开项目管理</a>
+                    <a class="secondary" href="/projects/create">新建项目</a>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
         <section class="panel">
             <h3 style="margin-top:0;">上传并执行 Postman JSON</h3>
             <div class="upload-grid">

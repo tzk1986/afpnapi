@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import make_response, redirect, render_template, request, url_for
 from flask.typing import ResponseReturnValue
 
+from postman_api_tester.config import ENABLE_PROJECT_SCAFFOLD
 from postman_api_tester.report_repository import (
     find_report as _repo_find_report,
 )
@@ -82,6 +83,7 @@ def index() -> ResponseReturnValue:
         enable_retry_failures=ENABLE_RETRY_FAILURES,
         enable_junit_export=ENABLE_JUNIT_EXPORT,
         enable_report_list_filter=ENABLE_REPORT_LIST_FILTER,
+        enable_project_scaffold=ENABLE_PROJECT_SCAFFOLD,
         environments_json=json.dumps(list(ENVIRONMENTS.keys()), ensure_ascii=False),
         default_env_name=DEFAULT_ENV_NAME,
     )

@@ -82,6 +82,60 @@ from postman_api_tester.handlers.page_routes import (
 from postman_api_tester.handlers.page_routes import (
     report_view as _route_report_view,
 )
+from postman_api_tester.handlers.project_routes import (
+    api_add_project_collection as _route_api_add_project_collection,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_create_project as _route_api_create_project,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_create_project_template as _route_api_create_project_template,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_delete_project as _route_api_delete_project,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_execute_project as _route_api_execute_project,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_export_project_tracing_csv as _route_api_export_project_tracing_csv,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_export_project_zip as _route_api_export_project_zip,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_get_project as _route_api_get_project,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_get_project_tracing as _route_api_get_project_tracing,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_list_project_collections as _route_api_list_project_collections,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_list_project_templates as _route_api_list_project_templates,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_list_projects as _route_api_list_projects,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_put_project_tracing as _route_api_put_project_tracing,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_remove_project_collection as _route_api_remove_project_collection,
+)
+from postman_api_tester.handlers.project_routes import (
+    api_update_project as _route_api_update_project,
+)
+from postman_api_tester.handlers.project_routes import (
+    projects_create_page as _route_projects_create_page,
+)
+from postman_api_tester.handlers.project_routes import (
+    projects_detail_page as _route_projects_detail_page,
+)
+from postman_api_tester.handlers.project_routes import (
+    projects_page as _route_projects_page,
+)
 from postman_api_tester.handlers.report_meta_routes import (
     api_manual_case_add as _route_api_manual_case_add,
 )
@@ -1020,6 +1074,98 @@ def ui_login_configs_page_route() -> ResponseReturnValue:
 @app.route("/ui-testing/login-configs/editor/<path:config_id>")
 def ui_login_config_editor_page_route(config_id: str = "") -> ResponseReturnValue:
     return _route_ui_login_config_editor_page(config_id)
+
+
+@app.route("/projects")
+def projects_page_route() -> ResponseReturnValue:
+    return _route_projects_page()
+
+
+@app.route("/projects/create")
+def projects_create_page_route() -> ResponseReturnValue:
+    return _route_projects_create_page()
+
+
+@app.route("/projects/detail/<project_id>")
+def projects_detail_page_route(project_id: str) -> ResponseReturnValue:
+    return _route_projects_detail_page(project_id)
+
+
+@app.route("/api/projects", methods=["GET"])
+def api_projects_list_route() -> ResponseReturnValue:
+    return _route_api_list_projects()
+
+
+@app.route("/api/projects", methods=["POST"])
+def api_projects_create_route() -> ResponseReturnValue:
+    return _route_api_create_project()
+
+
+@app.route("/api/projects/<project_id>", methods=["GET"])
+def api_projects_get_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_get_project(project_id)
+
+
+@app.route("/api/projects/<project_id>", methods=["PUT"])
+def api_projects_update_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_update_project(project_id)
+
+
+@app.route("/api/projects/<project_id>", methods=["DELETE"])
+def api_projects_delete_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_delete_project(project_id)
+
+
+@app.route("/api/projects/<project_id>/collections", methods=["GET"])
+def api_projects_collections_list_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_list_project_collections(project_id)
+
+
+@app.route("/api/projects/<project_id>/collections", methods=["POST"])
+def api_projects_collections_add_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_add_project_collection(project_id)
+
+
+@app.route("/api/projects/<project_id>/collections/<col_id>", methods=["DELETE"])
+def api_projects_collections_remove_route(
+    project_id: str, col_id: str
+) -> ResponseReturnValue:
+    return _route_api_remove_project_collection(project_id, col_id)
+
+
+@app.route("/api/projects/<project_id>/execute", methods=["POST"])
+def api_projects_execute_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_execute_project(project_id)
+
+
+@app.route("/api/projects/<project_id>/tracing", methods=["GET"])
+def api_projects_tracing_get_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_get_project_tracing(project_id)
+
+
+@app.route("/api/projects/<project_id>/tracing", methods=["PUT"])
+def api_projects_tracing_put_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_put_project_tracing(project_id)
+
+
+@app.route("/api/projects/<project_id>/export/tracing.csv")
+def api_projects_export_csv_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_export_project_tracing_csv(project_id)
+
+
+@app.route("/api/projects/<project_id>/export")
+def api_projects_export_zip_route(project_id: str) -> ResponseReturnValue:
+    return _route_api_export_project_zip(project_id)
+
+
+@app.route("/api/project-templates", methods=["GET"])
+def api_projects_templates_list_route() -> ResponseReturnValue:
+    return _route_api_list_project_templates()
+
+
+@app.route("/api/project-templates", methods=["POST"])
+def api_projects_templates_create_route() -> ResponseReturnValue:
+    return _route_api_create_project_template()
 
 
 @app.route("/favicon.ico")

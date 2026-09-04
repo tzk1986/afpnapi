@@ -1,0 +1,254 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>项目管理 - 项目脚手架</title>
+<style>
+    body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #1f2937; }
+    .page { max-width: 1240px; margin: 0 auto; padding: 24px; }
+    .hero { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; border-radius: 18px; padding: 20px 26px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2); }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; }
+    .hero p { margin: 0; opacity: 0.92; font-size: 13px; }
+    .hero a { color: #bfdbfe; font-size: 13px; }
+    .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .toolbar input, .toolbar select, .toolbar button { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; }
+    .toolbar button { background: #1d4ed8; color: #fff; border: none; cursor: pointer; }
+    .toolbar button:hover { opacity: 0.92; }
+    .toolbar a.link-btn { padding: 9px 14px; border: 1px solid #93c5fd; border-radius: 10px; background: #eff6ff; color: #1d4ed8; text-decoration: none; font-size: 14px; }
+    .toolbar .grow { flex: 1; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 11px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; font-size: 14px; }
+    th { color: #475569; font-size: 13px; }
+    tr:hover { background: #f8fafc; }
+    .tag { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; background: #e0f2fe; color: #075985; }
+    .tag.status-active { background: #dcfce7; color: #166534; }
+    .tag.status-completed { background: #e0e7ff; color: #3730a3; }
+    .tag.status-archived { background: #f1f5f9; color: #64748b; }
+    .exec-done { color: #166534; }
+    .exec-failed { color: #b91c1c; }
+    .exec-running { color: #b45309; }
+    .exec-unknown { color: #64748b; }
+    .name-link { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+    .name-link:hover { text-decoration: underline; }
+    .muted { color: #64748b; }
+    .empty { padding: 30px 12px; text-align: center; color: #64748b; }
+    .pager { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 13px; color: #475569; }
+    .pager button { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; cursor: pointer; }
+    .pager button:disabled { opacity: 0.45; cursor: default; }
+    #notice { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+    #notice.err { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="hero">
+        <h1>项目管理</h1>
+        <p>按模板创建的接口测试项目一览。<a href="/">返回报告中心</a></p>
+    </div>
+
+    <section class="panel">
+        <div class="toolbar">
+            <input id="searchInput" type="search" placeholder="搜索项目名称/描述" style="min-width:220px;">
+            <select id="statusFilter">
+                <option value="">全部状态</option>
+                <option value="active">进行中</option>
+                <option value="completed">已完成</option>
+                <option value="archived">已归档</option>
+            </select>
+            <button id="queryBtn">查询</button>
+            <div class="grow"></div>
+            <a class="link-btn" href="/projects/create">新建项目</a>
+        </div>
+        <div id="notice"></div>
+        <table>
+            <thead>
+            <tr>
+                <th style="width:26%;">名称</th>
+                <th style="width:10%;">状态</th>
+                <th style="width:9%;">集合数</th>
+                <th style="width:9%;">请求数</th>
+                <th style="width:24%;">最近执行</th>
+                <th style="width:14%;">更新时间</th>
+            </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="emptyTip" style="display:none;">暂无项目，点击右上角「新建项目」开始。</div>
+        <div class="pager">
+            <button id="prevBtn">上一页</button>
+            <span id="pageInfo"></span>
+            <button id="nextBtn">下一页</button>
+        </div>
+    </section>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var state = { page: 1, page_size: 20, status: '', search: '' };
+    var total = 0;
+
+    var rowsEl = document.getElementById('rows');
+    var emptyTip = document.getElementById('emptyTip');
+    var pageInfo = document.getElementById('pageInfo');
+    var prevBtn = document.getElementById('prevBtn');
+    var nextBtn = document.getElementById('nextBtn');
+    var notice = document.getElementById('notice');
+
+    function showNotice(text) {
+        notice.textContent = text;
+        notice.className = text ? 'err' : '';
+    }
+
+    // L-1 统一包装解包：{code,message,data,timestamp} → data（兼容裸对象）
+    function unwrap(raw) {
+        if (raw && typeof raw === 'object' && ('data' in raw)) return raw.data || {};
+        return raw || {};
+    }
+
+    // 错误回退链：error_code 专义提示 → data.details → message → HTTP 状态
+    function extractError(raw, resp) {
+        if (raw && raw.error_code === 'PRJ_100') {
+            return '项目脚手架功能未启用（ENABLE_PROJECT_SCAFFOLD=false）';
+        }
+        if (raw && raw.data && raw.data.details) return String(raw.data.details);
+        if (raw && raw.message && raw.message !== 'OK') return String(raw.message);
+        return '请求失败（HTTP ' + resp.status + '）';
+    }
+
+    function fmtTime(iso) {
+        if (!iso) return '-';
+        return String(iso).replace('T', ' ').split('.')[0];
+    }
+
+    function cell(text, className) {
+        var td = document.createElement('td');
+        // 一切动态内容只经 textContent，杜绝 innerHTML 注入（CP-XSS）
+        td.textContent = text === null || text === undefined || text === '' ? '-' : String(text);
+        if (className) td.className = className;
+        return td;
+    }
+
+    function renderRows(items) {
+        rowsEl.textContent = '';
+        items.forEach(function (p) {
+            var tr = document.createElement('tr');
+
+            var nameTd = document.createElement('td');
+            var link = document.createElement('a');
+            link.className = 'name-link';
+            link.href = '/projects/detail/' + encodeURIComponent(p.id || '');
+            link.textContent = p.name || p.id || '(未命名)';  // textContent 渲染
+            nameTd.appendChild(link);
+            var desc = document.createElement('div');
+            desc.className = 'muted';
+            desc.style.fontSize = '12px';
+            desc.textContent = p.description || '';
+            nameTd.appendChild(desc);
+            tr.appendChild(nameTd);
+
+            var statusTd = document.createElement('td');
+            var tag = document.createElement('span');
+            tag.className = 'tag status-' + String(p.status || 'active').toLowerCase();
+            tag.textContent = statusLabel(p.status);
+            statusTd.appendChild(tag);
+            tr.appendChild(statusTd);
+
+            tr.appendChild(cell(p.collection_count, ''));
+            tr.appendChild(cell(p.request_count, ''));
+
+            var exec = p.last_execution || {};
+            var execTd = cell('', '');
+            if (exec.time || exec.status) {
+                execTd.textContent = fmtTime(exec.time) + ' · ' + execStatusLabel(exec.status);
+                execTd.className = 'exec-' + String(exec.status || 'unknown').toLowerCase();
+            } else {
+                execTd.textContent = '-';
+            }
+            tr.appendChild(execTd);
+
+            tr.appendChild(cell(fmtTime(p.updated_at), 'muted'));
+            rowsEl.appendChild(tr);
+        });
+    }
+
+    function statusLabel(s) {
+        if (s === 'completed') return '已完成';
+        if (s === 'archived') return '已归档';
+        return '进行中';
+    }
+
+    function execStatusLabel(s) {
+        var map = { done: '完成', failed: '失败', running: '执行中', queued: '排队中', unknown: '未知' };
+        return map[String(s || '').toLowerCase()] || (s || '-');
+    }
+
+    function renderPager() {
+        var pages = Math.max(1, Math.ceil(total / state.page_size));
+        pageInfo.textContent = '第 ' + state.page + ' / ' + pages + ' 页，共 ' + total + ' 个项目';
+        prevBtn.disabled = state.page <= 1;
+        nextBtn.disabled = state.page >= pages;
+    }
+
+    function load() {
+        showNotice('');
+        var params = new URLSearchParams();
+        params.set('page', String(state.page));
+        params.set('page_size', String(state.page_size));
+        if (state.status) params.set('status', state.status);
+        if (state.search) params.set('search', state.search);
+        fetch('/api/projects?' + params.toString())
+            .then(function (resp) {
+                return resp.json().catch(function () { return null; }).then(function (raw) {
+                    return { resp: resp, raw: raw };
+                });
+            })
+            .then(function (pack) {
+                if (!pack.resp.ok) {
+                    showNotice(extractError(pack.raw, pack.resp));
+                    total = 0;
+                    renderRows([]);
+                    renderPager();
+                    return;
+                }
+                var data = unwrap(pack.raw);
+                var items = Array.isArray(data.items) ? data.items : [];
+                total = Number(data.total || 0);
+                state.page = Number(data.page || state.page);
+                state.page_size = Number(data.page_size || state.page_size);
+                emptyTip.style.display = items.length ? 'none' : 'block';
+                renderRows(items);
+                renderPager();
+            })
+            .catch(function (err) {
+                showNotice('网络错误：' + (err && err.message ? err.message : err));
+            });
+    }
+
+    prevBtn.addEventListener('click', function () {
+        if (state.page > 1) { state.page -= 1; load(); }
+    });
+    nextBtn.addEventListener('click', function () {
+        state.page += 1;
+        load();
+    });
+    document.getElementById('queryBtn').addEventListener('click', function () {
+        state.page = 1;
+        state.status = document.getElementById('statusFilter').value;
+        state.search = document.getElementById('searchInput').value.trim();
+        load();
+    });
+    document.getElementById('searchInput').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') document.getElementById('queryBtn').click();
+    });
+
+    load();
+})();
+</script>
+</body>
+</html>
+{% endraw %}

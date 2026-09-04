@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "id": "tpl_api_payment",
+  "name": "支付接口测试",
+  "description": "支付通道回归模板：下单/查单样例集合（errCode 断言样板）+ 渠道追溯矩阵骨架。",
+  "version": "1.0.0",
+  "metadata_template": {
+    "system": "{{system}}",
+    "module": "{{module}}",
+    "owner": "{{owner}}"
+  },
+  "variables": [
+    {
+      "key": "system",
+      "label": "所属系统",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "支付中心",
+        "餐厅",
+        "零售"
+      ]
+    },
+    {
+      "key": "module",
+      "label": "模块",
+      "type": "string",
+      "required": true,
+      "default": "支付"
+    },
+    {
+      "key": "owner",
+      "label": "负责人",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "channel",
+      "label": "支付渠道",
+      "type": "enum",
+      "required": true,
+      "options": [
+        "微信支付",
+        "支付宝",
+        "银联"
+      ]
+    },
+    {
+      "key": "merchant_id",
+      "label": "商户号",
+      "type": "string",
+      "required": true,
+      "description": "测试环境商户号"
+    },
+    {
+      "key": "base_url",
+      "label": "网关基地址",
+      "type": "string",
+      "required": true,
+      "default": "http://127.0.0.1:5000"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/README.md",
+      "content_template": "# {{project_name}}\n\n- 渠道：{{channel}} / 商户号：{{merchant_id}} / 负责人：{{owner}}\n- 网关：{{base_url}}\n\n`支付网关冒烟` 集合演示 x_assertions 的 errCode 业务码断言写法；样例指向健康端点，接入真实网关后替换 URL 与断言 path。\n",
+      "render": true
+    },
+    {
+      "path": "tracing.json",
+      "content_template": "{\n  \"schema_version\": 1,\n  \"rows\": [\n    {\n      \"case_no\": \"PAY-001\",\n      \"title\": \"{{channel}} 下单\",\n      \"priority\": \"P0\",\n      \"convert_status\": \"automated\",\n      \"collection_id\": \"\",\n      \"request_id\": \"\"\n    },\n    {\n      \"case_no\": \"PAY-002\",\n      \"title\": \"异步回调对账\",\n      \"priority\": \"P0\",\n      \"convert_status\": \"pending\",\n      \"collection_id\": \"\",\n      \"request_id\": \"\"\n    },\n    {\n      \"case_no\": \"PAY-003\",\n      \"title\": \"退款（商户 {{merchant_id}}）\",\n      \"priority\": \"P1\",\n      \"convert_status\": \"pending\",\n      \"collection_id\": \"\",\n      \"request_id\": \"\"\n    }\n  ]\n}",
+      "render": true
+    },
+    {
+      "path": "collections/pay.json",
+      "content_template": "{\n  \"info\": {\n    \"name\": \"支付网关冒烟\",\n    \"schema\": \"https://schema.getpostman.com/json/collection/v2.1.0/collection.json\"\n  },\n  \"item\": [\n    {\n      \"name\": \"网关健康检查\",\n      \"request\": {\n        \"method\": \"GET\",\n        \"header\": [],\n        \"url\": \"{{base_url}}/health\",\n        \"x_assertions\": [\n          {\n            \"path\": \"$.status\",\n            \"op\": \"eq\",\n            \"expected\": \"ok\"\n          }\n        ]\n      }\n    }\n  ]\n}",
+      "render": true
+    }
+  ]
+}

@@ -213,6 +213,8 @@ def json_error(
     - HTTP_ = 代理/重发请求
     - AUTH_ = 认证相关
     - COM_ = 通用错误
+    - PRJ_ = 项目脚手架（含 PRJ_999 路由未预期异常兜底）
+    - TPL_ = 项目模板（用户模板创建 A15）
     """
     return BaseHandler.error_response(ValidationError(message), status_code, error_code)
 
