@@ -69,6 +69,7 @@ class UiExecutionStore:
             "steps_total": steps_total,
             "steps_passed": 0,
             "steps_failed": 0,
+            "healed_steps": 0,
             "steps": [],
         }
 
@@ -143,6 +144,10 @@ class UiExecutionStore:
                             existing["duration_ms"] = step_result["duration_ms"]
                         if "screenshot" in step_result:
                             existing["screenshot"] = step_result["screenshot"]
+                        # heal 键条件双写防丢（M4/N-7，防 browser 模式凭空加字段）
+                        if "healed" in step_result:
+                            existing["healed"] = step_result["healed"]
+                            existing["heal_info"] = step_result.get("heal_info", {})
                         self._write_result(job_id, record)
                         return
 
@@ -185,6 +190,7 @@ class UiExecutionStore:
             record["steps_failed"] = summary.get(
                 "steps_failed", record.get("steps_failed", 0)
             )
+            record["healed_steps"] = summary.get("healed_steps", 0)
             self._write_result(job_id, record)
 
         logger.info(
@@ -241,6 +247,7 @@ class UiExecutionStore:
                             "steps_total": data.get("steps_total", 0),
                             "steps_passed": data.get("steps_passed", 0),
                             "steps_failed": data.get("steps_failed", 0),
+                            "healed_steps": data.get("healed_steps", 0),
                             "total_duration_ms": data.get("total_duration_ms", 0),
                             "started_at": data.get("started_at", ""),
                             "ended_at": data.get("ended_at", ""),

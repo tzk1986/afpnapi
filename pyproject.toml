@@ -29,6 +29,7 @@ files = [
 	"postman_api_tester/services/report_analytics_service.py",
 	"postman_api_tester/services/ui_execution_manager.py",
 	"postman_api_tester/services/ui_headless_engine.py",
+	"postman_api_tester/services/ui_healing.py",
 	"postman_api_tester/services/ui_settings_store.py",
 	"postman_api_tester/services/collection_editor_service.py",
 	"postman_api_tester/services/global_variables_service.py",

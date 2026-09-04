@@ -46,6 +46,7 @@ def main() -> None:
 
         case_data: Dict[str, Any] = input_data["case_data"]
         options: Dict[str, Any] = input_data["options"]
+        options["case_id"] = case_data.get("id", "")  # V5-6 直接赋值防客户端伪造
         job_id: str = input_data["job_id"]
         screenshots_dir: str | None = input_data.get("screenshots_dir")
         auth_state_path: str | None = input_data.get("auth_state_path")

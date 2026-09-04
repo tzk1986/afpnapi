@@ -12,6 +12,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from postman_api_tester.config import (
+    UI_HEALING_CONFIDENCE,
+    UI_HEALING_MAX_PER_CASE,
+    UI_SELF_HEALING_ENABLED,
+)
+from postman_api_tester.services import ui_healing
+
 logger = logging.getLogger(__name__)
 
 # 无头执行日志目录
@@ -58,6 +65,10 @@ def _log_request(job_id: str, step_index: int, request_data: Dict[str, Any]) -> 
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
         pass
+
+
+# 自愈事件 jsonl 通道复用 _log_request（ui_healing M8 双通道之一）
+ui_healing.configure_log_sink(_log_request)
 
 
 try:
@@ -186,6 +197,17 @@ class UiHeadlessEngine:
             )
         self._browser_type = browser_type
         self._screenshots_dir = screenshots_dir
+        # UI 自愈上下文（V6-1 定稿 9 属性 + _heal_ctx 承载 case_id；登录链路全程默认 False）
+        self._job_id: str = ""
+        self._healing_active: bool = False
+        self._heal_ctx: str = ""
+        self._current_step_index: int = -1
+        self._current_action: str = ""
+        self._current_step: Optional[Dict[str, Any]] = None
+        self._last_heal: Optional[Dict[str, Any]] = None
+        self._heal_attempts: int = 0
+        self._healed_steps: int = 0
+        self._heal_once: set = set()
 
     def execute(
         self,
@@ -210,6 +232,9 @@ class UiHeadlessEngine:
             on_browser_ready: 浏览器启动完成回调 () -> None
             auth_state_path: Playwright storage_state JSON 文件路径（可选）
         """
+        self._job_id = job_id
+        self._healing_active = True
+        self._heal_ctx = str(options.get("case_id", "") or "")
         timeout_ms = options.get("timeout", DEFAULT_TIMEOUT_MS)
         delay_ms = options.get("delay_between_steps", 200)
         viewport_w = options.get("viewport_width", 1280)
@@ -344,6 +369,11 @@ class UiHeadlessEngine:
 
                 step_start = time.time()
                 action = step.get("action", "").lower()
+                # 自愈上下文四点合一（V5-3 循环头唯一插入点，防串步）
+                self._current_step_index = i
+                self._current_action = action
+                self._current_step = step
+                self._last_heal = None
                 url_before_step = page.url
 
                 # new_tab：导航到新页面（与浏览器回放引擎行为一致）
@@ -763,6 +793,13 @@ class UiHeadlessEngine:
                 step_result["index"] = i
                 step_result["duration_ms"] = step_duration_ms
 
+                # heal 字段在持久化与状态翻转之前落位（V5-3 回写唯一插入点）
+                if self._last_heal is not None:
+                    step_result["healed"] = True
+                    step_result["heal_info"] = self._last_heal
+                    if step_result["status"] != "passed":
+                        self._emit_heal_event("self_healing.healed_then_failed")
+
                 if step_result["status"] == "passed":
                     steps_passed += 1
                 else:
@@ -896,6 +933,7 @@ class UiHeadlessEngine:
             "steps_total": len(steps),
             "steps_passed": steps_passed,
             "steps_failed": steps_failed,
+            "healed_steps": self._healed_steps,  # V5-4（登录 summary 不加）
             "total_duration_ms": total_duration_ms,
             "_step_results": _step_results,
         }
@@ -1320,9 +1358,72 @@ class UiHeadlessEngine:
             except Exception as e:
                 last_error = e
                 if is_last:
+                    # V6-2 钩子保护：heal 链整体 try/except，原异常唯一出口照抛
+                    healed_locator = None
+                    try:
+                        healed_locator = self._try_self_heal(page, candidates)
+                    except Exception as heal_exc:
+                        self._emit_heal_event("self_healing.probe_error", error=str(heal_exc))
+                        healed_locator = None
+                    if healed_locator is not None:
+                        return healed_locator
                     raise
 
         raise last_error or HeadlessExecutionError("元素未找到")
+
+    def _emit_heal_event(self, event: str, **fields: Any) -> None:
+        """自愈事件统一转发：双通道留痕在 ui_healing._emit（内部全兜底，不外抛）。"""
+        ui_healing._emit(
+            self._job_id, self._current_step_index, event,
+            case_id=self._heal_ctx, action=self._current_action, **fields,
+        )
+
+    def _try_self_heal(self, page: "Page", candidates: Any) -> Any:
+        """自愈钩子主体（V5-§五门控链定稿）：命中返回新 locator，否则 None。
+
+        自身异常由 _find_element 外层 try/except 保护（V6-2），此处不吞不抛。
+        """
+        if not (
+            UI_SELF_HEALING_ENABLED
+            and self._healing_active
+            and self._heal_attempts < UI_HEALING_MAX_PER_CASE
+            and self._current_step_index not in self._heal_once
+            and not self._current_action.startswith("assert")
+        ) or self._current_step is None:
+            return None
+        step = self._current_step
+        # 进入策略链：尝试计数 +1、同步去重（V5-2/V6-4 同刻），此后拒绝不回退
+        self._heal_attempts += 1
+        self._heal_once.add(self._current_step_index)
+        if self._heal_attempts >= UI_HEALING_MAX_PER_CASE:
+            self._emit_heal_event("self_healing.capped", heal_count=self._heal_attempts)
+        old = ui_healing.original_selector_desc(step)
+        kind, _detail = ui_healing.classify_failure(page, candidates)
+        if kind != "not_found":
+            self._emit_heal_event("self_healing.rejected", reason=kind, original_selector=old)
+            return None
+        self._emit_heal_event("self_healing.attempt", original_selector=old)
+        t0 = time.time()
+        res = ui_healing.try_heal(page, step, self._heal_ctx, self._current_step_index)
+        dur_ms = int((time.time() - t0) * 1000)
+        if res is None:
+            self._emit_heal_event("self_healing.rejected", reason="ambiguous", original_selector=old)
+            return None
+        if res.confidence < UI_HEALING_CONFIDENCE:
+            self._emit_heal_event(
+                "self_healing.rejected", reason="low_confidence", confidence=res.confidence
+            )
+            return None
+        self._last_heal = ui_healing.build_heal_info(old, res)
+        self._healed_steps += 1
+        self._emit_heal_event(
+            "self_healing.healed", old=old, new=res.new_selector_desc,
+            strategy=res.strategy, confidence=res.confidence, duration_ms=dur_ms,
+        )
+        self._take_screenshot(
+            page, self._job_id, self._current_step_index, suffix="_healed"
+        )
+        return res.locator
 
     def _selector_to_dict(self, selector: Any) -> Any:
         """确保 selector 在结果中以 dict 形式返回。"""
