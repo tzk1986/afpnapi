@@ -427,10 +427,13 @@
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
     });
     document.getElementById('btnTplSubmit').addEventListener('click', function () {
+        var btn = this;
+        if (btn.disabled) { return; }
         var text = document.getElementById('tplJsonInput').value.trim();
         if (!text) { showNotice('请选择文件或粘贴模板 JSON 内容'); return; }
         var payload;
         try { payload = JSON.parse(text); } catch (e) { showNotice('JSON 解析失败：' + e.message); return; }
+        btn.disabled = true;
         fetch('/api/project-templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -440,13 +443,14 @@
                 return resp.json().then(function (raw) { return { resp: resp, raw: raw }; });
             })
             .then(function (pack) {
+                btn.disabled = false;
                 if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
                 var created = unwrap(pack.raw) || {};
                 document.getElementById('tplUploadPanel').style.display = 'none';
                 showNotice('模板已上传：' + (created.name || created.id), true);
                 loadTemplates(created.id);
             })
-            .catch(function () { showNotice('网络错误'); });
+            .catch(function () { btn.disabled = false; showNotice('网络错误'); });
     });
 
     function loadEnvironments() {
