@@ -1,0 +1,672 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>项目详情 - 项目脚手架</title>
+<style>
+    body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #1f2937; }
+    .page { max-width: 1240px; margin: 0 auto; padding: 24px; }
+    .hero { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; border-radius: 18px; padding: 20px 26px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2); }
+    .hero h1 { margin: 0 0 6px; font-size: 22px; }
+    .hero p { margin: 0; opacity: 0.92; font-size: 13px; }
+    .hero a { color: #bfdbfe; font-size: 13px; }
+    .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+    .panel h2 { margin: 0 0 12px; font-size: 17px; color: #0f172a; }
+    .panel h3 { margin: 16px 0 8px; font-size: 14px; color: #334155; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 20px; }
+    .info-item { font-size: 13px; }
+    .info-item b { color: #475569; font-weight: 600; }
+    .info-item span { color: #1f2937; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; font-size: 13px; }
+    th { color: #475569; font-size: 12px; }
+    .tag { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; background: #e0f2fe; color: #075985; }
+    .tag.status-active { background: #dcfce7; color: #166534; }
+    .tag.status-completed { background: #e0e7ff; color: #3730a3; }
+    .tag.status-archived { background: #f1f5f9; color: #64748b; }
+    .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+    .field label { font-size: 13px; color: #334155; font-weight: 600; }
+    .field input, .field select, .field textarea { padding: 8px 11px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 13px; box-sizing: border-box; background: #fff; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 16px; }
+    .actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+    .actions button, .mini-btn { padding: 8px 16px; border: none; border-radius: 10px; font-size: 13px; cursor: pointer; background: #1d4ed8; color: #fff; }
+    .actions button:disabled { opacity: 0.5; cursor: default; }
+    .mini-btn { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
+    .mini-btn.danger { background: #dc2626; }
+    .btn-secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd !important; }
+    .btn-warn { background: #b91c1c; }
+    #notice { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+    #notice.err { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    #notice.ok { display: block; background: #ecfdf5; color: #166534; border: 1px solid #86efac; }
+    .muted { color: #64748b; font-size: 12px; }
+    .empty { padding: 14px 8px; color: #64748b; font-size: 13px; }
+    .stats-bar { font-size: 13px; color: #334155; margin-bottom: 10px; display: flex; gap: 18px; flex-wrap: wrap; }
+    .stats-bar b { color: #1d4ed8; }
+    .warn-text { color: #b45309; font-size: 12px; }
+    #editForm { display: none; }
+    .row-input { width: 100%; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 7px; font-size: 12px; box-sizing: border-box; }
+    #execStatus { font-size: 13px; color: #334155; }
+    .hist-done { color: #166534; }
+    .hist-failed { color: #b91c1c; }
+    .hist-running, .hist-queued { color: #b45309; }
+    .hist-unknown { color: #64748b; }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="hero">
+        <h1 id="projTitle">项目详情</h1>
+        <p><a href="/projects">返回项目管理</a> · <a href="/">报告中心</a></p>
+    </div>
+    <div id="notice"></div>
+
+    <section class="panel">
+        <h2>项目信息</h2>
+        <div class="info-grid" id="infoBody"></div>
+        <div class="actions">
+            <button id="btnEditInfo" class="btn-secondary" disabled>编辑</button>
+            <button id="btnDeleteProject" class="btn-warn" disabled>删除项目</button>
+        </div>
+        <div id="editForm">
+            <h3>编辑项目信息</h3>
+            <div class="grid2">
+                <div class="field"><label>项目名称</label><input id="editName" type="text" maxlength="120"></div>
+                <div class="field"><label>状态</label>
+                    <select id="editStatus">
+                        <option value="active">进行中</option>
+                        <option value="completed">已完成</option>
+                        <option value="archived">已归档</option>
+                    </select>
+                </div>
+                <div class="field"><label>执行环境</label><select id="editEnv"><option value="">（跟随默认环境）</option></select></div>
+                <div class="field"><label>Base URL</label><input id="editBaseUrl" type="text" maxlength="300" placeholder="可选，覆盖环境默认"></div>
+            </div>
+            <div class="field"><label>描述</label><textarea id="editDesc" rows="2" maxlength="500"></textarea></div>
+            <div class="actions">
+                <button id="btnInfoSave">保存</button>
+                <button id="btnInfoCancel" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Collection 集合</h2>
+        <table>
+            <thead><tr><th style="width:36%;">名称</th><th style="width:12%;">请求数</th><th style="width:24%;">添加时间</th><th style="width:28%;">操作</th></tr></thead>
+            <tbody id="colRows"></tbody>
+        </table>
+        <div class="empty" id="colEmpty" style="display:none;">暂无集合，粘贴 Postman 导出 JSON 添加。</div>
+        <h3>添加集合</h3>
+        <div class="field"><label>集合名称（可选，默认取 info.name）</label><input id="colName" type="text" maxlength="120"></div>
+        <div class="field"><label>Postman Collection JSON</label><textarea id="colJson" rows="5" placeholder='{"info":{"name":"示例"},"item":[...]}'></textarea></div>
+        <div class="actions"><button id="btnColAdd">添加集合</button><span class="muted">结构需含 info/item，数量上限 50</span></div>
+    </section>
+
+    <section class="panel">
+        <h2>需求追溯表</h2>
+        <div class="stats-bar" id="tracingStats"></div>
+        <table>
+            <thead><tr>
+                <th style="width:12%;">用例编号</th><th style="width:24%;">标题</th><th style="width:10%;">优先级</th>
+                <th style="width:13%;">转换状态</th><th style="width:17%;">集合</th><th style="width:15%;">请求 ID</th><th style="width:9%;">操作</th>
+            </tr></thead>
+            <tbody id="trRows"></tbody>
+        </table>
+        <div class="empty" id="trEmpty" style="display:none;">追溯表为空，点击「添加行」开始。</div>
+        <div class="actions">
+            <button id="btnTrAddRow" class="btn-secondary">添加行</button>
+            <button id="btnTrSave">保存追溯表</button>
+            <button id="btnExportCsv" class="btn-secondary">导出 CSV</button>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>执行与历史</h2>
+        <div class="actions">
+            <button id="btnExecute">执行项目</button>
+            <span id="execStatus"></span>
+        </div>
+        <h3>执行历史</h3>
+        <table>
+            <thead><tr><th style="width:22%;">时间</th><th style="width:12%;">状态</th><th style="width:10%;">通过</th><th style="width:10%;">失败</th><th style="width:46%;">报告</th></tr></thead>
+            <tbody id="histRows"></tbody>
+        </table>
+        <div class="empty" id="histEmpty" style="display:none;">暂无执行记录。</div>
+    </section>
+
+    <section class="panel">
+        <h2>导出</h2>
+        <div class="actions">
+            <button id="btnExportZip">导出项目 ZIP</button>
+            <span id="exportBox" class="muted"></span>
+        </div>
+    </section>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // 壳页模式：project_id 从 URL 路径末段解析（服务端壳不注入数据，v2 冲突 7）
+    var segs = location.pathname.split('/');
+    var pid = decodeURIComponent(segs[segs.length - 1] || '');
+    var base = '/api/projects/' + encodeURIComponent(pid);
+
+    var state = { project: null, tracing: null };
+    var pollTimer = null;
+
+    var notice = document.getElementById('notice');
+    var infoBody = document.getElementById('infoBody');
+    var colRows = document.getElementById('colRows');
+    var trRows = document.getElementById('trRows');
+    var histRows = document.getElementById('histRows');
+    var btnExecute = document.getElementById('btnExecute');
+    var execStatus = document.getElementById('execStatus');
+
+    function showNotice(text, ok) {
+        notice.textContent = text;
+        notice.className = text ? (ok ? 'ok' : 'err') : '';
+    }
+
+    function unwrap(raw) {
+        if (raw && typeof raw === 'object' && ('data' in raw)) return raw.data;
+        return raw;
+    }
+
+    function extractError(raw, resp) {
+        if (raw && raw.error_code === 'PRJ_100') return '项目脚手架功能未启用';
+        if (raw && raw.data && raw.data.details) return String(raw.data.details);
+        if (raw && raw.message && raw.message !== 'OK') return String(raw.message);
+        return '请求失败（HTTP ' + resp.status + '）';
+    }
+
+    function api(method, url, body) {
+        var opts = { method: method, headers: {} };
+        if (body !== undefined) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        return fetch(url, opts)
+            .then(function (resp) {
+                return resp.json().catch(function () { return null; }).then(function (raw) {
+                    return { resp: resp, raw: raw };
+                });
+            });
+    }
+
+    function fmtTime(iso) {
+        if (!iso) return '-';
+        return String(iso).replace('T', ' ').split('.')[0];
+    }
+
+    function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text !== null && text !== undefined) e.textContent = String(text);
+        return e;
+    }
+
+    function cell(text, className) {
+        var td = el('td');
+        td.textContent = (text === null || text === undefined || text === '') ? '-' : String(text);
+        if (className) td.className = className;
+        return td;
+    }
+
+    function statusLabel(s) {
+        if (s === 'completed') return '已完成';
+        if (s === 'archived') return '已归档';
+        return '进行中';
+    }
+
+    // 历史状态（项目侧）：done/failed/running/queued/unknown
+    function histStatusLabel(s) {
+        var map = { done: '完成', failed: '失败', running: '执行中', queued: '排队中', unknown: '结果未知' };
+        return map[String(s || '').toLowerCase()] || (s || '-');
+    }
+
+    // 任务轮询状态（job 侧）：success 字样以对象键形式出现，不落引号字面量
+    function jobStatusLabel(s) {
+        var map = { queued: '排队中', running: '执行中', success: '成功', failed: '失败', error: '出错' };
+        return map[String(s || '').toLowerCase()] || (s || '-');
+    }
+
+    // ---- 项目信息 ----
+
+    function renderInfo() {
+        var p = state.project;
+        infoBody.textContent = '';
+        document.getElementById('projTitle').textContent = p.name || '项目详情';
+        var meta = p.metadata || {};
+        var cfg = p.config || {};
+        var tpl = p.template_info || {};
+        var pairs = [
+            ['项目名称', p.name],
+            ['状态', statusLabel(p.status)],
+            ['执行环境', cfg.environment || '（跟随默认环境）'],
+            ['Base URL', cfg.base_url || '-'],
+            ['模板', (tpl.id || '-') + ' v' + (tpl.version || '-') + '（' + (tpl.source === 'user' ? '用户模板' : '内置模板') + '）'],
+            ['负责人', meta.owner || '-'],
+            ['系统 / 模块', ((meta.system || '-') + ' / ' + (meta.module || '-'))],
+            ['标签', (meta.tags || []).join('、') || '-'],
+            ['Jira', (meta.jira_ids || []).join('、') || '-'],
+            ['创建时间', fmtTime(meta.created_at)],
+            ['更新时间', fmtTime(meta.updated_at)]
+        ];
+        pairs.forEach(function (pair) {
+            var item = el('div', 'info-item');
+            item.appendChild(el('b', null, pair[0] + '：'));
+            item.appendChild(el('span', null, pair[1] === null || pair[1] === undefined || pair[1] === '' ? '-' : pair[1]));
+            infoBody.appendChild(item);
+        });
+        if ((meta._unresolved || []).length) {
+            var warn = el('div', 'warn-text', '提示：以下模板变量创建时未解析：' + meta._unresolved.join('、'));
+            infoBody.appendChild(warn);
+        }
+        document.getElementById('btnEditInfo').disabled = false;
+        document.getElementById('btnDeleteProject').disabled = false;
+    }
+
+    document.getElementById('btnEditInfo').addEventListener('click', function () {
+        var p = state.project;
+        document.getElementById('editName').value = p.name || '';
+        document.getElementById('editDesc').value = p.description || '';
+        document.getElementById('editStatus').value = p.status || 'active';
+        document.getElementById('editEnv').value = (p.config && p.config.environment) || '';
+        document.getElementById('editBaseUrl').value = (p.config && p.config.base_url) || '';
+        document.getElementById('editForm').style.display = 'block';
+    });
+
+    document.getElementById('btnInfoCancel').addEventListener('click', function () {
+        document.getElementById('editForm').style.display = 'none';
+    });
+
+    document.getElementById('btnInfoSave').addEventListener('click', function () {
+        var p = state.project;
+        var payload = {
+            name: document.getElementById('editName').value.trim(),
+            description: document.getElementById('editDesc').value.trim(),
+            status: document.getElementById('editStatus').value,
+            config: {
+                environment: document.getElementById('editEnv').value,
+                base_url: document.getElementById('editBaseUrl').value.trim()
+            },
+            updated_at: (p.metadata && p.metadata.updated_at) || ''
+        };
+        if (!payload.name) { showNotice('项目名称不能为空'); return; }
+        api('PUT', base, payload).then(function (pack) {
+            if (!pack.resp.ok) {
+                var cur = pack.raw && pack.raw.data && pack.raw.data.current;
+                if (cur) {  // PRJ_306 CAS：加载最新版本供重新编辑
+                    state.project = cur;
+                    renderAll();
+                    showNotice('项目已被他人修改，已加载最新版本，请重新编辑后再保存');
+                    return;
+                }
+                showNotice(extractError(pack.raw, pack.resp));
+                return;
+            }
+            state.project = unwrap(pack.raw) || state.project;
+            renderAll();
+            document.getElementById('editForm').style.display = 'none';
+            showNotice('保存成功', true);
+        }).catch(function (err) {
+            showNotice('网络错误：' + (err && err.message ? err.message : err));
+        });
+    });
+
+    document.getElementById('btnDeleteProject').addEventListener('click', function () {
+        if (!window.confirm('删除后项目目录与数据不可恢复，确认删除「' + (state.project.name || pid) + '」？')) return;
+        api('DELETE', base, { confirm: true }).then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            window.location.href = '/projects';
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    // ---- 集合（A6~A8） ----
+
+    function renderCollections() {
+        colRows.textContent = '';
+        var items = (state.project && state.project.collections) || [];
+        document.getElementById('colEmpty').style.display = items.length ? 'none' : 'block';
+        items.forEach(function (c) {
+            var tr = el('tr');
+            tr.appendChild(cell(c.name || c.id));
+            tr.appendChild(cell(c.request_count));
+            tr.appendChild(cell(fmtTime(c.created_at), 'muted'));
+            var td = el('td');
+            var btn = el('button', 'mini-btn danger', '移除');
+            btn.addEventListener('click', function () { removeCollection(c); });
+            td.appendChild(btn);
+            tr.appendChild(td);
+            colRows.appendChild(tr);
+        });
+    }
+
+    function removeCollection(c) {
+        if (!window.confirm('确认移除集合「' + (c.name || c.id) + '」？')) return;
+        api('DELETE', base + '/collections/' + encodeURIComponent(c.id)).then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            var data = unwrap(pack.raw) || {};
+            state.project.collections = Array.isArray(data.items) ? data.items : [];
+            renderCollections();
+            renderTracing();  // 集合下拉与 dangling 提示联动
+            showNotice('集合已移除', true);
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    }
+
+    document.getElementById('btnColAdd').addEventListener('click', function () {
+        var text = document.getElementById('colJson').value.trim();
+        if (!text) { showNotice('请粘贴 Postman Collection JSON'); return; }
+        var collection;
+        try { collection = JSON.parse(text); } catch (e) { showNotice('JSON 解析失败：' + e.message); return; }
+        var name = document.getElementById('colName').value.trim();
+        var url = base + '/collections' + (name ? ('?name=' + encodeURIComponent(name)) : '');
+        api('POST', url, collection).then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            document.getElementById('colJson').value = '';
+            document.getElementById('colName').value = '';
+            showNotice('集合已添加', true);
+            loadProject();  // 重新拉取以刷新计数与 CAS 令牌
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    // ---- 追溯表（A10/A11） ----
+
+    function loadTracing() {
+        api('GET', base + '/tracing').then(function (pack) {
+            if (!pack.resp.ok) {
+                showNotice('追溯表加载失败：' + extractError(pack.raw, pack.resp));
+                return;
+            }
+            state.tracing = unwrap(pack.raw) || { rows: [] };
+            renderTracing();
+        }).catch(function () { /* 追溯面板失败不阻塞其他面板 */ });
+    }
+
+    function renderTracing() {
+        trRows.textContent = '';
+        var t = state.tracing || { rows: [] };
+        var rows = Array.isArray(t.rows) ? t.rows : [];
+        document.getElementById('trEmpty').style.display = rows.length ? 'none' : 'block';
+        var stats = document.getElementById('tracingStats');
+        stats.textContent = '';
+        [
+            ['总用例', t.total === undefined ? rows.length : t.total],
+            ['已自动化', t.automated === undefined ? '-' : t.automated],
+            ['自动化率', (t.rate === undefined ? '-' : t.rate + '%')],
+            ['更新时间', fmtTime(t.updated_at)]
+        ].forEach(function (pair) {
+            var s = el('span');
+            s.appendChild(el('b', null, pair[0] + '：'));
+            s.appendChild(document.createTextNode(String(pair[1])));
+            stats.appendChild(s);
+        });
+        rows.forEach(function (row, idx) {
+            trRows.appendChild(buildTrRow(row, idx));
+        });
+    }
+
+    function buildTrRow(row, idx) {
+        var tr = el('tr');
+        tr.appendChild(textCell(row.case_no, 'case_no'));
+        tr.appendChild(textCell(row.title, 'title'));
+        tr.appendChild(textCell(row.priority, 'priority'));
+
+        var tdStatus = el('td');
+        var sel = el('select', 'row-input');
+        ['pending', 'automated', 'manual'].forEach(function (v) {
+            var o = el('option', null, { pending: '待转换', automated: '已自动化', manual: '手工' }[v]);
+            o.value = v;
+            if (String(row.convert_status || 'pending') === v) o.selected = true;
+            sel.appendChild(o);
+        });
+        sel.dataset.field = 'convert_status';
+        tdStatus.appendChild(sel);
+        tr.appendChild(tdStatus);
+
+        var tdCol = el('td');
+        var colSel = el('select', 'row-input');
+        var blank = el('option', null, '（未关联）');
+        blank.value = '';
+        colSel.appendChild(blank);
+        (((state.project && state.project.collections) || [])).forEach(function (c) {
+            var o = el('option', null, c.name || c.id);
+            o.value = c.id;
+            if (String(row.collection_id || '') === String(c.id)) o.selected = true;
+            colSel.appendChild(o);
+        });
+        colSel.dataset.field = 'collection_id';
+        tdCol.appendChild(colSel);
+        if (row.dangling) {
+            tdCol.appendChild(el('div', 'warn-text', '⚠ 关联集合已被移除'));
+        }
+        tr.appendChild(tdCol);
+
+        tr.appendChild(textCell(row.request_id, 'request_id'));
+
+        var tdOp = el('td');
+        var del = el('button', 'mini-btn danger', '删除');
+        del.addEventListener('click', function () {
+            var rows = readRows();
+            rows.splice(idx, 1);
+            state.tracing.rows = rows;
+            renderTracing();
+        });
+        tdOp.appendChild(del);
+        tr.appendChild(tdOp);
+        return tr;
+    }
+
+    function textCell(value, field) {
+        var td = el('td');
+        var input = el('input', 'row-input');
+        input.type = 'text';
+        input.value = (value === null || value === undefined) ? '' : String(value);
+        input.dataset.field = field;
+        td.appendChild(input);
+        return td;
+    }
+
+    function readRows() {
+        var rows = [];
+        var trs = trRows.querySelectorAll('tr');
+        trs.forEach(function (tr) {
+            var row = {};
+            tr.querySelectorAll('[data-field]').forEach(function (input) {
+                row[input.dataset.field] = input.value;
+            });
+            rows.push(row);
+        });
+        return rows;
+    }
+
+    document.getElementById('btnTrAddRow').addEventListener('click', function () {
+        if (!state.tracing) state.tracing = { rows: [] };
+        state.tracing.rows = readRows().concat([{ case_no: '', title: '', priority: '', convert_status: 'pending', collection_id: '', request_id: '' }]);
+        renderTracing();
+    });
+
+    document.getElementById('btnTrSave').addEventListener('click', function () {
+        if (!state.tracing) { showNotice('追溯表尚未加载'); return; }
+        var payload = { rows: readRows(), updated_at: state.tracing.updated_at || '' };
+        api('PUT', base + '/tracing', payload).then(function (pack) {
+            if (!pack.resp.ok) {
+                var cur = pack.raw && pack.raw.data && pack.raw.data.current;
+                if (cur) {  // PRJ_602 CAS：覆盖为服务端最新版本
+                    state.tracing = cur;
+                    renderTracing();
+                    showNotice('追溯表已被他人修改，已加载最新版本，请重新编辑后再保存');
+                    return;
+                }
+                showNotice(extractError(pack.raw, pack.resp));
+                return;
+            }
+            showNotice('追溯表已保存', true);
+            loadTracing();  // 回读服务端规范化结果（含 dangling 派生）
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    // ---- 执行（A9 + 轮询既有 /api/run-postman-status） ----
+
+    btnExecute.addEventListener('click', function () {
+        showNotice('');
+        api('POST', base + '/execute', {}).then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            var data = unwrap(pack.raw) || {};
+            showNotice('已入队，报告：' + (data.report_name || '-'), true);
+            startPolling(data.job_id);
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        btnExecute.disabled = false;
+    }
+
+    function startPolling(jobId) {
+        stopPolling();
+        if (!jobId) { execStatus.textContent = '响应缺少 job_id，无法轮询'; loadProject(); return; }
+        btnExecute.disabled = true;
+        execStatus.textContent = '任务状态：排队中';
+        pollTimer = setInterval(function () {
+            fetch('/api/run-postman-status/' + encodeURIComponent(jobId))
+                .then(function (resp) {
+                    if (!resp.ok) throw new Error('gone');
+                    return resp.json();
+                })
+                .then(function (job) {
+                    var s = String(job.status || '');
+                    execStatus.textContent = '任务状态：' + jobStatusLabel(s);
+                    // 终态 = 非 queued/running（反向判断，见执行链契约）
+                    if (s && s !== 'queued' && s !== 'running') {
+                        stopPolling();
+                        loadProject();  // 懒对账刷新历史（G-30）
+                    }
+                })
+                .catch(function () {
+                    stopPolling();
+                    execStatus.textContent = '任务状态已丢失（服务可能重启），按报告对账刷新';
+                    loadProject();
+                });
+        }, 2000);
+    }
+
+    // ---- 历史面板 ----
+
+    function renderHistory() {
+        histRows.textContent = '';
+        var stats = (state.project && state.project.statistics) || {};
+        var history = Array.isArray(stats.execution_history) ? stats.execution_history : [];
+        document.getElementById('histEmpty').style.display = history.length ? 'none' : 'block';
+        history.forEach(function (entry) {
+            var tr = el('tr');
+            tr.appendChild(cell(fmtTime(entry.time), 'muted'));
+            var tdStatus = el('td');
+            var label = histStatusLabel(entry.status);
+            tdStatus.textContent = label;
+            tdStatus.className = 'hist-' + String(entry.status || 'unknown').toLowerCase();
+            tr.appendChild(tdStatus);
+            tr.appendChild(cell(entry.passed === null || entry.passed === undefined ? '-' : entry.passed, 'hist-done'));
+            tr.appendChild(cell(entry.failed === null || entry.failed === undefined ? '-' : entry.failed, 'hist-failed'));
+            var td = el('td');
+            if (entry.report_name) {
+                var a = el('a', null, entry.report_name);
+                a.href = '/reports/' + encodeURIComponent(entry.report_name);
+                a.target = '_blank';
+                td.appendChild(a);
+            } else {
+                td.textContent = '-';
+            }
+            tr.appendChild(td);
+            histRows.appendChild(tr);
+        });
+    }
+
+    // ---- 导出（A12 CSV / A13 zip） ----
+
+    document.getElementById('btnExportCsv').addEventListener('click', function () {
+        fetch(base + '/export/tracing.csv')
+            .then(function (resp) {
+                if (!resp.ok) {
+                    return resp.json().catch(function () { return null; }).then(function (raw) {
+                        showNotice(extractError(raw, resp));
+                    });
+                }
+                return resp.blob().then(function (blob) {
+                    var url = URL.createObjectURL(blob);
+                    var a = el('a');
+                    a.href = url;
+                    a.download = 'project_' + pid + '_tracing.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
+            })
+            .catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    document.getElementById('btnExportZip').addEventListener('click', function () {
+        var box = document.getElementById('exportBox');
+        box.textContent = '';
+        api('GET', base + '/export').then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            var data = unwrap(pack.raw) || {};
+            box.textContent = '导出完成：';
+            if (data.url) {
+                var a = el('a', null, data.file_name || '下载 ZIP');
+                a.href = data.url;
+                box.appendChild(a);
+            }
+        }).catch(function (err) { showNotice('网络错误：' + (err && err.message ? err.message : err)); });
+    });
+
+    // ---- 数据加载 ----
+
+    function renderAll() {
+        renderInfo();
+        renderCollections();
+        renderHistory();
+    }
+
+    function loadProject() {
+        api('GET', base).then(function (pack) {
+            if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+            state.project = unwrap(pack.raw) || {};
+            renderAll();
+        }).catch(function (err) {
+            showNotice('项目加载失败：' + (err && err.message ? err.message : err));
+        });
+    }
+
+    function loadEnvironments() {
+        fetch('/api/environments')
+            .then(function (r) { return r.json(); })
+            .then(function (raw) {
+                var data = unwrap(raw) || {};
+                var envs = [];
+                if (Array.isArray(data.environments)) envs = data.environments;
+                else if (Array.isArray(data)) envs = data;
+                var select = document.getElementById('editEnv');
+                envs.forEach(function (e) {
+                    var name = typeof e === 'string' ? e : e.name;
+                    if (!name) return;
+                    var opt = el('option', null, name);
+                    opt.value = name;
+                    select.appendChild(opt);
+                });
+            })
+            .catch(function () { /* 环境列表失败不阻塞（可选字段） */ });
+    }
+
+    loadProject();
+    loadTracing();
+    loadEnvironments();
+})();
+</script>
+</body>
+</html>
+{% endraw %}
