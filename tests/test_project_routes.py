@@ -4,12 +4,13 @@
 开关关→403 PRJ_100（API 包装体/页面提示页，且零文件系统痕迹）、
 非法 JSON→统一 400 包装（G-34）、成功包装 `data["code"]==200`+`data["data"]`、
 CRUD 全链、CAS 409（PRJ_306/602，current 合并体）、删除防护 PRJ_305、
-集合/追溯/模板端点、A12/A13 占位 501（S4.2 接线）。
+集合/追溯/模板端点、A12 CSV（BOM+表头+601）/A13 zip（EXPORTS_DIR 落盘+解压审计+701）。
 A9 execute_project 真实入队断言（S3.1）：env_name/base_url/report_name 透传、
 入队即记录 history、PRJ_501/502/503 分支。
 """
 
 import json
+import zipfile
 from pathlib import Path
 from typing import Any, Dict
 
@@ -424,22 +425,68 @@ def test_template_routes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert resp.get_json()["error_code"] == "TPL_002"
 
 
-# ---------- A12/A13 占位（真实实现在 S4.2 接线） ----------
+# ---------- A12/A13 导出（S4.2 接线） ----------
 
 
-def test_not_wired_endpoints_return_501(
+def test_export_tracing_csv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    e = _env(tmp_path, monkeypatch)
+    pid = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]["id"]
+    resp = e.client.get(f"/api/projects/{pid}/export/tracing.csv")
+    assert resp.status_code == 200
+    assert resp.headers["Content-Type"].startswith("text/csv")
+    assert "attachment" in resp.headers["Content-Disposition"]
+    text = resp.get_data(as_text=True)
+    assert text.startswith(chr(0xFEFF))  # UTF-8 BOM，Excel 兼容
+    assert "case_no,title,priority,convert_status,collection_id,request_id,dangling" in text
+    assert "C1,扫码" in text
+
+
+def test_export_tracing_csv_missing_returns_prj_601(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     e = _env(tmp_path, monkeypatch)
-    project = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]
-    pid = project["id"]
-    for path in (
-        f"/api/projects/{pid}/export/tracing.csv",
-        f"/api/projects/{pid}/export",
-    ):
-        resp = e.client.get(path)
-        assert resp.status_code == 501
-        assert resp.get_json()["error_code"] == "COM_001"
+    pid = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]["id"]
+    assert e.svc.store.delete_project_file(pid, "tracing.json")
+    resp = e.client.get(f"/api/projects/{pid}/export/tracing.csv")
+    assert resp.status_code == 404
+    assert resp.get_json()["error_code"] == "PRJ_601"
+
+
+def test_export_project_zip_ok_with_exports_dir_and_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exports = tmp_path / "exports"
+    monkeypatch.setattr(ps, "EXPORTS_DIR", exports)
+    e = _env(tmp_path, monkeypatch)
+    pid = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]["id"]
+    resp = e.client.get(f"/api/projects/{pid}/export")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    name = data["file_name"]
+    assert name.startswith(f"proj_{pid}_") and name.endswith("_project.zip")
+    assert data["url"] == f"/exports/{name}"
+    zip_path = exports / name
+    assert zip_path.is_file()
+    with zipfile.ZipFile(zip_path) as zf:
+        names = zf.namelist()
+        assert "project.json" in names and "tracing.json" in names
+        assert any(n.startswith("collections/") for n in names)
+        # 解压审计：全部相对路径且不出项目目录（无绝对/.. 逃逸）
+        for n in names:
+            assert not n.startswith("/") and ".." not in n.split("/")
+
+
+def test_export_project_zip_failure_maps_prj_701(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("占位文件，使 EXPORTS_DIR.mkdir 失败", encoding="utf-8")
+    monkeypatch.setattr(ps, "EXPORTS_DIR", blocker / "exports")
+    e = _env(tmp_path, monkeypatch)
+    pid = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]["id"]
+    resp = e.client.get(f"/api/projects/{pid}/export")
+    assert resp.status_code == 500
+    assert resp.get_json()["error_code"] == "PRJ_701"
 
 
 # ---------- A9 execute 真实入队（S3.1） ----------

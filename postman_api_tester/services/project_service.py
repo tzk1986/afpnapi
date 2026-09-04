@@ -16,11 +16,14 @@
   不触碰其生命周期（R13）。
 """
 
+import csv
+import io
 import json
 import logging
 import re
 import uuid
-from datetime import datetime
+import zipfile
+from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -51,12 +54,24 @@ from postman_api_tester.services.report_job_submission_service import (
     save_collection_json,
 )
 from postman_api_tester.services.report_request_service import is_valid_http_url
+from postman_api_tester.utils.file_utils import sanitize_export_name
 from postman_api_tester.utils.server_utils import clamp_page, clamp_page_size
 
 logger = logging.getLogger(__name__)
 
 # 与 handlers/job_routes.py 同路径规则（禁 import handlers，允许常量镜像）
 UPLOADS_DIR = (Path(__file__).resolve().parent.parent / "uploaded_collections").resolve()
+
+def _resolve_exports_dir() -> Path:
+    # 与 handlers/server_routes.py:49 同式（A13 产物必须可经 /exports/ 静态路由下载，G-37）
+    from postman_api_tester.report_server_app import ReportServerApp
+
+    return (
+        ReportServerApp._resolve_reports_dir().parent / "uploaded_collections" / "exports"
+    ).resolve()
+
+
+EXPORTS_DIR = _resolve_exports_dir()
 
 _RUN_POSTMAN_JOB_FN = partial(
     run_postman_job,
@@ -934,6 +949,56 @@ class ProjectService:
             }
             normalized.append(entry)
         return normalized
+
+    # ================= 导出（A12/A13，S4.2） =================
+
+    _TRACING_CSV_COLS = (
+        "case_no",
+        "title",
+        "priority",
+        "convert_status",
+        "collection_id",
+        "request_id",
+    )
+
+    def export_tracing_csv(self, project_id: str) -> Tuple[str, str]:
+        """A12：追溯表 CSV（stdlib csv + UTF-8 BOM 兼容 Excel）→ (文本, 文件名)。"""
+        rows = self.get_tracing(project_id).get("rows") or []
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(self._TRACING_CSV_COLS + ("dangling",))
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            writer.writerow(
+                [row.get(col, "") for col in self._TRACING_CSV_COLS]
+                + ["1" if row.get("dangling") else "0"]
+            )
+        ts = self._export_timestamp()
+        file_name = sanitize_export_name(f"proj_{project_id}_tracing_{ts}.csv")
+        return chr(0xFEFF) + buf.getvalue(), file_name
+
+    def export_project_zip(self, project_id: str) -> Dict[str, Any]:
+        """A13：项目目录整体打包（相对 arcname 零逃逸）落共享 EXPORTS_DIR（G-37）。"""
+        self._load_project(project_id)
+        root = self.store.project_dir(project_id)
+        file_name = sanitize_export_name(
+            f"proj_{project_id}_{self._export_timestamp()}_project.zip"
+        )
+        try:
+            EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            target = EXPORTS_DIR / file_name
+            with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
+                for path in sorted(root.rglob("*")):
+                    if path.is_file():
+                        zf.write(path, path.relative_to(root).as_posix())
+        except (OSError, zipfile.BadZipFile) as exc:
+            raise ProjectError("PRJ_701", f"导出失败: {exc}", 500) from exc
+        return {"file_name": file_name, "url": f"/exports/{file_name}"}
+
+    @staticmethod
+    def _export_timestamp() -> str:
+        return datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
 
     # ================= 执行入队（A9，S3.1） =================
 

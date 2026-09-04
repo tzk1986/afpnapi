@@ -185,14 +185,26 @@ def main() -> None:
     if view.status_code != 200:
         raise RuntimeError(f"报告页访问 {view.status_code}")
 
-    # A12/A13 占位（S4.2 接线后本段改为真实导出断言）
-    for path, method in (
-        (f"/api/projects/{pid}/export/tracing.csv", "get"),
-        (f"/api/projects/{pid}/export", "get"),
+    # A12 CSV 导出（S4.2 已接线）
+    csv_resp = requests.get(f"{BASE}/api/projects/{pid}/export/tracing.csv", timeout=20)
+    if csv_resp.status_code != 200 or "text/csv" not in csv_resp.headers.get(
+        "Content-Type", ""
     ):
-        resp = getattr(requests, method)(f"{BASE}{path}", timeout=20)
-        if resp.status_code != 501 or _error_code(resp) != "COM_001":
-            raise RuntimeError(f"导出占位应 501 COM_001: {path} → {resp.status_code}")
+        raise RuntimeError(f"A12 CSV 导出异常: {csv_resp.status_code}")
+    if "case_no" not in csv_resp.text:
+        raise RuntimeError("A12 CSV 缺表头")
+
+    # A13 zip 导出 + /exports/ 下载
+    zip_info = _must_ok(
+        requests.get(f"{BASE}/api/projects/{pid}/export", timeout=20), "A13"
+    )
+    file_name = str(zip_info.get("file_name") or "")
+    if not (file_name.startswith(f"proj_{pid}_") and file_name.endswith("_project.zip")):
+        raise RuntimeError(f"A13 命名非法: {file_name}")
+    dl = requests.get(f"{BASE}/exports/{file_name}", timeout=30)
+    if dl.status_code != 200 or len(dl.content) < 100:
+        raise RuntimeError(f"A13 下载 {dl.status_code} len={len(dl.content)}")
+    out["export_zip"] = file_name
 
     # 清理：A5 删除项目（确认位）
     _must_ok(

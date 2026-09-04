@@ -242,25 +242,28 @@ def api_put_project_tracing(project_id: str) -> ResponseReturnValue:
     return BaseHandler.json_response(result)
 
 
-# ==================== A12~A13 导出（阶段 4 接线） ====================
+# ==================== A12~A13 导出 ====================
 
 
 @project_api
 def api_export_project_tracing_csv(project_id: str) -> ResponseReturnValue:
-    """A12 GET /api/projects/<id>/export/tracing.csv → text/csv 文件流。
-
-    CSV 生成在 S4.2 交付；当前返回 501 占位（错误码语义 PRJ_601 由 service 抛出）。
-    """
-    return json_error("追溯表 CSV 导出将在 S4.2 接线", 501, "COM_001")
+    """A12 GET /api/projects/<id>/export/tracing.csv → text/csv 文件流；PRJ_601。"""
+    csv_text, file_name = get_project_service().export_tracing_csv(project_id)
+    resp = make_response(csv_text)
+    resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{file_name}"'
+    return resp
 
 
 @project_api
 def api_export_project_zip(project_id: str) -> ResponseReturnValue:
     """A13 GET /api/projects/<id>/export → {file_name, url}（共享 EXPORTS_DIR）。
 
-    zip 打包在 S4.2 交付（G-37 命名 `proj_<id>_<UTC紧凑>_project.zip`）；当前 501 占位。
+    G-37 命名 `proj_<id>_<UTC紧凑>_project.zip`，经 /exports/ 静态路由下载；
+    错误码 PRJ_701（导出失败，500）。
     """
-    return json_error("项目 zip 导出将在 S4.2 接线", 501, "COM_001")
+    result = get_project_service().export_project_zip(project_id)
+    return BaseHandler.json_response(result)
 
 
 # ==================== A14~A15 模板 ====================
