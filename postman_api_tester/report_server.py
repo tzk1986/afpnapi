@@ -95,6 +95,9 @@ from postman_api_tester.handlers.project_routes import (
     api_delete_project as _route_api_delete_project,
 )
 from postman_api_tester.handlers.project_routes import (
+    api_delete_project_template as _route_api_delete_project_template,
+)
+from postman_api_tester.handlers.project_routes import (
     api_execute_project as _route_api_execute_project,
 )
 from postman_api_tester.handlers.project_routes import (
@@ -1166,6 +1169,11 @@ def api_projects_templates_list_route() -> ResponseReturnValue:
 @app.route("/api/project-templates", methods=["POST"])
 def api_projects_templates_create_route() -> ResponseReturnValue:
     return _route_api_create_project_template()
+
+
+@app.route("/api/project-templates/<template_id>", methods=["DELETE"])
+def api_projects_templates_delete_route(template_id: str) -> ResponseReturnValue:
+    return _route_api_delete_project_template(template_id)
 
 
 @app.route("/favicon.ico")

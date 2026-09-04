@@ -248,6 +248,15 @@ class ProjectService:
         logger.info("已创建用户模板: %s -> %s", template_id, path)
         return template
 
+    def delete_template(self, template_id: str) -> Dict[str, Any]:
+        """A16：删除用户模板；内置只读 409 TPL_002；不存在 404 PRJ_203。"""
+        tid = str(template_id or "").strip()
+        if self.templates.builtin_template_exists(tid):
+            raise ProjectError("TPL_002", f"内置模板只读，不可删除: {tid}", 409)
+        if not self.templates.delete_user_template(tid):
+            raise ProjectError("PRJ_203", f"模板不存在: {tid}", 404)
+        return {"deleted": True, "id": tid}
+
     def _derive_user_template_id(self, name: str) -> str:
         slug = re.sub(r"[^a-z0-9_]", "_", name.lower()).strip("_")
         slug = re.sub(r"_+", "_", slug)[:28].strip("_")

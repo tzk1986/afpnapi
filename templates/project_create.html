@@ -15,7 +15,9 @@
     .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
     .panel h2 { margin: 0 0 12px; font-size: 17px; color: #0f172a; }
     .tpl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-    .tpl-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 14px; cursor: pointer; background: #f8fafc; }
+    .tpl-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 14px; cursor: pointer; background: #f8fafc; position: relative; }
+    .tpl-del { position: absolute; top: 6px; right: 6px; border: 1px solid #fecaca; background: #fff; color: #dc2626; font-size: 11px; border-radius: 6px; padding: 1px 7px; cursor: pointer; }
+    .tpl-del:hover { background: #fef2f2; }
     .tpl-card.selected { border-color: #1d4ed8; background: #eff6ff; }
     .tpl-card h3 { margin: 0 0 6px; font-size: 15px; }
     .tpl-card p { margin: 0 0 8px; font-size: 12px; color: #64748b; min-height: 32px; }
@@ -39,6 +41,11 @@
     #notice.ok { display: block; background: #ecfdf5; color: #166534; border: 1px solid #86efac; }
     .muted { color: #64748b; font-size: 13px; }
     .secret-warn { font-size: 12px; color: #b45309; }
+    .tpl-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tpl-bar button { padding: 6px 14px; border-radius: 8px; border: 1px solid #93c5fd; background: #fff; color: #1d4ed8; font-size: 13px; cursor: pointer; }
+    .tpl-bar button.primary { background: #1d4ed8; color: #fff; }
+    #tplUploadPanel { border: 1px dashed #94a3b8; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #f8fafc; }
+    #tplUploadPanel textarea { width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-family: monospace; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -50,8 +57,43 @@
 
     <section class="panel">
         <h2>1. 选择模板</h2>
+        <div class="tpl-bar">
+            <button type="button" class="primary" id="btnTplUpload">上传新模板</button>
+            <button type="button" id="btnTplSample">下载示例模板</button>
+            <span class="muted">小白用法：下载示例 → 记事本改名称/接口地址 → 上传新模板 → 选中它建项目</span>
+        </div>
+        <div id="tplUploadPanel" style="display:none;">
+            <div class="field"><label>选择 template.json 文件（选中后内容自动填入下方，可继续修改）</label>
+                <input type="file" id="tplFile" accept=".json,application/json"></div>
+            <div class="field"><label>模板 JSON 内容</label>
+                <textarea id="tplJsonInput" rows="12" spellcheck="false"></textarea></div>
+            <div class="actions" style="margin-top:4px;">
+                <button type="button" class="primary" id="btnTplSubmit">提交上传</button>
+                <button type="button" class="secondary" id="btnTplCancel">取消</button>
+            </div>
+        </div>
         <div class="tpl-grid" id="tplGrid"></div>
-        <div class="muted" id="tplEmpty" style="display:none;">暂无可用模板，可先通过「用户模板」接口创建。</div>
+        <div class="muted" id="tplEmpty" style="display:none;">暂无可用模板，可点上方「上传新模板」创建。</div>
+<script type="application/json" id="tplSampleData">
+{
+  "name": "我的第一个接口模板",
+  "description": "示例模板：1 个健康检查接口。用记事本打开本文件，改 name、集合里的 url、base_url 默认值，保存后回本页点「上传新模板」选这个文件即可。",
+  "version": "1.0.0",
+  "metadata_template": { "owner": "{{owner}}" },
+  "variables": [
+    { "key": "owner", "label": "负责人", "type": "string", "required": true },
+    { "key": "base_url", "label": "被测服务地址", "type": "string", "required": true, "default": "http://127.0.0.1:5000", "description": "集合里的 {{base_url}} 执行时会替换成这个地址" }
+  ],
+  "files": [
+    { "path": "collections/mine.json", "render": false,
+      "content_template": "{\"info\":{\"name\":\"我的示例集合\",\"schema\":\"https://schema.getpostman.com/json/collection/v2.1.0/collection.json\"},\"item\":[{\"name\":\"健康检查\",\"request\":{\"method\":\"GET\",\"header\":[],\"url\":\"{{base_url}}/health\",\"x_assertions\":[{\"path\":\"$.status\",\"op\":\"eq\",\"expected\":\"ok\"}]}}]}" },
+    { "path": "tracing.json", "render": false,
+      "content_template": "{\"schema_version\":1,\"rows\":[{\"case_no\":\"TC-001\",\"title\":\"健康检查\",\"priority\":\"P0\",\"convert_status\":\"automated\",\"collection_id\":\"\",\"request_id\":\"\"},{\"case_no\":\"TC-002\",\"title\":\"（自己补充业务用例）\",\"priority\":\"P1\",\"convert_status\":\"pending\",\"collection_id\":\"\",\"request_id\":\"\"}]}" },
+    { "path": "docs/README.md", "render": true,
+      "content_template": "# {{project_name}}\n\n- 负责人：{{owner}}\n- 被测地址：{{base_url}}\n\n本骨架由「示例模板」生成，可在项目详情页继续挂自己的 Postman 集合。\n" }
+  ]
+}
+</script>
     </section>
 
     <section class="panel">
@@ -148,9 +190,40 @@
             card.appendChild(h3);
             card.appendChild(p);
             card.appendChild(meta);
+            if (t.source === 'user') {
+                var del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'tpl-del';
+                del.textContent = '删除';
+                del.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    deleteTemplate(t);
+                });
+                card.appendChild(del);
+            }
             card.addEventListener('click', function () { selectTemplate(t); });
             tplGrid.appendChild(card);
         });
+    }
+
+    // ---- A16 删除用户模板（内置模板不渲染删除按钮） ----
+    function deleteTemplate(t) {
+        if (!confirm('确认删除用户模板「' + (t.name || t.id) + '」？该操作不可恢复。')) return;
+        fetch('/api/project-templates/' + encodeURIComponent(t.id), { method: 'DELETE' })
+            .then(function (resp) {
+                return resp.json().then(function (raw) { return { resp: resp, raw: raw }; });
+            })
+            .then(function (pack) {
+                if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+                templates = templates.filter(function (x) { return x.id !== t.id; });
+                if (selected && selected.id === t.id) {
+                    selected = null;
+                    formPanel.style.display = 'none';
+                }
+                renderTemplates();
+                showNotice('模板已删除', true);
+            })
+            .catch(function () { showNotice('网络错误'); });
     }
 
     // ---- 按 variables schema 动态重建表单（G-31） ----
@@ -309,17 +382,72 @@
     });
 
     // ---- 数据加载 ----
-    function loadTemplates() {
+    function loadTemplates(selectId) {
         fetch('/api/project-templates')
             .then(function (r) { return r.json(); })
             .then(function (raw) {
                 var data = unwrap(raw) || {};
                 templates = Array.isArray(data.items) ? data.items : [];
-                if (templates.length) selectTemplate(templates[0]);
+                var pick = null;
+                if (selectId) {
+                    templates.forEach(function (t) { if (t.id === selectId) pick = t; });
+                }
+                if (pick) selectTemplate(pick);
+                else if (templates.length) selectTemplate(templates[0]);
                 else renderTemplates();
             })
             .catch(function () { renderTemplates(); });
     }
+
+    // ---- 上传新模板（A15）+ 下载示例模板 ----
+    document.getElementById('btnTplUpload').addEventListener('click', function () {
+        document.getElementById('tplUploadPanel').style.display = 'block';
+    });
+    document.getElementById('btnTplCancel').addEventListener('click', function () {
+        document.getElementById('tplUploadPanel').style.display = 'none';
+    });
+    document.getElementById('tplFile').addEventListener('change', function () {
+        var f = this.files && this.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+            document.getElementById('tplJsonInput').value = String(reader.result);
+        };
+        reader.readAsText(f, 'utf-8');
+    });
+    document.getElementById('btnTplSample').addEventListener('click', function () {
+        var text = document.getElementById('tplSampleData').textContent.trim();
+        var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'template-sample.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+    });
+    document.getElementById('btnTplSubmit').addEventListener('click', function () {
+        var text = document.getElementById('tplJsonInput').value.trim();
+        if (!text) { showNotice('请选择文件或粘贴模板 JSON 内容'); return; }
+        var payload;
+        try { payload = JSON.parse(text); } catch (e) { showNotice('JSON 解析失败：' + e.message); return; }
+        fetch('/api/project-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(function (resp) {
+                return resp.json().then(function (raw) { return { resp: resp, raw: raw }; });
+            })
+            .then(function (pack) {
+                if (!pack.resp.ok) { showNotice(extractError(pack.raw, pack.resp)); return; }
+                var created = unwrap(pack.raw) || {};
+                document.getElementById('tplUploadPanel').style.display = 'none';
+                showNotice('模板已上传：' + (created.name || created.id), true);
+                loadTemplates(created.id);
+            })
+            .catch(function () { showNotice('网络错误'); });
+    });
 
     function loadEnvironments() {
         fetch('/api/environments')

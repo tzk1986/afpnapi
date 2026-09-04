@@ -354,6 +354,17 @@ class ProjectTemplateStore:
         logger.info("已保存用户模板: %s", template_id)
         return path
 
+    def delete_user_template(self, template_id: str) -> bool:
+        """A16：整目录删除用户模板；不存在返回 False。id 已经正则白名单守卫。"""
+        path = self._user_template_path(template_id)
+        with self._lock:
+            target = path.parent
+            if not target.is_dir():
+                return False
+            shutil.rmtree(target)
+        logger.info("已删除用户模板: %s", template_id)
+        return True
+
 
 def _mtime_of(path: Path) -> float:
     try:

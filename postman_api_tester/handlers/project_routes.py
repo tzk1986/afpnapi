@@ -285,3 +285,14 @@ def api_create_project_template() -> ResponseReturnValue:
     return BaseHandler.json_response(
         get_project_service().create_template(_json_body())
     )
+
+
+@project_api
+def api_delete_project_template(template_id: str) -> ResponseReturnValue:
+    """A16 DELETE /api/project-templates/<template_id> → {deleted, id}。
+
+    仅用户模板可删：内置 409 TPL_002；不存在 404 PRJ_203；非法 id 400 PRJ_301。
+    """
+    return BaseHandler.json_response(
+        get_project_service().delete_template(template_id)
+    )

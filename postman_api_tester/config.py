@@ -520,10 +520,10 @@ UI_SELF_HEALING_ENABLED = _env_bool("UI_SELF_HEALING_ENABLED", "false")
 UI_HEALING_CONFIDENCE = _env_int("UI_HEALING_CONFIDENCE", 70, lo=10, hi=100)  # 整数百分比
 UI_HEALING_MAX_PER_CASE = _env_int("UI_HEALING_MAX_PER_CASE", 5, lo=1, hi=50)  # 单用例尝试数熔断上限
 
-# ===== 项目脚手架（v1.39.0，默认关闭；开关关闭时零文件系统痕迹，G-25）=====
+# ===== 项目脚手架（v1.39.0，默认开启；显式关闭后零文件系统痕迹，G-25）=====
 
-# ENABLE_PROJECT_SCAFFOLD: 总开关。关闭时 /projects 页面与全部脚手架 API 返回 403 PRJ_100
-ENABLE_PROJECT_SCAFFOLD = _env_bool("ENABLE_PROJECT_SCAFFOLD", "false")
+# ENABLE_PROJECT_SCAFFOLD: 总开关，默认开启。显式置 env=false 时 /projects 页面与全部脚手架 API 返回 403 PRJ_100
+ENABLE_PROJECT_SCAFFOLD = _env_bool("ENABLE_PROJECT_SCAFFOLD", "true")
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
