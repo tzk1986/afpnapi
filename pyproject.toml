@@ -34,6 +34,7 @@ files = [
 	"postman_api_tester/services/collection_editor_service.py",
 	"postman_api_tester/services/global_variables_service.py",
 	"postman_api_tester/services/project_store.py",
+	"postman_api_tester/services/project_service.py",
 	"postman_api_tester/utils/file_utils.py",
 	"postman_api_tester/utils/report_utils.py",
 	"postman_api_tester/utils/request_builder.py",
