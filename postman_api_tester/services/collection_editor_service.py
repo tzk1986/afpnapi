@@ -57,6 +57,10 @@ def parse_collection_to_flat(collection_data: Dict[str, Any]) -> Dict[str, Any]:
         "x_shared_assertions": normalize_assertion_rules(
             collection_data.get("x_shared_assertions"), source="editor-parse"
         ),
+        # v1.38.1: 集合级共享判定规则（P1，作用于全部接口判定层）
+        "x_shared_judgment_rules": normalize_assertion_rules(
+            collection_data.get("x_shared_judgment_rules"), source="editor-parse"
+        ),
         "groups": _walk_items(collection_data.get("item", []), depth=0),
     }
 
@@ -334,6 +338,13 @@ def build_collection_json(flat_data: Dict[str, Any]) -> Dict[str, Any]:
     )
     if shared:
         collection["x_shared_assertions"] = shared
+
+    # v1.38.1: 根级共享判定规则写回（同防御口径，空不写）
+    shared_judgment = normalize_assertion_rules(
+        flat_data.get("x_shared_judgment_rules"), source="editor-build"
+    )
+    if shared_judgment:
+        collection["x_shared_judgment_rules"] = shared_judgment
 
     return collection
 

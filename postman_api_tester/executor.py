@@ -755,11 +755,19 @@ class PostmanTestExecutor:
 
         v1.37.23: 追加任务级规则 judgment_config.custom_rules（Web 首页/JSON 提交），
         任务规则在前、接口级 x_judgment_rules 在后；关闭一级判定的跳过语义不变。
+        v1.38.1: 追加集合级共享判定 x_shared_judgment_rules（parser 注入，已按
+        x_skip_shared_assertions 豁免过滤），合并顺序 任务 → 共享 → 接口自有。
         """
         task_raw = (self.judgment_config or {}).get("custom_rules")
         task_rules = (
             [item for item in task_raw if isinstance(item, dict)]
             if isinstance(task_raw, list)
+            else []
+        )
+        shared_raw = api.get("x_shared_judgment_rules")
+        shared_rules = (
+            [item for item in shared_raw if isinstance(item, dict)]
+            if isinstance(shared_raw, list)
             else []
         )
         raw_rules = api.get("x_judgment_rules")
@@ -768,7 +776,7 @@ class PostmanTestExecutor:
             if isinstance(raw_rules, list)
             else []
         )
-        rules = task_rules + item_rules
+        rules = task_rules + shared_rules + item_rules
         if not rules:
             return True, ""
         enable_err = judgment_params.get("enable_err_code_judgment")

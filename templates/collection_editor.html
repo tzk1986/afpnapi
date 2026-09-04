@@ -784,6 +784,18 @@
                     if (!seen.has(k)) { arr.push(r); seen.add(k); }
                 }
             }
+            // v1.38.1: 合并集合共享判定规则（去重追加）
+            if (Array.isArray(data.x_shared_judgment_rules) && data.x_shared_judgment_rules.length) {
+                if (!Array.isArray(state.collection.x_shared_judgment_rules)) {
+                    state.collection.x_shared_judgment_rules = [];
+                }
+                const jArr = state.collection.x_shared_judgment_rules;
+                const jSeen = new Set(jArr.map(v => JSON.stringify(v)));
+                for (const r of data.x_shared_judgment_rules) {
+                    const k = JSON.stringify(r);
+                    if (!jSeen.has(k)) { jArr.push(r); jSeen.add(k); }
+                }
+            }
             // 重新收集所有请求
             state.allRequests = collectAllRequests(state.collection.groups);
             state.selectedIds = new Set();
@@ -1711,6 +1723,15 @@
             html += `<button type="button" class="btn btn-secondary" onclick="addSharedAssertion()" style="font-size:12px;">+ 添加共享断言规则</button>`;
             html += '</div>';
 
+            // v1.38.1 集合共享判定小节（集合属性，作用于全部接口的一级判定层）
+            const sharedJ = (state.collection && Array.isArray(state.collection.x_shared_judgment_rules)) ? state.collection.x_shared_judgment_rules : [];
+            html += '<div style="margin-bottom:14px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;">';
+            html += '<div style="font-weight:600;font-size:13px;margin-bottom:4px;">集合共享判定（统一业务判定，作用于全部接口判定层）</div>';
+            html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">内置判定（errCode/message/状态码）通过后、断言之前执行，任一失败 → 该接口判 FAILED 且短路断言。与接口自有「自定义判定规则」合并（共享在前）。与共享断言一样受「关闭一级判定」开关联动：关闭后共享判定一并跳过。豁免复用接口上方「共享断言豁免」勾选。expected 暂不支持 {{变量}} 替换。</div>';
+            html += renderAssertionRuleRows(sharedJ, 'SharedJ');
+            html += `<button type="button" class="btn btn-secondary" onclick="addSharedJudgmentRule()" style="font-size:12px;">+ 添加共享判定规则</button>`;
+            html += '</div>';
+
             // 本接口自有断言
             const rules = Array.isArray(req.x_assertions) ? req.x_assertions : [];
             html += '<div style="margin-bottom:8px;font-size:12px;color:#666;">';
@@ -1804,6 +1825,39 @@
 
         function updateSharedAssertionOp(index, op) {
             const arr = state.collection && state.collection.x_shared_assertions;
+            if (Array.isArray(arr) && arr[index]) {
+                arr[index].op = op;
+                if (op === 'exists' || op === 'not_exists') arr[index].expected = null;
+                renderEditor();
+            }
+        }
+
+        // v1.38.1 集合共享判定 handler（作用于 state.collection.x_shared_judgment_rules）
+        function addSharedJudgmentRule() {
+            if (!state.collection) return;
+            if (!Array.isArray(state.collection.x_shared_judgment_rules)) {
+                state.collection.x_shared_judgment_rules = [];
+            }
+            state.collection.x_shared_judgment_rules.push({path: '', op: 'eq', expected: null});
+            renderEditor();
+        }
+
+        function removeSharedJAssertion(index) {
+            if (state.collection && Array.isArray(state.collection.x_shared_judgment_rules)) {
+                state.collection.x_shared_judgment_rules.splice(index, 1);
+                renderEditor();
+            }
+        }
+
+        function updateSharedJAssertionField(index, field, value) {
+            const arr = state.collection && state.collection.x_shared_judgment_rules;
+            if (Array.isArray(arr) && arr[index]) {
+                arr[index][field] = field === 'expected' ? parseAssertionExpected(value) : value;
+            }
+        }
+
+        function updateSharedJAssertionOp(index, op) {
+            const arr = state.collection && state.collection.x_shared_judgment_rules;
             if (Array.isArray(arr) && arr[index]) {
                 arr[index].op = op;
                 if (op === 'exists' || op === 'not_exists') arr[index].expected = null;

@@ -57,6 +57,7 @@ class ApiConfig(TypedDict, total=False):
     x_skip_shared_assertions: Optional[bool]
     x_shared_assertions: Optional[List[AssertionConfig]]
     x_judgment_rules: Optional[List[AssertionConfig]]
+    x_shared_judgment_rules: Optional[List[AssertionConfig]]
     x_extract: Optional[Dict[str, str]]
     x_pre_request: Optional[Dict[str, str]]
     x_repeat: Optional[int]
@@ -154,6 +155,18 @@ class PostmanApiParser:
                 if api.get("x_skip_shared_assertions"):
                     continue
                 api["x_shared_assertions"] = shared_rules
+
+        # v1.38.1: 集合级共享判定规则挂到每个 item 的独立键（P1，契约见
+        # 2026-09-02 自定义判定方案 §2.1）；判定层在 executor 与 item 自有
+        # x_judgment_rules 合并（shared 在前）；豁免复用 x_skip_shared_assertions。
+        shared_judgment = normalize_assertion_rules(
+            self.data.get("x_shared_judgment_rules"), source="parser"
+        )
+        if shared_judgment:
+            for api in apis:
+                if api.get("x_skip_shared_assertions"):
+                    continue
+                api["x_shared_judgment_rules"] = shared_judgment
 
         self.collections = apis
         return apis
