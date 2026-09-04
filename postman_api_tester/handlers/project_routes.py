@@ -205,17 +205,19 @@ def api_remove_project_collection(project_id: str, col_id: str) -> ResponseRetur
     return BaseHandler.json_response(result)
 
 
-# ==================== A9 执行（阶段 3 接线） ====================
+# ==================== A9 执行 ====================
 
 
 @project_api
 def api_execute_project(project_id: str) -> ResponseReturnValue:
     """A9 POST /api/projects/<project_id>/execute → {job_id, report_name, status}。
 
-    真实入队（临时集合 + build_run_postman_job_params + enqueue_job_with_worker）
-    在 S3.1 接线；当前返回 501 占位，保证契约形状与门控先行可测。
+    真实入队见 project_service.execute_project（S3.1）：合并集合→临时文件→
+    与手工执行同队列。错误码 PRJ_501（环境不存在/base_url 非法，400）、
+    PRJ_502（无集合可执行，409）、PRJ_503（入队失败，500）。
     """
-    return json_error("项目执行入队将在阶段 3（S3.1）接线", 501, "COM_001")
+    result = get_project_service().execute_project(project_id)
+    return BaseHandler.json_response(result)
 
 
 # ==================== A10~A11 追溯表 ====================

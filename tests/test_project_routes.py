@@ -4,8 +4,9 @@
 开关关→403 PRJ_100（API 包装体/页面提示页，且零文件系统痕迹）、
 非法 JSON→统一 400 包装（G-34）、成功包装 `data["code"]==200`+`data["data"]`、
 CRUD 全链、CAS 409（PRJ_306/602，current 合并体）、删除防护 PRJ_305、
-集合/追溯/模板端点、A9/A12/A13 占位 501。
-execute 真实入队断言（env_name/report_name 透传）在 S3.1 补充。
+集合/追溯/模板端点、A12/A13 占位 501（S4.2 接线）。
+A9 execute_project 真实入队断言（S3.1）：env_name/base_url/report_name 透传、
+入队即记录 history、PRJ_501/502/503 分支。
 """
 
 import json
@@ -17,6 +18,7 @@ from flask import Flask
 
 from postman_api_tester.handlers import project_routes as pr
 from postman_api_tester.handlers.base_handler import register_error_handlers
+from postman_api_tester.services import project_service as ps
 from postman_api_tester.services.project_service import ProjectService
 from postman_api_tester.services.project_store import (
     ProjectStore,
@@ -422,7 +424,7 @@ def test_template_routes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert resp.get_json()["error_code"] == "TPL_002"
 
 
-# ---------- A9/A12/A13 占位（真实实现分别在 S3.1/S4.2 接线） ----------
+# ---------- A12/A13 占位（真实实现在 S4.2 接线） ----------
 
 
 def test_not_wired_endpoints_return_501(
@@ -432,13 +434,143 @@ def test_not_wired_endpoints_return_501(
     project = e.client.post("/api/projects", json=_create_payload()).get_json()["data"]
     pid = project["id"]
     for path in (
-        f"/api/projects/{pid}/execute",
         f"/api/projects/{pid}/export/tracing.csv",
         f"/api/projects/{pid}/export",
     ):
-        resp = e.client.post(path) if path.endswith("execute") else e.client.get(path)
+        resp = e.client.get(path)
         assert resp.status_code == 501
         assert resp.get_json()["error_code"] == "COM_001"
+
+
+# ---------- A9 execute 真实入队（S3.1） ----------
+
+
+def _execute_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    environment: str = "",
+):
+    """构造启用 ENVIRONMENTS/UPLOADS_DIR/reports 隔离的测试环境。"""
+    monkeypatch.setattr(
+        ps, "ENVIRONMENTS", {"t-env": {"base_url": "http://env.example", "token": "tok"}}
+    )
+    monkeypatch.setattr(ps, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setenv("POSTMAN_REPORTS_DIR", str(tmp_path / "reports"))
+    e = _env(tmp_path, monkeypatch)
+    payload = _create_payload()
+    if environment:
+        payload["config"] = {"environment": environment}
+    project = e.client.post("/api/projects", json=payload).get_json()["data"]
+    return e, project["id"]
+
+
+def test_execute_no_collections_returns_409_prj_502(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    e, pid = _execute_env(tmp_path, monkeypatch)
+    cols = e.client.get(f"/api/projects/{pid}/collections").get_json()["data"]["items"]
+    for col in cols:
+        e.client.delete(f"/api/projects/{pid}/collections/{col['id']}")
+    resp = e.client.post(f"/api/projects/{pid}/execute")
+    assert resp.status_code == 409
+    assert resp.get_json()["error_code"] == "PRJ_502"
+
+
+def test_execute_missing_env_returns_400_prj_501(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    e, pid = _execute_env(tmp_path, monkeypatch, environment="t-env")
+    monkeypatch.setattr(ps, "ENVIRONMENTS", {})  # 创建后环境被移除
+    resp = e.client.post(f"/api/projects/{pid}/execute")
+    assert resp.status_code == 400
+    assert resp.get_json()["error_code"] == "PRJ_501"
+
+
+def test_execute_success_mock_enqueue_passthrough(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v5 S3.1：mock enqueue 断言 env_name/base_url/report_name 透传 + 入队即记录。"""
+    e, pid = _execute_env(tmp_path, monkeypatch, environment="t-env")
+    e.client.put(
+        f"/api/projects/{pid}",
+        json={
+            "name": "项目甲",
+            "config": {"environment": "t-env", "base_url": "http://api.example"},
+            "updated_at": e.client.get(f"/api/projects/{pid}").get_json()["data"][
+                "metadata"
+            ]["updated_at"],
+        },
+    )
+    calls = []
+
+    def fake_enqueue(job_id, saved_file, job_params, results_per_page, **kwargs):
+        calls.append(
+            {
+                "job_id": job_id,
+                "saved_file": saved_file,
+                "job_params": job_params,
+                "results_per_page": results_per_page,
+                "kwargs": kwargs,
+            }
+        )
+        # 镜像真实 enqueue_job_with_worker：同步登记内存 job，
+        # 否则 A3 懒对账（get_run_job miss → unknown）会把头条改写为终态
+        kwargs["set_run_job"](job_id, **job_params)
+
+    monkeypatch.setattr(ps, "enqueue_job_with_worker", fake_enqueue)
+    resp = e.client.post(f"/api/projects/{pid}/execute")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["status"] == "queued"
+    assert len(calls) == 1
+    call = calls[0]
+    job_params = call["job_params"]
+    assert call["job_id"] == data["job_id"]
+    assert job_params["env_name"] == "t-env"
+    assert job_params["base_url"] == "http://api.example"
+    assert job_params["token"] == "tok"  # token 来自环境配置
+    assert job_params["output_dir"] == str((tmp_path / "reports").resolve())
+    assert job_params["report_name"] == data["report_name"]
+    assert data["report_name"].endswith(".html")
+    assert pid in data["report_name"]
+    assert data["job_id"][:8] in data["report_name"]
+    assert call["results_per_page"] == ps.RUN_RESULTS_PER_PAGE_DEFAULT
+    assert "run_postman_job_fn" in call["kwargs"]
+
+    # 临时合并文件落盘且为各集合 item 拼接（模板 demo 集合 1 个请求）
+    saved = Path(job_params["saved_file"])
+    assert saved == tmp_path / "uploads" / f"{data['job_id']}.json"
+    merged = json.loads(saved.read_text(encoding="utf-8"))
+    assert merged["info"]["name"] == "项目甲"
+    assert len(merged["item"]) >= 1
+
+    # 入队即记录：A3 history 头条 queued + last_execution 同步
+    proj = e.client.get(f"/api/projects/{pid}").get_json()["data"]
+    head = proj["statistics"]["execution_history"][0]
+    assert head["job_id"] == data["job_id"]
+    assert head["status"] == "queued"
+    assert head["report_name"] == data["report_name"]
+    assert proj["statistics"]["last_execution"]["job_id"] == data["job_id"]
+
+
+def test_execute_enqueue_failure_returns_500_prj_503(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    e, pid = _execute_env(tmp_path, monkeypatch)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("queue down")
+
+    monkeypatch.setattr(ps, "enqueue_job_with_worker", boom)
+    resp = e.client.post(f"/api/projects/{pid}/execute")
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["error_code"] == "PRJ_503"
+    assert "queue down" in body["data"]["details"]
+    # 入队失败不写 history（避免幻影条目）
+    proj = e.client.get(f"/api/projects/{pid}").get_json()["data"]
+    assert proj["statistics"]["execution_history"] == []
 
 
 # ---------- ValueError 兜底映射（PRJ_301 via PROJECT_ERROR_MAP） ----------

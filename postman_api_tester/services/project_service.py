@@ -8,8 +8,10 @@
   secret answers 落盘脱敏（R15）。
 - 错误以 ProjectError(code, message, http_status) 抛出，由 project_routes 统一
   转 json_error 包装；一码一义见 v3 5.4 与本文映射（PRJ_302 并入 PRJ_102）。
-- A9 执行入队在阶段 3（S3.1）接线；本文件提供其依赖的
-  record_execution_enqueued / reconcile_executions 两个状态机函数。
+- A9 执行入队（S3.1）：execute_project 合并集合为临时文件
+  （uploaded_collections/<job_id>.json，复用 build_saved_json_path），
+  与手工执行同队列（v2 R3），入队后调 record_execution_enqueued 记录；
+  统计收敛依赖 reconcile_executions 查询时懒对账（G-30）。
 - 只读 import report_job_store / report_repository（真值优先级：报告>内存>unknown），
   不触碰其生命周期（R13）。
 """
@@ -19,6 +21,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -28,16 +31,38 @@ from postman_api_tester.config import (
     PROJECT_MAX_COLLECTIONS,
     PROJECT_TEMPLATE_MAX_BYTES,
 )
-from postman_api_tester.report_job_store import get_run_job
-from postman_api_tester.report_repository import find_report
-from postman_api_tester.report_server_config import ENVIRONMENTS
+from postman_api_tester.report_job_store import get_run_job, set_run_job
+from postman_api_tester.report_repository import find_report, invalidate_reports_cache
+from postman_api_tester.report_server_config import (
+    ENVIRONMENTS,
+    RUN_RESULTS_PER_PAGE_DEFAULT,
+)
 from postman_api_tester.services.project_store import (
     ProjectStore,
     ProjectTemplateStore,
 )
+from postman_api_tester.services.report_job_execution_service import (
+    enqueue_job_with_worker,
+    run_postman_job,
+)
+from postman_api_tester.services.report_job_submission_service import (
+    build_run_postman_job_params,
+    build_saved_json_path,
+    save_collection_json,
+)
+from postman_api_tester.services.report_request_service import is_valid_http_url
 from postman_api_tester.utils.server_utils import clamp_page, clamp_page_size
 
 logger = logging.getLogger(__name__)
+
+# 与 handlers/job_routes.py 同路径规则（禁 import handlers，允许常量镜像）
+UPLOADS_DIR = (Path(__file__).resolve().parent.parent / "uploaded_collections").resolve()
+
+_RUN_POSTMAN_JOB_FN = partial(
+    run_postman_job,
+    set_run_job=set_run_job,
+    invalidate_reports_cache=invalidate_reports_cache,
+)
 
 SCHEMA_VERSION = 1
 PROJECT_STATUSES = ("active", "completed", "archived")
@@ -909,6 +934,96 @@ class ProjectService:
             }
             normalized.append(entry)
         return normalized
+
+    # ================= 执行入队（A9，S3.1） =================
+
+    def execute_project(self, project_id: str) -> Dict[str, Any]:
+        """A9：合并集合→临时文件→与手工执行同队列入队（v2 R3）→入队即记录（G-30）。"""
+        project = self._load_project(project_id)
+        collections = project.get("collections") or []
+        if not collections:
+            raise ProjectError("PRJ_502", "无集合可执行", 409)
+
+        merged_items: List[Any] = []
+        for entry in collections:
+            rel = str(entry.get("file") or "")
+            if not rel:
+                continue
+            try:
+                data = self.store.read_project_json(project_id, rel)
+            except (OSError, ValueError):
+                logger.warning("读取集合文件失败，跳过: %s/%s", project_id, rel)
+                continue
+            if isinstance(data, dict) and isinstance(data.get("item"), list):
+                merged_items.extend(data["item"])
+        if not merged_items:
+            raise ProjectError("PRJ_502", "无集合可执行", 409)
+
+        config = project.get("config") or {}
+        env_name = str(config.get("environment") or "").strip()
+        if env_name and env_name not in ENVIRONMENTS:
+            raise ProjectError("PRJ_501", f"环境不存在: {env_name}")
+        base_url = str(config.get("base_url") or "").strip() or None
+        token: Optional[str] = None
+        env_cfg = ENVIRONMENTS.get(env_name) if env_name else None
+        if isinstance(env_cfg, dict):
+            # env fallback 镜像 job_routes.api_run_postman：表单空值回退环境配置
+            if not base_url and str(env_cfg.get("base_url") or "").strip():
+                env_base = str(env_cfg["base_url"]).strip()
+                if is_valid_http_url(env_base):
+                    base_url = env_base
+            token = str(env_cfg.get("token") or "").strip() or None
+        if base_url and not is_valid_http_url(base_url):
+            raise ProjectError("PRJ_501", f"base_url 非法: {base_url}")
+
+        collection_data = {
+            "info": {
+                "name": str(project.get("name") or project_id),
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+            },
+            "item": merged_items,
+        }
+        job_id = uuid.uuid4().hex
+        saved_file = build_saved_json_path(UPLOADS_DIR, job_id)
+        try:
+            save_collection_json(saved_file, collection_data)
+        except OSError as exc:
+            raise ProjectError("PRJ_503", f"入队失败: {exc}", 500) from exc
+
+        # 延迟 import：避免服务层在启动期拖入 app 工厂重依赖
+        from postman_api_tester.report_server_app import ReportServerApp
+
+        reports_dir = ReportServerApp._resolve_reports_dir()
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # 含 .html 且嵌 job_id → 执行器原样落盘不撞名 → find_report 逐字节命中（G-30 对账）
+        report_name = f"project_{project_id}_{ts}_{job_id[:8]}.html"
+        job_params = build_run_postman_job_params(
+            job_id=job_id,
+            original_name=f"{project.get('name') or project_id}.json",
+            saved_file=str(saved_file),
+            output_dir=str(reports_dir),
+            report_name=report_name,
+            base_url=base_url,
+            token=token,
+            selected_item_paths=None,
+            env_name=env_name,
+        )
+        try:
+            enqueue_job_with_worker(
+                job_id,
+                str(saved_file),
+                job_params,
+                RUN_RESULTS_PER_PAGE_DEFAULT,
+                run_postman_job_fn=_RUN_POSTMAN_JOB_FN,
+                set_run_job=set_run_job,
+                default_output_dir=str(reports_dir),
+            )
+        except Exception as exc:
+            logger.error("项目执行入队失败 %s: %s", project_id, exc)
+            raise ProjectError("PRJ_503", f"入队失败: {exc}", 500) from exc
+
+        self.record_execution_enqueued(project_id, job_id, report_name)
+        return {"job_id": job_id, "report_name": report_name, "status": "queued"}
 
     # ================= 执行历史（G-30 状态机） =================
 
