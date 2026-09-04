@@ -59,6 +59,7 @@ files = [
 	"postman_api_tester/handlers/collection_editor_routes.py",
 	"postman_api_tester/handlers/global_variables_routes.py",
 	"postman_api_tester/handlers/page_routes.py",
+	"postman_api_tester/handlers/project_routes.py",
 	"postman_api_tester/run_test_and_open.py",
 	"postman_api_tester/session.py",
 	"postman_api_tester/runtime_utils.py",
