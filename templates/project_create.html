@@ -1,0 +1,352 @@
+{% raw %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>新建项目 - 项目脚手架</title>
+<style>
+    body { font-family: "Microsoft YaHei", sans-serif; margin: 0; background: #f3f6fb; color: #1f2937; }
+    .page { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .hero { background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #fff; border-radius: 18px; padding: 20px 26px; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2); }
+    .hero h1 { margin: 0 0 6px; font-size: 24px; }
+    .hero p { margin: 0; opacity: 0.92; font-size: 13px; }
+    .hero a { color: #bfdbfe; font-size: 13px; }
+    .panel { background: #fff; margin-top: 20px; border-radius: 16px; padding: 20px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+    .panel h2 { margin: 0 0 12px; font-size: 17px; color: #0f172a; }
+    .tpl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .tpl-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 14px; cursor: pointer; background: #f8fafc; }
+    .tpl-card.selected { border-color: #1d4ed8; background: #eff6ff; }
+    .tpl-card h3 { margin: 0 0 6px; font-size: 15px; }
+    .tpl-card p { margin: 0 0 8px; font-size: 12px; color: #64748b; min-height: 32px; }
+    .tpl-meta { font-size: 12px; color: #475569; display: flex; gap: 8px; flex-wrap: wrap; }
+    .tpl-meta span { background: #e0f2fe; color: #075985; border-radius: 999px; padding: 2px 8px; }
+    .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+    .field label { font-size: 13px; color: #334155; font-weight: 600; }
+    .field label .req { color: #dc2626; }
+    .field input, .field select, .field textarea { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 14px; min-height: 40px; box-sizing: border-box; background: #fff; }
+    .field .hint { font-size: 12px; color: #64748b; }
+    .field.check { flex-direction: row; align-items: center; gap: 8px; }
+    .field.check input { min-height: auto; }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 16px; }
+    .actions { display: flex; gap: 10px; margin-top: 16px; }
+    .actions button { padding: 10px 22px; border: none; border-radius: 10px; font-size: 14px; cursor: pointer; }
+    .actions .primary { background: #1d4ed8; color: #fff; }
+    .actions .primary:disabled { opacity: 0.5; cursor: default; }
+    .actions .secondary { background: #fff; color: #1d4ed8; border: 1px solid #93c5fd; }
+    #notice { display: none; margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: 13px; }
+    #notice.err { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    #notice.ok { display: block; background: #ecfdf5; color: #166534; border: 1px solid #86efac; }
+    .muted { color: #64748b; font-size: 13px; }
+    .secret-warn { font-size: 12px; color: #b45309; }
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="hero">
+        <h1>新建项目</h1>
+        <p>选择模板并按问卷创建。<a href="/projects">返回项目列表</a></p>
+    </div>
+
+    <section class="panel">
+        <h2>1. 选择模板</h2>
+        <div class="tpl-grid" id="tplGrid"></div>
+        <div class="muted" id="tplEmpty" style="display:none;">暂无可用模板，可先通过「用户模板」接口创建。</div>
+    </section>
+
+    <section class="panel">
+        <h2>2. 项目信息</h2>
+        <div class="grid2">
+            <div class="field">
+                <label>项目名称 <span class="req">*</span></label>
+                <input id="nameInput" type="text" maxlength="120" placeholder="必填，全局唯一">
+            </div>
+            <div class="field">
+                <label>执行环境</label>
+                <select id="envSelect"><option value="">（跟随默认环境）</option></select>
+                <span class="hint">来自既有环境配置（/api/environments）</span>
+            </div>
+        </div>
+        <div class="field">
+            <label>描述</label>
+            <textarea id="descInput" rows="2" maxlength="500" placeholder="可选"></textarea>
+        </div>
+    </section>
+
+    <section class="panel" id="formPanel" style="display:none;">
+        <h2>3. 模板问卷</h2>
+        <div class="grid2" id="varFields"></div>
+        <div class="secret-warn" id="secretWarn" style="display:none;">提示：标记为 secret 的变量落盘时会被脱敏存储，仅用于本次生成。</div>
+        <div class="actions">
+            <button class="primary" id="createBtn" disabled>创建项目</button>
+            <button class="secondary" id="resetBtn">重置</button>
+        </div>
+        <div id="notice"></div>
+    </section>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    var templates = [];
+    var selected = null;  // 当前选中的模板对象
+
+    var tplGrid = document.getElementById('tplGrid');
+    var tplEmpty = document.getElementById('tplEmpty');
+    var formPanel = document.getElementById('formPanel');
+    var varFields = document.getElementById('varFields');
+    var nameInput = document.getElementById('nameInput');
+    var descInput = document.getElementById('descInput');
+    var envSelect = document.getElementById('envSelect');
+    var createBtn = document.getElementById('createBtn');
+    var notice = document.getElementById('notice');
+
+    function showNotice(text, ok) {
+        notice.textContent = text;
+        notice.className = text ? (ok ? 'ok' : 'err') : '';
+    }
+
+    function unwrap(raw) {
+        if (raw && typeof raw === 'object' && ('data' in raw)) return raw.data;
+        return raw;
+    }
+
+    function extractError(raw, resp) {
+        if (raw && raw.error_code === 'PRJ_100') return '项目脚手架功能未启用';
+        if (raw && raw.data && raw.data.details) return String(raw.data.details);
+        if (raw && raw.message && raw.message !== 'OK') return String(raw.message);
+        return '请求失败（HTTP ' + resp.status + '）';
+    }
+
+    // ---- 模板卡片 ----
+    function renderTemplates() {
+        tplGrid.textContent = '';
+        if (!templates.length) {
+            tplEmpty.style.display = 'block';
+            return;
+        }
+        tplEmpty.style.display = 'none';
+        templates.forEach(function (t) {
+            var card = document.createElement('div');
+            card.className = 'tpl-card' + (selected && selected.id === t.id ? ' selected' : '');
+            var h3 = document.createElement('h3');
+            h3.textContent = t.name || t.id;
+            var p = document.createElement('p');
+            p.textContent = t.description || '（无描述）';
+            var meta = document.createElement('div');
+            meta.className = 'tpl-meta';
+            [
+                (t.source === 'user' ? '用户模板' : '内置模板'),
+                'v' + (t.version || '1.0.0'),
+                (t.variables || []).length + ' 个变量'
+            ].forEach(function (txt) {
+                var s = document.createElement('span');
+                s.textContent = txt;
+                meta.appendChild(s);
+            });
+            card.appendChild(h3);
+            card.appendChild(p);
+            card.appendChild(meta);
+            card.addEventListener('click', function () { selectTemplate(t); });
+            tplGrid.appendChild(card);
+        });
+    }
+
+    // ---- 按 variables schema 动态重建表单（G-31） ----
+    function selectTemplate(t) {
+        selected = t;
+        renderTemplates();
+        formPanel.style.display = 'block';
+        varFields.textContent = '';
+        var hasSecret = false;
+        (t.variables || []).forEach(function (v) {
+            var wrap = document.createElement('div');
+            wrap.className = 'field';
+            var label = document.createElement('label');
+            label.textContent = (v.label || v.key);
+            if (v.required) {
+                var req = document.createElement('span');
+                req.className = 'req';
+                req.textContent = ' *';
+                label.appendChild(req);
+            }
+            wrap.appendChild(label);
+
+            var input;
+            var type = String(v.type || 'string');
+            if (type === 'enum') {
+                input = document.createElement('select');
+                (v.options || []).forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = String(opt);
+                    o.textContent = String(opt);
+                    input.appendChild(o);
+                });
+            } else if (type === 'bool') {
+                wrap.className = 'field check';
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = !!v.default;
+                label.appendChild(document.createTextNode(' '));
+                wrap.appendChild(label);
+                wrap.appendChild(input);
+                input.dataset.varKey = v.key;
+                input.dataset.varType = 'bool';
+                var span = document.createElement('span');
+                span.className = 'hint';
+                span.textContent = v.description || '';
+                if (v.description) wrap.appendChild(span);
+                varFields.appendChild(wrap);
+                return;
+            } else if (type === 'secret') {
+                input = document.createElement('input');
+                input.type = 'password';
+                input.autocomplete = 'new-password';
+                hasSecret = true;
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+            input.dataset.varKey = v.key;
+            input.dataset.varType = type === 'enum' ? 'enum' : type;
+            if (type === 'string' || type === 'secret') {
+                input.placeholder = v.default ? ('默认: ' + v.default) : (v.description || '');
+            }
+            wrap.appendChild(input);
+            if (v.description && (type === 'secret' || type === 'enum')) {
+                var hint = document.createElement('span');
+                hint.className = 'hint';
+                hint.textContent = v.description;
+                wrap.appendChild(hint);
+            }
+            varFields.appendChild(wrap);
+        });
+        document.getElementById('secretWarn').style.display = hasSecret ? 'block' : 'none';
+        updateCreateState();
+    }
+
+    function collectAnswers() {
+        var answers = {};
+        var missing = [];
+        var inputs = varFields.querySelectorAll('[data-var-key]');
+        inputs.forEach(function (el) {
+            var key = el.dataset.varKey;
+            var type = el.dataset.varType;
+            var value;
+            if (type === 'bool') value = el.checked;
+            else value = el.value;
+            if (typeof value === 'string' && !value.trim() && type !== 'bool') value = '';
+            if ((type === 'string' || type === 'secret') && !value && el.placeholder && el.placeholder.indexOf('默认: ') === 0) {
+                value = el.placeholder.slice(3);  // 未填时回退模板默认值
+            }
+            answers[key] = value;
+        });
+        if (selected) {
+            (selected.variables || []).forEach(function (v) {
+                if (!v.required) return;
+                var val = answers[v.key];
+                if (val === undefined || val === null || val === '') missing.push(v.label || v.key);
+            });
+        }
+        return { answers: answers, missing: missing };
+    }
+
+    function updateCreateState() {
+        var ok = !!selected && !!nameInput.value.trim();
+        createBtn.disabled = !ok;
+    }
+
+    nameInput.addEventListener('input', updateCreateState);
+
+    document.getElementById('resetBtn').addEventListener('click', function () {
+        nameInput.value = '';
+        descInput.value = '';
+        envSelect.value = '';
+        showNotice('');
+        updateCreateState();
+    });
+
+    createBtn.addEventListener('click', function () {
+        showNotice('');
+        if (!nameInput.value.trim()) { showNotice('项目名称不能为空'); return; }
+        var pack = collectAnswers();
+        if (pack.missing.length) {
+            showNotice('请填写必填项：' + pack.missing.join('、'));
+            return;
+        }
+        createBtn.disabled = true;
+        var payload = {
+            name: nameInput.value.trim(),
+            description: descInput.value.trim(),
+            template_id: selected.id,
+            variables: pack.answers
+        };
+        if (envSelect.value) payload.config = { environment: envSelect.value };
+        fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(function (resp) {
+                return resp.json().catch(function () { return null; }).then(function (raw) {
+                    return { resp: resp, raw: raw };
+                });
+            })
+            .then(function (pack2) {
+                createBtn.disabled = false;
+                if (!pack2.resp.ok) { showNotice(extractError(pack2.raw, pack2.resp)); return; }
+                var project = unwrap(pack2.raw) || {};
+                showNotice('创建成功，正在进入详情页…', true);
+                if (project.id) {
+                    window.location.href = '/projects/detail/' + encodeURIComponent(project.id);
+                }
+            })
+            .catch(function (err) {
+                createBtn.disabled = false;
+                showNotice('网络错误：' + (err && err.message ? err.message : err));
+            });
+    });
+
+    // ---- 数据加载 ----
+    function loadTemplates() {
+        fetch('/api/project-templates')
+            .then(function (r) { return r.json(); })
+            .then(function (raw) {
+                var data = unwrap(raw) || {};
+                templates = Array.isArray(data.items) ? data.items : [];
+                if (templates.length) selectTemplate(templates[0]);
+                else renderTemplates();
+            })
+            .catch(function () { renderTemplates(); });
+    }
+
+    function loadEnvironments() {
+        fetch('/api/environments')
+            .then(function (r) { return r.json(); })
+            .then(function (raw) {
+                var data = unwrap(raw) || {};
+                var envs = [];
+                if (Array.isArray(data.environments)) envs = data.environments;
+                else if (Array.isArray(data)) envs = data;
+                envs.forEach(function (e) {
+                    var name = typeof e === 'string' ? e : e.name;
+                    if (!name) return;
+                    var opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    envSelect.appendChild(opt);
+                });
+                var def = data.default_env_name || data.default;
+                if (def) envSelect.value = def;
+            })
+            .catch(function () { /* 环境列表失败不阻塞创建（可选字段） */ });
+    }
+
+    loadTemplates();
+    loadEnvironments();
+})();
+</script>
+</body>
+</html>
+{% endraw %}
