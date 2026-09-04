@@ -11,6 +11,9 @@ variables.json
 ui_testing_cases/
 ui_testing_recordings/
 uireports/
+# 项目脚手架数据目录（根级；包内内置模板 postman_api_tester/project_templates/ 不受影响）
+/projects/
+/project_templates/
 
 # 备份与临时文件
 .backup/
