@@ -1,9 +1,10 @@
 # Postman API 测试工具文档入口（统一目录）
 
-版本：v1.38.2
+版本：v1.39.0
 发布日期：2026-09-04
 
-本版新增重点（v1.37.0 ~ v1.38.2）：
+本版新增重点（v1.37.0 ~ v1.39.0）：
+- **项目脚手架（v1.39.0，默认关闭）**：模板化创建接口测试项目（模板 → 项目 → 集合 → 执行 → 追溯 → 导出全链路），3 页面（`/projects` 列表 / 创建 / 详情）+ 15 API；内置 3 套模板（api_basic / api_esp / api_payment），支持用户上传模板（同名覆盖内置）；A9 一键执行与手工上传执行**同队列**复用既有执行链，执行历史懒对账（重启后仍能收敛 done/failed）；用例追溯表（CSV 导出 + zip 整项导出经 `/exports/` 下载）；编辑采用 CAS 乐观锁（冲突返回最新对象供前端合并）。开关 `ENABLE_PROJECT_SCAFFOLD=true` 启用，默认关闭时页面与 API 均 403、零文件系统痕迹（方案：`方案讨论/2026-09-02-项目脚手架功能实施方案-v5.md`）
 - **断言页签简化归并（v1.38.2，A+C 方案，纯渲染层）**：编辑器断言页签由 5 区块归并为「本接口规则」「集合共享规则」两卡片，规则行前以橙（判定）/绿（断言）徽标标注执行阶段、添加按钮带阶段下拉；新增「成功标准」radio 快捷开关（内置业务判定 ⇄ 断言接管，等效 errCode/message 三态双关，空断言时弹确认），三态折叠进「⚙ 精细控制」。**四键存储（`x_judgment_rules`/`x_assertions`/`x_shared_judgment_rules`/`x_shared_assertions`）、行编辑 handler、执行语义与 Collection 保存结构逐字节不变**，旧集合零迁移
 - **集合级共享判定规则（v1.38.1，P1 落地）**：Collection 根级 `x_shared_judgment_rules`（与断言同三元组），parser 注入集合内全部接口判定层，与任务级/接口级规则合并评估（顺序：任务 → 共享 → 接口自有），任一失败判 FAILED 且短路断言；豁免复用接口 `x_skip_shared_assertions`；受「关闭一级判定」开关联动；编辑器集合区新增「集合共享判定」小节，parse/build 与导入合并往返完整
 - **UI 自愈测试能力（v1.38.0）**：无头引擎元素定位失败时按四级策略自动修复选择器（①test_id 95 / ②role+text 85 / ③text 75 / ④xpath-LCS 连续分），采纳前强制「唯一匹配 + 可见」校验，置信阈值把关；报告页显示「已自愈」徽章与自愈步骤统计；单用例尝试数熔断（默认 5 次）、assert 类动作豁免、同步骤不重复自愈；开关 `UI_SELF_HEALING_ENABLED` 默认关闭，关闭态行为与 v1.37.x 完全一致。**仅无头引擎支持，浏览器回放引擎不做自愈**（方案：`方案讨论/2026-09-02-UI自愈测试能力实施方案-v6.md`）
@@ -418,14 +419,15 @@ d:/tangzk/py/seldom-api-testing/
 │  ├─ report_server_config.py        # 配置读取工具函数
 │  ├─ config.py                      # 地址、Token、超时、报告目录等集中配置
 │  ├─ core/                          # 核心执行层（报告生成、执行管道、断点恢复、类型定义）
-│  ├─ handlers/                      # 路由编排层（server/job/retry/export/test-proxy/report-meta/report-result/collection/page）
-│  ├─ services/                      # 领域服务层（导出、重试、列表、判定、锁、提交、UI 执行存储、无头引擎与自愈 ui_healing 等）
+│  ├─ handlers/                      # 路由编排层（server/job/retry/export/test-proxy/report-meta/report-result/collection/page/project 脚手架）
+│  ├─ services/                      # 领域服务层（导出、重试、列表、判定、锁、提交、UI 执行存储、无头引擎与自愈 ui_healing、项目脚手架 project_store/project_service 等）
 │  ├─ utils/                         # 通用工具层（URL、请求构建、脱敏、缓存、解析）
 │  ├─ models.py                      # 共享数据模型与结构定义
 │  ├─ report_repository.py           # 报告仓储（列表缓存、报告发现）
 │  ├─ report_meta_repository.py      # 元数据读写仓储
 │  ├─ report_job_store.py            # 任务状态内存存储
 │  ├─ assertions.py                  # JSONPath 断言引擎（需 ENABLE_ASSERTIONS=true）
+│  ├─ project_templates/             # 内置项目模板（api_basic / api_esp / api_payment，只读；需 ENABLE_PROJECT_SCAFFOLD=true）
 │  ├─ run_test_and_open.py           # 交互式快速启动脚本
 │  ├─ README.md                      # 文档总入口（本文）
 │  ├─ 操作手册.md                    # 完整操作说明
@@ -438,6 +440,8 @@ d:/tangzk/py/seldom-api-testing/
 │  ├─ report_server.log                  # 回放日志、网络比对日志、导航日志
 │  └─ headless/                          # 无头执行请求日志（JSONL 格式）
 ├─ uploaded_collections/             # 报告中心上传执行时保存的 Collection 与导出文件
+├─ projects/                         # 项目脚手架数据根（运行时懒建，不提交；开关关时不创建）
+├─ project_templates/                # 用户上传项目模板（运行时懒建，不提交；同名覆盖内置模板）
 ├─ requirements.txt                  # 依赖安装入口
 ├─ allow_report_server_firewall.ps1  # Windows 防火墙放通 5000 端口脚本
 ├─ sample_api_collection.json        # 示例 Collection
@@ -455,6 +459,7 @@ d:/tangzk/py/seldom-api-testing/
 - `reports/` 是测试执行后的默认产物目录，报告中心默认也从这里读数据。
 - `logs/` 是日志目录，包含回放日志（`report_server.log`）和无头执行请求日志（`headless/exec_{job_id}.jsonl`），统一 10 天自动清理。
 - `uploaded_collections/` 是通过报告中心网页上传执行时产生的中间文件目录。
+- `projects/` 与 `project_templates/` 是项目脚手架（v1.39.0）的项目数据根与用户上传模板目录，需 `ENABLE_PROJECT_SCAFFOLD=true` 启用后才会创建。
 
 ### 0.1 调用路径总览（目录迁移后）
 
