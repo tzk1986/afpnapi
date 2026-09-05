@@ -413,6 +413,10 @@
         reader.onload = function () {
             document.getElementById('tplJsonInput').value = String(reader.result);
         };
+        reader.onerror = function () {
+            document.getElementById('tplJsonInput').value = '';
+            showNotice('文件读取失败：' + f.name + '，可改用下方粘贴 JSON 内容');
+        };
         reader.readAsText(f, 'utf-8');
     });
     document.getElementById('btnTplSample').addEventListener('click', function () {
