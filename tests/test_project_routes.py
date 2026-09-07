@@ -420,9 +420,10 @@ def test_template_routes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert resp.status_code == 400
     assert resp.get_json()["error_code"] == "TPL_001"
 
+    # v1.40.3: slug 撞内置 id 不再 409，自动避让随机 id（上传必成功且可删）
     resp = e.client.post("/api/project-templates", json={"name": "api_basic", "files": []})
-    assert resp.status_code == 409
-    assert resp.get_json()["error_code"] == "TPL_002"
+    assert resp.status_code == 200
+    assert resp.get_json()["data"]["id"] != "tpl_api_basic"
 
 
 # ---------- A12/A13 导出（S4.2 接线） ----------

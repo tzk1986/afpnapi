@@ -539,11 +539,12 @@ def test_template_declaration_validation(env: _Env) -> None:
     assert (env.user / created["id"] / "template.json").is_file()
 
 
-def test_template_builtin_readonly_conflict(env: _Env) -> None:
-    # slug 命中内置 id → TPL_002
-    with pytest.raises(ProjectError) as exc:
-        env.svc.create_template({"name": "api_basic"})
-    assert exc.value.code == "TPL_002" and exc.value.http_status == 409
+def test_template_name_colliding_builtin_falls_back_random(env: _Env) -> None:
+    # v1.40.3: slug 命中内置 id → 自动避让随机 id（旧行为 409 TPL_002 已废弃）
+    created = env.svc.create_template({"name": "api_basic"})
+    assert str(created["id"]).startswith("tpl_")
+    assert created["id"] != "tpl_api_basic"
+    assert created["source"] == "user"
 
 
 def test_template_size_limit(env: _Env, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -215,10 +215,6 @@ class ProjectService:
             raise ProjectError("TPL_001", "模板名称不能为空")
 
         template_id = self._derive_user_template_id(name)
-        if self.templates.builtin_template_exists(template_id):
-            raise ProjectError(
-                "TPL_002", f"与内置模板同 id，内置模板只读: {template_id}", 409
-            )
 
         try:
             template: Dict[str, Any] = {
@@ -262,7 +258,10 @@ class ProjectService:
         slug = re.sub(r"_+", "_", slug)[:28].strip("_")
         if len(slug) >= 2:
             candidate = f"tpl_{slug}"
-            if not self.templates.user_template_path_exists(candidate):
+            # 撞内置 id 也走随机：否则上传产生"影子内置"条目，A16 删除被 409 挡死不可恢复
+            if not self.templates.user_template_path_exists(
+                candidate
+            ) and not self.templates.builtin_template_exists(candidate):
                 return candidate
         return f"tpl_{uuid.uuid4().hex[:12]}"
 

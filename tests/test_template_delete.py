@@ -126,6 +126,33 @@ def test_delete_invalid_id_returns_400_prj_301(
     assert resp.get_json()["error_code"] == "PRJ_301"
 
 
+def test_upload_name_colliding_builtin_gets_random_deletable_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """派生 id 撞内置时走随机：条目可被 A16 删除，不再形成不可恢复的影子内置。"""
+    e = _Env(tmp_path, monkeypatch)
+    payload: Dict[str, Any] = {
+        "name": "API Basic",
+        "version": "1.0.0",
+        "variables": [],
+        "files": [],
+    }
+    resp = e.client.post("/api/project-templates", json=payload)
+    assert resp.status_code == 200
+    tid = str(resp.get_json()["data"]["id"])
+    assert tid != "tpl_api_basic"
+
+    items = e.client.get("/api/project-templates").get_json()["data"]["items"]
+    by_id = {t["id"]: t for t in items}
+    assert by_id["tpl_api_basic"]["source"] == "builtin"
+    assert by_id[tid]["source"] == "user"
+
+    resp = e.client.delete(f"/api/project-templates/{tid}")
+    assert resp.status_code == 200
+    assert (e.user_dir / tid).exists() is False
+    assert (e.svc.templates._builtin / "api_basic" / "template.json").is_file()
+
+
 def test_delete_disabled_returns_403_prj_100(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
