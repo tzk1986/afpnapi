@@ -1776,7 +1776,7 @@ class UiHeadlessEngine:
             # 构建 locator 并统计匹配数
             try:
                 if role:
-                    locator = page.get_by_role(role, name=text)  # type: ignore[arg-type]
+                    locator = page.get_by_role(cast("Any", role), name=text)  # type: ignore[arg-type,unused-ignore]
                 else:
                     locator = page.get_by_text(text, exact=False)
                 match_count = locator.count()
