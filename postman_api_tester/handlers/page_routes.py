@@ -65,7 +65,7 @@ def index() -> ResponseReturnValue:
         host_name=socket.gethostname(),
         self_url=f"http://127.0.0.1:{port}",
         lan_url=f"http://{get_local_ip()}:{port}",
-        reports_json=json.dumps(reports, ensure_ascii=False),
+        reports_json=json.dumps(reports, ensure_ascii=False).replace("</", "<\\/"),
         run_results_per_page_default=RUN_RESULTS_PER_PAGE_DEFAULT,
         run_results_per_page_min=RUN_RESULTS_PER_PAGE_MIN,
         run_results_per_page_max=RUN_RESULTS_PER_PAGE_MAX,
@@ -140,7 +140,9 @@ def report_view() -> ResponseReturnValue:
     html = render_template(
         "report_view.html",
         report_name=report.get("report_name", ""),
-        report_name_json=json.dumps(report.get("report_name", ""), ensure_ascii=False),
+        report_name_json=json.dumps(
+            report.get("report_name", ""), ensure_ascii=False
+        ).replace("</", "<\\/"),
         collection_name=report.get("collection_name", ""),
         source_file=report.get("source_file", ""),
         generated_at=report.get("generated_at", ""),

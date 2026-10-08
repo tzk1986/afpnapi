@@ -88,6 +88,31 @@ class TestIndex:
                 assert len(reports_data) == 1
                 assert reports_data[0]["report_name"] == "test"
 
+    def test_index_escapes_closing_script_in_reports_json(
+        self, app_context: None
+    ) -> None:
+        """reports_json 应转义 `</`，防止提前闭合 <script> 标签。"""
+        with patch(
+            "postman_api_tester.handlers.page_routes._repo_list_reports"
+        ) as mock_list:
+            mock_list.return_value = [
+                {"report_name": "x</script><script>alert(1)</script>"}
+            ]
+            with patch(
+                "postman_api_tester.handlers.page_routes.render_template"
+            ) as mock_render:
+                mock_render.return_value = "<html></html>"
+                index()
+
+                call_kwargs = mock_render.call_args[1]
+                raw_json = call_kwargs["reports_json"]
+                assert "</script>" not in raw_json
+                assert "alert(1)</script>" not in raw_json
+                assert raw_json.count("<\\/") == 2
+                assert json.loads(raw_json)[0]["report_name"] == (
+                    "x</script><script>alert(1)</script>"
+                )
+
     def test_index_passes_environments_json(self, app_context: None) -> None:
         """index 应传递 environments_json。"""
         with patch(
@@ -234,6 +259,39 @@ class TestReportView:
                         call_kwargs = mock_render.call_args[1]
                         assert call_kwargs["report_name"] == "my_report"
                         assert call_kwargs["collection_name"] == "Test Collection"
+
+    def test_report_view_escapes_closing_script_in_name_json(
+        self, app_context: None
+    ) -> None:
+        """report_name_json 应转义 `</`，防止提前闭合 <script> 标签。"""
+        with patch("postman_api_tester.handlers.page_routes.request") as mock_request:
+            mock_request.args = {"name": "evil</script>"}
+            with patch(
+                "postman_api_tester.handlers.page_routes._repo_find_report"
+            ) as mock_find:
+                mock_find.return_value = {
+                    "report_name": "evil</script>",
+                    "collection_name": "",
+                    "source_file": "",
+                    "generated_at": "",
+                    "summary": {},
+                }
+                with patch(
+                    "postman_api_tester.handlers.page_routes.render_template"
+                ) as mock_render:
+                    mock_render.return_value = "<html></html>"
+                    with patch(
+                        "postman_api_tester.handlers.page_routes.make_response"
+                    ) as mock_response:
+                        mock_resp = MagicMock()
+                        mock_resp.headers = {}
+                        mock_response.return_value = mock_resp
+                        report_view()
+
+                        call_kwargs = mock_render.call_args[1]
+                        raw_json = call_kwargs["report_name_json"]
+                        assert "</script>" not in raw_json
+                        assert json.loads(raw_json) == "evil</script>"
 
     def test_report_view_sets_no_cache_headers(self, app_context: None) -> None:
         """报告详情页应设置 no-cache 头。"""
